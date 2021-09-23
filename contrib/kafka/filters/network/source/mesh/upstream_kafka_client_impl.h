@@ -61,8 +61,8 @@ public:
 
   // KafkaProducer
   void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-            const int32_t partition, const absl::string_view key,
-            const absl::string_view value) override;
+            const int32_t partition, const absl::string_view key, const absl::string_view value,
+            const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) override;
 
   // This method gets executed by monitoring thread.
   // Does not finish until this object gets 'markFinished' invoked or gets destroyed.

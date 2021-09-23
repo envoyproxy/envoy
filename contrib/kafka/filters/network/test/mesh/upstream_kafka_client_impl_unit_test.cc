@@ -80,7 +80,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldSendRecordsAndReceiveConfirmations) {
       .WillRepeatedly(Return(RdKafka::ERR_NO_ERROR));
   const std::vector<std::string> payloads = {"value1", "value2", "value3"};
   for (const auto& arg : payloads) {
-    testee.send(origin_, "t1", 13, "KEY", arg);
+    testee.send(origin_, "t1", 13, "KEY", arg, {});
   }
   EXPECT_EQ(testee.getUnfinishedRequestsForTest().size(), payloads.size());
 
@@ -105,8 +105,8 @@ TEST_F(UpstreamKafkaClientTest, ShouldCheckCallbacksForDeliveries) {
   const std::vector<std::string> payloads = {"value1", "value2"};
   auto origin1 = std::make_shared<MockProduceFinishCb>();
   auto origin2 = std::make_shared<MockProduceFinishCb>();
-  testee.send(origin1, "t1", 13, "KEY", payloads[0]);
-  testee.send(origin2, "t1", 13, "KEY", payloads[1]);
+  testee.send(origin1, "t1", 13, "KEY", payloads[0], {});
+  testee.send(origin2, "t1", 13, "KEY", payloads[1], {});
   EXPECT_EQ(testee.getUnfinishedRequestsForTest().size(), payloads.size());
 
   // when, then - should process confirmations (notice we pass second memento first).
@@ -129,7 +129,7 @@ TEST_F(UpstreamKafkaClientTest, ShouldHandleProduceFailures) {
   EXPECT_CALL(producer, produce("t1", 42, 0, _, _, _, _, _, _))
       .WillOnce(Return(RdKafka::ERR_LEADER_NOT_AVAILABLE));
   EXPECT_CALL(*origin_, accept(_)).WillOnce(Return(true));
-  testee.send(origin_, "t1", 42, "KEY", "VALUE");
+  testee.send(origin_, "t1", 42, "KEY", "VALUE", {});
   EXPECT_EQ(testee.getUnfinishedRequestsForTest().size(), 0);
 }
 

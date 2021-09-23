@@ -79,17 +79,46 @@ RichKafkaProducer::~RichKafkaProducer() {
 
 void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
 
-void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-                             const int32_t partition, const absl::string_view key,
-                             const absl::string_view value) {
+// Helper function converting our byte arrays into librdkafka headers object.
+RdKafka::Headers*
+convertHeaders(const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) {
+  RdKafka::Headers* result = RdKafka::Headers::create();
+  for (const auto& header : headers) {
+    const RdKafka::Headers::Header librdkafka_header = {
+        std::string(header.first), header.second.data(), header.second.length()};
+    const auto ec = result->add(librdkafka_header);
+    if (RdKafka::ERR_NO_ERROR != ec) {
+      delete result;
+      return nullptr;
+    }
+  }
+  return result;
+}
+
+void RichKafkaProducer::send(
+    const ProduceFinishCbSharedPtr origin, const std::string& topic, const int32_t partition,
+    const absl::string_view key, const absl::string_view value,
+    const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) {
   {
     void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
     // Data is a pointer into request internals, and it is going to be managed by
     // ProduceRequestHolder lifecycle. So we are not going to use any of librdkafka's memory
     // management.
     const int flags = 0;
-    const RdKafka::ErrorCode ec = producer_->produce(
-        topic, partition, flags, value_data, value.size(), key.data(), key.size(), 0, nullptr);
+    const int64_t timestamp = 0;
+
+    RdKafka::ErrorCode ec;
+    // librdkafka requires a raw pointer and deletes it on success.
+    RdKafka::Headers* librdkafka_headers = convertHeaders(headers);
+    if (nullptr != librdkafka_headers) {
+      ec = producer_->produce(topic, partition, flags, value_data, value.size(), key.data(),
+                              key.size(), timestamp, librdkafka_headers, nullptr);
+    } else {
+      // Headers could not be converted (this should never happen).
+      ENVOY_LOG(trace, "Header conversion failed while sending to [{}/{}]", topic, partition);
+      ec = RdKafka::ERR_UNKNOWN;
+    }
+
     if (RdKafka::ERR_NO_ERROR == ec) {
       // We have succeeded with submitting data to producer, so we register a callback.
       unfinished_produce_requests_.push_back(origin);
@@ -98,6 +127,10 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
       // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
       // downstream.
       ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, topic, partition);
+      if (nullptr != librdkafka_headers) {
+        // Kafka headers need to be deleted manually if produce call fails.
+        delete librdkafka_headers;
+      }
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);
     }
