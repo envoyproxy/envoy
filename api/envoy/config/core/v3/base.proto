@@ -206,7 +206,7 @@ message Node {
   // if there is a listener bound to port 80, the list can optionally contain the
   // SocketAddress `(0.0.0.0,80)`. The field is optional and just a hint.
   repeated Address listening_addresses = 11
-  [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 }
 
 // Metadata provides additional inputs to filters based on matched listeners,
@@ -302,8 +302,8 @@ message HeaderValue {
 
   // Header name.
   string key = 1
-  [(validate.rules).string =
-  {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(validate.rules).string =
+           {min_len: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Header value.
   //
@@ -393,7 +393,7 @@ message RetryPolicy {
   // Specifies the allowed number of retries. This parameter is optional and
   // defaults to 1.
   google.protobuf.UInt32Value num_retries = 2
-  [(udpa.annotations.field_migrate).rename = "max_retries"];
+      [(udpa.annotations.field_migrate).rename = "max_retries"];
 }
 
 // The message specifies how to fetch data from remote and how to verify it.
