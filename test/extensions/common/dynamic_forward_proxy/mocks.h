@@ -77,6 +77,7 @@ public:
 
   MOCK_METHOD(DnsCacheSharedPtr, getCache,
               (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
+  MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name));
 
   std::shared_ptr<NiceMock<MockDnsCache>> dns_cache_{new NiceMock<MockDnsCache>()};
 };
