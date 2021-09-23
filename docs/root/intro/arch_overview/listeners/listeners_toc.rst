@@ -12,3 +12,4 @@ Listeners
   udp_proxy
   dns_filter
   connection_limiting
+  connection_draining

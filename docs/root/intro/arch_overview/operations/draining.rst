@@ -38,8 +38,11 @@ level. Currently the only filters that support graceful draining are
 and :ref:`HTTP connection manager <config_http_conn_man>`.
 
 By default, the :ref:`HTTP connection manager <config_http_conn_man>` filter will
-add "Connection: close" to HTTP1 requests, send HTTP2 GOAWAY, and terminate connections
-on request completion (after the delayed close period).
+add "Connection: close" to HTTP1 requests and terminate connections on request
+completion (after the delayed close period). HTTP2 connections will proactively
+issue "GOAWAY" frames to signal no new streams should be created and terminate
+connections at the end of the drain period.
+
 
 Each :ref:`configured listener <arch_overview_listeners>` has a :ref:`drain_type
 <envoy_v3_api_enum_config.listener.v3.Listener.DrainType>` setting which controls when draining takes place. The currently
