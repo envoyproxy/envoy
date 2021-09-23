@@ -9,12 +9,6 @@ bool MainThread::isMainThread() {
   return main_thread_singleton->inMainThread() || main_thread_singleton->inTestThread();
 }
 
-bool MainThread::isWorkerThread() {
-  auto main_thread_singleton = MainThreadSingleton::getExisting();
-  ASSERT(main_thread_singleton != nullptr);
-  return !main_thread_singleton->inMainThread();
-}
-
 void MainThread::clearSingleton() {
   delete MainThreadSingleton::getExisting();
   MainThreadSingleton::clear();

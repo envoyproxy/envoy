@@ -203,7 +203,6 @@ struct MainThread {
   static void clearSingleton();
   static void clearMainThread();
   static bool isMainThread();
-  static bool isWorkerThread();
 
   void incRefCount();
   void decRefCount();
