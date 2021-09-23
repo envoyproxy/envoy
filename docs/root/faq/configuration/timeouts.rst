@@ -44,7 +44,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   upstreams stay healthly.  Forcing a maximum upstream lifetime in this scenario prevents holding onto healthy
   connections even after they would otherwise be undiscoverable. To modify the max connection duration for downstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
-  field in the HTTP connection manager configuration. To modify the max connectino duration for upstream connections use the
+  field in the HTTP connection manager configuration. To modify the max connection duration for upstream connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.common_http_protocol_options>` field in the cluster configuration.
 
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
