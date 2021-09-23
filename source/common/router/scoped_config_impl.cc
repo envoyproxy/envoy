@@ -76,7 +76,7 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
 }
 
 ScopedRouteInfo::ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
-                                 ConfigConstSharedPtr&& route_config)
+                                 ConfigConstSharedPtr route_config)
     : config_proto_(std::move(config_proto)), route_config_(std::move(route_config)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
