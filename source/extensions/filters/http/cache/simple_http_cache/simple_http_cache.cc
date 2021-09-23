@@ -163,7 +163,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
           return Http::HeaderMap::Iterate::Continue;
         }
         // `setCopy` is currently implemented as `remove` then `addCopy`. But it is not used here
-        // because (1) if there's a repeated header in the incoming update, the second occurrence 
+        // because (1) if there's a repeated header in the incoming update, the second occurrence
         // would overwrite our first occurrence. (2) The behaviour of `setCopy` is implementation
         // dependent. A different implementation might only replace set first occurrence.
         if (!updatedHeaderFields.contains(lower_case_key)) {
