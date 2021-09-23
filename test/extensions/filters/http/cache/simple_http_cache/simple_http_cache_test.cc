@@ -422,6 +422,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"content-range", "bytes 200-1000/67589"},
       {"content-length", "800"},
       {"etag", "0000-0000"},
+      {"etag", "1111-1111"},
       {"link", "<https://example.com>; rel=\"preconnect\""}};
   insert(request_path_1, response_headers_1, "body");
   EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
@@ -434,8 +435,9 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 5-1000/67589"},
       {"content-length", "995"},
+      {"content-length", "996"},
       {"age", "20"},
-      {"etag", "1111-1111"},
+      {"etag", "2222-2222"},
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
   // The skipped headers should not be updated
@@ -447,6 +449,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"content-length", "800"},
       {"age", "20"},
       {"etag", "0000-0000"},
+      {"etag", "1111-1111"},
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
   updateHeaders(request_path_1, response_headers_2, {time_2});
