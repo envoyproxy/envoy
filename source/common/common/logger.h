@@ -333,6 +333,7 @@ template <Id id> class Loggable {
 protected:
   /**
    * Do not use this directly, use macros defined below.
+   * See source/docs/logging.md for more details.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
   static spdlog::logger& __log_do_not_use_read_comment() {

@@ -68,7 +68,7 @@ the caller, or by requesting the logger for a specific ID. For example:
                               "factory is not configured correctly.");
 ```
 
-#### ENVOY_LOG_TO_MISC
+#### ENVOY_LOG_MISC
 
 As a last resort, the `ENVOY_LOG_MISC` macro can be used to log with the `misc` ID. For
 example:
@@ -83,7 +83,7 @@ However, it is usually much better to log to a more specific ID.
 There is another API which can be used specifically for `Connection` or `Stream`
 related log messages. `ENVOY_CONN_LOG` takes an additional `Connection` argument
 and `ENVOY_STREAM_LOG` takes an additional `Stream` argument. These macros work
-like `ENVOY_LOG` except that they prepend the log message with `[Cxyz]` or
-`[Cxyz][Sabc]` based on the connection/stream ID of the specified argument.
+like `ENVOY_LOG` except that they prepend the log message with `[C123]` or
+`[C123][S456` based on the connection/stream ID of the specified argument.
 Note that the IDs here are the Envoy IDs *NOT* the on-the-wire IDs from HTTP/2
 or HTTP/3.
