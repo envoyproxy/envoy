@@ -73,7 +73,7 @@ protected:
       // "stream info" from the original HTTP request all the way down to the
       // ext_proc stream.
       auto* metadata = proto_config_.mutable_grpc_service()->mutable_initial_metadata()->Add();
-      metadata->set_key("x-request_id");
+      metadata->set_key("x-request-id");
       metadata->set_value("%REQ(x-request-id)%");
 
       // Merge the filter.
@@ -140,14 +140,15 @@ INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
-// after the headers come in.
+// after the headers come in. Also check the metadata in this test.
 TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
   uint32_t num_chunks = 150;
   uint32_t chunk_size = 1000;
 
   // This starts the gRPC server in the background. It'll be shut down when we stop the tests.
   test_processor_.start(
-      ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(),
+      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         // This is the same gRPC stream processing code that a "user" of ext_proc
         // would write. In this case, we expect to receive a request_headers
         // message, and then close the stream.
@@ -160,12 +161,20 @@ TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
         stream->Write(header_resp);
         // Returning here closes the stream, unless we had an ASSERT failure
         // previously.
+      },
+      [](grpc::ServerContext* ctx) {
+        // Verify that the metadata set in the grpc client configuration
+        // above is actually sent to our RPC.
+        auto request_id = ctx->client_metadata().find("x-request-id");
+        ASSERT_NE(request_id, ctx->client_metadata().end());
+        EXPECT_EQ(request_id->second, "sent some metadata");
       });
 
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto& encoder = sendClientRequestHeaders([num_chunks, chunk_size](Http::HeaderMap& headers) {
     headers.addCopy(LowerCaseString("expect_request_size_bytes"), num_chunks * chunk_size);
+    headers.addCopy(LowerCaseString("x-request-id"), "sent some metadata");
   });
 
   for (uint32_t i = 0; i < num_chunks; i++) {
