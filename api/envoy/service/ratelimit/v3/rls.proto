@@ -175,7 +175,7 @@ message RateLimitResponse {
   // If there is not sufficient quota, there are three cases:
   // 1. A cached entry exists for a RLS descriptor set that is out-of-quota, but not expired.
   //    In this case, the request will be treated as OVER_LIMIT.
-  // 2. All RLS descriptor sets lack a cached entry, this will trigger a new RLS request,
+  // 2. The RLS descriptor set lacks a cached entry, this will trigger a new RLS request,
   //    When the result is returned, a single unit will be consumed from the quota for all
   //    matching descriptor sets.
   //    If the server did not provide a quota, such as the quota message is empty for some of
