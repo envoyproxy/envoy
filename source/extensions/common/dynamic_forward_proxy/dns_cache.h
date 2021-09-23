@@ -221,6 +221,14 @@ public:
    */
   virtual DnsCacheSharedPtr
   getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
+
+  /**
+   * Look up an existing DNS cache by name.
+   * @param name supplies the cache name to look up. If a cache exists with the same name it
+   *             will be returned.
+   * @return pointer to the cache if it exists, nullptr otherwise.
+   */
+  virtual DnsCacheSharedPtr lookUpCacheByName(absl::string_view cache_name) PURE;
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;
