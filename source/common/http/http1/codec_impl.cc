@@ -635,7 +635,8 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
 
 Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ASSERT(codec_status_.ok() && dispatching_);
-  auto [nread, rc] = parser_->execute(slice, len);
+  auto nread = parser_->execute(slice, len).nread;
+  auto rc = parser_->execute(slice, len).rc;
   if (!codec_status_.ok()) {
     return codec_status_;
   }
