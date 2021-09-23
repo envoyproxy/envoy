@@ -30,6 +30,21 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   connections use the
   :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.common_http_protocol_options>` field in the Cluster's :ref:`extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`, keyed by `envoy.extensions.upstreams.http.v3.HttpProtocolOptions`
 
+* The HTTP protocol :ref:`max_connection_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`
+  is defined in a generic message used by both the HTTP connection manager as well as upstream cluster
+  HTTP connections but is currently only implemented for the downstream connections. The maximum
+  connection duration is the time after which a downstream connection will be drained and/or closed,
+  starting from when it first got established. If there are no active streams, the connection will be
+  closed. If there are any active streams, the drain sequence will kick-in, and the connection will be
+  force-closed after the drain period. The default value of max connection duration is *0* or unlimited,
+  which means that the connections will never be closed due to aging. It could be helpful in scenarios
+  when you are running a pool of Envoy edge-proxies and would want to close a downstream connection after
+  some time to prevent sticky-ness. It could also help to better load balance the overall traffic among
+  this pool, especially if the size of this pool is dynamically changing. To modify the max connection
+  duration for downstream connections use the
+  :ref:`common_http_protocol_options <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.common_http_protocol_options>`
+  field in the HTTP connection manager configuration.
+
 See :ref:`below <faq_configuration_timeouts_transport_socket>` for other connection timeouts.
 
 Stream timeouts

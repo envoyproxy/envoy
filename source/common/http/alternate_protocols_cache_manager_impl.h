@@ -15,9 +15,12 @@ namespace Http {
 struct AlternateProtocolsData {
   AlternateProtocolsData(Server::Configuration::FactoryContextBase& context)
       : dispatcher_(context.mainThreadDispatcher()),
-        validation_visitor_(context.messageValidationVisitor()) {}
+        validation_visitor_(context.messageValidationVisitor()),
+        file_system_(context.api().fileSystem()), concurrency_(context.options().concurrency()) {}
   Event::Dispatcher& dispatcher_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Filesystem::Instance& file_system_;
+  uint32_t concurrency_;
 };
 
 class AlternateProtocolsCacheManagerImpl : public AlternateProtocolsCacheManager,
