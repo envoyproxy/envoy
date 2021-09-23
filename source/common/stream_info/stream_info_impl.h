@@ -365,7 +365,7 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
-  // Default construct the bytes meterer because upstream stream is not constructed in some cases.
+  // Default construct the object because upstream stream is not constructed in some cases.
   BytesMetererSharedPtr upstream_bytes_meterer_{std::make_shared<BytesMeterer>()};
   BytesMetererSharedPtr downstream_bytes_meterer_;
 };
