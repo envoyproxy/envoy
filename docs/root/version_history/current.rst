@@ -28,11 +28,8 @@ Incompatible Behavior Changes
   renumbered fields have the types expected by those releases.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 * extensions: deprecated extension names now default to triggering a configuration error.
-  The previous warning-only behavior can be reverted by setting the runtime key
+  The previous warning-only behavior may be temporarily reverted by setting the runtime key
   ``envoy.deprecated_features.allow_deprecated_extension_names`` to true.
-* grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter.
-  The behavior can be reverted by changing runtime key ``envoy.reloadable_features.grpc_bridge_stats_disabled``.
-* tracing: update Apache SkyWalking tracer version to be compatible with 8.4.0 data collect protocol. This change will introduce incompatibility with SkyWalking 8.3.0.
 
 Minor Behavior Changes
 ----------------------
