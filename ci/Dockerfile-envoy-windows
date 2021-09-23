@@ -4,7 +4,8 @@ ARG BUILD_TAG=ltsc2019
 FROM $BUILD_OS:$BUILD_TAG
 
 USER ContainerAdministrator
-RUN net user /add "EnvoyUser"
+RUN net accounts /MaxPWAge:unlimited
+RUN net user /add "EnvoyUser" /expires:never
 RUN net localgroup "Network Configuration Operators" "EnvoyUser" /add
 
 RUN mkdir "C:\\Program\ Files\\envoy"
