@@ -27,6 +27,12 @@ public:
   uint32_t numActiveStreams() const override { return active_streams_; }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
 
+  static void incrementActiveStreams(ActiveClient& client) {
+    TestActiveClient* testClient = dynamic_cast<TestActiveClient*>(&client);
+    ASSERT_TRUE(testClient != nullptr);
+    testClient->active_streams_++;
+  }
+
   uint32_t active_streams_{};
 };
 
@@ -68,8 +74,8 @@ public:
       return ret;
     }));
     ON_CALL(pool_, onPoolReady(_, _))
-        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) -> void {
-          ++(reinterpret_cast<TestActiveClient*>(&client)->active_streams_);
+        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
+          TestActiveClient::incrementActiveStreams(client);
         }));
   }
 
@@ -110,8 +116,8 @@ public:
       return ret;
     }));
     ON_CALL(pool_, onPoolReady(_, _))
-        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) -> void {
-          ++(reinterpret_cast<TestActiveClient*>(&client)->active_streams_);
+        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
+          TestActiveClient::incrementActiveStreams(client);
         }));
   }
 
@@ -136,7 +142,7 @@ public:
     // Verify that the lifetime timer is consistent with the max connection duration opt
     if (max_connection_duration_opt_.has_value()) {
       EXPECT_TRUE(clients_.back()->lifetime_timer_ != nullptr);
-      EXPECT_EQ(true, clients_.back()->lifetime_timer_->enabled());
+      EXPECT_TRUE(clients_.back()->lifetime_timer_->enabled());
     } else {
       EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
     }
