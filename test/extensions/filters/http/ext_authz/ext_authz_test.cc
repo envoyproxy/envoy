@@ -1729,9 +1729,6 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   // `foo` will be added to this key.
   const Http::LowerCaseString key_to_add{"bar"};
 
-  // `true` will be set to this key as this key is not present.
-  const Http::LowerCaseString key_to_add_if_absent{"add-if-absent"};
-
   // `foo` will be override with `bar`.
   const Http::LowerCaseString key_to_override{"foobar"};
   request_headers_.addCopy("foobar", "foo");
@@ -1745,8 +1742,6 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
-  response.headers_to_add_if_absent =
-      Http::HeaderVector{{request_header_key, "no-op"}, {key_to_add_if_absent, "true"}};
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
   response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
   // This cookie will be appended to the encoded headers.
@@ -1778,7 +1773,6 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.get_(request_header_key), "foo,bar");
   EXPECT_EQ(request_headers_.get_(key_to_add), "foo");
   EXPECT_EQ(request_headers_.get_(key_to_override), "bar");
-  EXPECT_EQ(request_headers_.get_(key_to_add_if_absent), "true");
   EXPECT_EQ(request_headers_.has(key_to_remove), false);
 
   Buffer::OwnedImpl response_data{};
@@ -1904,9 +1898,6 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.body = std::string{"foo"};
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
                                                {Http::LowerCaseString{"bar"}, "foo"}};
-  // `foobar` should be added as it's not already present but `foo` should be left untouched.
-  response.headers_to_add_if_absent = Http::HeaderVector{
-      {Http::LowerCaseString{"foo"}, "no-op"}, {Http::LowerCaseString{"foobar"}, "foobar"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
       std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1919,9 +1910,11 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "403"},   {"content-length", "3"}, {"content-type", "text/plain"},
-      {"foobar", "foobar"}, {"foo", "bar"},          {"bar", "foo"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"},
+                                                   {"content-length", "3"},
+                                                   {"content-type", "text/plain"},
+                                                   {"foo", "bar"},
+                                                   {"bar", "foo"}};
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) { saved_headers = &headers; }));

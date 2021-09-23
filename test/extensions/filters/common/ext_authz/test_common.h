@@ -52,8 +52,7 @@ public:
 
 MATCHER_P(AuthzErrorResponse, status, "") {
   // These fields should be always empty when the status is an error.
-  if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() ||
-      !arg->headers_to_add_if_absent.empty() || !arg->body.empty()) {
+  if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
     return false;
   }
   // HTTP status code should be always set to Forbidden.
@@ -98,12 +97,6 @@ MATCHER_P(AuthzOkResponse, response, "") {
   }
   // Compare headers_to_append.
   if (!TestCommon::compareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
-    return false;
-  }
-
-  // Compare headers_to_add_if_absent
-  if (!TestCommon::compareHeaderVector(response.headers_to_add_if_absent,
-                                       arg->headers_to_add_if_absent)) {
     return false;
   }
 
