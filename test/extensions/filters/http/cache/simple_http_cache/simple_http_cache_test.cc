@@ -416,7 +416,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
 
   // Vary not tested because we have separate tests that cover it
-  Http::TestResponseHeaderMapImpl response_headers_1{
+  Http::TestResponseHeaderMapImpl origin_response_headers{
       {"date", time_value_1},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
@@ -424,13 +424,14 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"etag", "0000-0000"},
       {"etag", "1111-1111"},
       {"link", "<https://example.com>; rel=\"preconnect\""}};
-  insert(request_path_1, response_headers_1, "body");
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+  insert(request_path_1, origin_response_headers, "body");
+  EXPECT_TRUE(
+      expectLookupSuccessWithHeaders(lookup(request_path_1).get(), origin_response_headers));
   time_source_.advanceTimeWait(Seconds(100));
 
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
-  Http::TestResponseHeaderMapImpl response_headers_2{
+  Http::TestResponseHeaderMapImpl incoming_response_headers{
       {"date", time_value_2},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 5-1000/67589"},
@@ -442,7 +443,7 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
 
   // The skipped headers should not be updated
   // "age" and "link" should be updated
-  Http::TestResponseHeaderMapImpl response_headers_3{
+  Http::TestResponseHeaderMapImpl expected_response_headers{
       {"date", time_value_2},
       {"cache-control", "public,max-age=3600"},
       {"content-range", "bytes 200-1000/67589"},
@@ -452,9 +453,10 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipSpecificHeaders) {
       {"etag", "1111-1111"},
       {"link", "<https://changed.com>; rel=\"preconnect\""}};
 
-  updateHeaders(request_path_1, response_headers_2, {time_2});
+  updateHeaders(request_path_1, incoming_response_headers, {time_2});
 
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_3));
+  EXPECT_TRUE(
+      expectLookupSuccessWithHeaders(lookup(request_path_1).get(), expected_response_headers));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersWithMultivalue) {
