@@ -256,7 +256,17 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
-  child_span_->setSampled(options.sampled_);
+  switch (options.sampling_preference_) {
+  case AsyncClient::RequestOptions::SamplingPreference::Always:
+    child_span_->setSampled(true);
+    break;
+  case AsyncClient::RequestOptions::SamplingPreference::Never:
+    child_span_->setSampled(false);
+    break;
+  default:
+    // Do nothing, keep the inherited sampling decision from the parent span.
+    break;
+  }
 }
 
 void AsyncRequestImpl::initialize() {

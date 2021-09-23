@@ -855,7 +855,16 @@ void Filter::maybeDoShadowing() {
                        .setTimeout(timeout_.global_timeout_)
                        .setParentSpan(callbacks_->activeSpan())
                        .setChildSpanName("mirror")
-                       .setSampled(shadow_policy.traceSampled());
+                       // As documented, traceSampled set to false means we should never
+                       // trace shadowed requests. When set to true, the existing behavior
+                       // is to always sample, even if there was a different sampling decision
+                       // elsewhere (e.g. because of a random sampling policy). Ideally,
+                       // there should be a way to inherit the parent span's sampling decision,
+                       // but there is currently no shadow policy API for this.
+                       .setSamplingPreference(
+                           shadow_policy.traceSampled()
+                               ? Http::AsyncClient::RequestOptions::SamplingPreference::Always
+                               : Http::AsyncClient::RequestOptions::SamplingPreference::Never);
     config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request), options);
   }
 }

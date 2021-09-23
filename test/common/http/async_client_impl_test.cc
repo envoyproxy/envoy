@@ -115,6 +115,56 @@ public:
           EXPECT_EQ(code, Utility::getResponseStatus(response->headers()));
         }));
   }
+
+  void testSamplingPreference(
+      const absl::optional<AsyncClient::RequestOptions::SamplingPreference> sampling_preference,
+      const absl::optional<bool> expected_set_sampled) {
+    Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+    message_->body().add("test body");
+    Buffer::Instance& data = message_->body();
+
+    EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+        .WillOnce(Invoke([&](ResponseDecoder& decoder,
+                             ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+          callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                stream_info_, {});
+          response_decoder_ = &decoder;
+          return nullptr;
+        }));
+
+    EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
+    AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
+                                              .setParentSpan(parent_span_)
+                                              .setChildSpanName(child_span_name_);
+    if (sampling_preference.has_value()) {
+      options.setSamplingPreference(sampling_preference.value());
+    }
+    if (expected_set_sampled.has_value()) {
+      EXPECT_CALL(*child_span, setSampled(expected_set_sampled.value()));
+    }
+    EXPECT_CALL(*child_span, injectContext(_));
+
+    auto* request = client_.send(std::move(message_), callbacks_, options);
+    EXPECT_NE(request, nullptr);
+
+    expectSuccess(request, 200);
+
+    EXPECT_CALL(*child_span, setTag(Eq("onBeforeFinalizeUpstreamSpan"), Eq("called")));
+    EXPECT_CALL(*child_span,
+                setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+    EXPECT_CALL(*child_span,
+                setTag(Eq(Tracing::Tags::get().UpstreamClusterName), Eq("observability_name")));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
+    EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
+    EXPECT_CALL(*child_span, finishSpan());
+
+    ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
+    response_decoder_->decodeHeaders(std::move(response_headers), false);
+    response_decoder_->decodeData(data, true);
+  }
 };
 
 TEST_F(AsyncClientImplTest, BasicStream) {
@@ -222,7 +272,6 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
       .WillOnce(Return(child_span));
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
-  EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
@@ -270,11 +319,8 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
 
   EXPECT_CALL(parent_span_, spawnChild_(_, child_span_name_, _)).WillOnce(Return(child_span));
 
-  AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
-                                            .setParentSpan(parent_span_)
-                                            .setChildSpanName(child_span_name_)
-                                            .setSampled(false);
-  EXPECT_CALL(*child_span, setSampled(false));
+  AsyncClient::RequestOptions options =
+      AsyncClient::RequestOptions().setParentSpan(parent_span_).setChildSpanName(child_span_name_);
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
@@ -297,6 +343,32 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers), false);
   response_decoder_->decodeData(data, true);
+}
+
+// Expect the child span to _not_ have setSampled called at all when the sampling
+// preference is ParentDefault (i.e. inherit the value from the parent)
+TEST_F(AsyncClientImplTracingTest, BasicSamplingPreferenceDeafultInherit) {
+  testSamplingPreference(AsyncClient::RequestOptions::SamplingPreference::ParentDefault,
+                         absl::nullopt);
+}
+
+// Expect the child span to _not_ have setSampled called at all when the sampling
+// preference is not explicitly set on the AsyncClient::RequestOptions (default
+// behavior is equivalent to ParentDefault)
+TEST_F(AsyncClientImplTracingTest, BasicSamplingPreferenceUnset) {
+  testSamplingPreference(absl::nullopt, absl::nullopt);
+}
+
+// Expect the child span to be called with setSampled(true) when the sampling
+// preference is ALWAYS.
+TEST_F(AsyncClientImplTracingTest, BasicSamplingPreferenceAlways) {
+  testSamplingPreference(AsyncClient::RequestOptions::SamplingPreference::Always, true);
+}
+
+// Expect the child span to be called with setSampled(false) when the sampling
+// preference is NEVER.
+TEST_F(AsyncClientImplTracingTest, BasicSamplingPreferenceNever) {
+  testSamplingPreference(AsyncClient::RequestOptions::SamplingPreference::Never, false);
 }
 
 TEST_F(AsyncClientImplTest, BasicHashPolicy) {
@@ -1097,7 +1169,6 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
       .WillOnce(Return(child_span));
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
-  EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
   EXPECT_CALL(callbacks_, onBeforeFinalizeUpstreamSpan(_, _))
       .WillOnce(Invoke([](Tracing::Span& span, const Http::ResponseHeaderMap* response_headers) {
@@ -1180,7 +1251,6 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
       .WillOnce(Return(child_span));
 
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions().setParentSpan(parent_span_);
-  EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
@@ -1374,7 +1444,6 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
                                             .setParentSpan(parent_span_)
                                             .setTimeout(std::chrono::milliseconds(40));
-  EXPECT_CALL(*child_span, setSampled(true));
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);

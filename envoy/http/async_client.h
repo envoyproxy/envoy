@@ -294,15 +294,28 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
-    RequestOptions& setSampled(bool sampled) {
-      sampled_ = sampled;
+
+    enum class SamplingPreference {
+      // Just default to the sampling status of the parent.
+      ParentDefault = 0,
+
+      // Always trace this request, even if the parent span is sampled.
+      Always = 1,
+
+      // Never trace this request, even if the parent span is sampled.
+      Never = 2
+    };
+
+    RequestOptions& setSamplingPreference(const SamplingPreference& preference) {
+      sampling_preference_ = preference;
       return *this;
     }
 
     // For gmock test
     bool operator==(const RequestOptions& src) const {
       return StreamOptions::operator==(src) && parent_span_ == src.parent_span_ &&
-             child_span_name_ == src.child_span_name_ && sampled_ == src.sampled_;
+             child_span_name_ == src.child_span_name_ &&
+             sampling_preference_ == src.sampling_preference_;
     }
 
     // The parent span that child spans are created under to trace egress requests/responses.
@@ -312,8 +325,9 @@ public:
     // If left empty and parent_span_ is set, then the default name will have the cluster name.
     // Only used if parent_span_ is set.
     std::string child_span_name_{""};
-    // Sampling decision for the tracing span. The span is sampled by default.
-    bool sampled_{true};
+    // Sampling preference for the tracing span. The span uses the parent sampling decision by
+    // default.
+    SamplingPreference sampling_preference_{SamplingPreference::ParentDefault};
   };
 
   /**
