@@ -50,10 +50,4 @@ public protocol PulseClient: AnyObject {
   ///
   /// - returns: A Distribution based on the joined elements and along with tags
   func distribution(elements: [Element], tags: Tags) -> Distribution
-
-  /// - parameter level: Level of the log
-  /// - parameter message: The log message
-  /// - parameter logTags: Log tags, carries miscellaneous information about the log, such as file
-  ///   name, line number etc.
-  func log(level: LogLevel, message: String, logTags: [String: String]?)
 }
