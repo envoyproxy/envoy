@@ -1660,13 +1660,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
-    if (alternate_protocol_options.has_value()) {
-      alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
-    }
+    ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
+    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,

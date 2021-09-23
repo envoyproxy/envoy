@@ -262,11 +262,23 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 }
 
 TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
+    // protocols cache, but currently there is no easy way to initialize the test with this state.
+    return;
+  }
+
   use_alpn_ = true;
   simultaneousRequest(1024, 512, 1023, 513);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
+    // protocols cache, but currently there is no easy way to initialize the test with this state.
+    return;
+  }
+
   use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
@@ -666,11 +678,15 @@ protected:
   bool use_http2_{false};
 };
 
-TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp3) {
+// TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
+// protocols cache, but currently there is no easy way to initialize the test with this state.
+TEST_P(MixedUpstreamIntegrationTest, DISABLED_SimultaneousRequestAutoWithHttp3) {
+  use_alternate_protocols_cache_ = true;
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
-TEST_P(MixedUpstreamIntegrationTest, SimultaneousRequestAutoWithHttp2) {
+TEST_P(MixedUpstreamIntegrationTest, DISABLED_SimultaneousRequestAutoWithHttp2) {
+  use_alternate_protocols_cache_ = true;
   use_http2_ = true;
   testRouterRequestAndResponseWithBody(0, 0, false);
 }

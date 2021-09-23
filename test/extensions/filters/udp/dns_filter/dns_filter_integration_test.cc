@@ -171,7 +171,7 @@ listener_filters:
   void setup(uint32_t upstream_count) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     if (upstream_count > 1) {
-      setDeterministic();
+      setDeterministicValue();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
