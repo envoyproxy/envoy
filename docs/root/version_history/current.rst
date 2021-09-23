@@ -27,7 +27,7 @@ Incompatible Behavior Changes
   vendor the corresponding protobuf definitions to ensure that the
   renumbered fields have the types expected by those releases.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
-* extensions: Deprecated extension names now default to triggering a configuration error.
+* extensions: deprecated extension names now default to triggering a configuration error.
   The previous warning-only behavior can be reverted by setting the runtime key
   ``envoy.deprecated_features.allow_deprecated_extension_names`` to true.
 * grpc_bridge_filter: the filter no longer collects grpc stats in favor of the existing grpc stats filter.
