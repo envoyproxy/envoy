@@ -43,19 +43,7 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::T
 Envoy::Network::IoHandlePtr
 VclSocketInterface::socket(Envoy::Network::Socket::Type socket_type,
                            const Envoy::Network::Address::InstanceConstSharedPtr addr) const {
-  if (vppcom_worker_index() == -1) {
-    vclInterfaceWorkerRegister();
-  }
-  VCL_LOG("trying to create socket2 epoll fd {}", vppcom_mq_epoll_fd());
-  if (addr->type() == Envoy::Network::Address::Type::Pipe) {
-    return nullptr;
-  }
-  auto sh = vppcom_session_create(
-      socket_type == Envoy::Network::Socket::Type::Stream ? VPPCOM_PROTO_TCP : VPPCOM_PROTO_UDP, 1);
-  if (sh < 0) {
-    return nullptr;
-  }
-  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
+  return socket(socket_type, addr->type(), Envoy::Network::Address::IpVersion::v4, false);
 }
 
 bool VclSocketInterface::ipFamilySupported(int) { return true; };
