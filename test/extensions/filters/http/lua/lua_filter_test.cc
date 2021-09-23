@@ -1678,6 +1678,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
 }
 
 // Test that the deprecated filter is disabled by default for metadata.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDeprecatedName)) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
