@@ -40,10 +40,10 @@ Minor Behavior Changes
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
 * grpc: gRPC async client can be cached and shared accross filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
+* grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: connection draining is now proactive and does not require traffic to trigger graceful draining. This
   feature is enabled by default, can be turned off by setting runtime guard
   ``envoy.reloadable_features.http_conn_manager_proactive_drain`` to false.
-* grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
   can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
