@@ -330,17 +330,18 @@ message RateLimitPerRoute {
   }
 
   // The override option determines how the filter handles the cases where there is an override config at a more specific level than this one (from least to most specific: virtual host, route, cluster weight).
+  // [#not-implemented-hide:]
   enum OverrideOptions {
     // Client-defined default, typically OVERRIDE_POLICY. If VhRateLimitsOptions is set, that will be used instead.
     DEFAULT = 0;
 
-    // Only use the specific rate limit policy override when the route doesn't have a rate limit policy.
+    // If there is an override config at a more specific level, use that instead of this one.
     OVERRIDE_POLICY = 1;
 
-    // Always include the specific rate limit policy override even if the route has a rate limit policy.
+    // If there is an override config at a more specific level, use data from both.
     INCLUDE_POLICY = 2;
 
-    // Always ignore the specific rate limit policy override.
+    // If there is an override config at a more specific level, ignore it and use only this one.
     IGNORE_POLICY = 3;
   }
 
