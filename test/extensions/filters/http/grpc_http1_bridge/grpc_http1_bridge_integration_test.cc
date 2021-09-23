@@ -2,8 +2,8 @@
 
 #include "gtest/gtest.h"
 
-namespace {
 namespace Envoy {
+namespace {
 
 // A test class for testing HTTP/1.1 upstream and downstreams
 
@@ -40,10 +40,14 @@ TEST_P(GrpcIntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
+              HeaderValueOf(Http::Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
-} // namespace Envoy
+INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 } // namespace
+} // namespace Envoy
