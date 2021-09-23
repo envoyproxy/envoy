@@ -230,7 +230,6 @@ envoy_cc_test(
     ],
     deps = [
         ":http_protocol_integration_lib",
-        "//source/extensions/filters/http/health_check:config",
         "//test/test_common:utility_lib",
     ],
 )
@@ -361,7 +360,6 @@ envoy_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:metadata_stop_all_filter_config_lib",
         "//test/integration/filters:on_local_reply_filter_config_lib",
         "//test/integration/filters:request_metadata_filter_config_lib",
@@ -464,8 +462,6 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/extensions/filters/http/health_check:config",
-        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
     ],
 )
 
@@ -492,7 +488,6 @@ envoy_cc_test_library(
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/health_check:config",
         "//test/common/http/http2:http2_frame",
         "//test/integration/filters:continue_after_local_reply_filter_lib",
         "//test/integration/filters:continue_headers_only_inject_body",
@@ -536,7 +531,6 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
@@ -557,7 +551,6 @@ envoy_cc_test(
         "//source/common/stats:histogram_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/extensions/filters/http/buffer:config",
-        "//source/extensions/filters/http/health_check:config",
         "//test/common/stats:stat_test_utility_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -943,7 +936,6 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
-        "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:invalid_header_filter_lib",
@@ -1633,7 +1625,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:utility_lib",
-        "//source/extensions/filters/http/health_check:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",

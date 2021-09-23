@@ -954,7 +954,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
-  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+  autonomous_upstream_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
