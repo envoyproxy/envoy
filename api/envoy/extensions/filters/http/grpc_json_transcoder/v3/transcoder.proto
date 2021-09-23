@@ -211,11 +211,15 @@ message GrpcJsonTranscoder {
   bool convert_grpc_status = 9;
 
   // URL unescaping policy.
-  // This spec is only applied when extracting variable with multiple segments.
+  // This spec is only applied when extracting variable with multiple segments in the URL path.
   // For example, in case of `/foo/{x=*}/bar/{y=prefix/*}/{z=**}` `x` variable is single segment and `y` and `z` are multiple segments.
   // For a path with `/foo/first/bar/prefix/second/third/fourth`, `x=first`, `y=prefix/second`, `z=third/fourth`.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_v3_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
   UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
+
+  // If true, unescape '+' to space when extracting variables in query parameters.
+  // This is to support HTML 2.0(RFC1866) [spec](https://tools.ietf.org/html/rfc1866#section-8.2.1).
+  bool query_param_unescape_plus = 12;
 
   // Configure the behavior when handling requests that cannot be transcoded.
   //
