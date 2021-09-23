@@ -29,7 +29,6 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-// TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
@@ -906,8 +905,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
-  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -940,7 +938,7 @@ TEST_P(Http2IntegrationTest, Http2BadMagic) {
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
 
   initialize();
   std::string response;
@@ -956,7 +954,6 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
   config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
