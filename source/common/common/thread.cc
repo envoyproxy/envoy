@@ -29,18 +29,18 @@ struct ThreadIds {
     if (singleton == nullptr) {
       singleton = new ThreadIds;
       Singleton::initialize(singleton);
-    } else {
-      absl::MutexLock lock(&singleton->mutex_);
-      ++singleton->ref_count_;
-    }
+    } /* else {
+       absl::MutexLock lock(&singleton->mutex_);
+       ++singleton->ref_count_;
+       }*/
     return *singleton;
   }
 
   void release() EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
-    if (--ref_count_ == 0) {
+    /*if (--ref_count_ == 0) {
       Singleton::clear();
       delete this;
-    }
+      }*/
   }
 
   void releaseMainThread() {
@@ -86,7 +86,7 @@ private:
   absl::optional<std::thread::id> test_thread_id_ GUARDED_BY(mutex_);
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
   int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
-  int32_t ref_count_ GUARDED_BY(mutex_) = 1;
+  // int32_t ref_count_ GUARDED_BY(mutex_) = 1;
   mutable absl::Mutex mutex_;
 };
 
