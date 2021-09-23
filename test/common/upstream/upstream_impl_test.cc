@@ -2814,45 +2814,29 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
 }
 
 TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
-  const std::string yaml_default_max_connection_duration = R"EOF(
-  name: cluster1
+  const std::string yaml_base = R"EOF(
+  name: {}
   type: STRICT_DNS
   lb_policy: ROUND_ROBIN
   )EOF";
 
-  const std::string yaml_set_max_connection_duration = R"EOF(
-  name: cluster2
-  type: STRICT_DNS
-  lb_policy: ROUND_ROBIN
+  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
       "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
       explicit_http_config:
-        http_protocol_options: {}
+        http_protocol_options: {{}}
       common_http_protocol_options:
-        max_connection_duration: 9s
+        max_connection_duration: {}
   )EOF";
 
-  const std::string yaml_zero_max_connection_duration = R"EOF(
-  name: cluster2
-  type: STRICT_DNS
-  lb_policy: ROUND_ROBIN
-  typed_extension_protocol_options:
-    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-      explicit_http_config:
-        http_protocol_options: {}
-      common_http_protocol_options:
-        max_connection_duration: 0s
-  )EOF";
-
-  auto cluster1 = makeCluster(yaml_default_max_connection_duration);
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
   EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
 
-  auto cluster2 = makeCluster(yaml_set_max_connection_duration);
+  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
   EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
 
-  auto cluster3 = makeCluster(yaml_zero_max_connection_duration);
+  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
   EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
