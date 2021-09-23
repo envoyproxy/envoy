@@ -239,6 +239,9 @@ private:
       response_details_ = response_details;
     }
 
+    // Saves latest "Intel" data as it may not be available when accessed.
+    void saveLatestStreamIntel();
+
     const envoy_stream_t stream_handle_;
 
     // Used to issue outgoing HTTP stream operations.
@@ -264,6 +267,8 @@ private:
     // back, avoids excessive buffering of response bodies if the response body is
     // read faster than the mobile caller can process it.
     bool explicit_flow_control_ = false;
+    // Latest intel data retrieved from the StreamInfo.
+    envoy_stream_intel stream_intel_;
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
