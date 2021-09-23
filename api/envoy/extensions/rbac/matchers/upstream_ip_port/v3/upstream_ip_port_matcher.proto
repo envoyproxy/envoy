@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.rbac.matchers.upstream_ip.v3;
+package envoy.extensions.rbac.matchers.upstream_ip_port.v3;
 
 import "envoy/config/core/v3/address.proto";
 import "envoy/type/v3/range.proto";
@@ -8,16 +8,16 @@ import "envoy/type/v3/range.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream_ip.v3";
-option java_outer_classname = "UpstreamIpMatcherProto";
+option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream_ip_port.v3";
+option java_outer_classname = "UpstreamIpPortMatcherProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: RBAC upstream IP matcher plugin]
-// [#extension: envoy.rbac.matchers.upstream_ip]
+// [#extension: envoy.rbac.matchers.upstream_ip_port]
 
 // This is configuration for matching upstream ip (and port if provided).
-message UpstreamIpMatcher {
+message UpstreamIpPortMatcher {
   // A CIDR block that will be used to match the upstream IP.
   // This matcher requires a filter in the chain to have saved the upstream address in the
   // filter state before the matcher is executed by RBAC filter. The state should be saved with key

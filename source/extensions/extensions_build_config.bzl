@@ -302,7 +302,7 @@ EXTENSIONS = {
     # RBAC matchers
     #
 
-    "envoy.rbac.matchers.upstream_ip":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_lib",
+    "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
     "envoy.rbac.matchers.upstream_port":   "//source/extensions/filters/common/rbac/matchers:upstream_port_lib",
 }
 

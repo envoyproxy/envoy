@@ -9,12 +9,12 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "upstream_ip_lib",
+    name = "upstream_ip_port_lib",
     srcs = [
-        "upstream_ip.cc",
+        "upstream_ip_port.cc",
     ],
     hdrs = [
-        "upstream_ip.h",
+        "upstream_ip_port.h",
     ],
     deps = [
         "//source/common/common:logger_lib",
@@ -22,7 +22,7 @@ envoy_cc_extension(
         "//source/extensions/filters/common/rbac:matchers_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/rbac/matchers/upstream_ip/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/rbac/matchers/upstream_ip_port/v3:pkg_cc_proto",
     ],
 )
 

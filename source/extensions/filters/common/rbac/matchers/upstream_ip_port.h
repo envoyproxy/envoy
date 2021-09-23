@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/rbac/matchers/upstream_ip/v3/upstream_ip_matcher.pb.validate.h"
+#include "envoy/extensions/rbac/matchers/upstream_ip_port/v3/upstream_ip_port_matcher.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/network/cidr_range.h"
@@ -15,11 +15,11 @@ namespace Matchers {
 
 // RBAC matcher extension for matching upstream's IP address (and port range if configured).
 // configuration with the resolved upstream IP (v4 and v6).
-class UpstreamIpMatcher : public Filters::Common::RBAC::Matcher,
-                          public Logger::Loggable<Logger::Id::rbac> {
+class UpstreamIpPortMatcher : public Filters::Common::RBAC::Matcher,
+                              public Logger::Loggable<Logger::Id::rbac> {
 public:
-  UpstreamIpMatcher(
-      const envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher& proto);
+  UpstreamIpPortMatcher(
+      const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto);
 
   // Matcher interface.
   bool matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
@@ -30,13 +30,13 @@ private:
   absl::optional<envoy::type::v3::Int64Range> port_;
 };
 
-// Extension factory for UpstreamIpMatcher.
-class UpstreamIpMatcherFactory
+// Extension factory for UpstreamIpPortMatcher.
+class UpstreamIpPortMatcherFactory
     : public Filters::Common::RBAC::BaseMatcherExtensionFactory<
-          UpstreamIpMatcher,
-          envoy::extensions::rbac::matchers::upstream_ip::v3::UpstreamIpMatcher> {
+          UpstreamIpPortMatcher,
+          envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher> {
 public:
-  std::string name() const override { return "envoy.rbac.matchers.upstream.upstream_ip"; }
+  std::string name() const override { return "envoy.rbac.matchers.upstream.upstream_ip_port"; }
 };
 
 } // namespace Matchers

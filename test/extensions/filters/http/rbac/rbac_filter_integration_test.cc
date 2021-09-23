@@ -636,9 +636,9 @@ typed_config:
         - or_rules:
             rules:
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: 127.0.0.1
                     prefix_len: 24
@@ -679,23 +679,23 @@ typed_config:
         - or_rules:
             rules:
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: 127.2.1.1
                     prefix_len: 24
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: 127.0.0.1
                     prefix_len: 24
             - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_ip
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip.v3.UpstreamIpMatcher
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
                   upstream_ip:
                     address_prefix: ::1
                     prefix_len: 24

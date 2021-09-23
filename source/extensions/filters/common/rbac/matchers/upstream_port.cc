@@ -32,8 +32,8 @@ bool UpstreamPortMatcher::matches(const Network::Connection&, const Envoy::Http:
 
   const auto port = address_obj.address_->ip()->port();
   if (port >= start_ && port <= end_) {
-      ENVOY_LOG(debug, "Port {} matched range: {}, {}", port, start_, end_);
-      return true;
+    ENVOY_LOG(debug, "Port {} matched range: {}, {}", port, start_, end_);
+    return true;
   }
 
   ENVOY_LOG(trace, "Port {} did not match range: {}, {}", port, start_, end_);

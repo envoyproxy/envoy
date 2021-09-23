@@ -462,8 +462,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // Verify the data
   EXPECT_TRUE(updated_address_obj.address_);
-  EXPECT_EQ(
-      updated_address_obj.address_->asStringView(), host_info->address_->asStringView());
+  EXPECT_EQ(updated_address_obj.address_->asStringView(), host_info->address_->asStringView());
 
   filter_->onDestroy();
 }
