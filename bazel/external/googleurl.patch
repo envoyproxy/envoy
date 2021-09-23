@@ -93,29 +93,31 @@ index 6651220..a469c19 100644
  #define REINITIALIZES_AFTER_MOVE
  #endif
 diff --git a/base/containers/checked_iterators.h b/base/containers/checked_iterators.h
-index b5fe925..553a772 100644
+index b5fe925..24e9063 100644
 --- a/base/containers/checked_iterators.h
 +++ b/base/containers/checked_iterators.h
-@@ -217,7 +217,7 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
+@@ -217,7 +217,8 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
  
  }  // namespace base
  
 -#if defined(_LIBCPP_VERSION) && !defined(OS_NACL)
++
 +#if defined(_LIBCPP_VERSION) && !defined(OS_NACL) && !defined(SKIP_CONTIGUOUS_ITERATOR_CPP17)
  // Specialize both std::__is_cpp17_contiguous_iterator and std::pointer_traits
  // for CCI in case we compile with libc++ outside of NaCl. The former is
  // required to enable certain algorithm optimizations (e.g. std::copy can be a
-@@ -237,10 +237,6 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
+@@ -237,9 +238,11 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
  // [3] https://wg21.link/pointer.traits.optmem
  namespace std {
  
--template <typename T>
--struct __is_cpp17_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
--    : true_type {};
--
++#ifdef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
+ template <typename T>
+ struct __is_cpp17_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
+     : true_type {};
++#endif
+ 
  template <typename T>
  struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {
-   using pointer = ::gurl_base::CheckedContiguousIterator<T>;
 diff --git a/url/BUILD b/url/BUILD
 index f2ec8da..df69661 100644
 --- a/url/BUILD
