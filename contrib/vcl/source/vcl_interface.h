@@ -20,12 +20,32 @@ namespace Vcl {
 #define VCL_LOG(fmt, _args...)
 #endif
 
-constexpr int VclInvalidFd = 1 << 23;
+/**
+ * VclIoHandle does not rely on linux fds. Constant lower used as invalid fd.
+ */
+const int VclInvalidFd = 1 << 23;
 
+/**
+ * Used to initialize VCL interface when VclSocketInterface extension is loaded.
+ */
 void vclInterfaceInit(Event::Dispatcher& dispatcher);
+
+/**
+ * Register Envoy worker with VCL and allocate epoll session handle to be used to retrieve per
+ * worker session events.
+ */
 void vclInterfaceWorkerRegister();
+
+/**
+ * Create FileEvent for VCL worker message queue `eventfd` if one does not exist. Used to signal
+ * main dispatch loop that VCL has session events.
+ */
 void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher);
-uint32_t& vclEpollHandle(uint32_t wrk_index);
+
+/**
+ * Retrieve epoll session handle for VCL worker.
+ */
+uint32_t vclEpollHandle(uint32_t wrk_index);
 
 } // namespace Vcl
 } // namespace Network

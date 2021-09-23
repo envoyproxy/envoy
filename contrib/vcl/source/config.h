@@ -15,7 +15,7 @@ public:
 
 class VclSocketInterface : public Envoy::Network::SocketInterfaceBase {
 public:
-  // SocketInterface
+  // Network::SocketInterface
   Envoy::Network::IoHandlePtr socket(Envoy::Network::Socket::Type socket_type,
                                      Envoy::Network::Address::Type addr_type,
                                      Envoy::Network::Address::IpVersion version,

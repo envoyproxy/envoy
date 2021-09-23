@@ -11,11 +11,26 @@ namespace Vcl {
 
 namespace {
 
-constexpr int MaxNumWorkers = 128;
-constexpr int MaxNumEpollEvents = 128;
+/**
+ * Max number of workers supported. Used in declaration of epoll_handles array
+ */
+const int MaxNumWorkers = 128;
 
+/**
+ * Max number of epoll events to drain from VCL per `vppcom_epoll_wait` call
+ */
+const int MaxNumEpollEvents = 128;
+
+/**
+ * Envoy worker epoll session handles by VCL worker index, i.e., `vppcom_worker_index()`. Each
+ * worker uses its respective handle to retrieve session events from VCL via `vppcom_epoll_wait()`.
+ */
 uint32_t epoll_handles[MaxNumWorkers];
-std::mutex wrk_lock;
+
+/**
+ * Mutex only used during VCL worker registration
+ */
+ABSL_CONST_INIT absl::Mutex wrk_lock(absl::kConstInit);
 
 using MqFileEventsMap = absl::flat_hash_map<int, Envoy::Event::FileEventPtr>;
 
@@ -67,15 +82,14 @@ static void onMqSocketEvents(uint32_t flags) {
 
 } // namespace
 
-uint32_t& vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
+uint32_t vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
 
 void vclInterfaceWorkerRegister() {
-  std::lock_guard<std::mutex> lk(wrk_lock);
-  vppcom_worker_register();
-  int epoll_handle = vppcom_epoll_create();
-  if (epoll_handle < 0) {
-    RELEASE_ASSERT(0, "failed to create epoll handle");
+  {
+    absl::MutexLock lk(&wrk_lock);
+    vppcom_worker_register();
   }
+  int epoll_handle = vppcom_epoll_create();
   epoll_handles[vppcom_worker_index()] = epoll_handle;
   VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", vppcom_worker_index(),
           epoll_handle, vppcom_mq_epoll_fd());

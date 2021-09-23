@@ -21,26 +21,17 @@ using namespace Envoy::Network;
 #define VCL_SH_VALID(_sh) (_sh != static_cast<uint32_t>(~0))
 #define VCL_SET_SH_INVALID(_sh) (_sh = static_cast<uint32_t>(~0))
 
-class VclIoHandle : public Envoy::Network::IoHandle, Logger::Loggable<Logger::Id::connection> {
+class VclIoHandle : public Envoy::Network::IoHandle,
+                    Logger::Loggable<Logger::Id::connection>,
+                    NonCopyable {
 public:
-  explicit VclIoHandle(os_fd_t fd = INVALID_SOCKET) : sh_(fd) {
-    RELEASE_ASSERT(0, "not supported");
-  }
-
   VclIoHandle(uint32_t sh, os_fd_t fd) : sh_(sh), fd_(fd) {}
-
   ~VclIoHandle() override;
 
+  // Network::IoHandle
   os_fd_t fdDoNotUse() const override { return fd_; }
-
-  uint32_t sh() const { return sh_; }
-  bool isListener() const { return is_listener_; }
-  void setListener(bool is_listener) { is_listener_ = is_listener; }
-
   Api::IoCallUint64Result close() override;
-
   bool isOpen() const override;
-
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
   Api::IoCallUint64Result read(Buffer::Instance& buffer,
@@ -81,14 +72,12 @@ public:
   void activateFileEvents(uint32_t events) override { file_event_->activate(events); }
   void enableFileEvents(uint32_t events) override { file_event_->setEnabled(events); }
   void resetFileEvents() override { file_event_.reset(); }
+  IoHandlePtr duplicate() override;
 
   void cb(uint32_t events) { cb_(events); }
   void setCb(Event::FileReadyCb cb) { cb_ = cb; }
   void updateEvents(uint32_t events);
-
-  IoHandlePtr duplicate() override;
-
-  void setChildWrkListener(VclIoHandle* parent_listener) { parent_listener_ = parent_listener; }
+  uint32_t sh() const { return sh_; }
   void clearChildWrkListener() {
     if (wrk_listener_) {
       wrk_listener_ = nullptr;
@@ -98,31 +87,15 @@ public:
   bool isWrkListener() { return parent_listener_ != nullptr; }
 
 private:
+  void setChildWrkListener(VclIoHandle* parent_listener) { parent_listener_ = parent_listener; }
+
   uint32_t sh_{VCL_INVALID_SH};
   os_fd_t fd_;
   Event::FileEventPtr file_event_{nullptr};
-
   bool is_listener_ = false;
   bool not_listened_ = false;
   VclIoHandle* parent_listener_{nullptr};
   std::unique_ptr<VclIoHandle> wrk_listener_{nullptr};
-
-  // Converts a VCL return types to IoCallUint64Result.
-  Api::IoCallUint64Result vclCallResultToIoCallResult(const int32_t result) {
-    if (result >= 0) {
-      // Return nullptr as IoError upon success.
-      return Api::IoCallUint64Result(
-          result, Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError));
-    }
-    RELEASE_ASSERT(result != VPPCOM_EINVAL, "Invalid argument passed in.");
-    return Api::IoCallUint64Result(
-        /*rc=*/0, (result == VPPCOM_EAGAIN
-                       // EAGAIN is frequent enough that its memory allocation should be avoided.
-                       ? Api::IoErrorPtr(Envoy::Network::IoSocketError::getIoSocketEagainInstance(),
-                                         Envoy::Network::IoSocketError::deleteIoError)
-                       : Api::IoErrorPtr(new Envoy::Network::IoSocketError(-result),
-                                         Envoy::Network::IoSocketError::deleteIoError)));
-  }
   Event::FileReadyCb cb_;
 };
 

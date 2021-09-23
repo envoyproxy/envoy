@@ -111,6 +111,23 @@ void vclEndptFromAddress(vppcom_endpt_t& endpt,
   }
 }
 
+// Converts a VCL return types to IoCallUint64Result.
+Api::IoCallUint64Result vclCallResultToIoCallResult(const int32_t result) {
+  if (result >= 0) {
+    // Return nullptr as IoError upon success.
+    return Api::IoCallUint64Result(
+        result, Api::IoErrorPtr(nullptr, Envoy::Network::IoSocketError::deleteIoError));
+  }
+  RELEASE_ASSERT(result != VPPCOM_EINVAL, "Invalid argument passed in.");
+  return Api::IoCallUint64Result(
+      /*rc=*/0, (result == VPPCOM_EAGAIN
+                     // EAGAIN is frequent enough that its memory allocation should be avoided.
+                     ? Api::IoErrorPtr(Envoy::Network::IoSocketError::getIoSocketEagainInstance(),
+                                       Envoy::Network::IoSocketError::deleteIoError)
+                     : Api::IoErrorPtr(new Envoy::Network::IoSocketError(-result),
+                                       Envoy::Network::IoSocketError::deleteIoError)));
+}
+
 } // namespace
 
 VclIoHandle::~VclIoHandle() {
@@ -266,7 +283,7 @@ Api::IoCallUint64Result VclIoHandle::sendmsg(const Buffer::RawSlice* slices, uin
   if (!VCL_SH_VALID(sh_)) {
     return vclCallResultToIoCallResult(VPPCOM_EBADFD);
   }
-  fprintf(stderr, "sendmsg called\n");
+  VCL_LOG("sendmsg called on {:x}", sh_);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_to_write = 0;
@@ -394,7 +411,7 @@ Api::SysCallIntResult VclIoHandle::listen(int) {
 
 Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrlen) {
   auto wrk_index = vclWrkIndexOrRegister();
-  RELEASE_ASSERT(wrk_index != -1 && isListener(), "must have worker and must be listener");
+  RELEASE_ASSERT(wrk_index != -1 && is_listener_, "must have worker and must be listener");
 
   auto sh = sh_;
   if (wrk_index) {
