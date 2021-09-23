@@ -36,6 +36,7 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
+                                            Http::HeaderVector{},
                                             {{}},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
@@ -70,6 +71,8 @@ struct SuccessResponse {
             std::string(header.value().getStringView()));
       }
       if (response_matchers_->matches(header.key().getStringView())) {
+        // For HTTP implementation, the response headers from the auth server will, by default, be
+        // appended (using addCopy) to the encoded response headers.
         response_->response_headers_to_add.emplace_back(
             Http::LowerCaseString{std::string(header.key().getStringView())},
             std::string(header.value().getStringView()));
@@ -348,7 +351,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
                        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{},
+                                Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
                                 std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
                                 ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
@@ -361,6 +364,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->clientHeaderOnSuccessMatchers(),
                          config_->dynamicMetadataMatchers(),
                          Response{CheckStatus::Denied,
+                                  Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
