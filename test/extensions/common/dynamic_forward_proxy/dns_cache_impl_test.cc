@@ -975,6 +975,23 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
                             "config specified DNS cache 'foo' with different settings");
 }
 
+TEST(DnsCacheManagerImplTest, LookupByName) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  DnsCacheManagerImpl cache_manager(context);
+
+  EXPECT_EQ(cache_manager.lookUpCacheByName("foo"), nullptr);
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
+  config1.set_name("foo");
+
+  auto cache1 = cache_manager.getCache(config1);
+  EXPECT_NE(cache1, nullptr);
+
+  auto cache2 = cache_manager.lookUpCacheByName("foo");
+  EXPECT_NE(cache2, nullptr);
+  EXPECT_EQ(cache1, cache2);
+}
+
 TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;

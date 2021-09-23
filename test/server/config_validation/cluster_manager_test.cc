@@ -32,7 +32,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
-  Server::MockOptions options;
+  NiceMock<Server::MockOptions> options;
   NiceMock<Runtime::MockLoader> runtime;
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Random::MockRandomGenerator> random;
