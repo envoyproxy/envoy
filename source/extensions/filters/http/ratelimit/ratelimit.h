@@ -30,9 +30,9 @@ namespace RateLimitFilter {
 enum class FilterRequestType { Internal, External, Both };
 
 /**
- * Type of rate limit override options
+ * Type of virtual host rate limit options
  */
-enum class OverrideOptions { Default, Override, Include, Ignore };
+enum class VhRateLimitOptions { Override, Include, Ignore };
 
 /**
  * Global configuration for the HTTP rate limit filter.
@@ -98,26 +98,21 @@ private:
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
-using RateLimitOverrideOptions =
-    envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::OverrideOptions;
 
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
   FilterConfigPerRoute(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& config)
-      : vh_rate_limits_(config.vh_rate_limits()), override_option_(config.override_option()) {}
+      : vh_rate_limits_(config.vh_rate_limits()) {}
 
   envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
   virtualHostRateLimits() const {
     return vh_rate_limits_;
   }
 
-  RateLimitOverrideOptions rateLimits() const { return override_option_; }
-
 private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
-  const RateLimitOverrideOptions override_option_;
 };
 
 /**
@@ -163,8 +158,7 @@ private:
                                     const Http::RequestHeaderMap& headers) const;
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
-
-  OverrideOptions getRateLimitOverrideOption(const Router::RouteConstSharedPtr& route);
+  VhRateLimitOptions getVirtualHostRateLimitOption(const Router::RouteConstSharedPtr& route);
 
   Http::Context& httpContext() { return config_->httpContext(); }
 
@@ -174,7 +168,7 @@ private:
   Filters::Common::RateLimit::ClientPtr client_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   State state_{State::NotStarted};
-  OverrideOptions override_option_;
+  VhRateLimitOptions vh_rate_limits_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
