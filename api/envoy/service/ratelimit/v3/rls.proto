@@ -104,7 +104,7 @@ message RateLimitResponse {
   }
 
   // Cacheable quota for responses, see documentation for the :ref:`quota
-  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.quota>` field.
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.quota>` field.
   // [#not-implemented-hide:]
   message Quota {
     // Number of matching requests granted in quota. Must be 1 or more.
