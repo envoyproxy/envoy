@@ -20,7 +20,7 @@ ProduceRequestHolder::ProduceRequestHolder(AbstractRequestListener& filter,
                                            const RecordExtractor& record_extractor,
                                            const std::shared_ptr<Request<ProduceRequest>> request)
     : BaseInFlightRequest{filter}, kafka_facade_{kafka_facade}, request_{request} {
-  outbound_records_ = record_extractor.extractRecords(request_->data_.topics_);
+  outbound_records_ = record_extractor.extractRecords(request_->data_.topic_data_);
   expected_responses_ = outbound_records_.size();
 }
 

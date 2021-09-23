@@ -10,11 +10,11 @@ std::vector<OutboundRecord>
 RecordExtractorImpl::extractRecords(const std::vector<TopicProduceData>& data) const {
   std::vector<OutboundRecord> result;
   for (const auto& topic_data : data) {
-    for (const auto& partition_data : topic_data.partitions_) {
+    for (const auto& partition_data : topic_data.partition_data_) {
       // Kafka protocol allows nullable data.
       if (partition_data.records_) {
-        const auto topic_result = extractPartitionRecords(
-            topic_data.name_, partition_data.partition_index_, *(partition_data.records_));
+        const auto topic_result = extractPartitionRecords(topic_data.name_, partition_data.index_,
+                                                          *(partition_data.records_));
         std::copy(topic_result.begin(), topic_result.end(), std::back_inserter(result));
       }
     }
