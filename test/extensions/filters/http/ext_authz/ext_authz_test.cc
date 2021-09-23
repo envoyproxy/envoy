@@ -1904,7 +1904,7 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   response.body = std::string{"foo"};
   response.headers_to_set = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
                                                {Http::LowerCaseString{"bar"}, "foo"}};
-  // `foobar` should be added as it's not already present but `foo` should be left untouched.
+  // None of the headers should be added in this case as the response is denied.
   response.headers_to_add_if_absent = Http::HeaderVector{
       {Http::LowerCaseString{"foo"}, "no-op"}, {Http::LowerCaseString{"foobar"}, "foobar"}};
   Filters::Common::ExtAuthz::ResponsePtr response_ptr =
@@ -1919,9 +1919,11 @@ TEST_P(HttpFilterTestParam, DestroyResponseBeforeSendLocalReply) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));
 
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "403"},   {"content-length", "3"}, {"content-type", "text/plain"},
-      {"foobar", "foobar"}, {"foo", "bar"},          {"bar", "foo"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"},
+                                                   {"content-length", "3"},
+                                                   {"content-type", "text/plain"},
+                                                   {"foo", "bar"},
+                                                   {"bar", "foo"}};
   Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
       .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) { saved_headers = &headers; }));
