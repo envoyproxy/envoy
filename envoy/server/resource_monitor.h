@@ -41,25 +41,6 @@ public:
   virtual void onFailure(const EnvoyException& error) PURE;
 };
 
-class ReactiveResourceUpdateCallbacks {
-public:
-  virtual ~ReactiveResourceUpdateCallbacks() = default;
-
-  /**
-   * Called when the request for updated resource usage succeeds.
-   * @param usage the updated resource usage
-   */
-  virtual void onSuccess(const uint64_t usage) PURE;
-
-  /**
-   * Called when the request for updated resource usage fails.
-   * todo may need propagate error
-   */
-  virtual void onFailure() PURE;
-
-  virtual Event::Dispatcher& dispatcher() PURE;
-};
-
 class ResourceMonitor {
 public:
   virtual ~ResourceMonitor() = default;
