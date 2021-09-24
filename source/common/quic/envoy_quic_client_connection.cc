@@ -126,7 +126,6 @@ void EnvoyQuicClientConnection::MaybeMigratePort(Network::Address::InstanceConst
     return;
   }
 
-  std::cout << "prepare for migration" << std::endl;
   std::cout << "current local address " << connectionSocket()->connectionInfoProvider().localAddress()->asString() << std::endl;
 
   //Network::Address::InstanceConstSharedPtr local_addr;
@@ -160,13 +159,10 @@ void EnvoyQuicClientConnection::OnPathValidationFailure(std::unique_ptr<quic::Qu
   std::cout << "path validation failed" << std::endl;
   OnPathValidationFailureAtClient();
   CancelPathValidation();
+  probing_socket_.reset();
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
-  if (events == 1) {
-    //std::cout << quic::QuicStackTrace() << std::endl;
-  }
-  std::cout << "client connection file event " << events << std::endl;
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));
 
@@ -179,39 +175,30 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   // TODO(mattklein123): Right now QUIC client is hard coded to use GRO because it is probably the
   // right default for QUIC. Determine whether this should be configurable or not.
   if (connected() && (events & Event::FileReadyType::Read)) {
-    if (!connectionSocket()) {
+    for (auto& socket : connectionSockets()) {
+      Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
+        socket->ioHandle(),
+        *socket->connectionInfoProvider().localAddress(), *this,
+        dispatcher_.timeSource(), true, packets_dropped_);
+      if (err == nullptr) {
+        socket->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+      } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+        ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
+                       err->getErrorDetails());
+      }
+    }
+
+    if (!probing_socket_) {
       return;
     }
-    Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        connectionSocket()->ioHandle(),
-        *connectionSocket()->connectionInfoProvider().localAddress(), *this,
-        dispatcher_.timeSource(), true, packets_dropped_);
-    std::cout << "done reading from " << connectionSocket()->ioHandle().fdDoNotUse() << std::endl;
-    if (err == nullptr) {
-      if (!connectionSocket()) {
-        std::cout << "socket disappeared" << std::endl;
-        return;
-      }
-      std::cout << "at here!!!!!!!!!!!!!!!!!" << std::endl;
-      connectionSocket()->ioHandle().activateFileEvents(Event::FileReadyType::Read);
-      std::cout << "past here!!!!!!!!!!!!!!!!!" << std::endl;
-    }
-    std::cout << "error is nullptr??" << (err ==nullptr) <<std::endl;
-    if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-      ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
-                     err->getErrorDetails());
-      std::cout << "passed logging" <<std::endl;
-    }
-    std::cout << "reached return" << std::endl;
-    return;
 
-    err = Network::Utility::readPacketsFromSocket(
-        probing_socket_->ioHandle(),
-        *probing_socket_->connectionInfoProvider().localAddress(), *this,
+    auto* probing_socket = probing_socket_.get();
+    Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
+        probing_socket->ioHandle(),
+        *probing_socket->connectionInfoProvider().localAddress(), *this,
         dispatcher_.timeSource(), true, packets_dropped_);
-    if (err == nullptr) {
-      std::cout << "probing socket moved ? " << (probing_socket_ == nullptr) << std::endl;
-      probing_socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    if (err == nullptr && probing_socket) {
+      probing_socket->ioHandle().activateFileEvents(Event::FileReadyType::Read);
       return;
     }
     if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {

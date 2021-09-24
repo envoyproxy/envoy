@@ -63,6 +63,57 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
+// This class enables testing on QUIC path validation
+class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
+public:
+  TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                            Network::Address::InstanceConstSharedPtr& initial_peer_address,
+                            quic::QuicConnectionHelperInterface& helper,
+                            quic::QuicAlarmFactory& alarm_factory,
+                            const quic::ParsedQuicVersionVector& supported_versions,
+                            Network::Address::InstanceConstSharedPtr local_addr,
+                            Event::Dispatcher& dispatcher,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options, bool validation_failure_on_path_response = false)
+  : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory, supported_versions, local_addr, dispatcher, options), dispatcher_(dispatcher), validation_failure_on_path_response_(validation_failure_on_path_response) {}
+
+  AssertionResult WaitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    bool timer_fired = false;
+    if (!saw_path_response_) {
+      Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+        timer_fired = true;
+        dispatcher_.exit();
+      }));
+      timer->enableTimer(timeout);
+      waiting_for_path_response_ = true;
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+      if (timer_fired) {
+        return AssertionFailure() << "Timed out waiting for path response\n";
+      }
+    }
+    return AssertionSuccess();
+  }
+
+  bool OnPathResponseFrame(const quic::QuicPathResponseFrame& frame) override {
+    saw_path_response_ = true;
+    if (waiting_for_path_response_) {
+      dispatcher_.exit();
+    }
+    if (!validation_failure_on_path_response_) {
+      return EnvoyQuicClientConnection::OnPathResponseFrame(frame);
+    }
+    CancelPathValidation();
+    return connected();
+  }  
+
+
+
+private:
+  Event::Dispatcher& dispatcher_;
+  bool saw_path_response_{false};
+  bool waiting_for_path_response_{false};
+  bool validation_failure_on_path_response_{false};
+};
+
 // A test that sets up its own client connection with customized quic version and connection ID.
 class QuicHttpIntegrationTest : public HttpIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
@@ -95,7 +146,7 @@ public:
     // supported by server, this connection will fail.
     // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
     // different version set on server side to test that.
-    auto connection = std::make_unique<EnvoyQuicClientConnection>(
+    auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
     quic_connection_ = connection.get();
@@ -221,7 +272,7 @@ protected:
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
-  EnvoyQuicClientConnection* quic_connection_{nullptr};
+  TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
 };
@@ -323,11 +374,10 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
       createConnectionSocket(server_addr_, local_addr, nullptr));
-  std::cout << "switch socket complete" <<std::endl;
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
-  /*codec_client_->sendData(*request_encoder_, 1024u, true);
-  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);*/
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
   // Send response headers, and end_stream if there is no response body.
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   size_t response_size{5u};
@@ -378,15 +428,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->MaybeMigratePort(local_addr);
-  sleep(2);
-  //quic_connection_->onFileEvent(1);
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  constexpr auto timeout_first = std::chrono::seconds(15);
-  if (GetParam() == Network::Address::IpVersion::v4) {
-      test_server_->waitForCounterEq("listener.127.0.0.1_0.downstream_cx_total", 0u, timeout_first);
-    } else {
-      test_server_->waitForCounterEq("listener.[__1]_0.downstream_cx_total", 0u, timeout_first);
-    }
+  ASSERT_TRUE(quic_connection_->WaitForPathResponse());
   //dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Change to a new port by switching socket, and connection should still continue.

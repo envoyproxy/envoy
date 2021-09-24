@@ -38,6 +38,8 @@ public:
 protected:
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }
 
+  std::vector<Network::ConnectionSocketPtr>& connectionSockets() { return connection_sockets_; }
+
   void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
     connection_sockets_.push_back(std::move(connection_socket));
   }
