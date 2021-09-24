@@ -131,6 +131,8 @@ New Features
 * sxg_filter: added filter to transform response to SXG package to :ref:`contrib images <install_contrib>`. This can be enabled by setting :ref:`SXG <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>` configuration.
 * thrift_proxy: added support for :ref:`mirroring requests <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies>`.
 * upstream: support max stream duration for upstream connections.
+* udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
+* udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 
 Deprecated
 ----------

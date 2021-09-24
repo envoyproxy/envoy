@@ -128,10 +128,10 @@ TEST_F(ProduceUnitTest, ShouldSendRecordsInNormalFlow) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 2);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, dm1.error_code_);
-  EXPECT_EQ(responses[0].partitions_[0].base_offset_, dm1.offset_);
-  EXPECT_EQ(responses[1].partitions_[0].error_code_, dm2.error_code_);
-  EXPECT_EQ(responses[1].partitions_[0].base_offset_, dm2.offset_);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, dm1.error_code_);
+  EXPECT_EQ(responses[0].partition_responses_[0].base_offset_, dm1.offset_);
+  EXPECT_EQ(responses[1].partition_responses_[0].error_code_, dm2.error_code_);
+  EXPECT_EQ(responses[1].partition_responses_[0].base_offset_, dm2.offset_);
 }
 
 // Typical flow without errors.
@@ -182,9 +182,9 @@ TEST_F(ProduceUnitTest, ShouldMergeOutboundRecordResponses) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 1);
-  EXPECT_EQ(responses[0].partitions_.size(), 1);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, 0);
-  EXPECT_EQ(responses[0].partitions_[0].base_offset_, 1313);
+  EXPECT_EQ(responses[0].partition_responses_.size(), 1);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, 0);
+  EXPECT_EQ(responses[0].partition_responses_[0].base_offset_, 1313);
 }
 
 // Flow with errors.
@@ -237,7 +237,7 @@ TEST_F(ProduceUnitTest, ShouldHandleDeliveryErrors) {
   ASSERT_TRUE(response);
   const std::vector<TopicProduceResponse> responses = response->data_.responses_;
   EXPECT_EQ(responses.size(), 1);
-  EXPECT_EQ(responses[0].partitions_[0].error_code_, dm1.error_code_);
+  EXPECT_EQ(responses[0].partition_responses_[0].error_code_, dm1.error_code_);
 }
 
 // As with current version of Kafka library we have no capability of linking producer's notification
