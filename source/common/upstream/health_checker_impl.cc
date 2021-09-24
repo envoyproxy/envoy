@@ -176,7 +176,7 @@ HttpHealthCheckerImpl::HttpStatusChecker::HttpStatusChecker(
 }
 
 void HttpHealthCheckerImpl::HttpStatusChecker::validateRange(uint64_t start, uint64_t end,
-                                                             absl::string_view range_type) const {
+                                                             absl::string_view range_type) {
   if (start >= end) {
     throw EnvoyException(fmt::format("Invalid http {} status range: expecting start < "
                                      "end, but found start={} and end={}",
@@ -204,7 +204,7 @@ bool HttpHealthCheckerImpl::HttpStatusChecker::inExpectedRanges(uint64_t http_st
 }
 
 bool HttpHealthCheckerImpl::HttpStatusChecker::inRanges(
-    uint64_t http_status, const std::vector<std::pair<uint64_t, uint64_t>>& ranges) const {
+    uint64_t http_status, const std::vector<std::pair<uint64_t, uint64_t>>& ranges) {
   for (const auto& range : ranges) {
     if (http_status >= range.first && http_status < range.second) {
       return true;
