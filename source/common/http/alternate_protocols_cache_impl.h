@@ -19,7 +19,8 @@ namespace Http {
 // See: source/docs/http3_upstream.md
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache {
 public:
-  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store);
+  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store,
+                              size_t max_entries);
   ~AlternateProtocolsCacheImpl() override;
 
   // Convert an AlternateProtocol vector to a string to cache to the key value
@@ -48,12 +49,16 @@ private:
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
-  // Map from hostname to list of alternate protocols.
-  // TODO(RyanTheOptimist): Add a limit to the size of this map and evict based on usage.
-  std::map<Origin, std::vector<AlternateProtocol>> protocols_;
+  using ListType = std::list<std::pair<Origin, std::vector<AlternateProtocol>>>;
+  // List of origin, alternate protocol pairs, in insertion order.
+  ListType protocols_list_;
+  // Map from hostname to iterator into protocols_list_.
+  std::map<Origin, ListType::iterator> protocols_map_;
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;
+
+  const size_t max_entries_;
 };
 
 } // namespace Http
