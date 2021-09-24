@@ -196,7 +196,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::initRdsConfigPro
 
   rds_update_callback_handle_ = route_provider_->subscription().addUpdateCallback([this]() {
     // Subscribe to RDS update.
-    parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+    parent_.onRdsConfigUpdate(scope_name_, route_provider_->config());
   });
   parent_.stats_.active_scopes_.inc();
 }
@@ -231,7 +231,7 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
     return;
   }
   // If RouteConfiguration has been initialized, apply update to all the threads.
-  parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
+  parent_.onRdsConfigUpdate(scope_name_, route_provider_->config());
 }
 
 bool ScopedRdsConfigSubscription::addOrUpdateScopes(
@@ -393,16 +393,13 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
 }
 
 void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_name,
-                                                    RdsRouteConfigSubscription& rds_subscription) {
+                                                    ConfigConstSharedPtr new_rds_config) {
   auto iter = scoped_route_map_.find(scope_name);
   ASSERT(iter != scoped_route_map_.end(),
          fmt::format("trying to update route config for non-existing scope {}", scope_name));
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3::ScopedRouteConfiguration(iter->second->configProto()),
-      std::make_shared<ConfigImpl>(
-          rds_subscription.routeConfigUpdate()->protobufConfiguration(), optional_http_filters_,
-          factory_context_, factory_context_.messageValidationContext().dynamicValidationVisitor(),
-          false));
+      std::move(new_rds_config));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =

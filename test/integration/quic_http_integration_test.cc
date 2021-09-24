@@ -87,6 +87,12 @@ public:
       uint32_t port, const Network::ConnectionSocket::OptionsSharedPtr& options) override {
     // Setting socket options is not supported.
     ASSERT(!options);
+    return makeClientConnectionWithHost(port, "");
+  }
+
+  Network::ClientConnectionPtr makeClientConnectionWithHost(uint32_t port,
+                                                            const std::string& host) {
+    // Setting socket options is not supported.
     server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
@@ -103,8 +109,9 @@ public:
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
     auto session = std::make_unique<EnvoyQuicClientSession>(
         persistent_info.quic_config_, supported_versions_, std::move(connection),
-        persistent_info.server_id_, persistent_info.cryptoConfig(), &push_promise_index_,
-        *dispatcher_,
+        (host.empty() ? persistent_info.server_id_
+                      : quic::QuicServerId{host, static_cast<uint16_t>(port), false}),
+        persistent_info.cryptoConfig(), &push_promise_index_, *dispatcher_,
         // Use smaller window than the default one to have test coverage of client codec buffer
         // exceeding high watermark.
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
@@ -119,8 +126,6 @@ public:
         HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
     if (!codec->disconnected()) {
       codec->setCodecClientCallbacks(client_codec_callback_);
-      EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
-                codec->connection()->requestedServerName());
     }
     return codec;
   }
@@ -240,6 +245,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   initialize();
   // Start the first connection.
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
   // Send a complete request on the first connection.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
@@ -434,6 +441,188 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForReset());
+}
+
+class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
+public:
+  void inplaceInitialize(bool add_default_filter_chain = false) {
+    autonomous_upstream_ = true;
+    setUpstreamCount(2);
+
+    config_helper_.addConfigModifier([add_default_filter_chain](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* filter_chain_0 =
+          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+      *filter_chain_0->mutable_filter_chain_match()->mutable_server_names()->Add() = "www.lyft.com";
+      auto* filter_chain_1 = bootstrap.mutable_static_resources()
+                                 ->mutable_listeners(0)
+                                 ->mutable_filter_chains()
+                                 ->Add();
+      filter_chain_1->MergeFrom(*filter_chain_0);
+
+      // filter chain 1 route to cluster_1
+      *filter_chain_1->mutable_filter_chain_match()->mutable_server_names(0) = "lyft.com";
+
+      filter_chain_0->set_name("filter_chain_0");
+      filter_chain_1->set_name("filter_chain_1");
+
+      auto* config_blob = filter_chain_1->mutable_filters(0)->mutable_typed_config();
+
+      ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::http_connection_manager::v3::
+                                      HttpConnectionManager>());
+      auto hcm_config = MessageUtil::anyConvert<
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
+          *config_blob);
+      hcm_config.mutable_route_config()
+          ->mutable_virtual_hosts(0)
+          ->mutable_routes(0)
+          ->mutable_route()
+          ->set_cluster("cluster_1");
+      config_blob->PackFrom(hcm_config);
+      bootstrap.mutable_static_resources()->mutable_clusters()->Add()->MergeFrom(
+          *bootstrap.mutable_static_resources()->mutable_clusters(0));
+      bootstrap.mutable_static_resources()->mutable_clusters(1)->set_name("cluster_1");
+
+      if (add_default_filter_chain) {
+        auto default_filter_chain = bootstrap.mutable_static_resources()
+                                        ->mutable_listeners(0)
+                                        ->mutable_default_filter_chain();
+        default_filter_chain->MergeFrom(*filter_chain_0);
+        default_filter_chain->set_name("filter_chain_default");
+      }
+    });
+
+    QuicHttpIntegrationTest::initialize();
+  }
+
+  void makeRequestAndWaitForResponse(IntegrationCodecClient& codec_client) {
+    IntegrationStreamDecoderPtr response =
+        codec_client.makeHeaderOnlyRequest(default_request_headers_);
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_FALSE(codec_client.sawGoAway());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicInplaceLdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateNonDefaultFilterChain) {
+  inplaceInitialize(/*add_default_filter_chain=*/false);
+
+  auto codec_client_0 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
+  auto codec_client_1 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
+
+  // Remove filter_chain_1.
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  EXPECT_TRUE(codec_client_1->sawGoAway());
+  codec_client_1->close();
+
+  auto codec_client_2 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client_2);
+  codec_client_2->close();
+
+  // Update filter chain again to add back filter_chain_1.
+  config_helper_.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 2);
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 3);
+
+  auto codec_client_3 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client_3);
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+  codec_client_3->close();
+}
+
+// Verify that the connection received GO_AWAY after its filter chain gets deleted during the
+// listener update.
+TEST_P(QuicInplaceLdsIntegrationTest, ReloadConfigUpdateDefaultFilterChain) {
+  inplaceInitialize(/*add_default_filter_chain=*/true);
+
+  auto codec_client_0 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "www.lyft.com"));
+
+  // Remove filter_chain_1.
+  ConfigHelper new_config_helper(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
+  new_config_helper.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->mutable_filter_chains()->RemoveLast();
+      });
+
+  new_config_helper.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+  // This connection should pick up the default filter chain.
+  auto codec_client_default =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client_default);
+  makeRequestAndWaitForResponse(*codec_client_0);
+
+  // Modify the default filter chain.
+  ConfigHelper new_config_helper1(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper.bootstrap()));
+  new_config_helper1.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap)
+                                           -> void {
+    auto default_filter_chain =
+        bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_default_filter_chain();
+    default_filter_chain->set_name("default_filter_chain_v3");
+  });
+
+  new_config_helper1.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 2);
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+
+  makeRequestAndWaitForResponse(*codec_client_0);
+  EXPECT_TRUE(codec_client_default->sawGoAway());
+  codec_client_default->close();
+
+  // This connection should pick up the new default filter chain.
+  auto codec_client_1 =
+      makeHttpConnection(makeClientConnectionWithHost(lookupPort("http"), "lyft.com"));
+  makeRequestAndWaitForResponse(*codec_client_1);
+
+  // Remove the default filter chain.
+  ConfigHelper new_config_helper2(
+      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(new_config_helper1.bootstrap()));
+  new_config_helper2.addConfigModifier(
+      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+        listener->clear_default_filter_chain();
+      });
+
+  new_config_helper2.setLds("1");
+  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 3);
+  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+
+  makeRequestAndWaitForResponse(*codec_client_0);
+  codec_client_0->close();
+  EXPECT_TRUE(codec_client_1->sawGoAway());
+  codec_client_1->close();
 }
 
 } // namespace Quic

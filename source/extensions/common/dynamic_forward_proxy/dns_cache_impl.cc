@@ -282,7 +282,8 @@ void DnsCacheImpl::forceRefreshHosts() {
     if (primary_host.second->active_query_ == nullptr) {
       ASSERT(!primary_host.second->timeout_timer_->enabled());
       primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
-      ENVOY_LOG(debug, "force refreshing host='{}'", primary_host.first);
+      ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'",
+                      primary_host.first);
     }
   }
 }
