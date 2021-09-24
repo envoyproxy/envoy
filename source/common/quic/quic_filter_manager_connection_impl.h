@@ -183,7 +183,7 @@ private:
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
-  Network::FilterManagerImpl filter_manager_;
+  std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;

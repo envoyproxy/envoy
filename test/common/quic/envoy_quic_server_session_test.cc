@@ -164,8 +164,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_,
-                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
+                            crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
