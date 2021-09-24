@@ -153,6 +153,9 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
 
   // use other header fields provided in the new response to replace all instances
   // of the corresponding header fields in the stored response
+
+  // `updatedHeaderFields`to makes sure each field is only removed when we update the header
+  // field for the first time to handle the case where incoming headers have repeated values
   absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
   response_headers.iterate(
       [&entry, &updatedHeaderFields](
@@ -162,9 +165,6 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
         if (headersNotToUpdate().contains(lower_case_key)) {
           return Http::HeaderMap::Iterate::Continue;
         }
-        // A single `setCopy` cannot be used here, because if there's a repeated header in the
-        // incoming update, the second occurrence would overwrite our first occurrence. We need
-        // to make sure each field is only removed once using the `updatedHeaderFields`
         if (!updatedHeaderFields.contains(lower_case_key)) {
           entry.response_headers_->setCopy(lower_case_key, incoming_value);
           updatedHeaderFields.insert(lower_case_key);
