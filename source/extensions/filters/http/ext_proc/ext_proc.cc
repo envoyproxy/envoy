@@ -65,16 +65,24 @@ Filter::StreamOpenState Filter::openStream() {
   return StreamOpenState::Ok;
 }
 
-void Filter::onDestroy() {
-  ENVOY_LOG(trace, "onDestroy");
-  // Make doubly-sure we no longer use the stream, as
-  // per the filter contract.
-  processing_complete_ = true;
+void Filter::closeStream() {
   if (stream_) {
+    ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
     }
+    stream_.reset();
+  } else {
+    ENVOY_LOG(debug, "Stream already closed");
   }
+}
+
+void Filter::onDestroy() {
+  ENVOY_LOG(debug, "onDestroy");
+  // Make doubly-sure we no longer use the stream, as
+  // per the filter contract.
+  processing_complete_ = true;
+  closeStream();
 }
 
 FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
@@ -478,7 +486,9 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
   case ProcessingResponse::ResponseCase::kImmediateResponse:
     // We won't be sending anything more to the stream after we
     // receive this message.
+    ENVOY_LOG(debug, "Sending immediate response");
     processing_complete_ = true;
+    closeStream();
     cleanUpTimers();
     sendImmediateResponse(response->immediate_response());
     message_handled = true;
@@ -499,6 +509,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // to protect us from a malformed server.
     ENVOY_LOG(warn, "Spurious response message {} received on gRPC stream",
               response->response_case());
+    closeStream();
     clearAsyncState();
     processing_complete_ = true;
   }
@@ -519,6 +530,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
 
   } else {
     processing_complete_ = true;
+    closeStream();
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
     cleanUpTimers();
@@ -535,6 +547,7 @@ void Filter::onGrpcClose() {
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
+  closeStream();
   clearAsyncState();
 }
 
@@ -547,12 +560,14 @@ void Filter::onMessageTimeout() {
     // and we can't wait any more. So, as we do for a spurious message, ignore
     // the external processor for the rest of the request.
     processing_complete_ = true;
+    closeStream();
     stats_.failure_mode_allowed_.inc();
     clearAsyncState();
 
   } else {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
+    closeStream();
     decoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;

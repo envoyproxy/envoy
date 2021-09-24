@@ -31,7 +31,9 @@ public:
                                    const StreamInfo::StreamInfo& stream_info) override;
 
 private:
-  Grpc::AsyncClientFactoryPtr factory_;
+  Grpc::AsyncClientManager& client_manager_;
+  const envoy::config::core::v3::GrpcService grpc_service_;
+  Stats::Scope& scope_;
 };
 
 class ExternalProcessorStreamImpl : public ExternalProcessorStream,

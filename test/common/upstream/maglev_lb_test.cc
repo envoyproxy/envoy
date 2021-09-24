@@ -103,6 +103,19 @@ TEST_F(MaglevLoadBalancerTest, SelectOverrideHost) {
   EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
 }
 
+// Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
+// cluster, the operation does not immediately reach the worker thread. There may be cases where the
+// thread aware load balancer is destructed, but the load balancer factory is still used in the
+// worker thread.
+TEST_F(MaglevLoadBalancerTest, LbDestructedBeforeFactory) {
+  init(7);
+
+  auto factory = lb_->factory();
+  lb_.reset();
+
+  EXPECT_NE(nullptr, factory->create());
+}
+
 // Throws an exception if table size is not a prime number.
 TEST_F(MaglevLoadBalancerTest, NoPrimeNumber) {
   EXPECT_THROW_WITH_MESSAGE(init(8), EnvoyException,

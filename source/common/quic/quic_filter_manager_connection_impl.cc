@@ -12,7 +12,9 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
-      network_connection_(&connection), filter_manager_(*this, *connection.connectionSocket()),
+      network_connection_(&connection),
+      filter_manager_(
+          std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(dispatcher.timeSource(),
                    connection.connectionSocket()->connectionInfoProviderSharedPtr()),
       write_buffer_watermark_simulation_(
@@ -22,23 +24,23 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {
-  filter_manager_.addWriteFilter(filter);
+  filter_manager_->addWriteFilter(filter);
 }
 
 void QuicFilterManagerConnectionImpl::addFilter(Network::FilterSharedPtr filter) {
-  filter_manager_.addFilter(filter);
+  filter_manager_->addFilter(filter);
 }
 
 void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr filter) {
-  filter_manager_.addReadFilter(filter);
+  filter_manager_->addReadFilter(filter);
 }
 
 void QuicFilterManagerConnectionImpl::removeReadFilter(Network::ReadFilterSharedPtr filter) {
-  filter_manager_.removeReadFilter(filter);
+  filter_manager_->removeReadFilter(filter);
 }
 
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
-  return filter_manager_.initializeReadFilters();
+  return filter_manager_->initializeReadFilters();
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
@@ -171,6 +173,7 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     network_connection_ = nullptr;
   }
 
+  filter_manager_ = nullptr;
   if (!codec_stats_.has_value()) {
     // The connection was closed before it could be used. Stats are not recorded.
     return;

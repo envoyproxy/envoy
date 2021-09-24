@@ -20,7 +20,7 @@ public:
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
     if (upstream_count > 1) {
-      setDeterministic();
+      setDeterministicValue();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
