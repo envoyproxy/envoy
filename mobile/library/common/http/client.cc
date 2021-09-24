@@ -13,7 +13,7 @@
 #include "library/common/data/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
-#include "library/common/network/mobile_utility.h"
+#include "library/common/network/configurator.h"
 
 namespace Envoy {
 namespace Http {

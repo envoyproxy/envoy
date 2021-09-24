@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+package envoymobile.extensions.filters.http.network_configuration;
+
+message NetworkConfiguration {
+}

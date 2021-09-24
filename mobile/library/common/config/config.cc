@@ -235,9 +235,9 @@ static_resources:
                       max_interval: 60s
           http_filters:
 #{custom_filters}
-          - name: envoy.filters.http.socket_selection
+          - name: envoy.filters.http.network_configuration
             typed_config:
-              "@type": type.googleapis.com/envoymobile.extensions.filters.http.socket_selection.SocketSelection
+              "@type": type.googleapis.com/envoymobile.extensions.filters.http.network_configuration.NetworkConfiguration
           - name: envoy.filters.http.local_error
             typed_config:
               "@type": type.googleapis.com/envoymobile.extensions.filters.http.local_error.LocalError
@@ -245,7 +245,7 @@ static_resources:
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
               dns_cache_config: &dns_cache_config
-                name: dynamic_forward_proxy_cache_config
+                name: base_dns_cache
 )"              // TODO: Support API for overriding prefetch_hostnames:
                 // https://github.com/envoyproxy/envoy-mobile/issues/1534
 R"(

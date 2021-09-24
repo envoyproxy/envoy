@@ -1,4 +1,4 @@
-#include "library/common/network/mobile_utility.h"
+#include "library/common/network/configurator.h"
 
 #include "envoy/common/platform.h"
 
@@ -6,6 +6,7 @@
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/addr_family_aware_socket_option_impl.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 // Used on Linux/Android
 #ifdef SO_BINDTODEVICE
@@ -60,21 +61,46 @@ namespace {
 #define SUPPORTS_GETIFADDRS
 #endif
 
-std::atomic<envoy_network_t> MobileUtility::preferred_network_{ENVOY_NET_GENERIC};
+SINGLETON_MANAGER_REGISTRATION(network_configurator);
 
-void MobileUtility::setPreferredNetwork(envoy_network_t network) { preferred_network_ = network; }
+constexpr absl::string_view BaseDnsCache = "base_dns_cache";
 
-envoy_network_t MobileUtility::getPreferredNetwork() { return preferred_network_.load(); }
+std::atomic<envoy_network_t> Configurator::preferred_network_{ENVOY_NET_GENERIC};
 
-std::vector<std::string> MobileUtility::enumerateV4Interfaces() {
+envoy_network_t Configurator::setPreferredNetwork(envoy_network_t network) {
+  ENVOY_LOG_EVENT(debug, "network_configuration_network_change", std::to_string(network));
+  return preferred_network_.exchange(network);
+}
+
+envoy_network_t Configurator::getPreferredNetwork() { return preferred_network_.load(); }
+
+void Configurator::refreshDns(envoy_network_t network) {
+  // refreshDns is intended to be queued on Envoy's event loop, whereas preferred_network_ is
+  // updated synchronously. In the event that multiple refreshes become queued on the event loop,
+  // this avoids triggering a refresh for a non-current network.
+  // Note this does NOT completely prevent parallel refreshes from being triggered in multiple
+  // flip-flop scenarios.
+  if (network != preferred_network_.load()) {
+    return;
+  }
+  // TODO(goaway): track event here or are there existing signals we can use?
+  if (auto dns_cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache)) {
+    ENVOY_LOG_EVENT(debug, "network_configuration_refresh_dns", std::to_string(network));
+    dns_cache->forceRefreshHosts();
+  } else {
+    ENVOY_LOG_EVENT(warn, "network_configuration_dns_cache_missing", BaseDnsCache);
+  }
+}
+
+std::vector<std::string> Configurator::enumerateV4Interfaces() {
   return enumerateInterfaces(AF_INET);
 }
 
-std::vector<std::string> MobileUtility::enumerateV6Interfaces() {
+std::vector<std::string> Configurator::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6);
 }
 
-Socket::OptionsSharedPtr MobileUtility::getUpstreamSocketOptions(envoy_network_t network) {
+Socket::OptionsSharedPtr Configurator::getUpstreamSocketOptions(envoy_network_t network) {
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
@@ -87,8 +113,7 @@ Socket::OptionsSharedPtr MobileUtility::getUpstreamSocketOptions(envoy_network_t
   return options;
 }
 
-std::vector<std::string>
-MobileUtility::enumerateInterfaces([[maybe_unused]] unsigned short family) {
+std::vector<std::string> Configurator::enumerateInterfaces([[maybe_unused]] unsigned short family) {
   std::vector<std::string> names{};
 
 #ifdef SUPPORTS_GETIFADDRS
@@ -108,6 +133,15 @@ MobileUtility::enumerateInterfaces([[maybe_unused]] unsigned short family) {
 #endif // SUPPORTS_GETIFADDRS
 
   return names;
+}
+
+ConfiguratorSharedPtr ConfiguratorHandle::get() {
+  return context_.singletonManager().getTyped<Configurator>(
+      SINGLETON_MANAGER_REGISTERED_NAME(network_configurator), [&] {
+        Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory{
+            context_};
+        return std::make_shared<Configurator>(cache_manager_factory.get());
+      });
 }
 
 } // namespace Network
