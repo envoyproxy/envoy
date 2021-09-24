@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-package envoymobile.extensions.filters.http.socket_selection;
-
-message SocketSelection {
-}

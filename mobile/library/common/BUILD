@@ -31,7 +31,7 @@ envoy_cc_library(
         "//library/common/event:provisional_dispatcher_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
-        "//library/common/network:mobile_utility_lib",
+        "//library/common/network:configurator_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/server:lifecycle_notifier_interface",

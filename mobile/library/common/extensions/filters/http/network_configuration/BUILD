@@ -15,14 +15,14 @@ envoy_proto_library(
 )
 
 envoy_cc_extension(
-    name = "socket_selection_filter_lib",
+    name = "network_configuration_filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     repository = "@envoy",
     deps = [
         ":filter_cc_proto",
         "//library/common/http:internal_headers_lib",
-        "//library/common/network:mobile_utility_lib",
+        "//library/common/network:configurator_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:codes_interface",
         "@envoy//envoy/http:filter_interface",
@@ -42,7 +42,7 @@ envoy_cc_extension(
     hdrs = ["config.h"],
     repository = "@envoy",
     deps = [
-        ":socket_selection_filter_lib",
+        ":network_configuration_filter_lib",
         "@envoy//source/extensions/filters/http/common:factory_base_lib",
     ],
 )
