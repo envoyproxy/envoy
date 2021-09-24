@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -115,13 +116,33 @@ public:
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    IntegrationCodecClientPtr codec =
-        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    if (!codec->disconnected()) {
-      codec->setCodecClientCallbacks(client_codec_callback_);
-      EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
-                codec->connection()->requestedServerName());
+    std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+    cluster->max_response_headers_count_ = 200;
+    if (http2_options.has_value()) {
+      cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+          http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
+    cluster->http3_options_.set_allow_extended_connect(true);
+    *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
+    Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+        timeSystem())};
+    // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
+    // in-connection version negotiation.
+    auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                          host_description, downstream_protocol_);
+    if (codec->disconnected()) {
+      // Connection may get closed during version negotiation or handshake.
+      // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
+      // INVALID_VERSION error to caller and let caller to use server advertised version list to
+      // create a new connection with mutually supported version and make client codec again.
+      ENVOY_LOG(error, "Fail to connect to server with error: {}",
+                codec->connection()->transportFailureReason());
+      return codec;
+    }
+    codec->setCodecClientCallbacks(client_codec_callback_);
+    EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+              codec->connection()->requestedServerName());
     return codec;
   }
 
@@ -224,6 +245,7 @@ protected:
   EnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
+  envoy::config::core::v3::QuicProtocolOptions client_quic_options_;
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
@@ -434,6 +456,59 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   auto response = std::move(encoder_decoder.second);
 
   ASSERT_TRUE(response->waitForReset());
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 5;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_value(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_value(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // connection would have idle timed out.
+  Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
+  timer->enableTimer(std::chrono::seconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // PING frames should be sent at 1s, 2s, 3s, 4s, 5s, 6s and 8s after entering the wait.
+  EXPECT_EQ(quic_connection_->GetStats().ping_frames_sent, 7u);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepaliveDisabled) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 0;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_value(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_value(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // As keepalive is disabled, the connection will timeout after 5s.
+  EXPECT_TRUE(response->waitForReset());
+  EXPECT_EQ(quic_connection_->GetStats().ping_frames_sent, 0u);
 }
 
 } // namespace Quic

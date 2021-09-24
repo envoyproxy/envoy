@@ -79,6 +79,10 @@ public:
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
   }
 
+  bool ShouldKeepConnectionAlive() const override;
+
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
@@ -104,6 +108,7 @@ private:
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  bool disable_keepalive_{false};
 };
 
 } // namespace Quic

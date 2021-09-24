@@ -26,7 +26,31 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
+//
+message QuicKeepAliveSettings {
+  // The max interval in seconds for a connection to send keep-alive probing packets
+  // (with PING or PATH_RESPONSE).
+  //
+  // If initial_interval is zero, a client connection will use this value to start probing. In such case, the value should be smaller than :ref:`connection idle_timeout <>` to
+  // prevent idle timeout while not too small to throttle the connection or to flood the peer.
+  // If zero, disable keepalive probing.
+  google.protobuf.UInt32Value max_interval = 1 [(validate.rules).message = {required: true}];
+
+  // The interval in seconds to send the first 6 keep-alive probing packet to prevent
+  // connection from idle timeout. The following probing will be sent, each
+  // one with an interval exponentially longer than previous one, till it reaches
+  // max_interval. And the probing afterwards will always use max_interval.
+  //
+  // The value should be smaller than :ref:`connection idle_timeout <>`  to
+  // prevent idle timeout and smaller than  max_interval to take effect.
+  //
+  // If zero, disable keepalive probing for a server connection. For a client
+  // connection, if max_internval is also zero, do not keepalive, otherwise use max_interval to probe all the time.
+  google.protobuf.UInt32Value initial_interval = 2 [(validate.rules).message = {required: true}];
+}
+
 // QUIC protocol options which apply to both downstream and upstream connections.
+// [#next-free-field: 9]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -53,6 +77,18 @@ message QuicProtocolOptions {
   // window size now, so it's also the minimum.
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
+
+  // QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+  // itself doesn't timeout waiting for a probing response but it would elicit the peer to
+  // send something, i.e. ACK or PATH_RESPONSE, to push back connection idle timeout. Quic has a shorter idle
+  // timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive
+  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
+  // There is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
+  // since a similar feature is built into QUICHE which uses idle timeout and
+  // PTO to decide whether to probe before a new request.
+  //
+  // If absent, use the default keepalive behavior which sends PINGs every 15s for a client connection and doesn't do anything for a server connection.
+  QuicKeepAliveSettings connection_keepalive = 8;
 }
 
 message UpstreamHttpProtocolOptions {

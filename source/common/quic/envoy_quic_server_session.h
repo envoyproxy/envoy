@@ -77,6 +77,8 @@ public:
     headers_with_underscores_action_ = headers_with_underscores_action;
   }
 
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:

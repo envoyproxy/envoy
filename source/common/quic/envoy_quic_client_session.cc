@@ -2,6 +2,8 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include "quic_filter_manager_connection_impl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -120,6 +122,31 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
+}
+
+void EnvoyQuicClientSession::setHttp3Options(
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
+  if (http3_options_->has_quic_protocol_options() &&
+      http3_options_->quic_protocol_options().has_connection_keepalive()) {
+    const uint32_t initial_interval =
+        http3_options_->quic_protocol_options().connection_keepalive().initial_interval().value();
+    const uint32_t max_interval =
+        http3_options_->quic_protocol_options().connection_keepalive().max_interval().value();
+    if (max_interval == 0u) {
+      disable_keepalive_ = true;
+      return;
+    }
+    connection()->set_ping_timeout(quic::QuicTime::Delta::FromSeconds(max_interval));
+    if (max_interval > initial_interval && initial_interval > 0u) {
+      connection()->set_initial_retransmittable_on_wire_timeout(
+          quic::QuicTime::Delta::FromSeconds(initial_interval));
+    }
+  }
+}
+
+bool EnvoyQuicClientSession::ShouldKeepConnectionAlive() const {
+  return !disable_keepalive_ && quic::QuicSpdyClientSession::ShouldKeepConnectionAlive();
 }
 
 } // namespace Quic

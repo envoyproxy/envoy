@@ -6,6 +6,8 @@
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 
+#include "quic_filter_manager_connection_impl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -131,6 +133,26 @@ void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
   QuicServerSessionBase::OnRstStream(frame);
   quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error_code,
                                                    /*from_self*/ false, /*is_upstream*/ false);
+}
+
+void EnvoyQuicServerSession::setHttp3Options(
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
+  if (http3_options_->has_quic_protocol_options() &&
+      http3_options_->quic_protocol_options().has_connection_keepalive()) {
+    const uint32_t initial_interval =
+        http3_options_->quic_protocol_options().connection_keepalive().initial_interval().value();
+    const uint32_t max_interval =
+        http3_options_->quic_protocol_options().connection_keepalive().max_interval().value();
+    if (max_interval == 0) {
+      return;
+    }
+    if (initial_interval > 0) {
+      connection()->set_ping_timeout(quic::QuicTime::Delta::FromSeconds(max_interval));
+      connection()->set_initial_retransmittable_on_wire_timeout(
+          quic::QuicTime::Delta::FromSeconds(initial_interval));
+    }
+  }
 }
 
 } // namespace Quic
