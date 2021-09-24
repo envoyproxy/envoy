@@ -16,7 +16,7 @@ void FakeResourceMonitorFactory::onMonitorDestroyed(FakeResourceMonitor* monitor
 }
 Server::ResourceMonitorPtr FakeResourceMonitorFactory::createResourceMonitor(
     const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
-  auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher(), *this);
+  auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher(), *this);
   monitor_ = monitor.get();
   return monitor;
 }

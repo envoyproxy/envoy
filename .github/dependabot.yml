@@ -36,11 +36,6 @@ updates:
   schedule:
     interval: "daily"
 
-- package-ecosystem: "pip"
-  directory: "/ci/flaky_test"
-  schedule:
-    interval: "daily"
-
 - package-ecosystem: "docker"
   directory: "/ci"
   schedule:

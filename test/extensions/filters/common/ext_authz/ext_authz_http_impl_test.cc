@@ -303,7 +303,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
       {{":status", "200", false}, {"x-downstream-ok", "1", false}, {"x-upstream-ok", "1", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
-      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", false}}));
+      // By default, the value of envoy.config.core.v3.HeaderValueOption.append is true.
+      TestCommon::makeHeaderValueOption({{"x-downstream-ok", "1", true}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =

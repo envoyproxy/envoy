@@ -11,7 +11,7 @@ public:
   ~MockAlternateProtocolsCache() override;
 
   MOCK_METHOD(void, setAlternatives,
-              (const Origin& origin, const std::vector<AlternateProtocol>& protocols));
+              (const Origin& origin, std::vector<AlternateProtocol>& protocols));
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
               (const Origin& origin));
   MOCK_METHOD(size_t, size, (), (const));
