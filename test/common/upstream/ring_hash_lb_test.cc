@@ -122,7 +122,7 @@ TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
 
 // Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
 // cluster, the operation does not immediately reach the worker thread. There may be cases where the
-// thread aware load balancer is destructured, but the load balancer factory is still used in the
+// thread aware load balancer is destructed, but the load balancer factory is still used in the
 // worker thread.
 TEST_P(RingHashLoadBalancerTest, LbDestructedBeforeFactory) {
   init();

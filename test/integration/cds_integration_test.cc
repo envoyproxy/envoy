@@ -194,7 +194,7 @@ TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
       ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
       Network::Test::getLoopbackAddressString(ipVersion()), "MAGLEV");
 
-  // Cyclically add and remove cluster withs ThreadAwareLb.
+  // Cyclically add and remove cluster with ThreadAwareLb.
   for (int i = 42; i < 142; i += 2) {
     EXPECT_TRUE(
         compareDiscoveryRequest(Config::TypeUrl::get().Cluster, absl::StrCat(i), {}, {}, {}));
