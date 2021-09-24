@@ -71,6 +71,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
 
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
+      ENVOY_LOG(trace, "recv return try again");
       return PeekState::Again;
     }
     ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
@@ -87,6 +88,7 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
 }
 
 void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
+  ENVOY_LOG(trace, "onFileEvent: {}", events);
   if (events & Event::FileReadyType::Closed) {
     on_close_cb_();
     return;
