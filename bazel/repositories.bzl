@@ -1065,7 +1065,6 @@ filegroup(
     external_http_archive(
         name = "kafka_source",
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
-        patches = ["@envoy//bazel/external:kafka_int32.patch"],
     )
 
     # This archive provides Kafka C/CPP client used by mesh filter to communicate with upstream

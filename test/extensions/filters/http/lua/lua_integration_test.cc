@@ -274,6 +274,20 @@ typed_config:
       request_handle:streamInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
       local dynamic_metadata_value = request_handle:streamInfo():dynamicMetadata():get("envoy.lb")["foo"]
 
+      local test_header_value_0 = request_handle:headers():getAtIndex("X-Test-Header", 0)
+      request_handle:headers():add("test_header_value_0", test_header_value_0)
+      local test_header_value_1 = request_handle:headers():getAtIndex("X-TEST-Header", 1)
+      request_handle:headers():add("test_header_value_1", test_header_value_1)
+      local test_header_value_2 = request_handle:headers():getAtIndex("x-test-header", 2)
+      if test_header_value_2 == nil then
+        request_handle:headers():add("test_header_value_2", "nil_value")
+      end
+      local test_header_value_size = request_handle:headers():getNumValues("x-test-header")
+      request_handle:headers():add("test_header_value_size", test_header_value_size)
+      request_handle:headers():add("cookie_0", request_handle:headers():getAtIndex("set-cookie", 0))
+      request_handle:headers():add("cookie_1", request_handle:headers():getAtIndex("set-cookie", 1))
+      request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
+
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
@@ -305,11 +319,10 @@ typed_config:
 
   initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
-                                                 {":path", "/test/long/url"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "host"},
-                                                 {"x-forwarded-for", "10.0.0.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},      {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"},   {"x-forwarded-for", "10.0.0.1"}, {"x-test-header", "foo"},
+      {"x-test-header", "bar"}, {"set-cookie", "foo;bar;"},      {"set-cookie", "1,3;2,5;"}};
 
   auto encoder_decoder = codec_client_->startRequest(request_headers);
   Http::StreamEncoder& encoder = encoder_decoder.first;
@@ -320,6 +333,41 @@ typed_config:
   encoder.encodeData(request_data2, true);
 
   waitForNextUpstreamRequest();
+  EXPECT_EQ("foo", upstream_request_->headers()
+                       .get(Http::LowerCaseString("test_header_value_0"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("test_header_value_1"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil_value", upstream_request_->headers()
+                             .get(Http::LowerCaseString("test_header_value_2"))[0]
+                             ->value()
+                             .getStringView());
+
+  EXPECT_EQ("2", upstream_request_->headers()
+                     .get(Http::LowerCaseString("test_header_value_size"))[0]
+                     ->value()
+                     .getStringView());
+
+  EXPECT_EQ("foo;bar;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_0"))[0]
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("1,3;2,5;", upstream_request_->headers()
+                            .get(Http::LowerCaseString("cookie_1"))[0]
+                            ->value()
+                            .getStringView());
+
+  EXPECT_EQ("2", upstream_request_->headers()
+                     .get(Http::LowerCaseString("cookie_size"))[0]
+                     ->value()
+                     .getStringView());
+
   EXPECT_EQ("10", upstream_request_->headers()
                       .get(Http::LowerCaseString("request_body_size"))[0]
                       ->value()

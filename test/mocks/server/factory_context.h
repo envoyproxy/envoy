@@ -64,6 +64,7 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_loader_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> scope_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
+  testing::NiceMock<Server::MockOptions> options_;
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
