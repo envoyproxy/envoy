@@ -135,7 +135,7 @@ function bazel_binary_build() {
   fi
 
   # Build su-exec utility
-  bazel build external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 

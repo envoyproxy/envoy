@@ -53,12 +53,6 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-// TODO(#2557) fix all the failures.
-#define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
-    return;                                                                                        \
-  }
-
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());

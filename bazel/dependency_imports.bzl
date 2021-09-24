@@ -1,4 +1,4 @@
-load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
+load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe_exec_properties_dict", "custom_exec_properties")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
@@ -14,7 +14,8 @@ load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolch
 GO_VERSION = "1.15.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
-    rules_foreign_cc_dependencies()
+    # TODO: allow building of tools for easier onboarding
+    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
     go_rules_dependencies()
     go_register_toolchains(go_version)
     gazelle_dependencies()
