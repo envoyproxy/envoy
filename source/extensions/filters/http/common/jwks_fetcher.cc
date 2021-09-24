@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/common/jwks_fetcher.h"
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -64,8 +65,9 @@ public:
                        .setChildSpanName("JWT Remote PubKey Fetch");
 
     if (remote_jwks_.has_retry_policy()) {
-      auto route_retry_policy = Http::Utility::convertCoreToRouteRetryPolicy(
-          remote_jwks_.retry_policy(), "5xx,gateway-error,connect-failure,reset");
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(remote_jwks_.retry_policy(),
+                                                       "5xx,gateway-error,connect-failure,reset");
       options.setRetryPolicy(route_retry_policy);
       options.setBufferBodyForRetry(true);
     }

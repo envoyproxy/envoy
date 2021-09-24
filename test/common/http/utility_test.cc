@@ -972,22 +972,23 @@ TEST(HttpUtility, CheckIsIpAddress) {
 }
 
 TEST(HttpUtility, TestConvertCoreToRouteRetryPolicy) {
-  std::string core_policy = R"(
+  const std::string core_policy = R"(
 num_retries: 10
 )";
 
   envoy::config::core::v3::RetryPolicy core_retry_policy;
   TestUtility::loadFromYaml(core_policy, core_retry_policy);
 
-  const auto route_retry_policy = Utility::convertCoreToRouteRetryPolicy(
-      core_retry_policy, "5xx,gateway-error,connect-failure,reset");
+  const envoy::config::route::v3::RetryPolicy route_retry_policy =
+      Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
+                                             "5xx,gateway-error,connect-failure,reset");
   EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
   EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
   EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
   EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
   EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
 
-  std::string core_policy2 = R"(
+  const std::string core_policy2 = R"(
 retry_back_off:
   base_interval: 32s
   max_interval: 1s
