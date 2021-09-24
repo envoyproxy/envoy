@@ -154,7 +154,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
   // use other header fields provided in the new response to replace all instances
   // of the corresponding header fields in the stored response
 
-  // `updatedHeaderFields`to makes sure each field is only removed when we update the header
+  // `updatedHeaderFields` makes sure each field is only removed when we update the header
   // field for the first time to handle the case where incoming headers have repeated values
   absl::flat_hash_set<Http::LowerCaseString> updatedHeaderFields;
   response_headers.iterate(
