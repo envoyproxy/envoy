@@ -227,13 +227,9 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-<<<<<<< HEAD
-        context.overloadManager(), context.dispatcher().timeSource(),
+        context.overloadManager(), context.mainThreadDispatcher().timeSource(),
         Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.http_conn_manager_proactive_drain"));
-=======
-        context.overloadManager(), context.mainThreadDispatcher().timeSource());
->>>>>>> upstream/main
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
