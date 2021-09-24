@@ -27,18 +27,46 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
                                                     std::string& errstr) const override {
     return std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf, errstr));
   }
+
+  // LibRdKafkaUtils
+  RdKafka::Headers* convertHeaders(
+      const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) const override {
+    RdKafka::Headers* result = RdKafka::Headers::create();
+    for (const auto& header : headers) {
+      const RdKafka::Headers::Header librdkafka_header = {
+          std::string(header.first), header.second.data(), header.second.length()};
+      const auto ec = result->add(librdkafka_header);
+      // This should never happen ('add' in 1.7.0 does not return any other error codes).
+      if (RdKafka::ERR_NO_ERROR != ec) {
+        delete result;
+        return nullptr;
+      }
+    }
+    return result;
+  }
+
+  // LibRdKafkaUtils
+  virtual void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override {
+    delete librdkafka_headers;
+  }
+
+public:
+  static const LibRdKafkaUtils& getDefaultInstance() {
+    CONSTRUCT_ON_FIRST_USE(LibRdKafkaUtilsImpl);
+  }
 };
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
                                      const RawKafkaProducerConfig& configuration)
-    : RichKafkaProducer(dispatcher, thread_factory, configuration, LibRdKafkaUtilsImpl{}){};
+    : RichKafkaProducer(dispatcher, thread_factory, configuration,
+                        LibRdKafkaUtilsImpl::getDefaultInstance()){};
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
                                      const RawKafkaProducerConfig& configuration,
                                      const LibRdKafkaUtils& utils)
-    : dispatcher_{dispatcher} {
+    : dispatcher_{dispatcher}, utils_{utils} {
 
   // Create producer configuration object.
   std::unique_ptr<RdKafka::Conf> conf =
@@ -79,22 +107,6 @@ RichKafkaProducer::~RichKafkaProducer() {
 
 void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
 
-// Helper function converting our byte arrays into librdkafka headers object.
-RdKafka::Headers*
-convertHeaders(const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) {
-  RdKafka::Headers* result = RdKafka::Headers::create();
-  for (const auto& header : headers) {
-    const RdKafka::Headers::Header librdkafka_header = {
-        std::string(header.first), header.second.data(), header.second.length()};
-    const auto ec = result->add(librdkafka_header);
-    if (RdKafka::ERR_NO_ERROR != ec) {
-      delete result;
-      return nullptr;
-    }
-  }
-  return result;
-}
-
 void RichKafkaProducer::send(
     const ProduceFinishCbSharedPtr origin, const std::string& topic, const int32_t partition,
     const absl::string_view key, const absl::string_view value,
@@ -109,7 +121,7 @@ void RichKafkaProducer::send(
 
     RdKafka::ErrorCode ec;
     // librdkafka requires a raw pointer and deletes it on success.
-    RdKafka::Headers* librdkafka_headers = convertHeaders(headers);
+    RdKafka::Headers* librdkafka_headers = utils_.convertHeaders(headers);
     if (nullptr != librdkafka_headers) {
       ec = producer_->produce(topic, partition, flags, value_data, value.size(), key.data(),
                               key.size(), timestamp, librdkafka_headers, nullptr);
@@ -129,7 +141,7 @@ void RichKafkaProducer::send(
       ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, topic, partition);
       if (nullptr != librdkafka_headers) {
         // Kafka headers need to be deleted manually if produce call fails.
-        delete librdkafka_headers;
+        utils_.deleteHeaders(librdkafka_headers);
       }
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);

@@ -25,6 +25,7 @@ class Message:
         self.value = os.urandom(2048)
         self.headers = [('header_' + str(h), os.urandom(128)) for h in range(3)]
 
+
 class IntegrationTest(unittest.TestCase):
     """
     All tests in this class depend on Envoy/Zookeeper/Kafka running.
@@ -96,12 +97,20 @@ class IntegrationTest(unittest.TestCase):
         for _ in range(messages_to_send):
             message = Message()
             future1 = producer.send(
-                key=message.key, value=message.value, headers=message.headers, topic=partition1.topic, partition=partition1.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition1.topic,
+                partition=partition1.partition)
             self.assertTrue(future1.get().offset >= 0)
             offset_to_message1[future1.get().offset] = message
 
             future2 = producer.send(
-                key=message.key, value=message.value, headers=message.headers, topic=partition2.topic, partition=partition2.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition2.topic,
+                partition=partition2.partition)
             self.assertTrue(future2.get().offset >= 0)
             offset_to_message2[future2.get().offset] = message
         self.assertTrue(len(offset_to_message1) == messages_to_send)
@@ -138,12 +147,20 @@ class IntegrationTest(unittest.TestCase):
         for _ in range(messages_to_send):
             message = Message()
             future1 = producer.send(
-                key=message.key, value=message.value, headers=message.headers, topic=partition1.topic, partition=partition1.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition1.topic,
+                partition=partition1.partition)
             future_to_message1[future1] = message
 
             message = Message()
             future2 = producer.send(
-                key=message.key, value=message.value, headers=message.headers, topic=partition2.topic, partition=partition2.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition2.topic,
+                partition=partition2.partition)
             future_to_message2[future2] = message
 
         offset_to_message1 = {}
