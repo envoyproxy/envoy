@@ -342,9 +342,9 @@ public:
 
   /**
    * Return the size of data the filter want to inspect from the connection.
-   @return the size of data inspect from the connection. 0 means filter needn't any data.
+   * @return the size of data inspect from the connection. 0 means filter needn't any data.
    */
-  virtual size_t maxReadBytes() const { return 0; }
+  virtual size_t maxReadBytes() const PURE;
 };
 
 using ListenerFilterPtr = std::unique_ptr<ListenerFilter>;
