@@ -64,12 +64,12 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
     transaction_infos->emplace(cluster, transaction_info_ptr);
   }
 
-  return [filter_config, &context,
-          transaction_infos](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
-                                            context.dispatcher().timeSource(), transaction_infos));
-  };
+  return
+      [filter_config, &context, transaction_infos](Network::FilterManager& filter_manager) -> void {
+        filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+            *filter_config, context.api().randomGenerator(),
+            context.mainThreadDispatcher().timeSource(), transaction_infos));
+      };
 }
 
 /**
