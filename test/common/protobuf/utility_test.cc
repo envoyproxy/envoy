@@ -455,6 +455,29 @@ insensitive_repeated_string:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Fields that are values in a sensitive map should be redacted.
+TEST_F(ProtobufUtilityTest, RedactMap) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_map:
+  "a": "b"
+insensitive_map:
+  "c": "d"
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_map:
+  "a": "[redacted]"
+insensitive_map:
+  "c": "d"
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Bytes fields annotated as sensitive should be converted to the ASCII / UTF-8 encoding of the
 // string "[redacted]". Bytes fields that are neither annotated as sensitive nor contained in a
 // sensitive message should be left alone.
