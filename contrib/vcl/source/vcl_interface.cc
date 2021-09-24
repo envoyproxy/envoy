@@ -3,6 +3,7 @@
 #include "source/common/network/address_impl.h"
 
 #include "contrib/vcl/source/vcl_io_handle.h"
+#include "vppcom.h"
 
 namespace Envoy {
 namespace Extensions {

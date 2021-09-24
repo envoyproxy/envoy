@@ -8,8 +8,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
 
-#include "vppcom.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Network {
