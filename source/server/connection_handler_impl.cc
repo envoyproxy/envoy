@@ -27,9 +27,19 @@ void ConnectionHandlerImpl::decNumConnections() {
 
 void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_listener,
                                         Network::ListenerConfig& config) {
+  const bool support_udp_in_place_filter_chain_update = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place");
+  if (support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
+    ActiveListenerDetailsOptRef listener_detail =
+        findActiveListenerByTag(overridden_listener.value());
+    ASSERT(listener_detail.has_value());
+    listener_detail->get().listener_->updateListenerConfig(config);
+    return;
+  }
+
   ActiveListenerDetails details;
   if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
-    if (overridden_listener.has_value()) {
+    if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
           listener.second.tcpListener()->get().updateListenerConfig(config);
@@ -89,7 +99,7 @@ void ConnectionHandlerImpl::removeFilterChains(
     std::function<void()> completion) {
   for (auto& listener : listeners_) {
     if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.tcpListener()->get().deferredRemoveFilterChains(filter_chains);
+      listener.second.listener_->onFilterChainDraining(filter_chains);
       break;
     }
   }
