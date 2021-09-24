@@ -34,9 +34,9 @@ ABSL_CONST_INIT absl::Mutex wrk_lock(absl::kConstInit);
 
 using MqFileEventsMap = absl::flat_hash_map<int, Envoy::Event::FileEventPtr>;
 
-static MqFileEventsMap& mqFileEventsMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(MqFileEventsMap); }
+MqFileEventsMap& mqFileEventsMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(MqFileEventsMap); }
 
-static void onMqSocketEvents(uint32_t flags) {
+void onMqSocketEvents(uint32_t flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
   auto wrk_index = vppcom_worker_index();
   VCL_LOG("events on worker {}", wrk_index);

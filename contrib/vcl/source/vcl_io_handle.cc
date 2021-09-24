@@ -14,9 +14,8 @@ namespace Vcl {
 namespace {
 
 int vclWrkIndexOrRegister() {
-  int wrk_index;
-
-  if ((wrk_index = vppcom_worker_index()) == -1) {
+  int wrk_index = vppcom_worker_index();
+  if (wrk_index == -1) {
     vclInterfaceWorkerRegister();
     wrk_index = vppcom_worker_index();
   }
@@ -373,7 +372,7 @@ Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uin
 }
 
 Api::IoCallUint64Result VclIoHandle::recvmmsg(RawSliceArrays&, uint32_t, RecvMsgOutput&) {
-  throw EnvoyException("not supported");
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 bool VclIoHandle::supportsMmsg() const { return false; }
