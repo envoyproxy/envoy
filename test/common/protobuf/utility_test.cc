@@ -459,18 +459,26 @@ insensitive_repeated_string:
 TEST_F(ProtobufUtilityTest, RedactMap) {
   envoy::test::Sensitive actual, expected;
   TestUtility::loadFromYaml(R"EOF(
-sensitive_map:
+sensitive_string_map:
   "a": "b"
-insensitive_map:
+sensitive_int_map:
+  "x": 12345
+insensitive_string_map:
   "c": "d"
+insensitive_int_map:
+  "y": 123456
 )EOF",
                             actual);
 
   TestUtility::loadFromYaml(R"EOF(
-sensitive_map:
+sensitive_string_map:
   "a": "[redacted]"
-insensitive_map:
+sensitive_int_map:
+  "x":
+insensitive_string_map:
   "c": "d"
+insensitive_int_map:
+  "y": 123456
 )EOF",
                             expected);
 
