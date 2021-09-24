@@ -119,9 +119,14 @@ message RateLimitResponse {
     string id = 3;
   }
 
+  // [#next-free-field: 6]
   message DescriptorStatus {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.DescriptorStatus";
+
+    reserved 5;
+
+    reserved "quota";
 
     // The response code for an individual descriptor.
     Code code = 1;
