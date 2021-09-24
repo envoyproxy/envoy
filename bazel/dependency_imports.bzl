@@ -8,6 +8,7 @@ load("@upb//bazel:workspace_deps.bzl", "upb_deps")
 load("@rules_rust//rust:repositories.bzl", "rust_repositories")
 load("@rules_antlr//antlr:deps.bzl", "antlr_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 
 # go version for rules_go
 GO_VERSION = "1.15.5"
@@ -26,6 +27,8 @@ def envoy_dependency_imports(go_version = GO_VERSION):
         oss_fuzz = True,
         honggfuzz = False,
     )
+    rules_cc_dependencies()
+    rules_cc_toolchains()
 
     custom_exec_properties(
         name = "envoy_large_machine_exec_property",
