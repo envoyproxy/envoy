@@ -26,8 +26,8 @@ struct ThreadIds {
   bool inMainOrTestThread() const {
     std::thread::id id = std::this_thread::get_id();
     absl::MutexLock lock(&mutex_);
-    return ((main_thread_id_.has_value() && (main_thread_id_.value() == id)) ||
-            (test_thread_id_.has_value() && (test_thread_id_.value() == id)));
+    return ((main_thread_use_count_ != 0 && main_thread_id_ == id) ||
+            (test_thread_use_count_ != 0 && test_thread_id_ == id));
   }
 
   // Returns a singleton instance of this. The instance is never freed.
@@ -38,30 +38,27 @@ struct ThreadIds {
   // properly.
   void releaseMainThread() {
     absl::MutexLock lock(&mutex_);
-    ASSERT(std::this_thread::get_id() == main_thread_id_.value());
-    if (--main_thread_use_count_ == 0) {
-      main_thread_id_ = absl::nullopt;
-    }
+    ASSERT(main_thread_use_count_ > 0);
+    ASSERT(std::this_thread::get_id() == main_thread_id_);
+    --main_thread_use_count_;
   }
 
-  // Call this when the MainThread exits. Nested semantics are supported, so
+  // Call this when the TestThread exits. Nested semantics are supported, so
   // that if multiple TestThread instances are declared, we unwind them
   // properly.
   void releaseTestThread() {
     absl::MutexLock lock(&mutex_);
-    ASSERT(std::this_thread::get_id() == test_thread_id_.value());
-    if (--test_thread_use_count_ == 0) {
-      test_thread_id_ = absl::nullopt;
-    }
+    ASSERT(test_thread_use_count_ > 0);
+    ASSERT(std::this_thread::get_id() == test_thread_id_);
+    --test_thread_use_count_;
   }
 
   // Declares current thread as the main one, or verifies that the current
   // thread matches any previous declarations.
   void registerMainThread() {
     absl::MutexLock lock(&mutex_);
-    ++main_thread_use_count_;
-    if (main_thread_id_.has_value()) {
-      ASSERT(std::this_thread::get_id() == main_thread_id_.value());
+    if (++main_thread_use_count_ > 1) {
+      ASSERT(std::this_thread::get_id() == main_thread_id_);
     } else {
       main_thread_id_ = std::this_thread::get_id();
     }
@@ -71,17 +68,16 @@ struct ThreadIds {
   // thread matches any previous declarations.
   void registerTestThread() {
     absl::MutexLock lock(&mutex_);
-    ++test_thread_use_count_;
-    if (test_thread_id_.has_value()) {
-      ASSERT(std::this_thread::get_id() == test_thread_id_.value());
+    if (++test_thread_use_count_ > 1) {
+      ASSERT(std::this_thread::get_id() == test_thread_id_);
     } else {
       test_thread_id_ = std::this_thread::get_id();
     }
   }
 
 private:
-  absl::optional<std::thread::id> main_thread_id_ GUARDED_BY(mutex_);
-  absl::optional<std::thread::id> test_thread_id_ GUARDED_BY(mutex_);
+  std::thread::id main_thread_id_ GUARDED_BY(mutex_);
+  std::thread::id test_thread_id_ GUARDED_BY(mutex_);
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
   int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
