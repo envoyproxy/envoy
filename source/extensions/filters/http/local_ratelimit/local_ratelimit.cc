@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/extensions/filters/http/local_ratelimit/v3/local_rate_limit.pb.h"
 #include "envoy/http/codes.h"
 
@@ -70,9 +71,8 @@ FilterConfig::FilterConfig(
           config.request_headers_to_add_when_not_enforced())),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
-      enable_x_rate_limit_headers_(
-          config.enable_x_ratelimit_headers() ==
-          envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit::DRAFT_VERSION_03) {
+      enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
+                                   envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03) {
   // Note: no token bucket is fine for the global config, which would be the case for enabling
   //       the filter globally but disabled and then applying limits at the virtual host or
   //       route level. At the virtual or route level, it makes no sense to have an no token

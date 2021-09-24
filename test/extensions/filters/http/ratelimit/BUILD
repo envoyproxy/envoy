@@ -61,6 +61,7 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",

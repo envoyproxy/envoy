@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -197,8 +198,8 @@ public:
   const uint64_t response_size_ = 512;
   int num_requests_{1};
   bool failure_mode_deny_ = false;
-  envoy::extensions::filters::http::ratelimit::v3::RateLimit::XRateLimitHeadersRFCVersion
-      enable_x_ratelimit_headers_ = envoy::extensions::filters::http::ratelimit::v3::RateLimit::OFF;
+  envoy::extensions::common::ratelimit::v3::XRateLimitHeadersRFCVersion
+      enable_x_ratelimit_headers_ = envoy::extensions::common::ratelimit::v3::OFF;
   bool disable_x_envoy_ratelimited_header_ = false;
   envoy::extensions::filters::http::ratelimit::v3::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
@@ -217,8 +218,7 @@ public:
 class RatelimitFilterHeadersEnabledIntegrationTest : public RatelimitIntegrationTest {
 public:
   RatelimitFilterHeadersEnabledIntegrationTest() {
-    enable_x_ratelimit_headers_ =
-        envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03;
+    enable_x_ratelimit_headers_ = envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03;
   }
 };
 

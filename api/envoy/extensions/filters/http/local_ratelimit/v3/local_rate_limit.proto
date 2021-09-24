@@ -21,15 +21,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 13]
 message LocalRateLimit {
-  // Defines the version of the standard to use for X-RateLimit headers.
-  enum XRateLimitHeadersRFCVersion {
-    // X-RateLimit headers disabled.
-    OFF = 0;
-
-    // Use `draft RFC Version 03 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
-    DRAFT_VERSION_03 = 1;
-  }
-
   // The human readable prefix to use when emitting stats.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -130,6 +121,6 @@ message LocalRateLimit {
   // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
   //
   // Disabled by default.
-  XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
+  common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
       [(validate.rules).enum = {defined_only: true}];
 }
