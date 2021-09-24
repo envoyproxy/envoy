@@ -33,7 +33,7 @@ protected:
     absl::BlockingCounter blocking_counter_;
   };
 
-  RealThreadsTestHelper(uint32_t num_threads);
+  explicit RealThreadsTestHelper(uint32_t num_threads);
   // TODO(chaoqin-li1123): Clean up threading resources from the destructor when we figure out how
   // to handle different destruction orders of thread local object.
   ~RealThreadsTestHelper() = default;

@@ -211,7 +211,7 @@ private:
     EXPECT_NE(mock_async_client, nullptr);
     // All the request in this thread should be sent through the same async client because the async
     // client is cached.
-    EXPECT_EQ(mock_async_client->send_cnt_, requests_sent_per_thread);
+    EXPECT_EQ(mock_async_client->send_count_, requests_sent_per_thread);
   }
 
   Network::Address::InstanceConstSharedPtr addr_;

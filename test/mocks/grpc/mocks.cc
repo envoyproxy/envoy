@@ -11,7 +11,7 @@ MockAsyncClient::MockAsyncClient() {
       .WillByDefault(Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
                                    RawAsyncRequestCallbacks&, Tracing::Span&,
                                    const Http::AsyncClient::RequestOptions&) {
-        send_cnt_++;
+        send_count_++;
         return async_request_.get();
       }));
 }
