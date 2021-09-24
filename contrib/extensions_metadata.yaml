@@ -38,4 +38,9 @@ envoy.filters.network.sip_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.sip.router:
+  categories:
+  - envoy.sip_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 

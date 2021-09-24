@@ -1,6 +1,10 @@
+.. _api-v3_config_contrib:
+
+Contrib Extensions
+==================
+
 .. toctree::
   :glob:
   :maxdepth: 2
 
-  ../../extensions/filters/network/sip_proxy/router/v3alpha/*
-  ../../extensions/filters/network/sip_proxy/v3alpha/*
+  sip/sip
