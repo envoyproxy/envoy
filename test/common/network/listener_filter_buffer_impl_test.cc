@@ -50,7 +50,7 @@ public:
 TEST_F(ListenerFilterBufferImplTest, Basic) {
   initialize();
 
-  // peek 256 bytes data.
+  // Peek 256 bytes data.
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
     EXPECT_EQ(MSG_PEEK, flags);
     EXPECT_EQ(buffer_size_, length);
@@ -70,7 +70,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   };
   file_event_callback_(Event::FileReadyType::Read);
 
-  // peek another 256 bytes data.
+  // Peek another 256 bytes data.
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
     EXPECT_EQ(MSG_PEEK, flags);
     EXPECT_EQ(buffer_size_, length);
@@ -94,7 +94,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   };
   file_event_callback_(Event::FileReadyType::Read);
 
-  // on socket failure
+  // On socket failure
   bool is_closed = false;
   on_close_cb_ = [&]() { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
@@ -104,7 +104,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_TRUE(is_closed);
 
-  // on remote closed
+  // On remote closed
   is_closed = false;
   on_close_cb_ = [&]() { is_closed = true; };
   EXPECT_CALL(io_handle_, recv)
@@ -113,7 +113,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_TRUE(is_closed);
 
-  // on socket again.
+  // On socket again.
   is_closed = false;
   EXPECT_CALL(io_handle_, recv)
       .WillOnce(Return(ByMove(
@@ -122,7 +122,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_FALSE(is_closed);
 
-  // close the socket.
+  // Close the socket.
   is_closed = true;
   file_event_callback_(Event::FileReadyType::Closed);
   EXPECT_TRUE(is_closed);
@@ -131,7 +131,7 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
 TEST_F(ListenerFilterBufferImplTest, DrainData) {
   initialize();
 
-  // peek 256 bytes data.
+  // Peek 256 bytes data.
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
     EXPECT_EQ(MSG_PEEK, flags);
     EXPECT_EQ(buffer_size_, length);
@@ -151,38 +151,10 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
   };
   file_event_callback_(Event::FileReadyType::Read);
 
-  // drain the 128 bytes data
+  // Drain the 128 bytes data
   uint64_t drained_size = 128;
-  listener_buffer_->drain(drained_size);
-  // then should only can access the last 128 bytes
-  auto slice1 = listener_buffer_->rawSlice();
-  EXPECT_EQ(drained_size, slice1.len_);
-  const char* buf = static_cast<const char*>(slice1.mem_);
-  for (uint64_t i = 0; i < drained_size; i++) {
-    EXPECT_EQ(buf[i], 'a');
-  }
 
-  // peek again
-  EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
-    EXPECT_EQ(MSG_PEEK, flags);
-    EXPECT_EQ(buffer_size_, length);
-    char* buf = static_cast<char*>(buffer);
-    for (uint64_t i = 0; i < buffer_size_; i++) {
-      buf[i] = 'b';
-    }
-    return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
-  });
-  on_data_cb_ = [&]() {
-    auto raw_slice = listener_buffer_->rawSlice();
-    EXPECT_EQ(buffer_size_ - drained_size, raw_slice.len_);
-    buf = static_cast<const char*>(raw_slice.mem_);
-    for (uint64_t i = 0; i < raw_slice.len_; i++) {
-      EXPECT_EQ(buf[i], 'b');
-    }
-  };
-  file_event_callback_(Event::FileReadyType::Read);
-
-  // drain the data from the actual socket
+  // Drain the data from the actual socket
   EXPECT_CALL(io_handle_, recv)
       .WillOnce([&](void*, size_t length, int flags) {
         // expect to read, not peek
@@ -201,29 +173,33 @@ TEST_F(ListenerFilterBufferImplTest, DrainData) {
         return Api::IoCallUint64Result(drained_size / 2,
                                        Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
       });
-  listener_buffer_->drainFromSocket();
-  auto slice2 = listener_buffer_->rawSlice();
-  EXPECT_EQ(buffer_size_ - drained_size, slice2.len_);
 
-  // peek again after drain the data from actual socket
+  auto ret = listener_buffer_->drain(drained_size);
+  EXPECT_TRUE(ret);
+  // Then should only can access the last 128 bytes
+  auto slice1 = listener_buffer_->rawSlice();
+  EXPECT_EQ(drained_size, slice1.len_);
+  const char* buf = static_cast<const char*>(slice1.mem_);
+  for (uint64_t i = 0; i < drained_size; i++) {
+    EXPECT_EQ(buf[i], 'a');
+  }
+
+  // Peek again
   EXPECT_CALL(io_handle_, recv).WillOnce([&](void* buffer, size_t length, int flags) {
-    // expect to read, not peek
     EXPECT_EQ(MSG_PEEK, flags);
-    // expect to read the `drained_size` data
     EXPECT_EQ(buffer_size_ - drained_size, length);
     char* buf = static_cast<char*>(buffer);
-    for (uint64_t i = 0; i < buffer_size_ - drained_size; i++) {
-      buf[i] = 'x';
+    for (uint64_t i = 0; i < length; i++) {
+      buf[i] = 'b';
     }
-    return Api::IoCallUint64Result(buffer_size_ - drained_size,
-                                   Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+    return Api::IoCallUint64Result(length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
   });
   on_data_cb_ = [&]() {
     auto raw_slice = listener_buffer_->rawSlice();
     EXPECT_EQ(buffer_size_ - drained_size, raw_slice.len_);
-    const char* buf = static_cast<const char*>(raw_slice.mem_);
+    buf = static_cast<const char*>(raw_slice.mem_);
     for (uint64_t i = 0; i < raw_slice.len_; i++) {
-      EXPECT_EQ(buf[i], 'x');
+      EXPECT_EQ(buf[i], 'b');
     }
   };
   file_event_callback_(Event::FileReadyType::Read);

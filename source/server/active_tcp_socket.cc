@@ -141,13 +141,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
     }
     // Successfully ran all the accept filters.
     if (no_error) {
-      if (listener_filter_buffer_ != nullptr) {
-        // if drain from socket failed, then end the connection.
-        no_error = listener_filter_buffer_->drainFromSocket();
-      }
-      if (no_error) {
-        newConnection();
-      }
+      newConnection();
     } else {
       // Signal the caller that no extra filter chain iteration is needed.
       iter_ = accept_filters_.end();

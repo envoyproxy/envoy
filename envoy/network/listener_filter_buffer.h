@@ -24,9 +24,9 @@ public:
   /**
    * Drain the data from the beginning of the buffer.
    * @param length the length of data to drain.
-   * @return the actual length of data drained.
+   * @return return True if the drain success, otherwise return False.
    */
-  virtual uint64_t drain(uint64_t length) PURE;
+  virtual bool drain(uint64_t length) PURE;
 
   /**
    * Return the length of data in the buffer
