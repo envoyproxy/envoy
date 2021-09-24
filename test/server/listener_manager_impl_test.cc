@@ -5144,6 +5144,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDi
       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
   EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+  EXPECT_CALL(server_.drain_manager_, createChildManager(_, _));
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener_proto, "", true),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': 1 filter chain(s) specified "
