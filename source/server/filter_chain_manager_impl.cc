@@ -36,7 +36,8 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::DrainableFactoryContext& parent_context, Init::Manager& init_manager)
     : parent_context_(parent_context), init_manager_(init_manager),
-      drain_manager_(parent_context.drainManager().createChildManager(parent_context.mainThreadDispatcher())),
+      drain_manager_(
+          parent_context.drainManager().createChildManager(parent_context.mainThreadDispatcher())),
       tls_(parent_context.threadLocal().allocateSlot()) {
 
   // Create a drain-manager per thread as children to the top level filter-chain drain manager.
