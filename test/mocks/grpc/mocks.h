@@ -90,6 +90,7 @@ public:
                const Http::AsyncClient::StreamOptions& options));
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
+  // Keep track of the number of requests to detect potential race condition.
   int send_cnt_{};
 };
 
