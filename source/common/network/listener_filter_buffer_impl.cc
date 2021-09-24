@@ -5,6 +5,21 @@
 namespace Envoy {
 namespace Network {
 
+ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle, Event::Dispatcher& dispatcher,
+                           ListenerFilterBufferOnCloseCb close_cb,
+                           ListenerFilterBufferOnDataCb on_data_cb, uint64_t buffer_size)
+      : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
+        on_data_cb_(on_data_cb), buffer_(std::make_unique<char[]>(buffer_size)),
+        base_(buffer_.get()), buffer_size_(buffer_size) {
+    // If the buffer_size not greater than 0, it means that doesn't expect any data.
+    ASSERT(buffer_size > 0);
+
+    io_handle_.initializeFileEvent(
+        dispatcher_, [this](uint32_t events) { onFileEvent(events); },
+        Event::PlatformDefaultTriggerType,
+        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+}
+
 const Buffer::ConstRawSlice ListenerFilterBufferImpl::rawSlice() const {
   Buffer::ConstRawSlice slice;
   slice.mem_ = base_;
