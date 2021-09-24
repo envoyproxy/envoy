@@ -270,6 +270,9 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };

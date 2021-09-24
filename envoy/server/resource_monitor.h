@@ -4,6 +4,9 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/event/dispatcher.h"
+
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Server {
@@ -18,36 +21,55 @@ struct ResourceUsage {
   double resource_pressure_;
 };
 
+/**
+ * Notifies caller of updated resource usage.
+ */
+class ResourceUpdateCallbacks {
+public:
+  virtual ~ResourceUpdateCallbacks() = default;
+
+  /**
+   * Called when the request for updated resource usage succeeds.
+   * @param usage the updated resource usage
+   */
+  virtual void onSuccess(const ResourceUsage& usage) PURE;
+
+  /**
+   * Called when the request for updated resource usage fails.
+   * @param error the exception caught when trying to get updated resource usage
+   */
+  virtual void onFailure(const EnvoyException& error) PURE;
+};
+
+class ReactiveResourceUpdateCallbacks {
+public:
+  virtual ~ReactiveResourceUpdateCallbacks() = default;
+
+  /**
+   * Called when the request for updated resource usage succeeds.
+   * @param usage the updated resource usage
+   */
+  virtual void onSuccess(const uint64_t usage) PURE;
+
+  /**
+   * Called when the request for updated resource usage fails.
+   * todo may need propagate error
+   */
+  virtual void onFailure() PURE;
+
+  virtual Event::Dispatcher& dispatcher() PURE;
+};
+
 class ResourceMonitor {
 public:
   virtual ~ResourceMonitor() = default;
-
-  /**
-   * Notifies caller of updated resource usage.
-   */
-  class Callbacks {
-  public:
-    virtual ~Callbacks() = default;
-
-    /**
-     * Called when the request for updated resource usage succeeds.
-     * @param usage the updated resource usage
-     */
-    virtual void onSuccess(const ResourceUsage& usage) PURE;
-
-    /**
-     * Called when the request for updated resource usage fails.
-     * @param error the exception caught when trying to get updated resource usage
-     */
-    virtual void onFailure(const EnvoyException& error) PURE;
-  };
 
   /**
    * Recalculate resource usage.
    * This must be non-blocking so if RPCs need to be made they should be
    * done asynchronously and invoke the callback when finished.
    */
-  virtual void updateResourceUsage(Callbacks& callbacks) PURE;
+  virtual void updateResourceUsage(ResourceUpdateCallbacks& callbacks) PURE;
 };
 
 using ResourceMonitorPtr = std::unique_ptr<ResourceMonitor>;
