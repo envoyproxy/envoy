@@ -95,8 +95,12 @@ void Span::finishSpan() {
     s.mutable_annotations()->insert({item.first, item.second});
   }
 
-  // Gets this Span's direction from operation name, direction is either
-  // "ingress" or "egress" and will be the first word from operation_name_
+  // Gets this Span's direction from operation name.
+  // `operation_name_` can be either "ingress" or "egress <header_hostname>"
+  // which directly comes from `span_name` that is populated inside function
+  // `HttpTracerImpl::startSpan` at source/common/tracing/http_tracer_impl.cc
+  // The `substr` operation below will extract only the first word from
+  // `operation_name_`, so the `direction` is either "ingress" or "egress".
   s.mutable_annotations()->insert(
       {DirectionKey, operation_name_.substr(0, operation_name_.find(" "))});
 

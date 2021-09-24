@@ -38,19 +38,19 @@ struct MockDaemonBroker : DaemonBroker {
 struct TraceProperties {
   TraceProperties(const std::string span_name, const std::string origin_name,
                   const std::string aws_key_value, const std::string operation_name,
-                  const std::string direction, const std::string http_method,
-                  const std::string http_url, const std::string user_agent)
+                  const std::string http_method, const std::string http_url,
+                  const std::string user_agent, const std::string direction)
       : span_name(span_name), origin_name(origin_name), aws_key_value(aws_key_value),
-        operation_name(operation_name), direction(direction), http_method(http_method),
-        http_url(http_url), user_agent(user_agent) {}
+        operation_name(operation_name), http_method(http_method), http_url(http_url),
+        user_agent(user_agent), direction(direction) {}
   const std::string span_name;
   const std::string origin_name;
   const std::string aws_key_value;
   const std::string operation_name;
-  const std::string direction;
   const std::string http_method;
   const std::string http_url;
   const std::string user_agent;
+  const std::string direction;
 };
 
 class XRayTracerTest : public ::testing::Test {
@@ -58,8 +58,8 @@ public:
   XRayTracerTest()
       : broker_(std::make_unique<MockDaemonBroker>("127.0.0.1:2000")),
         expected_(std::make_unique<TraceProperties>(
-            "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "egress", "POST",
-            "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)")) {}
+            "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "POST",
+            "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)", "egress")) {}
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<MockDaemonBroker> broker_;
