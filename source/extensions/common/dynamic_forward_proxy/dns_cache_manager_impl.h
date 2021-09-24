@@ -19,6 +19,7 @@ public:
   // DnsCacheManager
   DnsCacheSharedPtr getCache(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) override;
+  DnsCacheSharedPtr lookUpCacheByName(absl::string_view cache_name) override;
 
 private:
   struct ActiveCache {

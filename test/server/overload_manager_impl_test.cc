@@ -99,7 +99,7 @@ public:
   Server::ResourceMonitorPtr
   createResourceMonitor(const Protobuf::Message&,
                         Server::Configuration::ResourceMonitorFactoryContext& context) override {
-    auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
+    auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher());
     monitor_ = monitor.get();
     return monitor;
   }
