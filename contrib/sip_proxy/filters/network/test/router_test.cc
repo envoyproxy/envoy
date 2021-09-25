@@ -22,17 +22,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AtLeast;
-using testing::Combine;
 using testing::ContainsRegex;
 using testing::Eq;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using ::testing::TestParamInfo;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {
@@ -42,9 +37,9 @@ namespace Router {
 
 class SipRouterTest : public testing::Test {
 public:
-  SipRouterTest() {}
-  void initializeTrans(bool hasOption = true) {
-    if (hasOption == true) {
+  SipRouterTest() = default;
+  void initializeTrans(bool has_option = true) {
+    if (has_option == true) {
       const std::string yaml = R"EOF(
 session_affinity: true
 registration_affinity: true

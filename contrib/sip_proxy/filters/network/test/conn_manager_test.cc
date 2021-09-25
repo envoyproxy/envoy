@@ -19,11 +19,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
-using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
 
 namespace Envoy {
@@ -169,60 +165,64 @@ settings:
     trans->upstreamData(filter_->decoder_->metadata_);
 
     // TransportBegin
-    struct MockResponseDecoder_TransportBegin : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_TransportBegin(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderTransportBegin : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderTransportBegin(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus transportBegin(MessageMetadataSharedPtr) { return FilterStatus::StopIteration; }
+      FilterStatus transportBegin(MessageMetadataSharedPtr) override {
+        return FilterStatus::StopIteration;
+      }
     };
-    MockResponseDecoder_TransportBegin decoder_transportBegin(*trans);
+    MockResponseDecoderTransportBegin decoder_transportBegin(*trans);
     trans->response_decoder_ =
-        std::make_unique<MockResponseDecoder_TransportBegin>(decoder_transportBegin);
+        std::make_unique<MockResponseDecoderTransportBegin>(decoder_transportBegin);
     trans->upstreamData(filter_->decoder_->metadata_);
 
     // MessageBegin
-    struct MockResponseDecoder_MessageBegin : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_MessageBegin(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderMessageBegin : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderMessageBegin(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus messageBegin(MessageMetadataSharedPtr) { return FilterStatus::StopIteration; }
+      FilterStatus messageBegin(MessageMetadataSharedPtr) override {
+        return FilterStatus::StopIteration;
+      }
     };
-    MockResponseDecoder_MessageBegin decoder_messageBegin(*trans);
+    MockResponseDecoderMessageBegin decoder_messageBegin(*trans);
     trans->response_decoder_ =
-        std::make_unique<MockResponseDecoder_MessageBegin>(decoder_messageBegin);
+        std::make_unique<MockResponseDecoderMessageBegin>(decoder_messageBegin);
     trans->upstreamData(filter_->decoder_->metadata_);
 
     // MessageEnd
-    struct MockResponseDecoder_MessageEnd : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_MessageEnd(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderMessageEnd : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderMessageEnd(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus messageEnd() { return FilterStatus::StopIteration; }
+      FilterStatus messageEnd() override { return FilterStatus::StopIteration; }
     };
-    MockResponseDecoder_MessageEnd decoder_messageEnd(*trans);
-    trans->response_decoder_ = std::make_unique<MockResponseDecoder_MessageEnd>(decoder_messageEnd);
+    MockResponseDecoderMessageEnd decoder_messageEnd(*trans);
+    trans->response_decoder_ = std::make_unique<MockResponseDecoderMessageEnd>(decoder_messageEnd);
     trans->upstreamData(filter_->decoder_->metadata_);
     EXPECT_NE(nullptr, trans->connection());
 
     // TransportEnd
-    struct MockResponseDecoder_TransportEnd : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_TransportEnd(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderTransportEnd : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderTransportEnd(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus transportEnd() { return FilterStatus::StopIteration; }
+      FilterStatus transportEnd() override { return FilterStatus::StopIteration; }
     };
-    MockResponseDecoder_TransportEnd decoder_transportEnd(*trans);
+    MockResponseDecoderTransportEnd decoder_transportEnd(*trans);
     trans->response_decoder_ =
-        std::make_unique<MockResponseDecoder_TransportEnd>(decoder_transportEnd);
+        std::make_unique<MockResponseDecoderTransportEnd>(decoder_transportEnd);
     trans->upstreamData(filter_->decoder_->metadata_);
 
     // AppException
-    struct MockResponseDecoder_AppException : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_AppException(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderAppException : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderAppException(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus transportBegin(MessageMetadataSharedPtr) {
-        throw AppException(AppExceptionType::ProtocolError, "MockResponseDecoder_AppException");
+      FilterStatus transportBegin(MessageMetadataSharedPtr) override {
+        throw AppException(AppExceptionType::ProtocolError, "MockResponseDecoderAppException");
       }
     };
-    MockResponseDecoder_AppException decoder_appException(*trans);
+    MockResponseDecoderAppException decoder_appException(*trans);
     trans->response_decoder_ =
-        std::make_unique<MockResponseDecoder_AppException>(decoder_appException);
+        std::make_unique<MockResponseDecoderAppException>(decoder_appException);
     try {
       trans->upstreamData(filter_->decoder_->metadata_);
     } catch (const EnvoyException& ex) {
@@ -231,16 +231,16 @@ settings:
     }
 
     // EnvoyException
-    struct MockResponseDecoder_EnvoyException : public ConnectionManager::ResponseDecoder {
-      MockResponseDecoder_EnvoyException(ConnectionManager::ActiveTrans& parent)
+    struct MockResponseDecoderEnvoyException : public ConnectionManager::ResponseDecoder {
+      MockResponseDecoderEnvoyException(ConnectionManager::ActiveTrans& parent)
           : ConnectionManager::ResponseDecoder(parent) {}
-      FilterStatus transportBegin(MessageMetadataSharedPtr) {
-        throw EnvoyException("MockResponseDecoder_EnvoyException");
+      FilterStatus transportBegin(MessageMetadataSharedPtr) override {
+        throw EnvoyException("MockResponseDecoderEnvoyException");
       }
     };
-    MockResponseDecoder_EnvoyException decoder_envoyException(*trans);
+    MockResponseDecoderEnvoyException decoder_envoyException(*trans);
     trans->response_decoder_ =
-        std::make_unique<MockResponseDecoder_EnvoyException>(decoder_envoyException);
+        std::make_unique<MockResponseDecoderEnvoyException>(decoder_envoyException);
     try {
       trans->upstreamData(filter_->decoder_->metadata_);
     } catch (const EnvoyException& ex) {

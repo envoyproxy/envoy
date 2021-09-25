@@ -75,7 +75,7 @@ RouteConstSharedPtr RouteMatcher::route(MessageMetadata& metadata) const {
 }
 
 void Router::onDestroy() {
-  if (!callbacks_->transactionId().empty())
+  if (!callbacks_->transactionId().empty()) {
     for (auto& kv : *transaction_infos_) {
       auto transaction_info = kv.second;
       try {
@@ -84,6 +84,7 @@ void Router::onDestroy() {
       } catch (std::out_of_range const&) {
       }
     }
+  }
 }
 
 void Router::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callbacks) {

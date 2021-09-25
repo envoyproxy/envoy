@@ -15,21 +15,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::Combine;
-using testing::DoAll;
-using testing::ExpectationSet;
-using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
-using testing::Ref;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SetArgReferee;
-using testing::StrictMock;
-using ::testing::TestParamInfo;
-using testing::Values;
 
 namespace Envoy {
 namespace Extensions {

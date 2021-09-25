@@ -5,10 +5,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InSequence;
-using testing::Ref;
-using testing::StrictMock;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

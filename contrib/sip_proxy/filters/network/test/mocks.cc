@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 

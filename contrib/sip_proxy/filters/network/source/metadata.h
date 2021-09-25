@@ -26,13 +26,13 @@ namespace SipProxy {
  */
 class MessageMetadata : public Logger::Loggable<Logger::Id::filter> {
 public:
-  MessageMetadata(){};
+  MessageMetadata() = default;
   MessageMetadata(std::string&& raw_msg) : raw_msg_(std::move(raw_msg)) {}
 
   MsgType msgType() { return msg_type_; }
   MethodType methodType() { return method_type_; }
   MethodType respMethodType() { return resp_method_type_; }
-  absl::optional<absl::string_view> EP() { return ep_; }
+  absl::optional<absl::string_view> ep() { return ep_; }
   std::vector<Operation>& operationList() { return operation_list_; }
   absl::optional<absl::string_view> routeEP() { return route_ep_; }
   absl::optional<absl::string_view> routeOpaque() { return route_opaque_; }
@@ -55,16 +55,16 @@ public:
 
   void setRequestURI(absl::string_view data) { request_uri_ = data; }
   void setTopRoute(absl::string_view data) { top_route_ = data; }
-  void setDomain(absl::string_view header, std::string domainMatchParamName) {
-    domain_ = getDomain(header, domainMatchParamName);
+  void setDomain(absl::string_view header, std::string domain_match_param_name) {
+    domain_ = getDomain(header, domain_match_param_name);
   }
 
-  // void addEPOperation(size_t rawOffset, absl::string_view& header, std::string& ownDomain,
-  // std::string& domainMatchParamName) {
-  void addEPOperation(size_t rawOffset, absl::string_view& header, std::string ownDomain,
-                      std::string domainMatchParamName) {
-    ENVOY_LOG(debug, "header: {}\n ownDomain: {}\n  domainMatchParamName: {}", header, ownDomain,
-              domainMatchParamName);
+  // void addEPOperation(size_t raw_offset, absl::string_view& header, std::string& own_domain,
+  // std::string& domain_match_param_name) {
+  void addEPOperation(size_t raw_offset, absl::string_view& header, std::string own_domain,
+                      std::string domain_match_param_name) {
+    ENVOY_LOG(debug, "header: {}\n own_domain: {}\n  domain_match_param_name: {}", header,
+              own_domain, domain_match_param_name);
     if (header.find(";ep=") != absl::string_view::npos) {
       // already Contact have ep
       return;
@@ -76,36 +76,36 @@ public:
     }
 
     // Get domain
-    absl::string_view domain = getDomain(header, domainMatchParamName);
+    absl::string_view domain = getDomain(header, domain_match_param_name);
 
     // Compare the domain
-    if (domain != ownDomain) {
-      ENVOY_LOG(debug, "header domain:{} not matches own_domain:{}", domain, ownDomain);
+    if (domain != own_domain) {
+      ENVOY_LOG(debug, "header domain:{} not matches own_domain:{}", domain, own_domain);
       return;
     }
 
-    setOperation(Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue(";ep=")));
+    setOperation(Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(";ep=")));
   }
 
-  void addOpaqueOperation(size_t rawOffset, absl::string_view& header) {
+  void addOpaqueOperation(size_t raw_offset, absl::string_view& header) {
     if (header.find("opaque=") != absl::string_view::npos) {
       // already has opaque
       return;
     }
     auto pos = header.length();
     setOperation(
-        Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue(",opaque=")));
+        Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(",opaque=")));
   }
 
-  void deleteInstipOperation(size_t rawOffset, absl::string_view& header) {
+  void deleteInstipOperation(size_t raw_offset, absl::string_view& header) {
     // Delete inst-ip and remove "sip:" in x-suri
     if (auto pos = header.find(";inst-ip="); pos != absl::string_view::npos) {
       setOperation(
-          Operation(OperationType::Delete, rawOffset + pos,
+          Operation(OperationType::Delete, raw_offset + pos,
                     DeleteOperationValue(
                         header.substr(pos, header.find_first_of(";>", pos + 1) - pos).size())));
       auto xsuri = header.find("sip:pcsf-cfed");
-      setOperation(Operation(OperationType::Delete, rawOffset + xsuri, DeleteOperationValue(4)));
+      setOperation(Operation(OperationType::Delete, raw_offset + xsuri, DeleteOperationValue(4)));
     }
   }
 
@@ -146,20 +146,20 @@ private:
 
   std::string raw_msg_{};
 
-  absl::string_view getDomain(absl::string_view header, std::string domainMatchParamName) {
-    ENVOY_LOG(debug, "header: {}\ndomainMatchParamName: {}", header, domainMatchParamName);
+  absl::string_view getDomain(absl::string_view header, std::string domain_match_param_name) {
+    ENVOY_LOG(debug, "header: {}\ndomain_match_param_name: {}", header, domain_match_param_name);
 
     // Get domain
     absl::string_view domain = "";
 
-    if (domainMatchParamName != "host") {
-      auto start = header.find(domainMatchParamName);
+    if (domain_match_param_name != "host") {
+      auto start = header.find(domain_match_param_name);
       if (start == absl::string_view::npos) {
         domain = "";
       } else {
-        // domainMatchParamName + "="
-        // start = start + strlen(domainMatchParamName.c_str()) + strlen("=") ;
-        start = start + domainMatchParamName.length() + strlen("=");
+        // domain_match_param_name + "="
+        // start = start + strlen(domain_match_param_name.c_str()) + strlen("=") ;
+        start = start + domain_match_param_name.length() + strlen("=");
         if ("sip:" == header.substr(start, strlen("sip:"))) {
           start += strlen("sip:");
         }
@@ -174,7 +174,7 @@ private:
     }
 
     // Still get host if mapped domain is empty
-    if (domainMatchParamName == "host" || domain == "") {
+    if (domain_match_param_name == "host" || domain == "") {
       auto start = header.find("sip:");
       if (start == absl::string_view::npos) {
         return "";
