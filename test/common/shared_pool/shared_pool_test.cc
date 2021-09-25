@@ -60,7 +60,7 @@ protected:
     go.WaitForNotification();
   }
 
-  void clearPointerOnSharedPool(std::shared_ptr<int>& intptr) {
+  void clearPointerOnMainThread(std::shared_ptr<int>& intptr) {
     absl::Notification go;
     dispatcher_->post([&intptr, &go]() {
       intptr.reset();
@@ -155,7 +155,7 @@ TEST_F(SharedPoolTest, GetObjectAndDeleteObjectRaceForSameHashValue) {
     go_.Notify();
   });
   go_.WaitForNotification();
-  clearPointerOnSharedPool(o2);
+  clearPointerOnMainThread(o2);
   deferredDeleteSharedPoolOnMainThread(pool);
 }
 
@@ -181,7 +181,7 @@ TEST_F(SharedPoolTest, RaceCondtionForGetObjectWithObjectDeleter) {
   pool->sync().signal(ObjectSharedPool<int>::ObjectDeleterEntry);
   thread->join();
   EXPECT_EQ(4, *o2);
-  clearPointerOnSharedPool(o2);
+  clearPointerOnMainThread(o2);
   deferredDeleteSharedPoolOnMainThread(pool);
 }
 
