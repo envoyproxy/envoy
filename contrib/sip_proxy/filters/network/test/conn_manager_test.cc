@@ -223,8 +223,12 @@ settings:
     MockResponseDecoder_AppException decoder_appException(*trans);
     trans->response_decoder_ =
         std::make_unique<MockResponseDecoder_AppException>(decoder_appException);
-    trans->upstreamData(filter_->decoder_->metadata_);
-    EXPECT_EQ(1U, filter_->stats_.response_exception_.value());
+    try {
+      trans->upstreamData(filter_->decoder_->metadata_);
+    } catch (const EnvoyException& ex) {
+      filter_->stats_.response_exception_.inc();
+      EXPECT_EQ(1U, filter_->stats_.response_exception_.value());
+    }
 
     // EnvoyException
     struct MockResponseDecoder_EnvoyException : public ConnectionManager::ResponseDecoder {
@@ -237,13 +241,19 @@ settings:
     MockResponseDecoder_EnvoyException decoder_envoyException(*trans);
     trans->response_decoder_ =
         std::make_unique<MockResponseDecoder_EnvoyException>(decoder_envoyException);
-    trans->upstreamData(filter_->decoder_->metadata_);
-
-    // metadata = nullptr
-    std::string transid = trans->transactionId();
-    trans->metadata_ = nullptr;
-    filter_->transactions_.emplace(transid, std::move(trans));
-    filter_->transactions_.at(transid)->upstreamData(filter_->decoder_->metadata_);
+    try {
+      trans->upstreamData(filter_->decoder_->metadata_);
+    } catch (const EnvoyException& ex) {
+      filter_->stats_.response_exception_.inc();
+      EXPECT_EQ(2U, filter_->stats_.response_exception_.value());
+    }
+    /*
+        // metadata = nullptr
+        std::string transid = trans->transactionId();
+        trans->metadata_ = nullptr;
+        filter_->transactions_.emplace(transid, std::move(trans));
+        filter_->transactions_.at(transid)->upstreamData(filter_->decoder_->metadata_);
+    */
 
     // transportEnd throw envoyException
     filter_->read_callbacks_->connection().setDelayedCloseTimeout(std::chrono::milliseconds(1));
@@ -601,7 +611,6 @@ TEST_F(SipConnectionManagerTest, EncodeInsertEPMatchedHost) {
 }
 
 TEST_F(SipConnectionManagerTest, EncodeInsertEPNoMatchedxSuri) {
-  std::cout << "DDD1 ===================================\n";
   const std::string SIP_OK200_FULL =
       "SIP/2.0 200 OK\x0d\x0a"
       "Call-ID: 1-3193@11.0.0.10\x0d\x0a"
@@ -643,10 +652,11 @@ TEST_F(SipConnectionManagerTest, EncodeInsertOpaque) {
 
   buffer_.add(SIP_OK200_FULL);
 
-  absl::string_view header = "<sip:User.0001@11.0.0.10:15060;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
-                             "local:5060;transport=TCP>";
+  absl::string_view header =
+      "Contact: <sip:User.0001@11.0.0.10:15060;x-suri=sip:pcsf-cfed.cncs.svc.cluster."
+      "local:5060;transport=TCP>";
   metadata_ = std::make_shared<MessageMetadata>(buffer_.toString());
-  metadata_->addOpaqueOperation(SIP_OK200_FULL.find("Contact: ") + strlen("Contact: "), header);
+  metadata_->addOpaqueOperation(SIP_OK200_FULL.find("Contact: "), header);
   Buffer::OwnedImpl response_buffer;
   metadata_->setEP("127.0.0.1");
 

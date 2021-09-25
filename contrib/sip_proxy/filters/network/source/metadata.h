@@ -94,7 +94,7 @@ public:
     }
     auto pos = header.length();
     setOperation(
-        Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue("opaque=")));
+        Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue(",opaque=")));
   }
 
   void deleteInstipOperation(size_t rawOffset, absl::string_view& header) {
