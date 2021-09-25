@@ -33,11 +33,11 @@ public:
   MOCK_METHOD(void, deleteHeaders, (RdKafka::Headers * librdkafka_headers), (const));
 
   MockLibRdKafkaUtils() {
-    ON_CALL(*this, convertHeaders(_)).WillByDefault(Return(headersHolder.get()));
+    ON_CALL(*this, convertHeaders(_)).WillByDefault(Return(headers_holder_.get()));
   }
 
 private:
-  std::unique_ptr<RdKafka::Headers> headersHolder{RdKafka::Headers::create()};
+  std::unique_ptr<RdKafka::Headers> headers_holder_{RdKafka::Headers::create()};
 };
 
 class MockProduceFinishCb : public ProduceFinishCb {

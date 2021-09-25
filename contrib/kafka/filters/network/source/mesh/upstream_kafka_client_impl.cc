@@ -46,7 +46,7 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
   }
 
   // LibRdKafkaUtils
-  virtual void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override {
+  void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override {
     delete librdkafka_headers;
   }
 
