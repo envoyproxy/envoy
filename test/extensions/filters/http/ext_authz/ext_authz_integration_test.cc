@@ -175,7 +175,9 @@ public:
 
   void waitForSuccessfulUpstreamResponse(
       const std::string& expected_response_code, const Headers& headers_to_add = Headers{},
-      const Headers& headers_to_append = Headers{}, const Headers& headers_to_remove = Headers{},
+      const Headers& headers_to_append = Headers{},
+      const Headers& headers_to_add_if_absent = Headers{},
+      const Headers& headers_to_remove = Headers{},
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream =
           Http::TestRequestHeaderMapImpl{},
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple =
@@ -224,6 +226,17 @@ public:
       EXPECT_EQ(2, values.size());
     }
 
+    for (const auto& header_to_add_if_absent : headers_to_add_if_absent) {
+      if (!absl::StartsWith(header_to_add_if_absent.second, "no-op")) {
+        EXPECT_THAT(
+            upstream_request_->headers(),
+            Http::HeaderValueOf(header_to_add_if_absent.first, header_to_add_if_absent.second));
+      }
+      // A suffix `-added-as-absent` should have got added for any valid headers in the list
+      // header_to_add_if_absent
+      EXPECT_TRUE(absl::EndsWith(header_to_add_if_absent.second, "-added-as-absent"));
+    }
+
     if (!new_headers_from_upstream.empty()) {
       // new_headers_from_upstream has append = true. The current implementation ignores to set
       // multiple headers that are not present in the original request headers. In order to add
@@ -257,6 +270,7 @@ public:
   }
 
   void sendExtAuthzResponse(const Headers& headers_to_add, const Headers& headers_to_append,
+                            const Headers& headers_to_add_if_absent,
                             const Headers& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
@@ -269,16 +283,23 @@ public:
 
     for (const auto& header_to_add : headers_to_add) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      entry->mutable_append()->set_value(false);
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
       entry->mutable_header()->set_key(header_to_add.first);
       entry->mutable_header()->set_value(header_to_add.second);
     }
 
     for (const auto& header_to_append : headers_to_append) {
       auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-      entry->mutable_append()->set_value(true);
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
       entry->mutable_header()->set_key(header_to_append.first);
       entry->mutable_header()->set_value(header_to_append.second);
+    }
+
+    for (const auto& header_to_add_if_absent : headers_to_add_if_absent) {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
+      entry->mutable_header()->set_key(header_to_add_if_absent.first);
+      entry->mutable_header()->set_value(header_to_add_if_absent.second);
     }
 
     for (const auto& header_to_remove : headers_to_remove) {
@@ -291,7 +312,7 @@ public:
         [&check_response](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
           auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
           // Try to append to a non-existent field.
-          entry->mutable_append()->set_value(true);
+          entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
           entry->mutable_header()->set_key(std::string(h.key().getStringView()));
           entry->mutable_header()->set_value(std::string(h.value().getStringView()));
           return Http::HeaderMap::Iterate::Continue;
@@ -299,18 +320,22 @@ public:
 
     // Entries in this headers are not present in the original request headers. But we set append =
     // true and append = false.
-    headers_to_append_multiple.iterate(
-        [&check_response](const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
-          auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
-          const auto key = std::string(h.key().getStringView());
-          const auto value = std::string(h.value().getStringView());
+    headers_to_append_multiple.iterate([&check_response](
+                                           const Http::HeaderEntry& h) -> Http::HeaderMap::Iterate {
+      auto* entry = check_response.mutable_ok_response()->mutable_headers()->Add();
+      const auto key = std::string(h.key().getStringView());
+      const auto value = std::string(h.value().getStringView());
 
-          // This scenario makes sure we have set the headers to be appended later.
-          entry->mutable_append()->set_value(!absl::EndsWith(value, "-first"));
-          entry->mutable_header()->set_key(key);
-          entry->mutable_header()->set_value(value);
-          return Http::HeaderMap::Iterate::Continue;
-        });
+      // This scenario makes sure we have set the headers to be appended later.
+      if (absl::EndsWith(value, "-first")) {
+        entry->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      } else {
+        entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      }
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      return Http::HeaderMap::Iterate::Continue;
+    });
 
     for (const auto& response_header_to_add : response_headers_to_add_if_absent) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
@@ -329,8 +354,7 @@ public:
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
       const auto key = std::string(response_header_to_add.first);
       const auto value = std::string(response_header_to_add.second);
-
-      entry->mutable_append()->set_value(true);
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_append {}={}", key,
@@ -343,7 +367,7 @@ public:
       const auto value = std::string(response_header_to_set.second);
 
       // Replaces the one sent by the upstream.
-      entry->mutable_append()->set_value(false);
+      entry->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set {}={}", key, value);
@@ -390,13 +414,14 @@ attributes:
 
   void expectCheckRequestWithBody(Http::CodecType downstream_protocol, uint64_t request_size) {
     expectCheckRequestWithBodyWithHeaders(downstream_protocol, request_size, Headers{}, Headers{},
-                                          Headers{}, Http::TestRequestHeaderMapImpl{},
+                                          Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                                           Http::TestRequestHeaderMapImpl{});
   }
 
   void expectCheckRequestWithBodyWithHeaders(
       Http::CodecType downstream_protocol, uint64_t request_size, const Headers& headers_to_add,
-      const Headers& headers_to_append, const Headers& headers_to_remove,
+      const Headers& headers_to_append, const Headers& headers_to_add_if_absent,
+      const Headers& headers_to_remove,
       const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
       const Http::TestRequestHeaderMapImpl& headers_to_append_multiple) {
     initializeConfig();
@@ -415,14 +440,18 @@ attributes:
       updated_headers_to_append.push_back(
           std::make_pair(header_to_append.first, header_to_append.second + "-appended"));
     }
-    sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append, headers_to_remove,
+    Headers updated_headers_to_add_if_absent;
+    for (const auto& header_to_add_if_absent : headers_to_add_if_absent) {
+      updated_headers_to_add_if_absent.push_back(std::make_pair(
+          header_to_add_if_absent.first, header_to_add_if_absent.second + "-added-as-absent"));
+    }
+    sendExtAuthzResponse(updated_headers_to_add, updated_headers_to_append,
+                         updated_headers_to_add_if_absent, headers_to_remove,
                          new_headers_from_upstream, headers_to_append_multiple, Headers{},
                          Headers{});
-
     waitForSuccessfulUpstreamResponse("200", updated_headers_to_add, updated_headers_to_append,
-                                      headers_to_remove, new_headers_from_upstream,
-                                      headers_to_append_multiple);
-
+                                      updated_headers_to_add_if_absent, headers_to_remove,
+                                      new_headers_from_upstream, headers_to_append_multiple);
     cleanup();
   }
 
@@ -669,6 +698,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
       Http::CodecType::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
       /*headers_to_append=*/Headers{{"header2", "header2"}},
+      /*headers_to_add_if_absent=*/Headers{{"new1", "no-op"}, {"header3", "header3"}},
       /*headers_to_remove=*/Headers{{"remove-me", "upstream-should-not-see-me"}},
       /*new_headers_from_upstream=*/Http::TestRequestHeaderMapImpl{{"new1", "new1"}},
       /*headers_to_append_multiple=*/
@@ -708,7 +738,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
 
   // Send back an ext_authz response with response_headers_to_add set.
   sendExtAuthzResponse(
-      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Headers{}, Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
       Http::TestRequestHeaderMapImpl{},
       Headers{{"add-if-absent", "add-if-absent-value"},
               {"replaceable", "should-never-be-this-value"}},
@@ -907,7 +937,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
 
   initiateClientConnection(4, Headers{}, Headers{});
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
 
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
@@ -945,7 +975,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
     EXPECT_EQ(expected_grpc_client_creation_count,
               test_server_->counter("grpc.ext_authz.google_grpc_client_creation")->value());
   }
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
                        Http::TestRequestHeaderMapImpl{}, Headers{}, Headers{});
 
   result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);

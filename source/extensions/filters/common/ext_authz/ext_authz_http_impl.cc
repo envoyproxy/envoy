@@ -38,6 +38,7 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
+                                            Http::HeaderVector{},
                                             {{}},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
@@ -329,13 +330,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
 
   // Create an Ok authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    SuccessResponse ok{message->headers(), config_->upstreamHeaderMatchers(),
-                       config_->upstreamHeaderToAppendMatchers(),
-                       config_->clientHeaderOnSuccessMatchers(),
-                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING,
-                                Http::Code::OK, ProtobufWkt::Struct{}}};
+    SuccessResponse ok{
+        message->headers(), config_->upstreamHeaderMatchers(),
+        config_->upstreamHeaderToAppendMatchers(), config_->clientHeaderOnSuccessMatchers(),
+        Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
+                 Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
+                 Http::HeaderVector{}, std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                 ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
 
@@ -344,6 +345,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                          config_->upstreamHeaderToAppendMatchers(),
                          config_->clientHeaderOnSuccessMatchers(),
                          Response{CheckStatus::Denied,
+                                  Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
