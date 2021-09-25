@@ -64,7 +64,7 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
+  ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   socket.ioHandle().initializeFileEvent(
       cb.dispatcher(),

@@ -55,15 +55,15 @@ TEST(MutationUtils, TestApplyMutations) {
 
   envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("2");
   s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("3");
   s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_value("no");
   s = mutation.add_set_headers();
@@ -78,12 +78,12 @@ TEST(MutationUtils, TestApplyMutations) {
   s->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_value("do-nothing");
-  // Default of "append_action" is "APPEND_IF_EXISTS" and mutations
+  // Default of "append_action" is "APPEND_IF_EXISTS_OR_ADD" and mutations
   // are applied in order.
   s = mutation.add_set_headers();
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_value("nope");
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   // Incomplete structures should be ignored
   mutation.add_set_headers();
 
@@ -148,7 +148,7 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   Http::TestRequestHeaderMapImpl headers;
   envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key(":path");
   s->mutable_header()->set_value("/foo");
   s = mutation.add_set_headers();
@@ -157,11 +157,11 @@ TEST(MutationUtils, TestNonAppendableHeaders) {
   // These two should be ignored since we ignore attempts
   // to set multiple values for system headers.
   s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key(":path");
   s->mutable_header()->set_value("/baz");
   s = mutation.add_set_headers();
-  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  s->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_value("401");
 

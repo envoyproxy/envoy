@@ -296,12 +296,12 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
         headers.addReferenceKey(key, value);
       }
       break;
-    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
+    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
       // Append the new value to the existing values if the header
       // already exist otherwise simply add the key-value pair.
       headers.addReferenceKey(key, value);
       break;
-    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
       // Overwrite the new value by discarding any existing values if the
       // header already exist otherwise simply add the key-value pair.
       headers.setReferenceKey(key, value);
@@ -327,12 +327,12 @@ Http::HeaderTransforms HeaderParser::getHeaderTransforms(const StreamInfo::Strea
       // Headers to be appended if it doesn't already exist.
       transforms.headers_to_add_if_absent.push_back({key, value});
       break;
-    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
+    case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
       // Headers on which the new value needs to be appended
       // to the existing values if the header already exists.
       transforms.headers_to_append_if_exist.push_back({key, value});
       break;
-    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+    case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
       // Headers on which the new value needs to be overwritten by
       // discarding any existing values if the header already exists.
       transforms.headers_to_overwrite_if_exist.push_back({key, value});

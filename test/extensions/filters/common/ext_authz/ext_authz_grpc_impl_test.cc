@@ -107,11 +107,12 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
 
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
       {{"authorized-by", "TestAuthService",
-        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"cookie", "authtoken=1234", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS}});
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"cookie", "authtoken=1234",
+        envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD}});
   auto check_response =
       TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
                                     empty_body, expected_headers, expected_downstream_headers);
@@ -185,8 +186,8 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
 
   const std::string expected_body{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"foobar", "bar", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS}});
+      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"foobar", "bar", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
   auto check_response = TestCommon::makeCheckResponse(
       Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Unauthorized,
@@ -217,8 +218,8 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus)
 
   const std::string expected_body{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"foobar", "bar", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS}});
+      {{"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"foobar", "bar", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD}});
   const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
   auto check_response = TestCommon::makeCheckResponse(
       Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Empty, expected_body,

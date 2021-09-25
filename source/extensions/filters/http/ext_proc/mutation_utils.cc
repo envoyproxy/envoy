@@ -64,7 +64,7 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
     } else {
       const auto append_action = Http::HeaderUtility::getHeaderAppendAction(sh);
       const LowerCaseString lcKey(sh.header().key());
-      if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS &&
+      if (append_action == envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD &&
           !headers.get(lcKey).empty() && !isAppendableHeader(lcKey)) {
         ENVOY_LOG(debug, "Ignoring duplicate value for header {}", sh.header().key());
       } else {
@@ -75,10 +75,10 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
             headers.addCopy(lcKey, sh.header().value());
           }
           break;
-        case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
+        case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
           headers.addCopy(lcKey, sh.header().value());
           break;
-        case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS:
+        case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
           headers.setCopy(lcKey, sh.header().value());
           break;
         default:

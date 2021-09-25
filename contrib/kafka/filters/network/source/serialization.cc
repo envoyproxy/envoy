@@ -205,6 +205,21 @@ uint32_t CompactBytesDeserializer::feed(absl::string_view& data) {
                                                     false);
 }
 
+uint32_t NullableCompactBytesDeserializer::feed(absl::string_view& data) {
+  return feedCompactBytesIntoBuffers<unsigned char>(data, length_buf_, length_consumed_, required_,
+                                                    data_buf_, ready_, NULL_COMPACT_BYTES_LENGTH,
+                                                    true);
+}
+
+NullableBytes NullableCompactBytesDeserializer::get() const {
+  const uint32_t original_data_len = length_buf_.get();
+  if (NULL_COMPACT_BYTES_LENGTH == original_data_len) {
+    return absl::nullopt;
+  } else {
+    return absl::make_optional(data_buf_);
+  }
+}
+
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

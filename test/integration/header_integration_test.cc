@@ -464,7 +464,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
 TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -495,7 +495,7 @@ TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
 // Validates the virtual host appends upstream request headers and appends/removes upstream
 // response headers.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -529,7 +529,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAppendHeaderManipulation) {
 
 // Validates the virtual host replaces request headers and replaces upstream response headers.
 TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -563,7 +563,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostReplaceHeaderManipulation) {
 
 // Validates the route appends request headers and appends/removes upstream response headers.
 TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -597,7 +597,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
 
 // Validates the route replaces request headers and replaces/removes upstream response headers.
 TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -633,7 +633,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
 
 // Validates the relationship between virtual host and route header manipulations when appending.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -675,7 +675,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteAppendHeaderManipulation) {
 
 // Validates the relationship between virtual host and route header manipulations when replacing.
 TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -714,7 +714,7 @@ TEST_P(HeaderIntegrationTest, TestVirtualHostAndRouteReplaceHeaderManipulation) 
 // Validates the relationship between route configuration, virtual host and route header
 // manipulations when appending.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAppendHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, true);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, true);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -810,7 +810,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteAaddAbsentHeader
 // Validates the relationship between route configuration, virtual host and route header
 // manipulations when replacing.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, true);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, true);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -853,7 +853,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostAndRouteReplaceHeaderMan
 // Validates the relationship between route configuration, virtual host, route, and weighted
 // cluster header manipulations when appending.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, true);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, true);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -912,7 +912,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterAppendHea
 // Validates the relationship between route configuration, virtual host, route and weighted cluster
 // header manipulations when replacing.
 TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHeaderManipulation) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, true);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, true);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -959,7 +959,7 @@ TEST_P(HeaderIntegrationTest, TestRouteConfigVirtualHostRouteAndClusterReplaceHe
 // Validates that upstream host metadata can be emitted in headers.
 TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
   prepareEDS();
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, true);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, true);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1009,7 +1009,7 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
 
 // Validates that XFF gets properly parsed.
 TEST_P(HeaderIntegrationTest, TestXFFParsing) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1041,7 +1041,7 @@ TEST_P(HeaderIntegrationTest, TestXFFParsing) {
 // Validates behavior around same header appending (both predefined headers and
 // other).
 TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1078,7 +1078,7 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
 // from downstream.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
   normalize_path_ = false;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1108,7 +1108,7 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
 // the normalized.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
   normalize_path_ = true;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1138,7 +1138,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
   normalize_path_ = true;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1170,7 +1170,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesDefaultOverriden) {
                                     "2");
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   IntegrationStreamDecoderPtr response =
@@ -1192,7 +1192,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesDefaultOverriden) {
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRejected) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::REJECT_REQUEST;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   IntegrationStreamDecoderPtr response =
@@ -1216,7 +1216,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::KEEP_UNCHANGED;
   normalize_path_ = true;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1246,7 +1246,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
   normalize_path_ = true;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1274,7 +1274,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   registerTestServerPorts({"http"});
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   IntegrationStreamDecoderPtr response =
@@ -1295,7 +1295,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
 
 // Validates TE header is forwarded if it contains a supported value
 TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
@@ -1329,7 +1329,7 @@ TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
 
 // Validates TE header is stripped if it contains an unsupported value
 TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
-  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS, false);
+  initializeFilter(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},

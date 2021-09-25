@@ -267,11 +267,11 @@ virtual_hosts:
       - header:
           key: x-global-header
           value: vhost-www2
-        append_action: "OVERWRITE_IF_EXISTS"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
       - header:
           key: x-vhost-header
           value: vhost-www2
-        append_action: "OVERWRITE_IF_EXISTS"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
     request_headers_to_remove: ["x-vhost-nope"]
     routes:
       - match:
@@ -280,15 +280,15 @@ virtual_hosts:
           - header:
               key: x-global-header
               value: route-endpoint
-            append_action: "OVERWRITE_IF_EXISTS"
+            append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
           - header:
               key: x-vhost-header
               value: route-endpoint
-            append_action: "OVERWRITE_IF_EXISTS"
+            append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
           - header:
               key: x-route-header
               value: route-endpoint
-            append_action: "OVERWRITE_IF_EXISTS"
+            append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
         request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
@@ -307,7 +307,7 @@ request_headers_to_add:
   - header:
       key: x-global-header
       value: global
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 request_headers_to_remove: ["x-global-nope"]
 most_specific_header_mutations_wins: {0}
 )EOF";
@@ -1509,7 +1509,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalseMostSpecificWins)
 // and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
   const std::string yaml = responseHeadersConfig(
-      /*most_specific_wins=*/false, envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      /*most_specific_wins=*/false,
+      envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1604,7 +1605,7 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeaders) {
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
   const std::string yaml = responseHeadersConfig(
       /*most_specific_wins=*/false,
-      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1633,7 +1634,8 @@ TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendFalse) {
 
 TEST_F(RouteMatcherTest, TestAddRemoveResponseHeadersAppendMostSpecificWins) {
   const std::string yaml = responseHeadersConfig(
-      /*most_specific_wins=*/true, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      /*most_specific_wins=*/true,
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
@@ -1675,7 +1677,7 @@ response_headers_to_add:
   - header:
       key: x-has-variable
       value: "%PER_REQUEST_STATE(testing)%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 )EOF";
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
 
@@ -1760,7 +1762,7 @@ virtual_hosts:
       - header:
           key: {}
           value: vhost-www2
-        append_action: "OVERWRITE_IF_EXISTS"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 )EOF",
                                          header);
 
@@ -1787,7 +1789,7 @@ virtual_hosts:
       - header:
           key: "host"
           value: vhost-www2
-        append_action: "OVERWRITE_IF_EXISTS"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;

@@ -325,7 +325,7 @@ message HeaderValueOption {
     // This action will append the specified value to the existing values if the header
     // already exists. If the header doesn't exist then this will add the header with
     // specified key and value.
-    APPEND_IF_EXISTS = 0;
+    APPEND_IF_EXISTS_OR_ADD = 0;
 
     // This action will add the header if it doesn't already exist. If the header
     // already exists then this will be a no-op.
@@ -334,7 +334,7 @@ message HeaderValueOption {
     // This action will overwrite the specified value by discarding any existing values if
     // the header already exists. If the header doesn't exist then this will add the header
     // with specified key and value.
-    OVERWRITE_IF_EXISTS = 2;
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
   }
 
   // Header name/value pair that this option applies to.
@@ -343,13 +343,13 @@ message HeaderValueOption {
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
   // This field is now deprecated in the favor of :ref:`append_action <envoy_v3_api_field_config.core.v3.HeaderValueOption.append_action>`.
-  // Setting this to true is equivalent of setting `append_action` to :ref:`APPEND_IF_EXISTS<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS>`
-  // and setting this to false is equivalent of setting `append_action` to :ref:`OVERWRITE_IF_EXISTS<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.OVERWRITE_IF_EXISTS>`
+  // Setting this to true is equivalent of setting `append_action` to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`
+  // and setting this to false is equivalent of setting `append_action` to :ref:`OVERWRITE_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.OVERWRITE_IF_EXISTS_OR_ADD>`
   google.protobuf.BoolValue append = 2
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Describes the action taken to append/overwrite the given value for an existing header
-  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS>`.
+  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
   HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 }
 

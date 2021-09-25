@@ -245,13 +245,13 @@ TYPED_TEST(HttpUpstreamRequestEncoderTest, RequestEncoderHeaders) {
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value1");
-  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_.add_headers_to_add();
   hdr = header->mutable_header();
   hdr->set_key("header1");
   hdr->set_value("value2");
-  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+  header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
 
   header = this->config_.add_headers_to_add();
   hdr = header->mutable_header();

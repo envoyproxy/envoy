@@ -827,6 +827,7 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
+  failure_reason_ = "connect timeout";
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

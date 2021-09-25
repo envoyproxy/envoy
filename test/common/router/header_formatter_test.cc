@@ -50,7 +50,7 @@ public:
                       const std::string& variable, const std::string& expected_output) {
     {
       auto f = StreamInfoHeaderFormatter(
-          variable, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+          variable, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
@@ -63,8 +63,8 @@ public:
 
   void testInvalidFormat(const std::string& variable) {
     EXPECT_THROW_WITH_MESSAGE(
-        StreamInfoHeaderFormatter(variable,
-                                  envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+        StreamInfoHeaderFormatter(
+            variable, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
         EnvoyException, fmt::format("field '{}' not supported as custom header", variable));
   }
 };
@@ -638,7 +638,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
     std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
-    header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+    header->set_append_action(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(route), ProtoValidationException,
                             "Proto constraint validation failed.*");
   }
@@ -715,8 +715,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("PER_REQUEST_STATE()",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "PER_REQUEST_STATE()",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "PER_REQUEST_STATE(<data_name>), actual format "
@@ -724,15 +725,17 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
 
   // Missing single parens
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "PER_REQUEST_STATE(testing",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "PER_REQUEST_STATE(<data_name>), actual format "
       "PER_REQUEST_STATE(testing");
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "PER_REQUEST_STATE testing)",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "PER_REQUEST_STATE(<data_name>), actual format "
@@ -744,8 +747,9 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA(abcd)",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA(abcd), because JSON supplied is not valid. "
@@ -753,16 +757,18 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // No parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA");
 
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA()",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA()",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA(), because JSON supplied is not valid. Error(offset "
@@ -770,8 +776,9 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // One parameter.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA([\"ns\"])",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -779,24 +786,27 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Missing close paren.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA(",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA(",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA(");
 
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA([a,b,c,d]",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([a,b,c,d]");
 
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA([\"a\",\"b\"]",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -804,8 +814,9 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA([\"a\", 1])",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -814,8 +825,9 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA([\"a\", \"\\unothex\"])",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
       "...]), actual format UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is "
@@ -823,8 +835,9 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})",
-                                envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS),
+      StreamInfoHeaderFormatter(
+          "UPSTREAM_METADATA({\"a\":1})",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
       EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -1034,11 +1047,11 @@ request_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1060,11 +1073,11 @@ request_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1088,7 +1101,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   first_entry.set_value("%DOWNSTREAM_REMOTE_ADDRESS%");
 
   HeaderParserPtr req_header_parser_add = HeaderParser::configure(
-      headers_values, envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   req_header_parser_add->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("%DOWNSTREAM_REMOTE_ADDRESS%", header_map.get_("key"));
@@ -1099,7 +1112,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   set_entry.set_value("great");
 
   HeaderParserPtr req_header_parser_set = HeaderParser::configure(
-      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   req_header_parser_set->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("key"));
   EXPECT_EQ("great", header_map.get_("key"));
@@ -1110,7 +1123,7 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   empty_entry.set_value("");
 
   HeaderParserPtr req_header_parser_empty = HeaderParser::configure(
-      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      headers_values, envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   req_header_parser_empty->evaluateHeaders(header_map, nullptr);
   EXPECT_TRUE(header_map.has("empty"));
 }
@@ -1125,11 +1138,11 @@ request_headers_to_add:
   - header:
       key: "x-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "y-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   - header:
       key: "z-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
@@ -1164,7 +1177,7 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
 )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -1287,33 +1300,33 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s%3f)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-range"
       value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
 )EOF";
 
   // Disable append mode.
   envoy::config::route::v3::Route route = parseRouteFromV3Yaml(yaml);
   route.mutable_request_headers_to_add(0)->set_append_action(
-      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   route.mutable_request_headers_to_add(1)->set_append_action(
-      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   route.mutable_request_headers_to_add(2)->set_append_action(
-      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
@@ -1389,7 +1402,7 @@ request_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s%3f)%"
@@ -1397,11 +1410,11 @@ request_headers_to_add:
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-range"
       value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 )EOF";
 
   // Disable append mode.
@@ -1439,38 +1452,38 @@ response_headers_to_add:
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-client-ip-port"
       value: "%DOWNSTREAM_REMOTE_ADDRESS%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s.%3f)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-multiple"
       value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-f"
       value: "%START_TIME(f)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-range"
       value: "%START_TIME(%f, %1f, %2f, %3f, %4f, %5f, %6f, %7f, %8f, %9f)%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "set-cookie"
       value: "foo"
   - header:
       key: "set-cookie"
       value: "bar"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
 
 response_headers_to_remove: ["x-nope"]
 )EOF";
@@ -1566,15 +1579,15 @@ response_headers_to_add:
   - header:
       key: "x-foo-header"
       value: "foo"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-bar-header"
       value: "bar"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   - header:
       key: "x-per-request-header"
       value: "%PER_REQUEST_STATE(testing)%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   - header:
       key: "x-foobar-header"
       value: "foobar"
@@ -1616,15 +1629,15 @@ response_headers_to_add:
   - header:
       key: "x-foo-header"
       value: "foo"
-    append_action: "APPEND_IF_EXISTS"
+    append_action: "APPEND_IF_EXISTS_OR_ADD"
   - header:
       key: "x-bar-header"
       value: "bar"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   - header:
       key: "x-per-request-header"
       value: "%PER_REQUEST_STATE(testing)%"
-    append_action: "OVERWRITE_IF_EXISTS"
+    append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
 response_headers_to_remove: ["x-baz-header"]
 )EOF";
 

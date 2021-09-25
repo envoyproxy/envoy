@@ -951,23 +951,23 @@ TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithSameAppendAction
   mutable_header->set_key("foo");
   mutable_header->set_value("bar");
   header_value_option.set_append_action(
-      envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS);
+      envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD);
   header_value_option.mutable_append()->set_value(true);
-  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS,
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD,
             HeaderUtility::getHeaderAppendAction(header_value_option));
 }
 
 TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithAppendFalse)) {
   envoy::config::core::v3::HeaderValueOption header_value_option;
   header_value_option.mutable_append()->set_value(false);
-  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS,
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD,
             HeaderUtility::getHeaderAppendAction(header_value_option));
 }
 
 TEST(HeaderAppendActionTest, DEPRECATED_FEATURE_TEST(HeadersWithAppendTrue)) {
   envoy::config::core::v3::HeaderValueOption header_value_option;
   header_value_option.mutable_append()->set_value(true);
-  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS,
+  EXPECT_EQ(envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD,
             HeaderUtility::getHeaderAppendAction(header_value_option));
 }
 

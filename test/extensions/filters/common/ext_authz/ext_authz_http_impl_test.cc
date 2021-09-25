@@ -102,6 +102,52 @@ public:
     return std::make_shared<ClientConfig>(proto_config, timeout, path_prefix);
   }
 
+  void dynamicMetadataTest(CheckStatus status, const std::string& http_status) {
+    const std::string yaml = R"EOF(
+    http_service:
+      server_uri:
+        uri: "ext_authz:9000"
+        cluster: "ext_authz"
+        timeout: 0.25s
+      authorization_response:
+        dynamic_metadata_from_headers:
+          patterns:
+          - prefix: "X-Metadata-"
+            ignore_case: true
+    failure_mode_allow: true
+    )EOF";
+
+    initialize(yaml);
+    envoy::service::auth::v3::CheckRequest request;
+    client_->check(request_callbacks_, request, parent_span_, stream_info_);
+
+    ProtobufWkt::Struct expected_dynamic_metadata;
+    auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
+    (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
+    (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");
+    (*metadata_fields)["x-metadata-header-2"] = ValueUtil::stringValue("4");
+
+    // When we call onSuccess() at the bottom of the test we expect that all the
+    // dynamic metadata values that we set above to be present in the authz Response
+    // below.
+    Response authz_response;
+    authz_response.status = status;
+    authz_response.dynamic_metadata = expected_dynamic_metadata;
+    EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                        AuthzResponseNoAttributes(authz_response))));
+
+    const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
+        {":status", http_status, false},
+        {"bar", "nope", false},
+        {"x-metadata-header-0", "zero", false},
+        {"x-metadata-header-1", "2", false},
+        {"x-foo", "nah", false},
+        {"x-metadata-header-2", "4", false},
+    });
+    Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
+    client_->onSuccess(async_request_, std::move(http_response));
+  }
+
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers) {
     envoy::service::auth::v3::CheckRequest request{};
     auto mutable_headers =
@@ -120,7 +166,8 @@ public:
             }));
 
     const auto expected_headers = TestCommon::makeHeaderValueOption(
-        {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+        {{":status", "200",
+          envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
     const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
     auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
@@ -286,7 +333,7 @@ TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
 // Verify client response when authorization server returns a 200 OK.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
@@ -302,14 +349,16 @@ using HeaderValuePair = std::pair<const Http::LowerCaseString, const std::string
 // Verify client response headers when authorization_headers_to_add is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"x-downstream-ok", "1", envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS},
-       {"x-upstream-ok", "1", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"x-downstream-ok", "1",
+        envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+       {"x-upstream-ok", "1",
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::OK, Http::Code::OK, EMPTY_STRING, TestCommon::makeHeaderValueOption({}),
       TestCommon::makeHeaderValueOption(
           {{"x-downstream-ok", "1",
-            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS}}));
+            envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD}}));
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
   envoy::service::auth::v3::CheckRequest request;
   auto mutable_headers =
@@ -352,7 +401,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
   initialize(yaml);
 
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
@@ -378,8 +427,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeadersFromStreamInf
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   const std::string empty_body{};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{"x-baz", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"bar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{"x-baz", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"bar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
@@ -389,13 +438,14 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   const auto check_response_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {":path", "/bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {":method", "post", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"content-length", "post", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"bar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"x-baz", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"foobar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {":path", "/bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {":method", "post", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"content-length", "post",
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"bar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"x-baz", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"foobar", "foo", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
 
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
   client_->onSuccess(async_request_, std::move(message_response));
@@ -419,20 +469,30 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithHeadersToRemove) {
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
   const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
-      {":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
+      {":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
       {"x-envoy-auth-headers-to-remove", " ,remove-me,, ,  remove-me-too , ",
-       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
+       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
       {"x-envoy-auth-headers-to-remove", " remove-me-also ",
-       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
+       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
   });
   Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
   client_->onSuccess(async_request_, std::move(http_response));
 }
 
+// Test the client when an OK response is received with dynamic metadata in that OK response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::OK, "200");
+}
+
+// Test the client when a denied response is received with dynamic metadata in the denied response.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithDynamicMetadata) {
+  dynamicMetadataTest(CheckStatus::Denied, "403");
+}
+
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "403", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "403", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Forbidden, EMPTY_STRING, expected_headers);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
@@ -454,9 +514,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   const auto expected_body = std::string{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "401", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"x-foobar", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":status", "401", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"x-foobar", "bar",
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
 
@@ -476,9 +537,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
       TestCommon::makeHeaderValueOption(
-          {{"x-foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-           {":status", "401", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-           {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}}),
+          {{"x-foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+           {":status", "401",
+            envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+           {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}}),
       TestCommon::makeHeaderValueOption({}));
 
   envoy::service::auth::v3::CheckRequest request;
@@ -486,10 +548,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
   const auto check_response_headers = TestCommon::makeHeaderValueOption(
-      {{":method", "post", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"x-foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {":status", "401", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS},
-       {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS}});
+      {{":method", "post", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"x-foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {":status", "401", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"foo", "bar", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   client_->onSuccess(async_request_,
                      TestCommon::makeMessageResponse(check_response_headers, expected_body));
 }
