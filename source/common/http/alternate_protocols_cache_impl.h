@@ -49,11 +49,18 @@ private:
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
-  using ListType = std::list<std::pair<Origin, std::vector<AlternateProtocol>>>;
+  struct OriginProtocols {
+    OriginProtocols(const Origin& origin, const std::vector<AlternateProtocol>& protocols)
+    //OriginProtocols(Origin origin, std::vector<AlternateProtocol> protocols)
+        : origin_(origin), protocols_(protocols) {}
+
+    Origin origin_;
+    std::vector<AlternateProtocol> protocols_;
+  };
   // List of origin, alternate protocol pairs, in insertion order.
-  ListType protocols_list_;
+  std::list<OriginProtocols> protocols_list_;
   // Map from hostname to iterator into protocols_list_.
-  std::map<Origin, ListType::iterator> protocols_map_;
+  std::map<Origin, std::list<OriginProtocols>::iterator> protocols_map_;
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;

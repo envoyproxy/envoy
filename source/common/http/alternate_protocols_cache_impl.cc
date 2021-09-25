@@ -66,7 +66,8 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
     TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
     : time_source_(time_source), key_value_store_(std::move(key_value_store)),
-      max_entries_(max_entries) {}
+      max_entries_(max_entries > 0 ? max_entries : 1024) {
+}
 
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
@@ -79,8 +80,8 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   }
   while (protocols_list_.size() >= max_entries_) {
     auto iter = protocols_list_.rbegin();
-    key_value_store_->remove(originToString(iter->first));
-    protocols_map_.erase(protocols_map_.find(iter->first));
+    key_value_store_->remove(originToString(iter->origin_));
+    protocols_map_.erase(protocols_map_.find(iter->origin_));
     protocols_list_.erase((++iter).base());
   }
   auto iter = protocols_map_.find(origin);
@@ -104,7 +105,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
 
-  std::vector<AlternateProtocol>& protocols = entry_it->second->second;
+  std::vector<AlternateProtocol>& protocols = entry_it->second->protocols_;
 
   auto original_size = protocols.size();
   const MonotonicTime now = time_source_.monotonicTime();
