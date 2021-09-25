@@ -72,7 +72,7 @@ void MutationUtils::applyHeaderMutations(const HeaderMutation& mutation, Http::H
         switch (append_action) {
         case envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT:
           if (headers.get(lcKey).empty()) {
-            headers.setCopy(lcKey, sh.header().value());
+            headers.addCopy(lcKey, sh.header().value());
           }
           break;
         case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:

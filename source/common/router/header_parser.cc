@@ -293,7 +293,7 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
       // Check whether the header already exist or not. We only
       // need to add the header if it doesn't already exist.
       if (headers.get(key).empty()) {
-        headers.setReferenceKey(key, value);
+        headers.addReferenceKey(key, value);
       }
       break;
     case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS:
