@@ -115,8 +115,8 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
                   protocols.end());
 
   if (protocols.empty()) {
-    protocols_map_.erase(entry_it);
     protocols_list_.erase(entry_it->second);
+    protocols_map_.erase(entry_it);
     if (key_value_store_) {
       key_value_store_->remove(originToString(origin));
     }
