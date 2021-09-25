@@ -51,7 +51,6 @@ private:
 
   struct OriginProtocols {
     OriginProtocols(const Origin& origin, const std::vector<AlternateProtocol>& protocols)
-    //OriginProtocols(Origin origin, std::vector<AlternateProtocol> protocols)
         : origin_(origin), protocols_(protocols) {}
 
     Origin origin_;
