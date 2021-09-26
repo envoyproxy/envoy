@@ -310,6 +310,23 @@ public:
   virtual const ClusterRequestResponseSizeStatNames&
   clusterRequestResponseSizeStatNames() const PURE;
   virtual const ClusterTimeoutBudgetStatNames& clusterTimeoutBudgetStatNames() const PURE;
+
+  /**
+   * Drain all connection pool connections owned by this cluster.
+   * @param cluster, the cluster to drain.
+   */
+  virtual void drainConnections(const std::string& cluster) PURE;
+
+  /**
+   * Drain all connection pool connections owned by all clusters in the cluster manager.
+   */
+  virtual void drainConnections() PURE;
+
+  /**
+   * Check if the cluster is active and statically configured, and if not, throw exception.
+   * @param cluster, the cluster to check.
+   */
+  virtual void checkActiveStaticCluster(const std::string& cluster) PURE;
 };
 
 using ClusterManagerPtr = std::unique_ptr<ClusterManager>;
@@ -395,6 +412,11 @@ public:
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
+
+  /**
+   * Returns the singleton manager.
+   */
+  virtual Singleton::Manager& singletonManager() PURE;
 };
 
 /**

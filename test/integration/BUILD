@@ -32,7 +32,6 @@ envoy_cc_test_library(
         ":http_integration_lib",
         "//source/common/common:matchers_lib",
         "//source/common/config:protobuf_link_hacks",
-        "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/version:version_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -387,6 +386,7 @@ envoy_cc_test(
         "buffer_accounting_integration_test.cc",
     ],
     deps = [
+        ":base_overload_integration_test_lib",
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
@@ -604,6 +604,7 @@ envoy_cc_test_library(
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_trailers_filter_config_lib",
         "//test/integration/filters:call_decodedata_once_filter_config_lib",
+        "//test/integration/filters:crash_filter_config_lib",
         "//test/integration/filters:decode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:encode_headers_return_stop_all_filter_config_lib",
         "//test/integration/filters:modify_buffer_filter_config_lib",
@@ -750,7 +751,6 @@ envoy_cc_test_library(
         ":integration_tcp_client_lib",
         ":utility_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:version_converter_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -886,7 +886,6 @@ envoy_cc_test_library(
         "//source/common/common:basic_resource_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -970,15 +969,9 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/internal_redirect/allow_listed_routes:config",
-        "//source/extensions/internal_redirect/previous_routes:config",
-        "//source/extensions/internal_redirect/safe_cross_scheme:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],
 )
 
@@ -1331,12 +1324,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
+    size = "large",
     srcs = [
         "tcp_tunneling_integration_test.cc",
     ],
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 3,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1833,5 +1828,18 @@ envoy_cc_test(
         "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "weighted_cluster_integration_test",
+    srcs = ["weighted_cluster_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/integration/filters:repick_cluster_filter_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

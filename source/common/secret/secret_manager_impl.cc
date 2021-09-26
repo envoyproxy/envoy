@@ -8,7 +8,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/secret/secret_provider_impl.h"
@@ -155,11 +154,6 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecre
 
 ProtobufTypes::MessagePtr
 SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
-  // TODO(htuch): unlike other config providers, we're recreating the original
-  // Secrets below. This makes it hard to support API_RECOVER_ORIGINAL()-style
-  // recovery of the original config message. As a result, for now we're
-  // providing v3 config dumps. For Secrets, the main deprecation of interest
-  // are the use of v2 Struct config() and verify_subject_alt_name.
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {

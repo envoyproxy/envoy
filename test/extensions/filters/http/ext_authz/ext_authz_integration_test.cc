@@ -23,7 +23,7 @@ namespace Envoy {
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
 
-class ExtAuthzGrpcIntegrationTest : public Grpc::VersionedGrpcClientIntegrationParamTest,
+class ExtAuthzGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
                                     public HttpIntegrationTest {
 public:
   ExtAuthzGrpcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
@@ -34,9 +34,6 @@ public:
   }
 
   void initializeConfig(bool disable_with_metadata = false) {
-    if (apiVersion() != envoy::config::core::v3::ApiVersion::V3) {
-      config_helper_.enableDeprecatedV2Api();
-    }
     config_helper_.addConfigModifier([this, disable_with_metadata](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -60,7 +57,7 @@ public:
       }
       proto_config_.mutable_deny_at_disable()->set_runtime_key("envoy.ext_authz.deny_at_disable");
       proto_config_.mutable_deny_at_disable()->mutable_default_value()->set_value(false);
-      proto_config_.set_transport_api_version(apiVersion());
+      proto_config_.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
 
       // Add labels and verify they are passed.
       std::map<std::string, std::string> labels;
@@ -82,7 +79,7 @@ public:
       envoy::config::listener::v3::Filter ext_authz_filter;
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -103,8 +100,10 @@ public:
                                 const Headers& headers_to_remove = Headers{}) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
-    Http::TestRequestHeaderMapImpl headers{
-        {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
+    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},     {":path", "/test"},
+                                           {":scheme", "http"},     {":authority", "host"},
+                                           {"x-duplicate", "one"},  {"x-duplicate", "two"},
+                                           {"x-duplicate", "three"}};
 
     // Initialize headers to append. If the authorization server returns any matching keys with one
     // of value in headers_to_add, the header entry from authorization server replaces the one in
@@ -142,8 +141,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-    EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                  apiVersion()),
+    EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
               ext_authz_request_->headers().getPathValue());
     EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
 
@@ -156,6 +154,9 @@ public:
     EXPECT_TRUE(attributes->request().has_time());
     EXPECT_EQ("value_1", attributes->destination().labels().at("label_1"));
     EXPECT_EQ("value_2", attributes->destination().labels().at("label_2"));
+
+    // Duplicate headers in the check request should be merged.
+    EXPECT_EQ("one,two,three", (*http_request->mutable_headers())["x-duplicate"]);
 
     // Clear fields which are not relevant.
     attributes->clear_source();
@@ -187,7 +188,11 @@ public:
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+    upstream_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                        {"replaceable", "set-by-upstream"},
+                                        {"set-cookie", "cookie1=snickerdoodle"}},
+        false);
     upstream_request_->encodeData(response_size_, true);
 
     for (const auto& header_to_add : headers_to_add) {
@@ -255,7 +260,8 @@ public:
                             const Headers& headers_to_remove,
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
-                            const Headers& response_headers_to_add) {
+                            const Headers& response_headers_to_append,
+                            const Headers& response_headers_to_set = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -305,15 +311,27 @@ public:
           return Http::HeaderMap::Iterate::Continue;
         });
 
-    for (const auto& response_header_to_add : response_headers_to_add) {
+    for (const auto& response_header_to_add : response_headers_to_append) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
       const auto key = std::string(response_header_to_add.first);
       const auto value = std::string(response_header_to_add.second);
 
-      entry->mutable_append()->set_value(false);
+      entry->mutable_append()->set_value(true);
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add {}={}", key, value);
+    }
+
+    for (const auto& response_header_to_set : response_headers_to_set) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      const auto key = std::string(response_header_to_set.first);
+      const auto value = std::string(response_header_to_set.second);
+
+      // Replaces the one sent by the upstream.
+      entry->mutable_append()->set_value(false);
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_set {}={}", key, value);
     }
 
     ext_authz_request_->sendGrpcMessage(check_response);
@@ -449,6 +467,9 @@ public:
         {"baz", "foo"},
         {"bat", "foo"},
         {"remove-me", "upstream-should-not-see-me"},
+        {"x-duplicate", "one"},
+        {"x-duplicate", "two"},
+        {"x-duplicate", "three"},
     });
   }
 
@@ -460,6 +481,12 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
+
+    // Duplicate headers in the check request should be merged.
+    const auto duplicate =
+        ext_authz_request_->headers().get(Http::LowerCaseString(std::string("x-duplicate")));
+    EXPECT_EQ(1, duplicate.size());
+    EXPECT_EQ("one,two,three", duplicate[0]->value().getStringView());
 
     // Send back authorization response with "baz" and "bat" headers.
     // Also add multiple values "append-foo" and "append-bar" for key "x-append-bat".
@@ -496,7 +523,7 @@ public:
       ext_authz_filter.set_name("envoy.filters.http.ext_authz");
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
 
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
     });
   }
 
@@ -573,6 +600,7 @@ public:
       allowed_headers:
         patterns:
         - exact: X-Case-Sensitive-Header
+        - exact: x-duplicate
 
     authorization_response:
       allowed_upstream_headers:
@@ -590,34 +618,30 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
-                         VERSIONED_GRPC_CLIENT_INTEGRATION_PARAMS,
-                         Grpc::VersionedGrpcClientIntegrationParamTest::protocolTestParamsToString);
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP1DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP1, 2048);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 4);
 }
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/2 and the size of the request body is larger than max_request_bytes.
 TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBody(Http::CodecType::HTTP2, 2048);
 }
 
@@ -625,7 +649,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, HTTP2DownstreamRequestWithLargeBody) {
 // server returns headers_to_add, response_headers_to_add, and headers_to_append in OkResponse
 // message.
 TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectCheckRequestWithBodyWithHeaders(
       Http::CodecType::HTTP1, 4,
       /*headers_to_add=*/Headers{{"header1", "header1"}},
@@ -638,27 +661,22 @@ TEST_P(ExtAuthzGrpcIntegrationTest, SendHeadersToAddAndToAppendToUpstream) {
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/false, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, AllowAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/false, /*disable_with_metadata=*/true, "200");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisable) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/false, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DenyAtDisableWithMetadata) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   expectFilterDisableCheck(/*deny_at_disable=*/true, /*disable_with_metadata=*/true, "403");
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   // Set up ext_authz filter.
   initializeConfig();
 
@@ -673,18 +691,27 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamHeadersOnSuccess) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
 
   // Send back an ext_authz response with response_headers_to_add set.
-  sendExtAuthzResponse(Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
-                       Http::TestRequestHeaderMapImpl{},
-                       Headers{{"downstream2", "downstream-should-see-me"}});
+  sendExtAuthzResponse(
+      Headers{}, Headers{}, Headers{}, Http::TestRequestHeaderMapImpl{},
+      Http::TestRequestHeaderMapImpl{},
+      Headers{{"downstream2", "downstream-should-see-me"}, {"set-cookie", "cookie2=gingerbread"}},
+      Headers{{"replaceable", "by-ext-authz"}});
 
   // Wait for the upstream response.
   waitForSuccessfulUpstreamResponse("200");
+
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_->headers(),
+                                                        Http::LowerCaseString("set-cookie"))
+                .result()
+                .value(),
+            "cookie1=snickerdoodle,cookie2=gingerbread");
 
   // Verify the response is HTTP 200 with the header from `response_headers_to_add` above.
   const std::string expected_body(response_size_, 'a');
   verifyResponse(std::move(response_), "200",
                  Http::TestResponseHeaderMapImpl{{":status", "200"},
-                                                 {"downstream2", "downstream-should-see-me"}},
+                                                 {"downstream2", "downstream-should-see-me"},
+                                                 {"replaceable", "by-ext-authz"}},
                  expected_body);
   cleanup();
 }
@@ -794,7 +821,7 @@ TEST_P(ExtAuthzLocalReplyIntegrationTest, DeniedHeaderTest) {
     envoy::config::listener::v3::Filter ext_authz_filter;
     ext_authz_filter.set_name("envoy.filters.http.ext_authz");
     ext_authz_filter.mutable_typed_config()->PackFrom(proto_config);
-    config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
+    config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_authz_filter));
   });
 
   const std::string local_reply_yaml = R"EOF(
@@ -853,7 +880,6 @@ body_format:
 }
 
 TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
-  XDS_DEPRECATED_FEATURE_TEST_SKIP;
   initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);
   HttpIntegrationTest::initialize();
@@ -889,8 +915,7 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   RELEASE_ASSERT(result, result.message());
 
   EXPECT_EQ("POST", ext_authz_request_->headers().getMethodValue());
-  EXPECT_EQ(TestUtility::getVersionedMethodPath("envoy.service.auth.{}.Authorization", "Check",
-                                                apiVersion()),
+  EXPECT_EQ("/envoy.service.auth.v3.Authorization/Check",
             ext_authz_request_->headers().getPathValue());
   EXPECT_EQ("application/grpc", ext_authz_request_->headers().getContentTypeValue());
   result = ext_authz_request_->waitForEndStream(*dispatcher_);

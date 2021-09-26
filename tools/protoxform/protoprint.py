@@ -82,8 +82,9 @@ def clang_format(contents):
     Returns:
         clang-formatted string
     """
+    clang_format_path = os.getenv("CLANG_FORMAT", "clang-format-11")
     return subprocess.run(
-        ['clang-format',
+        [clang_format_path,
          '--style=%s' % CLANG_FORMAT_STYLE, '--assume-filename=.proto'],
         input=contents.encode('utf-8'),
         stdout=subprocess.PIPE).stdout
@@ -268,7 +269,7 @@ def format_header_from_file(
                 # import_deprecation_proto is True or the proto is frozen.
                 continue
             infra_imports.append(d)
-        elif d.startswith('envoy/'):
+        elif d.startswith('envoy/') or d.startswith('contrib/'):
             # We ignore existing envoy/ imports, since these are computed explicitly
             # from type_dependencies.
             pass

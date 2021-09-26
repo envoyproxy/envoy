@@ -14,7 +14,6 @@
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-#include "source/common/quic/platform/quic_mem_slice_span_impl.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -47,6 +46,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
       headers_with_underscores_action_(headers_with_underscores_action) {
   ASSERT(static_cast<uint32_t>(GetReceiveWindow().value()) > 8 * 1024,
          "Send buffer limit should be larger than 8KB.");
+  // TODO(alyssawilk, danzh) if http3_options_.allow_extended_connect() is true,
+  // send the correct SETTINGS.
 }
 
 void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
@@ -74,8 +75,20 @@ void EnvoyQuicServerStream::encodeData(Buffer::Instance& data, bool end_stream) 
   ASSERT(!local_end_stream_);
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
+  Buffer::RawSliceVector raw_slices = data.getRawSlices();
+  absl::InlinedVector<quic::QuicMemSlice, 4> quic_slices;
+  quic_slices.reserve(raw_slices.size());
+  for (auto& slice : raw_slices) {
+    ASSERT(slice.len_ != 0);
+    // Move each slice into a stand-alone buffer.
+    // TODO(danzh): investigate the cost of allocating one buffer per slice.
+    // If it turns out to be expensive, add a new function to free data in the middle in buffer
+    // interface and re-design QuicMemSliceImpl.
+    quic_slices.emplace_back(quic::QuicMemSliceImpl(data, slice.len_));
+  }
+  absl::Span<quic::QuicMemSlice> span(quic_slices);
   // QUIC stream must take all.
-  WriteBodySlices(quic::QuicMemSliceSpan(quic::QuicMemSliceSpanImpl(data)), end_stream);
+  WriteBodySlices(span, end_stream);
   if (data.length() > 0) {
     // Send buffer didn't take all the data, threshold needs to be adjusted.
     Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
@@ -148,14 +161,17 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (fin) {
     end_stream_decoded_ = true;
   }
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
   std::unique_ptr<Http::RequestHeaderMapImpl> headers =
       quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_);
+          header_list, *this, filterManagerConnection()->maxIncomingHeadersCount(), details_, rst);
   if (headers == nullptr) {
-    onStreamError(close_connection_upon_invalid_header_);
+    onStreamError(close_connection_upon_invalid_header_, rst);
     return;
   }
-  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt) {
+  if (Http::HeaderUtility::requestHeadersValid(*headers) != absl::nullopt ||
+      Http::HeaderUtility::checkRequiredRequestHeaders(*headers) != Http::okStatus() ||
+      (headers->Protocol() && !http3_options_.allow_extended_connect())) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
     onStreamError(absl::nullopt);
     return;
@@ -232,10 +248,12 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
-        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_);
+        received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
+        rst);
     if (trailers == nullptr) {
-      onStreamError(close_connection_upon_invalid_header_);
+      onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
     request_decoder_->decodeTrailers(std::move(trailers));
@@ -249,14 +267,20 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicRstStreamErrorCode error) {
   stats_.rx_reset_.inc();
   bool end_stream_encoded = local_end_stream_;
   // This call will close write.
-  bool ret = quic::QuicSpdyServerStreamBase::OnStopSending(error);
+  if (!quic::QuicSpdyServerStreamBase::OnStopSending(error)) {
+    return false;
+  }
   ASSERT(write_side_closed());
-  if (read_side_closed() && !end_stream_encoded) {
+  // Also stop reading because the peer already didn't care about the response any more.
+  if (!reading_stopped()) {
+    StopReading();
+  }
+  if (!end_stream_encoded) {
     // If both directions are closed but end stream hasn't been encoded yet, notify reset callbacks.
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(error));
   }
-  return ret;
+  return true;
 }
 
 void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame) {
@@ -358,7 +382,8 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   return result;
 }
 
-void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection) {
+void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_connection,
+                                          quic::QuicRstStreamErrorCode rst) {
   if (details_.empty()) {
     details_ = Http3ResponseCodeDetailValues::invalid_http_header;
   }
@@ -371,9 +396,9 @@ void EnvoyQuicServerStream::onStreamError(absl::optional<bool> should_close_conn
         !http3_options_.override_stream_error_on_invalid_http_message().value();
   }
   if (close_connection_upon_invalid_header) {
-    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, "Invalid headers");
+    stream_delegate()->OnStreamError(quic::QUIC_HTTP_FRAME_ERROR, std::string(details_));
   } else {
-    Reset(quic::QUIC_BAD_APPLICATION_PAYLOAD);
+    Reset(rst);
   }
 }
 

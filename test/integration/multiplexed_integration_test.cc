@@ -29,7 +29,6 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-// TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
@@ -408,7 +407,7 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
-  addFilters({response_metadata_filter});
+  prependFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -652,7 +651,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -799,7 +798,7 @@ void Http2MetadataIntegrationTest::verifyHeadersOnlyTest() {
 }
 
 TEST_P(Http2MetadataIntegrationTest, HeadersOnlyRequestWithRequestMetadata) {
-  addFilters({request_metadata_filter});
+  prependFilters({request_metadata_filter});
   // Send a headers only request.
   runHeaderOnlyTest(false, 0);
   verifyHeadersOnlyTest();
@@ -842,17 +841,17 @@ typed_config:
 )EOF";
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterBeforeMetadataFilter) {
-  addFilters({request_metadata_filter, metadata_stop_all_filter});
+  prependFilters({request_metadata_filter, metadata_stop_all_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, RequestMetadataWithStopAllFilterAfterMetadataFilter) {
-  addFilters({metadata_stop_all_filter, request_metadata_filter});
+  prependFilters({metadata_stop_all_filter, request_metadata_filter});
   testRequestMetadataWithStopAllFilter();
 }
 
 TEST_P(Http2MetadataIntegrationTest, TestAddEncodedMetadata) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
 
@@ -906,8 +905,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
-  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -940,7 +938,7 @@ TEST_P(Http2IntegrationTest, Http2BadMagic) {
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
 
   initialize();
   std::string response;
@@ -956,8 +954,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
+  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1319,7 +1316,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
 }
 
 TEST_P(Http2IntegrationTest, PauseAndResume) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1349,7 +1346,7 @@ TEST_P(Http2IntegrationTest, PauseAndResume) {
 }
 
 TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
@@ -1671,6 +1668,35 @@ TEST_P(Http2FrameIntegrationTest, SetDetailsTwice) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("too_many_headers"));
 }
 
+TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
+  beginSession();
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  const uint32_t client_stream_idx = 1;
+  // Start a request request and wait for it to reach the upstream.
+  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
+
+  // Send RST_STREAM, GOAWAY and SETTINGS(0 max streams)
+  const Http2Frame rst_stream =
+      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
+  const Http2Frame go_away_frame =
+      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
+  const Http2Frame settings_max_connections_frame = Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 0}});
+  ;
+  ASSERT_TRUE(fake_upstream_connection->write(std::string(rst_stream) + std::string(go_away_frame) +
+                                              std::string(settings_max_connections_frame)));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
+
+  // Cleanup.
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FrameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -1800,7 +1826,7 @@ typed_config:
 )EOF";
 
 TEST_P(Http2IntegrationTest, OnLocalReply) {
-  config_helper_.addFilter(on_local_reply_filter);
+  config_helper_.prependFilter(on_local_reply_filter);
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

@@ -204,6 +204,7 @@ ConnectivityGrid::ConnectivityGrid(
   // HTTP/3.
   // TODO(#15649) support v6/v4, WiFi/cellular.
   ASSERT(connectivity_options.protocols_.size() == 3);
+  ASSERT(alternate_protocols);
 }
 
 ConnectivityGrid::~ConnectivityGrid() {
@@ -296,24 +297,20 @@ void ConnectivityGrid::addIdleCallback(IdleCb cb) {
   idle_callbacks_.emplace_back(cb);
 }
 
-void ConnectivityGrid::startDrain() {
+void ConnectivityGrid::drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) {
   if (draining_) {
     // A drain callback has already been set, and only needs to happen once.
     return;
   }
 
-  // Note that no new pools can be created from this point on
-  // as createNextPool fast-fails if `draining_` is true.
-  draining_ = true;
-
-  for (auto& pool : pools_) {
-    pool->startDrain();
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    // Note that no new pools can be created from this point on
+    // as createNextPool fast-fails if `draining_` is true.
+    draining_ = true;
   }
-}
 
-void ConnectivityGrid::drainConnections() {
   for (auto& pool : pools_) {
-    pool->drainConnections();
+    pool->drainConnections(drain_behavior);
   }
 }
 
@@ -367,11 +364,6 @@ bool ConnectivityGrid::shouldAttemptHttp3() {
   if (http3_status_tracker_.isHttp3Broken()) {
     ENVOY_LOG(trace, "HTTP/3 is broken to host '{}', skipping.", host_->hostname());
     return false;
-  }
-  if (!alternate_protocols_) {
-    ENVOY_LOG(trace, "No alternate protocols cache. Attempting HTTP/3 to host '{}'.",
-              host_->hostname());
-    return true;
   }
   if (host_->address()->type() != Network::Address::Type::Ip) {
     ENVOY_LOG(error, "Address is not an IP address");

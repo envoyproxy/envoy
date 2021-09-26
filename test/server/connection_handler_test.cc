@@ -216,13 +216,13 @@ public:
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, access_log_,
         overridden_filter_chain_manager, tcp_backlog_size, connection_balancer));
-    EXPECT_CALL(listeners_.back()->socket_factory_, socketType()).WillOnce(Return(socket_type));
 
     if (listener == nullptr) {
       // Expecting listener config in place update.
       // If so, dispatcher would not create new network listener.
       return listeners_.back().get();
     }
+    EXPECT_CALL(listeners_.back()->socket_factory_, socketType()).WillOnce(Return(socket_type));
     EXPECT_CALL(listeners_.back()->socket_factory_, getListenSocket(_))
         .WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
@@ -280,7 +280,7 @@ public:
         }));
     EXPECT_CALL(*test_filter, onAccept(_))
         .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-          cb.socket().addressProvider().restoreLocalAddress(original_dst_address);
+          cb.socket().connectionInfoProvider().restoreLocalAddress(original_dst_address);
           return Network::FilterStatus::Continue;
         }));
     EXPECT_CALL(*test_filter, destroy_());
@@ -669,7 +669,7 @@ TEST_F(ConnectionHandlerTest, NormalRedirect) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
@@ -739,7 +739,7 @@ TEST_F(ConnectionHandlerTest, FallbackToWildcardListener) {
       new Network::Address::Ipv4Instance("127.0.0.2", 0, nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
@@ -817,7 +817,7 @@ TEST_F(ConnectionHandlerTest, OldBehaviorMatchFirstWildcardListener) {
       new Network::Address::Ipv6Instance("::2", 80, nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);
@@ -897,7 +897,7 @@ TEST_F(ConnectionHandlerTest, MatchIPv6WildcardListener) {
       new Network::Address::Ipv6Instance("::2", 80, nullptr));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   EXPECT_CALL(manager_, findFilterChain(_)).Times(0);

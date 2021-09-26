@@ -114,10 +114,10 @@ public:
         .WillByDefault(Return(host_address_));
     ON_CALL(*context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_, locality())
         .WillByDefault(ReturnRef(upstream_locality_));
-    router_->downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
-        host_address_);
-    router_->downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-        Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(host_address_);
+    router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
   }
 
   void expectResponseTimerCreate() {

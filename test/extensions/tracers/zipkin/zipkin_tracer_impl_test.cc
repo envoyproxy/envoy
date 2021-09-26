@@ -65,7 +65,7 @@ public:
 
     std::string yaml_string = fmt::format(R"EOF(
     collector_cluster: fake_cluster
-    collector_endpoint: /api/v1/spans
+    collector_endpoint: /api/v2/spans
     collector_endpoint_version: {}
     )EOF",
                                           version);
@@ -99,7 +99,7 @@ public:
               callback = &callbacks;
 
               const std::string& expected_hostname = !hostname.empty() ? hostname : "fake_cluster";
-              EXPECT_EQ("/api/v1/spans", message->headers().getPathValue());
+              EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
               EXPECT_EQ(expected_hostname, message->headers().getHostValue());
               EXPECT_EQ(content_type, message->headers().getContentTypeValue());
 
@@ -180,7 +180,8 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     // Valid config but collector cluster doesn't exists.
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
-    collector_endpoint: /api/v1/spans
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
@@ -193,7 +194,8 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     cm_.initializeClusters({"fake_cluster"}, {});
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
-    collector_endpoint: /api/v1/spans
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
@@ -208,7 +210,8 @@ TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
-  collector_endpoint: /api/v1/spans
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
   )EOF";
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
   TestUtility::loadFromYaml(yaml_string, zipkin_config);
@@ -242,7 +245,7 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
             callback = &callbacks;
 
-            EXPECT_EQ("/api/v1/spans", message->headers().getPathValue());
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
             EXPECT_EQ("fake_cluster", message->headers().getHostValue());
             EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 

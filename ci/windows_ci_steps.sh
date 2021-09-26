@@ -103,7 +103,7 @@ if [[ $TEST_TARGETS == "//test/..." ]]; then
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" test "${BAZEL_BUILD_OPTIONS[@]}" $TEST_TARGETS --test_tag_filters=-skip_on_windows,-fails_on_${FAIL_GROUP} --build_tests_only
 
   echo "running flaky test reporting script"
-  "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
 
   # Build tests that are known flaky or failing to ensure no compilation regressions
   bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" //test/... --test_tag_filters=fails_on_${FAIL_GROUP} --build_tests_only

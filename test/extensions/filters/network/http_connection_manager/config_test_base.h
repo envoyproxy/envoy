@@ -24,17 +24,17 @@ namespace NetworkFilters {
 namespace HttpConnectionManager {
 
 envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
-parseHttpConnectionManagerFromYaml(const std::string& yaml, bool avoid_boosting = true) {
+parseHttpConnectionManagerFromYaml(const std::string& yaml) {
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
   return http_connection_manager;
 }
 
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
-  Http::SlowDateProviderImpl date_provider_{context_.dispatcher().timeSource()};
+  Http::SlowDateProviderImpl date_provider_{context_.mainThreadDispatcher().timeSource()};
   NiceMock<Router::MockRouteConfigProviderManager> route_config_provider_manager_;
   NiceMock<Config::MockConfigProviderManager> scoped_routes_config_provider_manager_;
   NiceMock<Tracing::MockHttpTracerManager> http_tracer_manager_;

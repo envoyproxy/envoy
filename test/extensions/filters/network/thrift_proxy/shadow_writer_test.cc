@@ -38,7 +38,8 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    shadow_writer_ = std::make_shared<ShadowWriterImpl>(cm_, "test", context_.scope(), dispatcher_);
+    shadow_writer_ = std::make_shared<ShadowWriterImpl>(cm_, "test", context_.scope(), dispatcher_,
+                                                        context_.threadLocal());
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName("ping");
     metadata_->setMessageType(MessageType::Call);
@@ -408,7 +409,7 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   auto decoder_ptr = std::make_unique<NullResponseDecoder>(*transport_ptr, *protocol_ptr);
 
   decoder_ptr->newDecoderEventHandler();
-  EXPECT_FALSE(decoder_ptr->passthroughEnabled());
+  EXPECT_TRUE(decoder_ptr->passthroughEnabled());
 
   metadata_->setMessageType(MessageType::Reply);
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));

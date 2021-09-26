@@ -21,18 +21,10 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
-void expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion api_version,
-                            std::string const& grpc_service_yaml) {
-  std::unique_ptr<TestDeprecatedV2Api> _deprecated_v2_api;
-  if (api_version != envoy::config::core::v3::ApiVersion::V3) {
-    _deprecated_v2_api = std::make_unique<TestDeprecatedV2Api>();
-  }
-
+void expectCorrectProtoGrpc(std::string const& grpc_service_yaml) {
   ExtAuthzFilterConfig factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  TestUtility::loadFromYaml(
-      fmt::format(grpc_service_yaml, TestUtility::getVersionStringFromApiVersion(api_version)),
-      *proto_config);
+  TestUtility::loadFromYaml(grpc_service_yaml, *proto_config);
 
   testing::StrictMock<Server::Configuration::MockFactoryContext> context;
   testing::StrictMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -81,13 +73,9 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGoogleGrpc) {
       target_uri: ext_authz_server
       stat_prefix: google
   failure_mode_allow: false
-  transport_api_version: {}
+  transport_api_version: V3
   )EOF";
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, google_grpc_service_yaml);
-#endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, google_grpc_service_yaml);
+  expectCorrectProtoGrpc(google_grpc_service_yaml);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
@@ -97,13 +85,9 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoEnvoyGrpc) {
     envoy_grpc:
       cluster_name: ext_authz_server
   failure_mode_allow: false
-  transport_api_version: {}
+  transport_api_version: V3
   )EOF";
-#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
-  // TODO(chaoqin-li1123): clean this up when we move AUTO to V3 by default.
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::AUTO, envoy_grpc_service_yaml);
-#endif
-  expectCorrectProtoGrpc(envoy::config::core::v3::ApiVersion::V3, envoy_grpc_service_yaml);
+  expectCorrectProtoGrpc(envoy_grpc_service_yaml);
 }
 
 TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {

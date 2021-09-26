@@ -99,9 +99,9 @@ protected:
         EXPECT_EQ(0, socket1->listen(0).return_value_);
       }
 
-      EXPECT_EQ(addr->ip()->port(), socket1->addressProvider().localAddress()->ip()->port());
+      EXPECT_EQ(addr->ip()->port(), socket1->connectionInfoProvider().localAddress()->ip()->port());
       EXPECT_EQ(addr->ip()->addressAsString(),
-                socket1->addressProvider().localAddress()->ip()->addressAsString());
+                socket1->connectionInfoProvider().localAddress()->ip()->addressAsString());
       EXPECT_EQ(Type, socket1->socketType());
 
       auto option2 = std::make_unique<MockSocketOption>();
@@ -122,7 +122,7 @@ protected:
       Network::IoHandlePtr io_handle =
           std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
-      EXPECT_EQ(socket3->addressProvider().localAddress()->asString(), addr->asString());
+      EXPECT_EQ(socket3->connectionInfoProvider().localAddress()->asString(), addr->asString());
 
       // Test successful.
       return;
@@ -132,11 +132,11 @@ protected:
   void testBindPortZero() {
     auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
     auto socket = createListenSocketPtr(loopback, nullptr, true);
-    EXPECT_EQ(Address::Type::Ip, socket->addressProvider().localAddress()->type());
-    EXPECT_EQ(version_, socket->addressProvider().localAddress()->ip()->version());
+    EXPECT_EQ(Address::Type::Ip, socket->connectionInfoProvider().localAddress()->type());
+    EXPECT_EQ(version_, socket->connectionInfoProvider().localAddress()->ip()->version());
     EXPECT_EQ(loopback->ip()->addressAsString(),
-              socket->addressProvider().localAddress()->ip()->addressAsString());
-    EXPECT_GT(socket->addressProvider().localAddress()->ip()->port(), 0U);
+              socket->connectionInfoProvider().localAddress()->ip()->addressAsString());
+    EXPECT_GT(socket->connectionInfoProvider().localAddress()->ip()->port(), 0U);
     EXPECT_EQ(Type, socket->socketType());
   }
 };
@@ -175,9 +175,9 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
 
   TestListenSocket socket(Utility::getIpv4AnyAddress());
 
-  socket.addressProvider().setLocalAddress(address);
+  socket.connectionInfoProvider().setLocalAddress(address);
 
-  EXPECT_EQ(socket.addressProvider().localAddress(), address);
+  EXPECT_EQ(socket.connectionInfoProvider().localAddress(), address);
 }
 
 TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -9,7 +10,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/api_version.h"
-#include "source/common/config/version_converter.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -70,7 +70,7 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministic() { deterministic_ = true; }
+  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -143,12 +143,11 @@ public:
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
-                             const std::vector<std::string>& removed, const std::string& version,
-                             const bool api_downgrade = false) {
+                             const std::vector<std::string>& removed, const std::string& version) {
     if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      sendSotwDiscoveryResponse(type_url, state_of_the_world, version, api_downgrade);
+      sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
-      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, api_downgrade);
+      sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
     }
   }
 
@@ -178,16 +177,12 @@ public:
 
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
-                                 const std::string& version, const bool api_downgrade = false) {
+                                 const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      if (api_downgrade) {
-        discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        discovery_response.add_resources()->PackFrom(message);
-      }
+      discovery_response.add_resources()->PackFrom(message);
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -195,21 +190,18 @@ public:
   }
 
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, const bool api_downgrade = false) {
-    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {},
-                               api_downgrade);
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version) {
+    sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_, {});
   }
   template <class T>
   void
   sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version,
-                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {},
-                             const bool api_downgrade = false) {
-    auto response = createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version,
-                                                    aliases, api_downgrade);
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
     stream->sendGrpcMessage(response);
   }
 
@@ -217,22 +209,15 @@ public:
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
-                               const std::vector<std::string>& aliases,
-                               const bool api_downgrade = false) {
-
+                               const std::vector<std::string>& aliases) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      if (api_downgrade) {
-        temp_any.PackFrom(API_DOWNGRADE(message));
-        resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
-      } else {
-        temp_any.PackFrom(message);
-        resource->mutable_resource()->PackFrom(message);
-      }
+      temp_any.PackFrom(message);
+      resource->mutable_resource()->PackFrom(message);
       resource->set_name(intResourceName(message));
       resource->set_version(version);
       for (const auto& alias : aliases) {
@@ -431,8 +416,9 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
+  // If this member is not empty, the test will use a fixed RNG value specified
+  // by it.
+  absl::optional<uint64_t> deterministic_value_{};
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.
@@ -441,9 +427,6 @@ protected:
   // By default the test server will use custom stats to notify on increment.
   // This override exists for tests measuring stats memory.
   bool use_real_stats_{};
-
-  // Use a v2 bootstrap.
-  bool v2_bootstrap_{false};
 
 private:
   // Configuration for the fake upstream.

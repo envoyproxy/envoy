@@ -23,10 +23,8 @@ namespace Router {
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
-                                   absl::optional<RouteConfigProvider*>& route_config_provider_opt,
-                                   envoy::config::core::v3::ApiVersion resource_api_version)
+                                   absl::optional<RouteConfigProvider*>& route_config_provider_opt)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
-          resource_api_version,
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +

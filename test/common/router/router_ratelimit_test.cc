@@ -28,10 +28,9 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string,
-                                                             bool avoid_boosting = true) {
+envoy::config::route::v3::RateLimit parseRateLimitFromV3Yaml(const std::string& yaml_string) {
   envoy::config::route::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml_string, rate_limit, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml_string, rate_limit);
   TestUtility::validate(rate_limit);
   return rate_limit;
 }
@@ -85,7 +84,7 @@ public:
     TestUtility::loadFromYaml(yaml, route_config);
     config_ = std::make_unique<ConfigImpl>(route_config, OptionalHttpFilters(), factory_context_,
                                            any_validation_visitor_, true);
-    stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
+    stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
@@ -297,7 +296,7 @@ public:
         parseRateLimitFromV3Yaml(yaml), ProtobufMessage::getStrictValidationVisitor());
     descriptors_.clear();
     local_descriptors_.clear();
-    stream_info_.downstream_address_provider_->setRemoteAddress(default_remote_address_);
+    stream_info_.downstream_connection_info_provider_->setRemoteAddress(default_remote_address_);
     ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route_));
   }
 
@@ -350,7 +349,7 @@ actions:
 
   setupTest(yaml);
 
-  stream_info_.downstream_address_provider_->setRemoteAddress(
+  stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::PipeInstance>("/hello"));
   rate_limit_entry_->populateDescriptors(descriptors_, "", header_, stream_info_);
   rate_limit_entry_->populateLocalDescriptors(local_descriptors_, "", header_, stream_info_);

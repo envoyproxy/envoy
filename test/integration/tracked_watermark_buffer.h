@@ -70,7 +70,8 @@ public:
                                    std::function<void()> above_high_watermark,
                                    std::function<void()> above_overflow_watermark) override;
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
-  void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class) override;
+  void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                         absl::optional<uint32_t> current_class) override;
 
   // Number of buffers created.
   uint64_t numBuffersCreated() const;

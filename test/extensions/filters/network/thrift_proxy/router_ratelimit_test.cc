@@ -37,9 +37,9 @@ public:
         std::make_unique<RouteConfigProviderManagerImpl>(factory_context_.admin_);
   }
 
-  void initialize(const std::string& yaml, bool avoid_boosting = true) {
+  void initialize(const std::string& yaml) {
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
-    TestUtility::loadFromYaml(yaml, config, false, avoid_boosting);
+    TestUtility::loadFromYaml(yaml, config);
     initialize(config);
   }
 

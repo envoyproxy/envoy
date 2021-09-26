@@ -39,18 +39,16 @@ namespace Upstream {
 
 class EdsSpeedTest {
 public:
-  EdsSpeedTest(State& state, bool v2_config)
-      : state_(state), v2_config_(v2_config),
-        type_url_(v2_config_
-                      ? "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment"
-                      : "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
+  EdsSpeedTest(State& state)
+      : state_(state),
+        type_url_("type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment"),
         subscription_stats_(Config::Utility::generateStats(stats_)),
         api_(Api::createApiForTest(stats_)), async_client_(new Grpc::MockAsyncClient()),
         grpc_mux_(new Config::GrpcMuxImpl(
             local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
                 "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints"),
-            envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, {}, true)) {
+            random_, stats_, {}, true)) {
     resetCluster(R"EOF(
       name: name
       connect_timeout: 0.25s
@@ -129,12 +127,6 @@ public:
     response->set_version_info(fmt::format("version-{}", version_++));
     auto* resource = response->mutable_resources()->Add();
     resource->PackFrom(cluster_load_assignment);
-    if (v2_config_) {
-      RELEASE_ASSERT(resource->type_url() ==
-                         "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-                     "");
-      resource->set_type_url("type.googleapis.com/envoy.api.v2.ClusterLoadAssignment");
-    }
     state_.ResumeTiming();
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
     ASSERT(cluster_->prioritySet().hostSetsPerPriority()[1]->hostsPerLocality().get()[0].size() ==
@@ -143,7 +135,6 @@ public:
 
   TestDeprecatedV2Api _deprecated_v2_api_;
   State& state_;
-  const bool v2_config_;
   const std::string type_url_;
   uint64_t version_{};
   bool initialized_{};
@@ -180,16 +171,16 @@ static void priorityAndLocalityWeighted(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, state.range(0));
+    Envoy::Upstream::EdsSpeedTest speed_test(state);
     // if we've been instructed to skip tests, only run once no matter the argument:
-    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(2);
+    uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(1);
 
-    speed_test.priorityAndLocalityWeightedHelper(state.range(1), endpoints, true);
+    speed_test.priorityAndLocalityWeightedHelper(state.range(0), endpoints, true);
   }
 }
 
 BENCHMARK(priorityAndLocalityWeighted)
-    ->Ranges({{false, true}, {false, true}, {1, 100000}})
+    ->Ranges({{false, true}, {1, 100000}})
     ->Unit(benchmark::kMillisecond);
 
 static void duplicateUpdate(State& state) {
@@ -198,7 +189,7 @@ static void duplicateUpdate(State& state) {
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
 
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+    Envoy::Upstream::EdsSpeedTest speed_test(state);
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
@@ -213,7 +204,7 @@ static void healthOnlyUpdate(State& state) {
   Envoy::Logger::Context logging_state(spdlog::level::warn,
                                        Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock, false);
   for (auto _ : state) {
-    Envoy::Upstream::EdsSpeedTest speed_test(state, false);
+    Envoy::Upstream::EdsSpeedTest speed_test(state);
     uint32_t endpoints = skipExpensiveBenchmarks() ? 1 : state.range(0);
 
     speed_test.priorityAndLocalityWeightedHelper(true, endpoints, true);
