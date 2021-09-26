@@ -478,7 +478,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
       client.lifetime_timer_ = client.parent_.dispatcher().createTimer(
-          [&client]() -> void { client.onLifetimeTimeout(); });
+          [&client]() { client.onLifetimeTimeout(); });
       client.lifetime_timer_->enableTimer(max_connection_duration.value());
     }
 
@@ -571,7 +571,7 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
                            uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
-      connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })) {
+      connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher().timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
