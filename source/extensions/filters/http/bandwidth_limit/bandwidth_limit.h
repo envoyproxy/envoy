@@ -32,12 +32,14 @@ namespace BandwidthLimitFilter {
 #define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                                       \
   COUNTER(request_enabled)                                                                         \
   COUNTER(response_enabled)                                                                        \
+  COUNTER(request_enforced)                                                                        \
+  COUNTER(response_enforced)                                                                       \
   GAUGE(request_pending, Accumulate)                                                               \
   GAUGE(response_pending, Accumulate)                                                              \
-  GAUGE(request_incoming_size, Accumulate)                                                         \
-  GAUGE(response_incoming_size, Accumulate)                                                        \
-  GAUGE(request_allowed_size, Accumulate)                                                          \
-  GAUGE(response_allowed_size, Accumulate)                                                         \
+  COUNTER(request_incoming_size)                                                                   \
+  COUNTER(response_incoming_size)                                                                  \
+  COUNTER(request_allowed_size)                                                                    \
+  COUNTER(response_allowed_size)                                                                   \
   HISTOGRAM(request_transfer_duration, Milliseconds)                                               \
   HISTOGRAM(response_transfer_duration, Milliseconds)
 
@@ -71,6 +73,8 @@ public:
   EnableMode enableMode() const { return enable_mode_; };
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
+  const Http::LowerCaseString& request_delay_trailer() const { return request_delay_trailer_; }
+  const Http::LowerCaseString& response_delay_trailer() const { return response_delay_trailer_; }
 
 private:
   friend class FilterTest;
@@ -86,6 +90,8 @@ private:
   mutable BandwidthLimitStats stats_;
   // Filter chain's shared token bucket
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
+  const Http::LowerCaseString request_delay_trailer_;
+  const Http::LowerCaseString response_delay_trailer_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -142,6 +148,8 @@ private:
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
+  uint64_t request_duration_ = 0;
+  Http::ResponseTrailerMap* trailers;
 };
 
 } // namespace BandwidthLimitFilter
