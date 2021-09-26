@@ -137,12 +137,16 @@ public:
                                         AuthzResponseNoAttributes(authz_response))));
 
     const HeaderValueOptionVector http_response_headers = TestCommon::makeHeaderValueOption({
-        {":status", http_status, false},
-        {"bar", "nope", false},
-        {"x-metadata-header-0", "zero", false},
-        {"x-metadata-header-1", "2", false},
-        {"x-foo", "nah", false},
-        {"x-metadata-header-2", "4", false},
+        {":status", http_status,
+         envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+        {"bar", "nope", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+        {"x-metadata-header-0", "zero",
+         envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+        {"x-metadata-header-1", "2",
+         envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+        {"x-foo", "nah", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+        {"x-metadata-header-2", "4",
+         envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
     });
     Http::ResponseMessagePtr http_response = TestCommon::makeMessageResponse(http_response_headers);
     client_->onSuccess(async_request_, std::move(http_response));
