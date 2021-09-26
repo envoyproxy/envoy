@@ -856,7 +856,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://storage.googleapis.com/quiche-envoy-integration/googleurl_{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
         extensions = [],
-        release_date = "2021-03-17",
+        release_date = "2021-08-31",
         cpe = "N/A",
     ),
     com_google_cel_cpp = dict(
