@@ -477,8 +477,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     const absl::optional<std::chrono::milliseconds> max_connection_duration =
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
-      client.lifetime_timer_ = client.parent_.dispatcher().createTimer(
-          [&client]() { client.onLifetimeTimeout(); });
+      client.lifetime_timer_ =
+          client.parent_.dispatcher().createTimer([&client]() { client.onLifetimeTimeout(); });
       client.lifetime_timer_->enableTimer(max_connection_duration.value());
     }
 
