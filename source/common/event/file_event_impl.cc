@@ -28,6 +28,9 @@ FileEventImpl::FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb
            "Cannot use EmulatedEdge events if they are not the default platform type");
   }
 
+  // We never ask for both early close and read at the same time.
+  ASSERT(!(events & FileReadyType::Read && (events & FileReadyType::Closed)));
+
   assignEvents(events, &dispatcher.base());
   event_add(&raw_event_, nullptr);
 }
@@ -148,8 +151,7 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
     // TODO(antoniovicente) remove this adjustment to activation events once ConnectionImpl can
     // handle Read and Close events delivered together.
     if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-      // We never ask for both early close and read at the same time. If close is requested
-      // keep that instead.
+      // We never ask for both early close and read at the same time.
       ASSERT(
           !(events & FileReadyType::Closed && injected_activation_events_ & FileReadyType::Read));
     }
