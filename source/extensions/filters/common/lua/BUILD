@@ -22,6 +22,18 @@ config_setting(
     },
 )
 
+bool_flag(
+    name = "luajit2",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "with_luajit2",
+    flag_values = {
+        ":luajit2": "True",
+    },
+)
+
 envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
@@ -35,6 +47,7 @@ envoy_cc_library(
         "//source/common/protobuf",
     ] + select({
         ":with_moonjit": [envoy_external_dep_path("moonjit")],
+        ":with_luajit2": [envoy_external_dep_path("luajit2")],
         "//conditions:default": [envoy_external_dep_path("luajit")],
     }),
 )
