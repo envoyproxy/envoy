@@ -88,17 +88,18 @@ void StreamRateLimiter::onTokenTimer() {
   }
 }
 
-void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_stream, bool trailer_added) {
+void StreamRateLimiter::writeData(Buffer::Instance& incoming_buffer, bool end_stream,
+                                  bool trailer_added) {
   auto len = incoming_buffer.length();
   buffer_.move(incoming_buffer);
   saw_end_stream_ = end_stream;
-  // If trailer_added is true, set saw_trailers_ to true to continue encode trailers, added 
+  // If trailer_added is true, set saw_trailers_ to true to continue encode trailers, added
   // after buffer_.move to ensure buffer has data and won't invoke continue_cb_ before
   // processing the data in last data frame.
   if (trailer_added) {
     saw_trailers_ = true;
   }
-  
+
   ENVOY_LOG(debug,
             "StreamRateLimiter <writeData>: got new {} bytes of data. token "
             "timer {} scheduled.",
