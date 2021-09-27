@@ -529,6 +529,13 @@ message RouteMatch {
   // against all the specified query parameters. If the number of specified
   // query parameters is nonzero, they all must match the *path* header's
   // query string for a match to occur.
+  //
+  // .. note::
+  //
+  //    If query parameters are used to pass request message fields when
+  //    grpc_json_transcoder is used, transcoded the message fields may be different
+  //    with the query parameters since the query parameters MUST be url_encoded,
+  //    but message fields are not.
   repeated QueryParameterMatcher query_parameters = 7;
 
   // If specified, only gRPC requests will be matched. The router will check
