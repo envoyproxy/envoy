@@ -52,6 +52,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
       : delegated_callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
+  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
   void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), match_tree_);
   }

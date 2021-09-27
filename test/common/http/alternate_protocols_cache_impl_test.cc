@@ -132,6 +132,18 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
   EXPECT_EQ(expected_protocols, protocols.ref());
 }
 
+TEST_F(AlternateProtocolsCacheImplTest, ToAndFromOriginString) {
+  std::string origin_str = "https://hostname1:1";
+  absl::optional<AlternateProtocolsCache::Origin> origin =
+      AlternateProtocolsCacheImpl::stringToOrigin(origin_str);
+  ASSERT_TRUE(origin.has_value());
+  EXPECT_EQ(1, origin.value().port_);
+  EXPECT_EQ("https", origin.value().scheme_);
+  EXPECT_EQ("hostname1", origin.value().hostname_);
+  std::string output = AlternateProtocolsCacheImpl::originToString(origin.value());
+  EXPECT_EQ(origin_str, output);
+}
+
 TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {
   auto testAltSvc = [&](const std::string& original_alt_svc,
                         const std::string& expected_alt_svc) -> void {

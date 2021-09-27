@@ -1,16 +1,28 @@
 #include "source/common/http/alternate_protocols_cache_impl.h"
 
 #include "source/common/common/logger.h"
-
 #include "quiche/spdy/core/spdy_alt_svc_wire_format.h"
+#include "re2/re2.h"
 
 namespace Envoy {
 namespace Http {
-namespace {
-std::string originToString(const AlternateProtocolsCache::Origin& origin) {
+
+std::string
+AlternateProtocolsCacheImpl::originToString(const AlternateProtocolsCache::Origin& origin) {
   return absl::StrCat(origin.scheme_, "://", origin.hostname_, ":", origin.port_);
 }
-} // namespace
+
+absl::optional<AlternateProtocolsCache::Origin>
+AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
+  re2::RE2 origin_regex("(.*)://(.*):(\\d+)");
+  std::string scheme;
+  std::string hostname;
+  int port = 0;
+  if (re2::RE2::FullMatch(str.c_str(), origin_regex, &scheme, &hostname, &port)) {
+    return AlternateProtocolsCache::Origin(scheme, hostname, port);
+  }
+  return {};
+}
 
 std::string AlternateProtocolsCacheImpl::protocolsToStringForCache(
     const std::vector<AlternateProtocol>& protocols, TimeSource& /*time_source*/) {
@@ -65,19 +77,40 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
     TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store)
-    : time_source_(time_source), key_value_store_(std::move(key_value_store)) {}
+    : time_source_(time_source), key_value_store_(std::move(key_value_store)) {
+  if (key_value_store_) {
+    KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
+      absl::optional<std::vector<AlternateProtocolsCache::AlternateProtocol>> protocols =
+          protocolsFromString(value, time_source_, true);
+      absl::optional<Origin> origin = stringToOrigin(key);
+      if (protocols.has_value() && origin.has_value()) {
+        setAlternativesImpl(origin.value(), protocols.value(), true);
+        return KeyValueStore::Iterate::Continue;
+      } else {
+        return KeyValueStore::Iterate::Break;
+      }
+    };
+    key_value_store_->iterate(load);
+  }
+}
 
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   std::vector<AlternateProtocol>& protocols) {
+  setAlternativesImpl(origin, protocols, false);
+}
+
+void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
+                                                      std::vector<AlternateProtocol>& protocols,
+                                                      bool from_cache) {
   static const size_t max_protocols = 10;
   if (protocols.size() > max_protocols) {
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
     protocols.erase(protocols.begin() + max_protocols, protocols.end());
   }
   protocols_[origin] = protocols;
-  if (key_value_store_) {
+  if (key_value_store_ && !from_cache) {
     key_value_store_->addOrUpdate(originToString(origin),
                                   protocolsToStringForCache(protocols, time_source_));
   }
@@ -89,7 +122,6 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   if (entry_it == protocols_.end()) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
-
   std::vector<AlternateProtocol>& protocols = entry_it->second;
 
   auto original_size = protocols.size();
