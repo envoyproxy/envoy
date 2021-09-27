@@ -68,13 +68,11 @@ message BandwidthLimit {
   // to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
-  // Optional the prefix for the response trailers of bandwidth decode/encode delays.
+  // Optional the prefix for the response trailers of bandwidth decode/encode delays for stream transfer.
   // If not set, use the default value "bandwidth-request-delay-ms" and "bandwidth-response-delay-ms".
   // If set, the trailer name will be set as:
-  //   request:  response_trailer_prefix + "-bandwidth-request-delay-ms"
-  //             Delay time it took for the request stream transfer.
-  //   response: response_trailer_prefix + "-bandwidth-response-delay-ms"
-  //             Delay time it took for the response stream transfer.
-  // If EnableMode is Disabled or Decode or delay time = 0, the trailer will not be set.
+  // request: response_trailer_prefix + "-bandwidth-request-delay-ms"
+  // response: response_trailer_prefix + "-bandwidth-response-delay-ms"
+  // If EnableMode is DISABLED or REQUEST or delay time = 0, the trailer will not be set.
   string response_trailer_prefix = 6;
 }
