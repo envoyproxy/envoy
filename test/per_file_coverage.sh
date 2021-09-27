@@ -11,16 +11,19 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
+"source/common/http:96.5"
 "source/common/json:90.1"
 "source/common/matcher:94.2"
 "source/common/network:94.8" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
+"source/common/secret:96.3"
 "source/common/signal:86.9" # Death tests don't report LCOV
 "source/common/singleton:95.7"
 "source/common/tcp:94.6"
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/tracing:96.1"
+"source/common/upstream:96.5"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
 "source/extensions/common:96.0"
@@ -29,7 +32,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
+"source/extensions/filters/common/expr:96.2"
 "source/extensions/filters/common/fault:94.5"
+"source/extensions/filters/common/lua:96.5"
 "source/extensions/filters/common/rbac:88.1"
 "source/extensions/filters/http/cache:93.4"
 "source/extensions/filters/http/cache/simple_http_cache:96.0"
@@ -37,23 +42,34 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/ip_tagging:89.1"
 "source/extensions/filters/http/kill_request:95.3" # Death tests don't report LCOV
 "source/extensions/filters/http/wasm:95.8"
+"source/extensions/filters/listener:96.2"
 "source/extensions/filters/listener/http_inspector:95.9"
 "source/extensions/filters/listener/original_dst:93.3"
 "source/extensions/filters/listener/tls_inspector:93.5"
 "source/extensions/filters/network/common:96.0"
+"source/extensions/filters/network/common/redis:96.2"
 "source/extensions/filters/network/mongo_proxy:95.5"
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:95.2"
+"source/extensions/filters/network/thrift_proxy/router:96.4"
 "source/extensions/filters/network/wasm:95.7"
+"source/extensions/filters/udp:96.4"
+"source/extensions/filters/udp/dns_filter:96.2"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
+"source/extensions/io_socket:96.2"
+"source/extensions/io_socket/user_space:96.2"
+"source/extensions/stat_sinks/common:96.4"
+"source/extensions/stat_sinks/common/statsd:96.4"
 "source/extensions/stat_sinks/graphite_statsd:88.5"
 "source/extensions/stat_sinks/statsd:88.0"
 "source/extensions/tracers/opencensus:94.8"
+"source/extensions/tracers/xray:96.2"
 "source/extensions/tracers/zipkin:96.1"
 "source/extensions/transport_sockets:95.4"
 "source/extensions/transport_sockets/tls:94.6"
 "source/extensions/transport_sockets/tls/cert_validator:96.0"
+"source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build
 "source/extensions/wasm_runtime/wasmtime:0.0" # Not enabled in coverage build
@@ -70,7 +86,7 @@ COVERAGE_DIR="${SRCDIR}"/generated/coverage
 COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 FAILED=0
-DEFAULT_COVERAGE_THRESHOLD=96.2
+DEFAULT_COVERAGE_THRESHOLD=96.6
 DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
 
 # Unfortunately we have a bunch of preexisting directory with low coverage.
