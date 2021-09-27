@@ -318,8 +318,8 @@ public:
       envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher matcher;
 
       if (config.ip_) {
-          matcher.mutable_upstream_ip()->set_address_prefix(*config.ip_);
-          matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
+        matcher.mutable_upstream_ip()->set_address_prefix(*config.ip_);
+        matcher.mutable_upstream_ip()->mutable_prefix_len()->set_value(32);
       }
 
       if (config.port_range_) {
@@ -379,7 +379,8 @@ TEST_F(UpstreamIpPortMatcherTests, UpstreamIpNoFilterStateMetadata) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
-// Tests simple upstream_ip ALLOW permission policy with ONLY upstream ip metadata in the filter state.
+// Tests simple upstream_ip ALLOW permission policy with ONLY upstream ip metadata in the filter
+// state.
 TEST_F(UpstreamIpPortMatcherTests, UpstreamIpWithFilterStateAllow) {
   // Setup filter state with the upstream address.
   upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
@@ -397,7 +398,8 @@ TEST_F(UpstreamIpPortMatcherTests, UpstreamIpWithFilterStateAllow) {
   EXPECT_EQ(1U, config_->stats().allowed_.value());
 }
 
-// Tests simple upstream_ip DENY permission policy with ONLY upstream ip metadata in the filter state.
+// Tests simple upstream_ip DENY permission policy with ONLY upstream ip metadata in the filter
+// state.
 TEST_F(UpstreamIpPortMatcherTests, UpstreamIpWithFilterStateDeny) {
   // Setup filter state with the upstream address.
   upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
@@ -514,8 +516,7 @@ TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsNoIpMatchPortMatchDeny) {
   upstreamIpTestsFilterStateSetup(callbacks_, {"2.2.3.4:123"});
 
   // Setup policy config.
-  const std::vector<UpstreamIpPortMatcherConfig> configs = {
-      {"1.1.1.2"}, {120, 123}, {"1.2.3.5"}};
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{"1.1.1.2"}, {120, 123}, {"1.2.3.5"}};
 
   upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
 
@@ -534,8 +535,7 @@ TEST_F(UpstreamIpPortMatcherTests, MultiUpstreamIpsNoIpMatchNoPortMatchDeny) {
   upstreamIpTestsFilterStateSetup(callbacks_, {"2.2.3.4:123"});
 
   // Setup policy config.
-  const std::vector<UpstreamIpPortMatcherConfig> configs = {
-      {"1.1.1.2"}, {124, 125}, {"1.2.3.5"}};
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{"1.1.1.2"}, {124, 125}, {"1.2.3.5"}};
 
   upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
 
@@ -587,9 +587,7 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
   upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
 
   // Setup policy config.
-  const std::vector<UpstreamIpPortMatcherConfig> configs = {
-      {}
-  };
+  const std::vector<UpstreamIpPortMatcherConfig> configs = {{}};
 
   upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
 

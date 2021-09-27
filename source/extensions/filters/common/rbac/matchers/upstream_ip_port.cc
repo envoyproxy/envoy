@@ -17,7 +17,7 @@ using namespace Filters::Common::RBAC;
 UpstreamIpPortMatcher::UpstreamIpPortMatcher(
     const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto) {
   if (proto.has_upstream_ip()) {
-      cidr_ = proto.upstream_ip();
+    cidr_ = proto.upstream_ip();
   }
   if (proto.has_upstream_port_range()) {
     port_ = proto.upstream_port_range();
@@ -44,17 +44,17 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
 
   bool is_match = false;
   if (cidr_) {
-      const auto range = Network::Address::CidrRange::create(*cidr_);
-      if (range.isInRange(*address_obj.address_)) {
-        ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
-                  range.asString());
+    const auto range = Network::Address::CidrRange::create(*cidr_);
+    if (range.isInRange(*address_obj.address_)) {
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
+                range.asString());
 
-        is_match = true;
-      } else {
-        ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: false",
-                  range.asString());
-        return false;
-      }
+      is_match = true;
+    } else {
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: false",
+                range.asString());
+      return false;
+    }
   }
 
   if (port_) {
