@@ -182,6 +182,15 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   return verify_mode;
 }
 
+std::string DefaultCertValidator::extractX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
+  const int n = X509_STORE_CTX_get_error(ctx);
+  const int depth = X509_STORE_CTX_get_error_depth(ctx);
+  std::string error_details =
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
+                   X509_verify_cert_error_string(n));
+  return error_details;
+}
+
 int DefaultCertValidator::doVerifyCertChain(
     X509_STORE_CTX* store_ctx, Ssl::SslExtendedSocketInfo* ssl_extended_info, X509& leaf_cert,
     const Network::TransportSocketOptions* transport_socket_options) {
@@ -195,6 +204,7 @@ int DefaultCertValidator::doVerifyCertChain(
 
     if (ret <= 0) {
       stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, "{}", extractX509VerificationErrorInfo(store_ctx));
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
