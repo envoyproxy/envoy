@@ -31,8 +31,7 @@ void ProduceRequestHolder::startProcessing() {
     KafkaProducer& producer = kafka_facade_.getProducerForTopic(outbound_record.topic_);
     // We need to provide our object as first argument, as we will want to be notified when the
     // delivery finishes.
-    producer.send(shared_from_this(), outbound_record.topic_, outbound_record.partition_,
-                  outbound_record.key_, outbound_record.value_, outbound_record.headers_);
+    producer.send(shared_from_this(), outbound_record);
   }
   // Corner case handling:
   // If we ever receive produce request without records, we need to notify the filter we are ready,

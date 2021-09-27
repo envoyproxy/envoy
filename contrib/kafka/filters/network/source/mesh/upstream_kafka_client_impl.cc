@@ -107,12 +107,9 @@ RichKafkaProducer::~RichKafkaProducer() {
 
 void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
 
-void RichKafkaProducer::send(
-    const ProduceFinishCbSharedPtr origin, const std::string& topic, const int32_t partition,
-    const absl::string_view key, const absl::string_view value,
-    const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) {
+void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const OutboundRecord& record) {
   {
-    void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
+    void* value_data = const_cast<char*>(record.value_.data()); // Needed for Kafka API.
     // Data is a pointer into request internals, and it is going to be managed by
     // ProduceRequestHolder lifecycle. So we are not going to use any of librdkafka's memory
     // management.
@@ -121,13 +118,15 @@ void RichKafkaProducer::send(
 
     RdKafka::ErrorCode ec;
     // librdkafka requires a raw pointer and deletes it on success.
-    RdKafka::Headers* librdkafka_headers = utils_.convertHeaders(headers);
+    RdKafka::Headers* librdkafka_headers = utils_.convertHeaders(record.headers_);
     if (nullptr != librdkafka_headers) {
-      ec = producer_->produce(topic, partition, flags, value_data, value.size(), key.data(),
-                              key.size(), timestamp, librdkafka_headers, nullptr);
+      ec = producer_->produce(record.topic_, record.partition_, flags, value_data,
+                              record.value_.size(), record.key_.data(), record.key_.size(),
+                              timestamp, librdkafka_headers, nullptr);
     } else {
       // Headers could not be converted (this should never happen).
-      ENVOY_LOG(trace, "Header conversion failed while sending to [{}/{}]", topic, partition);
+      ENVOY_LOG(trace, "Header conversion failed while sending to [{}/{}]", record.topic_,
+                record.partition_);
       ec = RdKafka::ERR_UNKNOWN;
     }
 
@@ -138,7 +137,8 @@ void RichKafkaProducer::send(
       // We could not submit data to producer.
       // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
       // downstream.
-      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, topic, partition);
+      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, record.topic_,
+                record.partition_);
       if (nullptr != librdkafka_headers) {
         // Kafka headers need to be deleted manually if produce call fails.
         utils_.deleteHeaders(librdkafka_headers);
