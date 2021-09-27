@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package envoy.extensions.cache.simple_http_cache.v3alpha;
+package envoy.extensions.cache.simple_http_cache.v3;
 
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.cache.simple_http_cache.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.cache.simple_http_cache.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;

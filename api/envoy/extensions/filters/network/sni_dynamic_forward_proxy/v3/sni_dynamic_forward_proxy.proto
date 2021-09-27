@@ -1,16 +1,15 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha;
+package envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3;
 
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3";
 option java_outer_classname = "SniDynamicForwardProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: SNI dynamic forward proxy]

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.cache.v3alpha;
+package envoy.extensions.filters.http.cache.v3;
 
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -11,10 +11,9 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.cache.v3";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Cache Filter]
