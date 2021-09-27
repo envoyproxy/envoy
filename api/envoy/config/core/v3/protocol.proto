@@ -31,7 +31,9 @@ message QuicKeepAliveSettings {
   // The max interval in seconds for a connection to send keep-alive probing packets
   // (with PING or PATH_RESPONSE).
   //
-  // If initial_interval is zero, a client connection will use this value to start probing. In such case, the value should be smaller than :ref:`connection idle_timeout <>` to
+  // If initial_interval is zero, a client connection will use this value to
+  // start probing. In such case, the value should be smaller than
+  // :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to
   // prevent idle timeout while not too small to throttle the connection or to flood the peer.
   // If zero, disable keepalive probing.
   google.protobuf.UInt32Value max_interval = 1 [(validate.rules).message = {required: true}];
@@ -41,11 +43,11 @@ message QuicKeepAliveSettings {
   // one with an interval exponentially longer than previous one, till it reaches
   // max_interval. And the probing afterwards will always use max_interval.
   //
-  // The value should be smaller than :ref:`connection idle_timeout <>`  to
-  // prevent idle timeout and smaller than  max_interval to take effect.
+  // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to
+  // prevent idle timeout and smaller than max_interval to take effect.
   //
   // If zero, disable keepalive probing for a server connection. For a client
-  // connection, if max_internval is also zero, do not keepalive, otherwise use max_interval to probe all the time.
+  // connection, if max_interval is also zero, do not keepalive, otherwise use max_interval to probe all the time.
   google.protobuf.UInt32Value initial_interval = 2 [(validate.rules).message = {required: true}];
 }
 
