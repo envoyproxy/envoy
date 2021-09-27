@@ -29,8 +29,8 @@ public:
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
   const Network::ConnectionSocketPtr& connectionSocket() const { 
-    //std::cout << "socket list size " << connection_sockets_.size() << std::endl;
-    return connection_sockets_.back(); }
+    return connection_sockets_.back();
+  }
 
   // Needed for ENVOY_CONN_LOG.
   uint64_t id() const;
@@ -49,6 +49,7 @@ private:
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;
   // Assigned upon construction. Constructed with empty local address if unknown
   // by then. The last one is the default active socket.
+  // TODO(renjietang): Impose an upper limit.
   std::vector<Network::ConnectionSocketPtr> connection_sockets_;
   // Points to an instance of EnvoyQuicServerSession or EnvoyQuicClientSession.
   Network::Connection* envoy_connection_{nullptr};
