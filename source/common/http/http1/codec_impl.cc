@@ -862,8 +862,7 @@ void ConnectionImpl::dispatchBufferedBody() {
   }
 }
 
-void ConnectionImpl::onChunkHeader(int content_length) {
-  bool is_final_chunk = (content_length == 0);
+void ConnectionImpl::onChunkHeader(bool is_final_chunk) {
   if (is_final_chunk) {
     // Dispatch body before parsing trailers, so body ends up dispatched even if an error is found
     // while processing trailers.

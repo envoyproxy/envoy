@@ -378,7 +378,7 @@ private:
   // Connection specific callback methods.
   virtual Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() PURE;
   virtual ParserStatus onMessageCompleteBase() PURE;
-  void onChunkHeader(int content_length) override;
+  void onChunkHeader(bool is_final_chunk) override;
 
   /**
    * Push the accumulated body through the filter pipeline.

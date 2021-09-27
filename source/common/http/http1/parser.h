@@ -96,7 +96,7 @@ public:
   /**
    * Called when accepting a chunk header.
    */
-  virtual void onChunkHeader(int content_length) PURE;
+  virtual void onChunkHeader(bool) PURE;
 
   virtual int setAndCheckCallbackStatus(Status&& status) PURE;
   virtual int setAndCheckCallbackStatusOr(Envoy::StatusOr<ParserStatus>&& statusor) PURE;

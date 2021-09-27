@@ -81,7 +81,8 @@ public:
           // When this function is called, http-parser holds the size of the chunk in
           // parser->content_length. See
           // https://github.com/nodejs/http-parser/blob/v2.9.3/http_parser.h#L336
-          static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(parser->content_length);
+          const bool is_final_chunk = (parser->content_length == 0);
+          static_cast<ParserCallbacks*>(parser->data)->onChunkHeader(is_final_chunk);
           return 0;
         },
         nullptr // on_chunk_complete
