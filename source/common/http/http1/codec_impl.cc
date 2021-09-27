@@ -511,10 +511,8 @@ Status ConnectionImpl::completeLastHeader() {
   auto& headers_or_trailers = headersOrTrailers();
   StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
   if (bytes_meterer) {
-    // Account for ":" bytes between the header key value pair.
-    bytes_meterer->addHeaderBytesReceived(headers_or_trailers.size());
-    // Account for "\r\n" at the end of headers.
-    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE * headers_or_trailers.size());
+    // Account for ":" and "\r\n" bytes between the header key value pair.
+    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE + 1);
   }
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().

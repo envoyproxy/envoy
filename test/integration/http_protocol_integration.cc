@@ -67,13 +67,13 @@ void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(
       header_bytes_sent = std::stoi(log_entries[2]),
       header_bytes_received = std::stoi(log_entries[3]);
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_sent_, wire_bytes_sent))
+    EXPECT_EQ(h1_expectation.wire_bytes_sent_, wire_bytes_sent)
         << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_received_, wire_bytes_received))
+    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
         << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_sent_, header_bytes_sent))
+    EXPECT_EQ(h1_expectation.header_bytes_sent_, header_bytes_sent)
         << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_received_, header_bytes_received))
+    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
         << "expect: " << h1_expectation.header_bytes_received_
         << ", actual: " << header_bytes_received;
   }
@@ -101,13 +101,13 @@ void HttpProtocolIntegrationTest::expectDownstreamBytesSentAndReceived(
       header_bytes_sent = std::stoi(log_entries[2]),
       header_bytes_received = std::stoi(log_entries[3]);
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_sent_, wire_bytes_sent))
+    EXPECT_EQ(h1_expectation.wire_bytes_sent_, wire_bytes_sent)
         << "expect: " << h1_expectation.wire_bytes_sent_ << ", actual: " << wire_bytes_sent;
-    EXPECT_TRUE(integer_near(h1_expectation.wire_bytes_received_, wire_bytes_received))
+    EXPECT_EQ(h1_expectation.wire_bytes_received_, wire_bytes_received)
         << "expect: " << h1_expectation.wire_bytes_received_ << ", actual: " << wire_bytes_received;
-    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_sent_, header_bytes_sent))
+    EXPECT_EQ(h1_expectation.header_bytes_sent_, header_bytes_sent)
         << "expect: " << h1_expectation.header_bytes_sent_ << ", actual: " << header_bytes_sent;
-    EXPECT_TRUE(integer_near(h1_expectation.header_bytes_received_, header_bytes_received))
+    EXPECT_EQ(h1_expectation.header_bytes_received_, header_bytes_received)
         << "expect: " << h1_expectation.header_bytes_received_
         << ", actual: " << header_bytes_received;
   }

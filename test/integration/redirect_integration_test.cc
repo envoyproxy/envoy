@@ -216,9 +216,9 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 28),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 31),
                                        BytesCountExpectation(0, 42, 0, 42), 0);
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(140, 63, 121, 28),
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(140, 63, 121, 31),
                                        BytesCountExpectation(77, 42, 77, 42), 1);
 }
 
@@ -250,7 +250,7 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
   ASSERT_TRUE(response->complete());
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85),
                                      BytesCountExpectation(137, 64, 137, 64), 0);
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(244, 38, 219, 15),
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(244, 38, 219, 18),
                                      BytesCountExpectation(85, 10, 85, 10), 1);
 }
 
