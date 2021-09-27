@@ -65,6 +65,7 @@ Minor Behavior Changes
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
+* bandwidth_limit: added response trailers when request or response delay are enforced.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
 * quic: enables IETF connection migration. This feature requires a stable UDP packet routine in the L4 load balancer with the same first-4-bytes in connection id. It can be turned off by setting runtime guard ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_connection_migration_use_new_cid_v2`` to false.
 

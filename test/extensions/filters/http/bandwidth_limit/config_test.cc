@@ -38,6 +38,7 @@ TEST(Factory, RouteSpecificFilterConfig) {
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 10
   fill_interval: 0.1s
+  response_trailer_prefix: test
   )";
 
   BandwidthLimitFilterConfig factory;
@@ -54,6 +55,10 @@ TEST(Factory, RouteSpecificFilterConfig) {
   EXPECT_EQ(config->fillInterval().count(), 100);
   EXPECT_EQ(config->enableMode(), EnableMode::BandwidthLimit_EnableMode_REQUEST_AND_RESPONSE);
   EXPECT_FALSE(config->tokenBucket() == nullptr);
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->request_delay_trailer(),
+            Http::LowerCaseString("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->response_delay_trailer(),
+            Http::LowerCaseString("test-bandwidth-response-delay-ms"));
 }
 
 TEST(Factory, RouteSpecificFilterConfigDisabledByDefault) {
@@ -97,6 +102,11 @@ TEST(Factory, RouteSpecificFilterConfigDefaultFillInterval) {
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 50);
+  // default trailers
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->request_delay_trailer(),
+            Http::LowerCaseString("bandwidth-request-delay-ms"));
+  EXPECT_EQ(const_cast<FilterConfig*>(config)->response_delay_trailer(),
+            Http::LowerCaseString("bandwidth-response-delay-ms"));
 }
 
 TEST(Factory, PerRouteConfigNoLimits) {
