@@ -71,7 +71,7 @@ message Quota {
     google.protobuf.Timestamp valid_until = 2;
   }
 
-  // The unique id that is associated with each Quota.
+  // The unique id that is associated with each Quoto either at individual descriptor level or whole descriptor set level.
   string id = 3;
 }
 
