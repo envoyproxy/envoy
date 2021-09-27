@@ -699,13 +699,6 @@ typed_config:
                   upstream_ip:
                     address_prefix: ::1
                     prefix_len: 24
-            - matcher:
-                name: envoy.filters.http.rbac.matchers.upstream_port
-                typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_port.v3.UpstreamPortMatcher
-                  upstream_port_range:
-                    start: 80
-                    end: 80
         principals:
           - any: true
 )EOF";

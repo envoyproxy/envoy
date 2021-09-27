@@ -709,9 +709,3 @@ envoy.rbac.matchers.upstream_ip_port:
   - envoy.rbac.matchers
   security_posture: unknown
   status: alpha
-envoy.rbac.matchers.upstream_port:
-  categories:
-  - envoy.rbac.matchers
-  security_posture: unknown
-  status: alpha
-

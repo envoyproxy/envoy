@@ -15,8 +15,10 @@ namespace Matchers {
 using namespace Filters::Common::RBAC;
 
 UpstreamIpPortMatcher::UpstreamIpPortMatcher(
-    const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto)
-    : range_(Network::Address::CidrRange::create(proto.upstream_ip())) {
+    const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto) {
+  if (proto.has_upstream_ip()) {
+      cidr_ = proto.upstream_ip();
+  }
   if (proto.has_upstream_port_range()) {
     port_ = proto.upstream_port_range();
   }
@@ -41,17 +43,30 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
           StreamInfo::UpstreamAddress::key());
 
   bool is_match = false;
-  if (range_.isInRange(*address_obj.address_)) {
-    ENVOY_LOG(debug, "UpstreamIpPort matcher for range: {} evaluated to: true", range_.asString());
-    is_match = true;
+  if (cidr_) {
+      const auto range = Network::Address::CidrRange::create(*cidr_);
+      if (range.isInRange(*address_obj.address_)) {
+        ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
+                  range.asString());
+
+        is_match = true;
+      } else {
+        ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: false",
+                  range.asString());
+        return false;
+      }
   }
 
-  if (is_match && port_) {
+  if (port_) {
     const auto port = address_obj.address_->ip()->port();
     if (port >= port_->start() && port <= port_->end()) {
-      ENVOY_LOG(debug, "UpstreamIpPort matcher matched port: {}", port);
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: true",
+                port_->start(), port_->end());
+      is_match = true;
     } else {
-      is_match = false;
+      ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: false",
+                port_->start(), port_->end());
+      return false;
     }
   }
 
