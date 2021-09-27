@@ -130,7 +130,7 @@ WIP_WARNING = (
     '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
     'work-in-progress are not considered stable, are not covered by the :ref:`threat model '
     '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
-    'breaking changees. Do not use this feature without understanding each of the previous '
+    'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
 
 r = runfiles.Create()
