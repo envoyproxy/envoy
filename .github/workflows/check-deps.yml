@@ -28,7 +28,7 @@ jobs :
       - name: setting up virtualenv
         run : |
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          # --cron flag to create issue only in github action
+          # --create_issues flag to create issue only in github action
           # and not interfere with the CI
-          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --check_deps
-          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --check_deps
+          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --create_issues
+          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --create_issues

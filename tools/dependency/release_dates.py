@@ -198,14 +198,14 @@ if __name__ == '__main__':
     # parsing location and github_action flag with argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('location', type=str)
-    parser.add_argument('--check_deps', action='store_true')
+    parser.add_argument('--create_issues', action='store_true')
     args = parser.parse_args()
     access_token = os.getenv('GITHUB_TOKEN')
     if not access_token:
         print('Missing GITHUB_TOKEN')
         sys.exit(1)
     path = args.location
-    create_issue = args.check_deps
+    create_issue = args.create_issues
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
