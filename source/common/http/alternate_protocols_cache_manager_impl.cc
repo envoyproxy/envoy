@@ -1,5 +1,10 @@
 #include "source/common/http/alternate_protocols_cache_manager_impl.h"
 
+#include "envoy/common/key_value_store.h"
+#include "envoy/config/common/key_value/v3/config.pb.h"
+#include "envoy/config/common/key_value/v3/config.pb.validate.h"
+
+#include "source/common/config/utility.h"
 #include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/protobuf/protobuf.h"
 
@@ -18,6 +23,12 @@ AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(
 
 AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
     const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) {
+  if (options.has_key_value_store_config() && data_.concurrency_ != 1) {
+    throw EnvoyException(
+        fmt::format("options has key value store but Envoy has concurrency = {} : {}",
+                    data_.concurrency_, options.DebugString()));
+  }
+
   const auto& existing_cache = (*slot_).caches_.find(options.name());
   if (existing_cache != (*slot_).caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(options, existing_cache->second.options_)) {
@@ -26,12 +37,21 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
           " first '{}' second '{}'",
           options.name(), existing_cache->second.options_.DebugString(), options.DebugString()));
     }
-
     return existing_cache->second.cache_;
   }
 
-  AlternateProtocolsCacheSharedPtr new_cache =
-      std::make_shared<AlternateProtocolsCacheImpl>(data_.dispatcher_.timeSource());
+  std::unique_ptr<KeyValueStore> store;
+  if (options.has_key_value_store_config()) {
+    envoy::config::common::key_value::v3::KeyValueStoreConfig kv_config;
+    MessageUtil::anyConvertAndValidate(options.key_value_store_config().typed_config(), kv_config,
+                                       data_.validation_visitor_);
+    auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_config.config());
+    store = factory.createStore(kv_config, data_.validation_visitor_, data_.dispatcher_,
+                                data_.file_system_);
+  }
+
+  AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
+      data_.dispatcher_.timeSource(), std::move(store));
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
