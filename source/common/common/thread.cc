@@ -24,10 +24,11 @@ struct ThreadIds {
   // test-thread. We need to allow for either one because we don't establish
   // the full threading model in all unit tests.
   bool inMainOrTestThread() const {
+    // We don't take the lock when testing the thread IDs, as they are atomic,
+    // and are cleared when being released. All possible thread orderings
+    // result in the correct result even without a lock.
     std::thread::id id = std::this_thread::get_id();
-    absl::MutexLock lock(&mutex_);
-    return ((main_thread_use_count_ != 0 && main_thread_id_ == id) ||
-            (test_thread_use_count_ != 0 && test_thread_id_ == id));
+    return main_thread_id_ == id || test_thread_id_ == id;
   }
 
   // Returns a singleton instance of this. The instance is never freed.
@@ -40,7 +41,11 @@ struct ThreadIds {
     absl::MutexLock lock(&mutex_);
     ASSERT(main_thread_use_count_ > 0);
     ASSERT(std::this_thread::get_id() == main_thread_id_);
-    --main_thread_use_count_;
+    if (--main_thread_use_count_ == 0) {
+      // Clearing the thread ID when its use-count goes to zero allows us
+      // to read the atomic without taking a lock.
+      main_thread_id_ = std::thread::id{};
+    }
   }
 
   // Call this when the TestThread exits. Nested semantics are supported, so
@@ -50,7 +55,11 @@ struct ThreadIds {
     absl::MutexLock lock(&mutex_);
     ASSERT(test_thread_use_count_ > 0);
     ASSERT(std::this_thread::get_id() == test_thread_id_);
-    --test_thread_use_count_;
+    if (--test_thread_use_count_ == 0) {
+      // Clearing the thread ID when its use-count goes to zero allows us
+      // to read the atomic without taking a lock.
+      test_thread_id_ = std::thread::id{};
+    }
   }
 
   // Declares current thread as the main one, or verifies that the current
@@ -76,8 +85,8 @@ struct ThreadIds {
   }
 
 private:
-  std::thread::id main_thread_id_ GUARDED_BY(mutex_);
-  std::thread::id test_thread_id_ GUARDED_BY(mutex_);
+  std::atomic<std::thread::id> main_thread_id_; // IDs are read without a mutex, but are written
+  std::atomic<std::thread::id> test_thread_id_; // a mutex to lock the use-count.
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
   int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;

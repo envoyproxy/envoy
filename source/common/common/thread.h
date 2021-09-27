@@ -170,6 +170,10 @@ public:
 
 // RAII object to declare the TestThread. This should be declared in main() or
 // equivalent for any test binaries.
+//
+// Generally we expect TestThread to be instantiated only once on main() for
+// each test binary, though nested instantiations are allowed as long as the
+// thread ID does not change.
 class TestThread {
 public:
   TestThread();
@@ -178,6 +182,15 @@ public:
 
 // RAII object to declare the MainThread. This should be declared in the thread
 // function or equivalent.
+//
+// Generally we expect MainThread to be instantiated only once or twice. It has
+// to be instantiated prior to OptionsImpl being created, so it needs to be in
+// instantiated from main_common(). In addition, it is instantiated by
+// ThreadLocal implementation to get the correct behavior for tests that do not
+// instantiate main.
+//
+// In general, nested instantiations are allowed as long as the thread ID does
+// not change.
 class MainThread {
 public:
   MainThread();
