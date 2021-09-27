@@ -32,12 +32,12 @@ Envoy::Network::IoHandlePtr VclSocketInterface::socket(Envoy::Network::Socket::T
   if (addr_type == Envoy::Network::Address::Type::Pipe) {
     return nullptr;
   }
-  auto sh = vppcom_session_create(
+  uint32_t sh = vppcom_session_create(
       socket_type == Envoy::Network::Socket::Type::Stream ? VPPCOM_PROTO_TCP : VPPCOM_PROTO_UDP, 1);
-  if (sh < 0) {
+  if (!VCL_SH_VALID(sh)) {
     return nullptr;
   }
-  return std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
+  return std::make_unique<VclIoHandle>(sh, VclInvalidFd);
 }
 
 Envoy::Network::IoHandlePtr

@@ -88,7 +88,9 @@ uint32_t vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
 void vclInterfaceWorkerRegister() {
   {
     absl::MutexLock lk(&wrk_lock);
-    vppcom_worker_register();
+    if (vppcom_worker_register()) {
+      RELEASE_ASSERT(0, "failed to register VCL worker");
+    }
   }
   int epoll_handle = vppcom_epoll_create();
   epoll_handles[vppcom_worker_index()] = epoll_handle;
@@ -98,11 +100,12 @@ void vclInterfaceWorkerRegister() {
 
 void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
   MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
-  if (mq_fevts_map.find(vppcom_worker_index()) != mq_fevts_map.end()) {
+  const int wrk_index = vppcom_worker_index();
+  RELEASE_ASSERT(wrk_index != -1, "");
+  if (mq_fevts_map.find(wrk_index) != mq_fevts_map.end()) {
     return;
   }
-  RELEASE_ASSERT(vppcom_worker_index() != -1, "");
-  mq_fevts_map[vppcom_worker_index()] = dispatcher.createFileEvent(
+  mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
       vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
@@ -110,8 +113,9 @@ void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
 void vclInterfaceInit(Event::Dispatcher& dispatcher) {
   MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
   vppcom_app_create("envoy");
-  epoll_handles[vppcom_worker_index()] = vppcom_epoll_create();
-  mq_fevts_map[vppcom_worker_index()] = dispatcher.createFileEvent(
+  const int wrk_index = vppcom_worker_index();
+  epoll_handles[wrk_index] = vppcom_epoll_create();
+  mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
       vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }

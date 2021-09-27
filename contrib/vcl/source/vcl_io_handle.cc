@@ -144,7 +144,7 @@ Api::IoCallUint64Result VclIoHandle::close() {
 
   if (is_listener_) {
     if (wrk_index) {
-      auto sh = wrk_listener_->sh();
+      uint32_t sh = wrk_listener_->sh();
       RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
       clearChildWrkListener();
       rc = vppcom_session_close(sh);
@@ -474,7 +474,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = 0;
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: setOption() SOL_TCP: sh %u optname %d unsupported!", sh_, optname);
+      ENVOY_LOG(error, "ERROR: setOption() SOL_TCP: sh {} optname {} unsupported!", sh_, optname);
       break;
     }
     break;
@@ -484,7 +484,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_SET_V6ONLY, const_cast<void*>(optval), &optlen);
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: setOption() SOL_IPV6: sh %u optname %d unsupported!", sh_, optname);
+      ENVOY_LOG(error, "ERROR: setOption() SOL_IPV6: sh {} optname {} unsupported!", sh_, optname);
       break;
     }
     break;
@@ -500,7 +500,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_SET_BROADCAST, const_cast<void*>(optval), &optlen);
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: setOption() SOL_SOCKET: sh %u optname %d unsupported!", sh_,
+      ENVOY_LOG(error, "ERROR: setOption() SOL_SOCKET: sh {} optname {} unsupported!", sh_,
                 optname);
       break;
     }
@@ -514,7 +514,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
 
 Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optval,
                                              socklen_t* optlen) {
-  VCL_LOG("trying to get option\n");
+  VCL_LOG("trying to get option");
   if (!VCL_SH_VALID(sh_)) {
     return {-1, VPPCOM_EBADFD};
   }
