@@ -160,7 +160,7 @@ TEST_F(EnvoyGoogleAsyncClientImplTest, RequestHttpStartFail) {
 
   Tracing::MockSpan active_span;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(active_span, spawnChild_(_, "t", _))
+  EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
