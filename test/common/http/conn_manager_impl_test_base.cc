@@ -63,8 +63,14 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
         .WillOnce(Invoke([&](Network::DrainDecision::DrainCloseCb cb) -> Common::CallbackHandlePtr {
           // for our tests, invoke immediately
           drain_close_func_ = cb;
-          return nullptr;
+          return std::make_unique<Network::MockCallbackHandle>();
         }));
+  } else {
+    ON_CALL(drain_close_, addOnDrainCloseCb(_))
+        .WillByDefault(
+            Invoke([](Network::DrainDecision::DrainCloseCb) -> Common::CallbackHandlePtr {
+              return std::make_unique<Network::MockCallbackHandle>();
+            }));
   }
 
   server_name_ = server_name;

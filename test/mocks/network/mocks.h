@@ -177,6 +177,12 @@ public:
   MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb, (DrainCloseCb cb), (const, override));
 };
 
+class MockCallbackHandle : public Common::CallbackHandle {
+public:
+  MockCallbackHandle();
+  ~MockCallbackHandle() override;
+};
+
 class MockListenerFilter : public ListenerFilter {
 public:
   MockListenerFilter();

@@ -5,6 +5,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/drain_manager.h"
 
+#include "test/mocks/network/mocks.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -40,6 +42,10 @@ MockDrainManager::MockDrainManager() {
       }));
 
   ON_CALL(*this, drainClose()).WillByDefault(Invoke([this]() { return draining_.load(); }));
+  ON_CALL(*this, addOnDrainCloseCb)
+      .WillByDefault(Invoke([](Network::DrainDecision::DrainCloseCb) -> Common::CallbackHandlePtr {
+        return std::make_unique<Network::MockCallbackHandle>();
+      }));
 }
 
 void MockDrainManager::startDrainSequence(std::function<void()> cb) {

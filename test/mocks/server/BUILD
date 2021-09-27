@@ -73,6 +73,7 @@ envoy_cc_mock(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/server:drain_manager_interface",
+        "//test/mocks/network:network_mocks",
     ],
 )
 

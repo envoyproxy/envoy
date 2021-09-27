@@ -167,7 +167,6 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
       stats_.named_.downstream_cx_drain_close_.inc();
       createStartDrainTimer(drain_delay);
     });
-    ASSERT(start_drain_cb_ != nullptr);
   }
 }
 

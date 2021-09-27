@@ -106,8 +106,16 @@ MockTcpListenerCallbacks::~MockTcpListenerCallbacks() = default;
 MockUdpListenerCallbacks::MockUdpListenerCallbacks() = default;
 MockUdpListenerCallbacks::~MockUdpListenerCallbacks() = default;
 
-MockDrainDecision::MockDrainDecision() = default;
+MockDrainDecision::MockDrainDecision() {
+  ON_CALL(*this, addOnDrainCloseCb)
+      .WillByDefault(Invoke([](Network::DrainDecision::DrainCloseCb) -> Common::CallbackHandlePtr {
+        return std::make_unique<MockCallbackHandle>();
+      }));
+}
 MockDrainDecision::~MockDrainDecision() = default;
+
+MockCallbackHandle::MockCallbackHandle() = default;
+MockCallbackHandle::~MockCallbackHandle() = default;
 
 MockListenerFilter::MockListenerFilter() = default;
 MockListenerFilter::~MockListenerFilter() { destroy_(); }
