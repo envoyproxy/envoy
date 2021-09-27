@@ -126,8 +126,7 @@ message RateLimitResponse {
     Unit unit = 2;
   }
 
-  // Cacheable quota for responses, see documentation for the :ref:`quota
-  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.quota>` field.
+  // Cacheable quota for responses.
   // [#not-implemented-hide:]
   message Quota {
     // Number of matching requests granted in quota. Must be 1 or more.
