@@ -19,9 +19,7 @@ class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::I
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {
-        std::cout << "new socket created " << fd << std::endl;
-      }
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
