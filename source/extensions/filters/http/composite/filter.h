@@ -29,7 +29,8 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(FilterStats& stats, Event::Dispatcher& dispatcher) : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats) {}
+  Filter(FilterStats& stats, Event::Dispatcher& dispatcher)
+      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,

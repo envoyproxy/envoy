@@ -108,7 +108,7 @@ class MixedUpstreamIntegrationTest : public FilterIntegrationTest {
 protected:
   void writeFile() {
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
-    // There's no hostname here because we're not doing DFP so we infer the
+    // There's no hostname here because we're not doing dynamic forward proxying so we infer the
     // hostname from the config (which does not set it)
     uint32_t port = fake_upstreams_[0]->localAddress()->ip()->port();
     std::string key = absl::StrCat("https://:", port);
