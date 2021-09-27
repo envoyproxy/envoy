@@ -553,7 +553,7 @@ public:
   COUNTER(upstream_cx_http2_total)                                                                 \
   COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
-  COUNTER(upstream_cx_max_duration)                                                                \
+  COUNTER(upstream_cx_max_duration_exceeded)                                                       \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \

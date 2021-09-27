@@ -619,7 +619,7 @@ void ActiveClient::onLifetimeTimeout() {
   }
 
   ENVOY_CONN_LOG(debug, "lifetime timeout, DRAINING", *this);
-  parent_.host()->cluster().stats().upstream_cx_max_duration_.inc();
+  parent_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.inc();
   parent_.transitionActiveClientState(*this, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
 
   // Close out the draining client if we no longer have active streams.
