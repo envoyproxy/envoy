@@ -56,7 +56,7 @@ message RateLimitRequest {
 // Quota can be granted at different levels: either for each individual descriptor or for the whole descriptor set.
 // This is a certain number of requests over a period of time.
 // The client may cache this result and apply the effective RateLimitResponse to future matching
-// requests containing a matching  without querying rate limit service.
+// requests containing a matching without querying rate limit service.
 //
 // When quota expires due to timeout, a new RLS request will also be made.
 // The implementation may choose to preemptively query the rate limit server for more quota on or
@@ -71,7 +71,7 @@ message Quota {
     google.protobuf.Timestamp valid_until = 2;
   }
 
-  // The unique id that is associated with each Quoto either at individual descriptor level or whole descriptor set level.
+  // The unique id that is associated with each Quota either at individual descriptor level or whole descriptor set level.
   string id = 3;
 }
 
@@ -124,6 +124,19 @@ message RateLimitResponse {
 
     // The unit of time.
     Unit unit = 2;
+  }
+
+  // Cacheable quota for responses, see documentation for the :ref:`quota
+  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.quota>` field.
+  // [#not-implemented-hide:]
+  message Quota {
+    // Number of matching requests granted in quota. Must be 1 or more.
+    uint32 requests = 1 [(validate.rules).uint32 = {gt: 0}];
+
+    oneof expiration_specifier {
+      // Point in time at which the quota expires.
+      google.protobuf.Timestamp valid_until = 2;
+    }
   }
 
   // [#next-free-field: 6]
