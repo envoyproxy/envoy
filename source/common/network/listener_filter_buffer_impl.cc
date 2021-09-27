@@ -89,7 +89,6 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
 
 void ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ENVOY_LOG(trace, "onFileEvent: {}", events);
-  ASSERT(events == Event::FileReadyType::Closed);
 
   auto state = peekFromSocket();
   if (state == PeekState::Done) {

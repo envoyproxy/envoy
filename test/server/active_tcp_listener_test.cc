@@ -300,9 +300,12 @@ TEST_F(ActiveTcpListenerTest, ListenerFilterWithClose) {
   // the filter is looking for more data
   EXPECT_CALL(*filter_, onData(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
   generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(
+          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
 
-  // emit the close event
-  file_event_callback(Event::FileReadyType::Closed);
+  // emit the read event
+  file_event_callback(Event::FileReadyType::Read);
 }
 
 TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout2) {
