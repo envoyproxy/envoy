@@ -33,8 +33,14 @@ AbstractResponseSharedPtr MetadataRequestHolder::computeAnswer() const {
                                    advertised_address.second};
   std::vector<MetadataResponseTopic> response_topics;
   if (request_->data_.topics_) {
-    for (const auto& topic : *(request_->data_.topics_)) {
-      const std::string& topic_name = topic.name_;
+    for (const MetadataRequestTopic& topic : *(request_->data_.topics_)) {
+      if (!topic.name_) {
+        // The client sent request without topic name (UUID was sent instead).
+        // We do not know how to handle it, so do not send any metadata.
+        // This will cause failures in clients downstream.
+        continue;
+      }
+      const std::string& topic_name = *(topic.name_);
       std::vector<MetadataResponsePartition> topic_partitions;
       const absl::optional<ClusterConfig> cluster_config =
           configuration_.computeClusterConfigForTopic(topic_name);

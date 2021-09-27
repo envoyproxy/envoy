@@ -13,7 +13,7 @@ namespace Kafka {
  * Decides if response with given api key & version should have tagged fields in header.
  * Bear in mind, that ApiVersions responses DO NOT contain tagged fields in header (despite having
  * flexible versions) as per
- * https://github.com/apache/kafka/blob/2.4.0/clients/src/main/resources/common/message/ApiVersionsResponse.json#L24
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/resources/common/message/ApiVersionsResponse.json#L24
  * This method gets implemented in generated code through 'kafka_response_resolver_cc.j2'.
  *
  * @param api_key Kafka request key.

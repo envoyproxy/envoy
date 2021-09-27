@@ -32,21 +32,14 @@ protected:
     auto grpc = service.mutable_envoy_grpc();
     grpc->set_cluster_name("test");
 
-    EXPECT_CALL(client_manager_, factoryForGrpcService(_, _, _))
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
     client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, service, stats_store_);
   }
 
-  Grpc::AsyncClientFactoryPtr doFactory(Unused, Unused, Unused) {
-    auto factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-    EXPECT_CALL(*factory, createUncachedRawAsyncClient())
-        .WillOnce(Invoke(this, &ExtProcStreamTest::doCreate));
-    return factory;
-  }
-
-  Grpc::RawAsyncClientPtr doCreate() {
-    auto async_client = std::make_unique<Grpc::MockAsyncClient>();
+  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused, Unused) {
+    auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client,
                 startRaw("envoy.service.ext_proc.v3alpha.ExternalProcessor", "Process", _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doStartRaw));
@@ -83,6 +76,7 @@ protected:
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
   auto stream = client_->start(*this);
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
@@ -93,6 +87,7 @@ TEST_F(ExtProcStreamTest, SendToStream) {
   ProcessingRequest req;
   stream->send(std::move(req), false);
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
@@ -129,6 +124,7 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
