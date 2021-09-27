@@ -284,7 +284,7 @@ TEST_F(RoleBasedAccessControlFilterTest, ShouldNotLog) {
 class UpstreamIpPortMatcherTests : public RoleBasedAccessControlFilterTest {
 public:
   struct UpstreamIpPortMatcherConfig {
-    UpstreamIpPortMatcherConfig() {}
+    UpstreamIpPortMatcherConfig() = default;
 
     UpstreamIpPortMatcherConfig(const std::string& ip) : ip_(ip) {}
 
