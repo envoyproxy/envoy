@@ -906,12 +906,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "compiler-rt",
         project_desc = "LLVM compiler runtime library",
         project_url = "https://compiler-rt.llvm.org",
-        version = "11.0.1",
-        sha256 = "087be3f1116e861cd969c9b0b0903c27028b52eaf45157276f50a9c2500687fc",
+        version = "12.0.1",
+        sha256 = "b4c8d5f2a802332987c1c0a95b5afb35b1a66a96fe44add4e4ed4792c4cba0a4",
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-{version}.src",
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
-        release_date = "2021-01-06",
+        release_date = "2021-07-09",
         use_category = ["test_only"],
     ),
     upb = dict(
