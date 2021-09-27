@@ -21,6 +21,7 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsPreresolveHostnames: String = "[]"
+  private var enableInterfaceBinding: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
   private var statsFlushSeconds: UInt32 = 60
@@ -130,6 +131,18 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
+    return self
+  }
+
+  /// Specify whether sockets may attempt to bind to a specific interface, based on network
+  /// conditions.
+  ///
+  /// - parameter enableInterfaceBinding: whether to allow interface binding.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableInterfaceBinding(_ enableInterfaceBinding: Bool) -> Self {
+    self.enableInterfaceBinding = enableInterfaceBinding
     return self
   }
 
@@ -339,6 +352,7 @@ open class EngineBuilder: NSObject {
       dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
       dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableInterfaceBinding: self.enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
       h2ConnectionKeepaliveTimeoutSeconds: self.h2ConnectionKeepaliveTimeoutSeconds,
