@@ -30,5 +30,5 @@ jobs :
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           # --cron flag to create issue only in github action
           # and not interfere with the CI
-          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --cron
-          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --cron
+          ./tools/dependency/release_dates.sh ./bazel/repository_locations.bzl --check_deps
+          ./tools/dependency/release_dates.sh ./api/bazel/repository_locations.bzl --check_deps

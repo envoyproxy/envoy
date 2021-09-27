@@ -60,19 +60,18 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date, c
         print(
             f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
-        # check for --cron flag, To run this only on github action schedule
+        # check for --check_deps flag, To run this only on github action schedule
         # and it does not bloat CI on every push
         if create_issue:
-            create_issues(dep, repo, metadata_version, release_date, latest_release)
+            create_issues(dep, metadata_version, release_date, latest_release)
 
 
 # create issue for stale dependency
-def create_issues(dep, repo, metadata_version, release_date, latest_release):
+def create_issues(dep, metadata_version, release_date, latest_release):
     """Create issues in GitHub.
 
     Args:
         dep : name of the deps
-        repo : BaseURL of the repo
         metadata_version :
         release_date : old release_date
         latest_release : latest_release (name and date )
@@ -88,20 +87,31 @@ def create_issues(dep, repo, metadata_version, release_date, latest_release):
     if len(labels) != len(LABELS):
         raise DependencyUpdateError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
     body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
-    title = f'{dep} has a newer release {latest_release.tag_name}'
-    exists = repo.legacy_search_issues('open', title) or repo.legacy_search_issues('closed', title)
-    # TODO(htuch): Figure out how to do this without legacy and faster.
-    if exists:
+    title = f'Newer release available {dep}: {latest_release.tag_name}'
+    if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
         return
-    print('Creating issues...')
-    try:
-        repo.create_issue(title, body=body, labels=LABELS)
-    except github.GithubException as e:
-        print(f'unable to create issue, Getting Error: {e}. Add them to the Envoy proxy org')
-        raise
+    else:
+        print('Creating issues...')
+        try:
+            repo.create_issue(title, body=body, labels=LABELS)
+        except github.GithubException as e:
+            print(f'UNABLE to create issue, received error: {e}. Add them to the Envoy proxy org')
+            raise
 
+# checks if issue exist
+def issues_exist(title, git):
+    query = f'repo:envoyproxy/envoy {title} in:title'
+    try:
+        issues = git.search_issues(query)
+    except github.GithubException as e:
+        print(f'There is a problem looking for issue title: {title}, received {e}')
+        raise
+    if issues.totalCount > 0:
+        return True
+    else:
+        return False
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
 def verify_and_print_release_date(dep, github_release_date, metadata_release_date):
@@ -183,27 +193,23 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
 
 
 if __name__ == '__main__':
-    # github action will have 3 args and CI will have 2 args
-    if len(sys.argv) < 1 or len(sys.argv) > 3:
-        print('Usage: %s <path to repository_locations.bzl>' % sys.argv[0])
-        sys.exit(1)
     # parsing location and github_action flag with argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('location', type=str)
-    parser.add_argument('--cron', action='store_true')
+    parser.add_argument('--check_deps', action='store_true')
     args = parser.parse_args()
     access_token = os.getenv('GITHUB_TOKEN')
     if not access_token:
         print('Missing GITHUB_TOKEN')
         sys.exit(1)
     path = args.location
-    cron_action = args.cron
+    create_issue = args.check_deps
     spec_loader = exports.repository_locations_utils.load_repository_locations_spec
     path_module = exports.load_module('repository_locations', path)
     try:
         verify_and_print_release_dates(
             spec_loader(path_module.REPOSITORY_LOCATIONS_SPEC), github.Github(access_token),
-            cron_action)
+            create_issue)
     except ReleaseDateVersionError as e:
         print(
             f'{Fore.RED}An error occurred while processing {path}, please verify the correctness of the '
