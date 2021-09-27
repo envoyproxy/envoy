@@ -579,7 +579,7 @@ stages:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
         artifactName: docker_windows
       condition: always()
-  - job: dockerWindowsServer2022
+  - job: dockerWindowsNanoServer2022
     dependsOn: ["release"]
     timeoutInMinutes: 120
     pool:
