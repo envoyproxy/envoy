@@ -100,6 +100,7 @@ def create_issues(dep, metadata_version, release_date, latest_release):
             print(f'UNABLE to create issue, received error: {e}. Add them to the Envoy proxy org')
             raise
 
+
 # checks if issue exist
 def issues_exist(title, git):
     query = f'repo:envoyproxy/envoy {title} in:title'
@@ -112,6 +113,7 @@ def issues_exist(title, git):
         return True
     else:
         return False
+
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
 def verify_and_print_release_date(dep, github_release_date, metadata_release_date):
