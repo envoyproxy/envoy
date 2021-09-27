@@ -52,6 +52,7 @@ private:
 
   struct OriginHash {
     size_t operator()(const Origin& origin) const {
+      // Mutiply the hashes by the magic number 37 to spread the bits around.
       size_t hash = std::hash<std::string>()(origin.scheme_) +
                     37 * (std::hash<std::string>()(origin.hostname_) +
                           37 * std::hash<uint32_t>()(origin.port_));
