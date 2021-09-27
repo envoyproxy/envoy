@@ -4,7 +4,6 @@
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/crypto/utility.h"
-#include "source/extensions/common/crypto/crypto_impl.h"
 #include "source/extensions/filters/common/lua/lua.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 
