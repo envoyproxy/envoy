@@ -146,8 +146,9 @@ public:
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
-                                                                const std::string& address);
+  static envoy::config::cluster::v3::Cluster
+  buildStaticCluster(const std::string& name, int port, const std::string& address,
+                     const std::string& lb_policy = "ROUND_ROBIN");
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
@@ -371,10 +372,6 @@ private:
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
-
-  // Configure a tap transport socket for a cluster/filter chain.
-  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;

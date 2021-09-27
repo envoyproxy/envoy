@@ -31,6 +31,16 @@ DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
   return new_cache;
 }
 
+DnsCacheSharedPtr DnsCacheManagerImpl::lookUpCacheByName(absl::string_view cache_name) {
+  ASSERT(context_.mainThreadDispatcher().isThreadSafe());
+  const auto& existing_cache = caches_.find(cache_name);
+  if (existing_cache != caches_.end()) {
+    return existing_cache->second.cache_;
+  }
+
+  return nullptr;
+}
+
 DnsCacheManagerSharedPtr DnsCacheManagerFactoryImpl::get() {
   return context_.singletonManager().getTyped<DnsCacheManager>(
       SINGLETON_MANAGER_REGISTERED_NAME(dns_cache_manager),

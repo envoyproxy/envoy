@@ -419,6 +419,7 @@ TEST_P(ConnectionImplTest, SetServerTransportSocketTimeout) {
   mock_timer->invokeCallback();
   EXPECT_THAT(stream_info_.connectionTerminationDetails(),
               Optional(HasSubstr("transport socket timeout")));
+  EXPECT_EQ(server_connection->transportFailureReason(), "connect timeout");
 }
 
 TEST_P(ConnectionImplTest, SetServerTransportSocketTimeoutAfterConnect) {
