@@ -85,7 +85,7 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
 

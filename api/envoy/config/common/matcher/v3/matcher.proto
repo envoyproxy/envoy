@@ -6,6 +6,8 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -21,9 +23,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // is found the action specified by the most specific on_no_match will be evaluated.
 // As an on_no_match might result in another matching tree being evaluated, this process
 // might repeat several times until the final OnMatch (or no match) is decided.
-//
-// [#alpha:]
 message Matcher {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
   // What to do if a match is successful.
   message OnMatch {
     oneof on_match {
