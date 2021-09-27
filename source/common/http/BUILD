@@ -165,6 +165,7 @@ envoy_cc_library(
         "alternate_protocols_cache_impl.cc",
         "alternate_protocols_cache_manager_impl.cc",
     ],
+    external_deps = ["quiche_quic_platform"],
     hdrs = [
         "alternate_protocols_cache_impl.h",
         "alternate_protocols_cache_manager_impl.h",

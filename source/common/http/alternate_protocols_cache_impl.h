@@ -11,6 +11,7 @@
 #include "envoy/http/alternate_protocols_cache.h"
 
 #include "absl/strings/string_view.h"
+#include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -49,17 +50,17 @@ private:
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
-  struct OriginProtocols {
-    OriginProtocols(const Origin& origin, const std::vector<AlternateProtocol>& protocols)
-        : origin_(origin), protocols_(protocols) {}
-
-    Origin origin_;
-    std::vector<AlternateProtocol> protocols_;
+  struct OriginHash {
+    size_t operator()(const Origin& origin) const {
+      size_t hash = std::hash<std::string>()(origin.scheme_) +
+                    37 * (std::hash<std::string>()(origin.hostname_) +
+                          37 * std::hash<uint32_t>()(origin.port_));
+      return hash;
+    }
   };
-  // List of origin, alternate protocol pairs, in insertion order.
-  std::list<OriginProtocols> protocols_list_;
-  // Map from hostname to iterator into protocols_list_.
-  std::map<Origin, std::list<OriginProtocols>::iterator> protocols_map_;
+
+  // Map from origin to list of alternate protocols.
+  quiche::QuicheLinkedHashMap<Origin, std::vector<AlternateProtocol>, OriginHash> protocols_;
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;

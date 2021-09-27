@@ -77,20 +77,12 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
     protocols.erase(protocols.begin() + max_protocols, protocols.end());
   }
-  while (protocols_list_.size() >= max_entries_) {
-    auto iter = protocols_list_.rbegin();
-    key_value_store_->remove(originToString(iter->origin_));
-    protocols_map_.erase(protocols_map_.find(iter->origin_));
-    protocols_list_.erase((++iter).base());
+  while (protocols_.size() >= max_entries_) {
+    auto iter = protocols_.begin();
+    key_value_store_->remove(originToString(iter->first));
+    protocols_.erase(iter);
   }
-  auto iter = protocols_map_.find(origin);
-  if (iter != protocols_map_.end()) {
-    protocols_list_.erase(iter->second);
-    protocols_map_.erase(iter);
-  }
-  std::pair<Origin, std::vector<AlternateProtocol>> value = {origin, protocols};
-  protocols_list_.emplace_front(origin, protocols);
-  protocols_map_[origin] = protocols_list_.begin();
+  protocols_[origin] = protocols;
   if (key_value_store_) {
     key_value_store_->addOrUpdate(originToString(origin),
                                   protocolsToStringForCache(protocols, time_source_));
@@ -99,12 +91,12 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>
 AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
-  auto entry_it = protocols_map_.find(origin);
-  if (entry_it == protocols_map_.end()) {
+  auto entry_it = protocols_.find(origin);
+  if (entry_it == protocols_.end()) {
     return makeOptRefFromPtr<const std::vector<AlternateProtocol>>(nullptr);
   }
 
-  std::vector<AlternateProtocol>& protocols = entry_it->second->protocols_;
+  std::vector<AlternateProtocol>& protocols = entry_it->second;
 
   auto original_size = protocols.size();
   const MonotonicTime now = time_source_.monotonicTime();
@@ -115,8 +107,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
                   protocols.end());
 
   if (protocols.empty()) {
-    protocols_list_.erase(entry_it->second);
-    protocols_map_.erase(entry_it);
+    protocols_.erase(entry_it);
     if (key_value_store_) {
       key_value_store_->remove(originToString(origin));
     }
@@ -130,7 +121,7 @@ AlternateProtocolsCacheImpl::findAlternatives(const Origin& origin) {
   return makeOptRef(const_cast<const std::vector<AlternateProtocol>&>(protocols));
 }
 
-size_t AlternateProtocolsCacheImpl::size() const { return protocols_list_.size(); }
+size_t AlternateProtocolsCacheImpl::size() const { return protocols_.size(); }
 
 } // namespace Http
 } // namespace Envoy
