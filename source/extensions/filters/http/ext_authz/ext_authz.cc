@@ -274,13 +274,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
       // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
       // to upstream server by only sets `headers_to_append`.
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(), header.second);
       if (!header_to_modify.empty()) {
-        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(),
-                         header.second);
         // The current behavior of appending is by combining entries with the same key, into one
         // entry. The value of that combined entry is separated by ",".
         // TODO(dio): Consider to use addCopy instead.
         request_headers_->appendCopy(header.first, header.second);
+      } else {
+        request_headers_->setCopy(header.first, header.second);
       }
     }
 
