@@ -7,7 +7,7 @@ index 5dbaa86..3c90e3b 100755
                  flag_groups = [
                      flag_group(
 -                        flags = ["-gsplit-dwarf"],
-+                        flags = ["-gsplit-dwarf", "-g2"],
++                        flags = ["-gsplit-dwarf", "-g"],
                          expand_if_available = "per_object_debug_info_file",
                      ),
                  ],
@@ -20,7 +20,7 @@ index 5dbaa86..3c90e3b 100755
                  flag_groups = [
                      flag_group(
 -                        flags = ["-gsplit-dwarf"],
-+                        flags = ["-gsplit-dwarf", "-g2"],
++                        flags = ["-gsplit-dwarf", "-g"],
                          expand_if_available = "per_object_debug_info_file",
                      ),
                  ],
@@ -33,7 +33,7 @@ index 5dbaa86..3c90e3b 100755
                  flag_groups = [
                      flag_group(
 -                        flags = ["-gsplit-dwarf"],
-+                        flags = ["-gsplit-dwarf", "-g2"],
++                        flags = ["-gsplit-dwarf", "-g"],
                          expand_if_available = "per_object_debug_info_file",
                      ),
                  ],

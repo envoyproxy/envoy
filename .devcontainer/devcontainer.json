@@ -7,7 +7,7 @@
     "--cap-add=NET_RAW",
     "--cap-add=NET_ADMIN",
     "--security-opt=seccomp=unconfined",
-    "--volume=${env:HOME}:${env:HOME}",
+    "--volume=/home:/home",
     "--volume=envoy-build:/build",
     "--network=host",
     // Uncomment next line if you have devcontainer.env
