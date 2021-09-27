@@ -39,7 +39,7 @@ Minor Behavior Changes
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
-* config: use of work-in-progress API fields, messages, or fields will now generate an explicit
+* config: use of work-in-progress API files, messages, or fields will now generate an explicit
   warning. Please read the text about ``(xds.annotations.v3.file_status).work_in_progress``,
   ``(xds.annotations.v3.message_status).work_in_progress``, and
   ``(xds.annotations.v3.field_status).work_in_progress``
