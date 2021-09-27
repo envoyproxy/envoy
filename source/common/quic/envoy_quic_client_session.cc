@@ -62,7 +62,7 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
 }
 
 void EnvoyQuicClientSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
-                                                     quic::QuicRstStreamErrorCode error,
+                                                     quic::QuicResetStreamError error,
                                                      quic::QuicStreamOffset bytes_written) {
   QuicSpdyClientSession::MaybeSendRstStreamFrame(id, error, bytes_written);
   quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, error, /*from_self*/ true,
@@ -71,7 +71,7 @@ void EnvoyQuicClientSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
 
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicSpdyClientSession::OnRstStream(frame);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, frame.error_code,
+  quic_stat_names_.chargeQuicResetStreamErrorStats(scope_, frame.error(),
                                                    /*from_self*/ false, /*is_upstream*/ true);
 }
 

@@ -22,7 +22,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/common/config/xds_mux:94.5"
 "source/exe:94.3"
-"source/extensions/common/crypto:91.5"
 "source/extensions/common/tap:95.9"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/null:77.8"
@@ -38,7 +37,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/listener/tls_inspector:92.4"
 "source/extensions/filters/network/common:96.2"
 "source/extensions/filters/network/common/redis:96.3"
-"source/extensions/filters/network/dubbo_proxy:96.2"
 "source/extensions/filters/network/mongo_proxy:94.0"
 "source/extensions/filters/network/sni_cluster:90.3"
 "source/extensions/filters/network/sni_dynamic_forward_proxy:90.9"

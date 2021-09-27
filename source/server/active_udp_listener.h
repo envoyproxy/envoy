@@ -103,6 +103,12 @@ public:
     read_filter_.reset();
     udp_listener_.reset();
   }
+  // These two are unreachable because a config will be rejected if it configures both this listener
+  // and any L4 filter chain.
+  void updateListenerConfig(Network::ListenerConfig&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void onFilterChainDraining(const std::list<const Network::FilterChain*>&) override {
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 
   // Network::UdpListenerFilterManager
   void addReadFilter(Network::UdpListenerReadFilterPtr&& filter) override;

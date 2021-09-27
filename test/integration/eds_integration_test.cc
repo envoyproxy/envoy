@@ -408,7 +408,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
 }
 
 TEST_P(EdsIntegrationTest, StatsReadyFilter) {
-  config_helper_.addFilter("name: eds-ready-filter");
+  config_helper_.prependFilter("name: eds-ready-filter");
   initializeTest(false);
 
   // Initial state: no healthy endpoints

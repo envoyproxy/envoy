@@ -20,7 +20,7 @@ public:
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addFilter(config);
+    config_helper_.prependFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }

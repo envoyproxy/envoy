@@ -39,7 +39,8 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  * Alternate protocol cache filter which parses the alt-svc response header and updates
  * the cache accordingly.
  */
-class Filter : public Http::PassThroughEncoderFilter, Logger::Loggable<Logger::Id::forward_proxy> {
+class Filter : public Http::PassThroughEncoderFilter,
+               Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
   explicit Filter(const FilterConfigSharedPtr& config);
 

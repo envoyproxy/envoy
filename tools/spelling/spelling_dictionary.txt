@@ -15,15 +15,18 @@ ARN
 ASAN
 ASCII
 ASM
+ASSERTed
 ASSERTs
 AST
 AWS
 BACKTRACE
 BSON
 BPF
+Repick
 btree
 CAS
 CB
+cbor
 CDN
 CDS
 CEL
@@ -190,6 +193,7 @@ LEDS
 LEV
 LF
 LHS
+libsxg
 LLVM
 LPT
 LRS
@@ -197,6 +201,7 @@ Loggable
 MB
 MD
 MERCHANTABILITY
+Merkle
 MGET
 MQ
 MSDN
@@ -326,6 +331,7 @@ STRLEN
 STS
 SVG
 SVID
+SXG
 Symbolizer
 TBD
 TCLAP
@@ -1082,6 +1088,7 @@ setsockopt
 sig
 sigaction
 sigactions
+sigaltstack
 siginfo
 signalstack
 siloed
