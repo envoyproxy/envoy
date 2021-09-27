@@ -611,7 +611,7 @@ void ActiveClient::onConnectTimeout() {
 
 void ActiveClient::onLifetimeTimeout() {
   // The lifetime timer should only have started after we left the CONNECTING state.
-  ASSERT(state_ != ActiveClient::State::CONNECTING);
+  ENVOY_BUG(state_ != ActiveClient::State::CONNECTING, "lifetime timeout while connecting");
 
   // There's nothing to do if the client is already closed or draining.
   if (state_ == ActiveClient::State::CLOSED || state_ == ActiveClient::State::DRAINING) {

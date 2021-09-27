@@ -121,21 +121,26 @@ public:
         }));
   }
 
-  void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::BUSY) {
+  void newConnectingClient() {
     ON_CALL(*cluster_, maxConnectionDuration).WillByDefault(Return(max_connection_duration_opt_));
 
     // Create a new stream using the pool
     EXPECT_CALL(pool_, instantiateActiveClient);
     pool_.newStreamImpl(context_);
     ASSERT_EQ(1, clients_.size());
-    EXPECT_CALL(pool_, onPoolReady);
     EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
 
     // Verify that the lifetime timer isn't set yet. This shouldn't happen
     // until after connect.
     EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+  }
+
+  void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::BUSY) {
+    // Start with a connecting client
+    newConnectingClient();
 
     // Connect and expect the expected state.
+    EXPECT_CALL(pool_, onPoolReady);
     clients_.back()->onEvent(Network::ConnectionEvent::Connected);
     EXPECT_EQ(expected_state, clients_.back()->state());
 
@@ -379,6 +384,20 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
   // client that is already closed.
   advanceTimeAndRun(max_connection_duration_ + 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_.value());
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationWhileConnectingBug) {
+  // Start with a connecting client
+  newConnectingClient();
+
+  // Expect an ENVOY_BUG if the lifetime timeout fires while still in the CONNECTING state.
+  // We forcibly call the lifetime timeout here because under normal circumstances there
+  // is no timer set up.
+  EXPECT_ENVOY_BUG(clients_.back()->onLifetimeTimeout(), "lifetime timeout while connecting");
+
+  // Finish the test as if the connection was never successful.
+  EXPECT_CALL(pool_, onPoolFailure);
+  pool_.destructAllConnections();
 }
 
 // Remote close simulates the peer closing the connection.
