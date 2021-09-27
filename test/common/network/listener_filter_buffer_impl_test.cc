@@ -120,11 +120,6 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
                                                      IoSocketError::deleteIoError)))));
   file_event_callback_(Event::FileReadyType::Read);
   EXPECT_FALSE(is_closed);
-
-  // Close the socket.
-  is_closed = true;
-  file_event_callback_(Event::FileReadyType::Closed);
-  EXPECT_TRUE(is_closed);
 }
 
 TEST_F(ListenerFilterBufferImplTest, DrainData) {
