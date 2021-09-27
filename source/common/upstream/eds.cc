@@ -51,46 +51,24 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
-    // TODO(adisuissa): Refactor the code below.
     if (locality_lb_endpoint.has_leds_cluster_locality_config()) {
       // The locality uses LEDS, fetch its dynamic data, which must be ready, or otherwise
       // the batchUpdate method should not have been called.
-
       const auto& leds_config = locality_lb_endpoint.leds_cluster_locality_config();
 
       // The batchUpdate call must be performed after all the endpoints of all localities
       // were received.
       ASSERT(parent_.leds_localities_.find(leds_config) != parent_.leds_localities_.end() &&
              parent_.leds_localities_[leds_config]->isUpdated());
-
       for (const auto& [_, lb_endpoint] :
            parent_.leds_localities_[leds_config]->getEndpointsMap()) {
-        auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
-        // When the configuration contains duplicate hosts, only the first one will be retained.
-        const auto address_as_string = address->asString();
-        if (all_new_hosts.count(address_as_string) > 0) {
-          continue;
-        }
-
-        priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
-                                                       locality_lb_endpoint, lb_endpoint,
-                                                       parent_.time_source_);
-        all_new_hosts.emplace(address_as_string);
+        UpdateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
+                                all_new_hosts);
       }
     } else {
-
       for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-        auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
-        // When the configuration contains duplicate hosts, only the first one will be retained.
-        const auto address_as_string = address->asString();
-        if (all_new_hosts.count(address_as_string) > 0) {
-          continue;
-        }
-
-        priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
-                                                       locality_lb_endpoint, lb_endpoint,
-                                                       parent_.time_source_);
-        all_new_hosts.emplace(address_as_string);
+        UpdateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
+                                all_new_hosts);
       }
     }
   }
@@ -147,6 +125,23 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   // If we didn't setup to initialize when our first round of health checking is complete, just
   // do it now.
   parent_.onPreInitComplete();
+}
+
+void EdsClusterImpl::BatchUpdateHelper::UpdateLocalityEndpoints(
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+    const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+    PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
+  const auto address = parent_.resolveProtoAddress(lb_endpoint.endpoint().address());
+  // When the configuration contains duplicate hosts, only the first one will be retained.
+  const auto address_as_string = address->asString();
+  if (all_new_hosts.count(address_as_string) > 0) {
+    return;
+  }
+
+  priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
+                                                 locality_lb_endpoint, lb_endpoint,
+                                                 parent_.time_source_);
+  all_new_hosts.emplace(address_as_string);
 }
 
 void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -214,7 +209,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
   // Add all the LEDS localities that are new.
   for (const auto& leds_config : cla_leds_configs) {
     if (leds_localities_.find(leds_config) == leds_localities_.end()) {
-      ENVOY_LOG(debug, "Found new LEDS config in EDS onConfigUpdate() for cluster {}: {}",
+      ENVOY_LOG(trace, "Found new LEDS config in EDS onConfigUpdate() for cluster {}: {}",
                 cluster_name_, leds_config.DebugString());
 
       // Create a new LEDS subscription and add it to the subscriptions map.
@@ -235,10 +230,8 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
   // If all the LEDS localities are updated, the EDS update can occur. If not, then when the last
   // LEDS locality will be updated, it will trigger the EDS update helper.
-  for (const auto& [_, leds_locality] : leds_localities_) {
-    if (!leds_locality->isUpdated()) {
-      return;
-    }
+  if (!validateAllLedsUpdated()) {
+    return;
   }
 
   BatchUpdateHelper helper(*this);

@@ -72,6 +72,12 @@ private:
     void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override;
 
   private:
+    void UpdateLocalityEndpoints(
+        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
+        const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
+        PriorityStateManager& priority_state_manager,
+        absl::flat_hash_set<std::string>& all_new_hosts);
+
     EdsClusterImpl& parent_;
   };
 

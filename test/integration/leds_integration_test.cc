@@ -40,7 +40,7 @@ protected:
   }
 
   ~LedsIntegrationTest() {
-    // First disconnect upstream connections to avoid FINs causing unexpected
+    // First disconnect upstream connections to avoid FIN messages causing unexpected
     // disconnects on the fake servers.
     for (auto& host_upstream_info : hosts_upstreams_info_) {
       resetFakeUpstreamInfo(host_upstream_info);
@@ -228,7 +228,6 @@ protected:
   void initializeTest(bool http_active_hc, uint32_t localities_num = 1) {
     // Set up a single upstream host for the LEDS cluster using HTTP2 (gRPC).
     setUpstreamCount(4);
-    //setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
     config_helper_.addConfigModifier([this, http_active_hc](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -777,6 +776,52 @@ TEST_P(LedsIntegrationTest, HealthUpdate) {
   EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_degraded")->value());
+}
+
+// Validates that in a LEDS response that contains 2 endpoints with the same
+// address, only the first will be used.
+TEST_P(LedsIntegrationTest, LedsSameAddressEndpoints) {
+  initializeTest(false);
+
+  // Send a response with 2 endpoints with a different resource name but that
+  // map to the same address.
+  const auto& collection_prefix = localities_prefixes_[0];
+  absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint> updated_endpoints;
+  std::vector<std::string> removed_endpoints;
+
+  const std::vector<std::string> endpoints_names{
+      absl::StrCat(collection_prefix, "endpoint0"),
+      absl::StrCat(collection_prefix, "endpoint1"),
+  };
+
+  for (const auto& endpoint_name : endpoints_names) {
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    // Shift fake_upstreams_ by 2 (due to EDS and LEDS fake upstreams).
+    setUpstreamAddress(2, endpoint);
+    endpoint.set_health_status(envoy::config::core::v3::HEALTHY);
+    updated_endpoints.emplace(endpoint_name, endpoint);
+  }
+
+  sendDeltaLedsResponse(updated_endpoints, removed_endpoints, "7", 0);
+
+  // Await for update (LEDS Ack).
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(
+      Config::TypeUrl::get().LbEndpoint, {}, {},
+      leds_upstream_info_.stream_by_resource_name_[localities_prefixes_[0]]));
+
+  // Verify that the update is successful.
+  test_server_->waitForCounterEq("cluster.cluster_0.leds.update_success", 1);
+
+  // Wait for our statically specified listener to become ready, and register its port in the
+  // test framework's downstream listener port map.
+  test_server_->waitUntilListenersReady();
+  registerTestServerPorts({"http"});
+
+  // Verify that only one endpoint was processed.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
 }
 
 } // namespace

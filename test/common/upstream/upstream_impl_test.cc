@@ -2177,6 +2177,32 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   }
 }
 
+// LEDS is not supported with a static cluster at the moment.
+TEST_F(StaticClusterImplTest, LedsUnsupported) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          leds_cluster_locality_config:
+            leds_collection_name: xdstp://foo/leds_collection_name
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  EXPECT_THROW_WITH_MESSAGE(
+      StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false),
+      EnvoyException,
+      "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
+}
+
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 
 // Test that the correct feature() is set when close_connections_on_host_health_failure is
