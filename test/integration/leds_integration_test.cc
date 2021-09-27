@@ -31,17 +31,23 @@ protected:
   };
 
   LedsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion()),
-        codec_client_type_(envoy::type::v3::HTTP2) {
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+        codec_client_type_(envoy::type::v3::HTTP1) {
     use_lds_ = false;
     create_xds_upstream_ = false;
     // LEDS is only supported by delta-xDS.
     sotw_or_delta_ = Grpc::SotwOrDelta::Delta;
   }
 
-  void TearDown() override {
-    resetFakeUpstreamInfo(eds_upstream_info_);
+  ~LedsIntegrationTest() {
+    // First disconnect upstream connections to avoid FINs causing unexpected
+    // disconnects on the fake servers.
+    for (auto& host_upstream_info : hosts_upstreams_info_) {
+      resetFakeUpstreamInfo(host_upstream_info);
+    }
+
     resetFakeUpstreamInfo(leds_upstream_info_);
+    resetFakeUpstreamInfo(eds_upstream_info_);
   }
 
   // Printing all counters and their values
@@ -65,7 +71,8 @@ protected:
     for (const auto endpoint_idx : endpoints_idxs) {
       const std::string endpoint_name = absl::StrCat(collection_prefix, "endpoint", endpoint_idx);
       envoy::config::endpoint::v3::LbEndpoint endpoint;
-      setUpstreamAddress(endpoint_idx, endpoint);
+      // Shift fake_upstreams_ by 2 (due to EDS and LEDS fake upstreams).
+      setUpstreamAddress(endpoint_idx + 2, endpoint);
       endpoint.set_health_status(health_status);
       updated_endpoints.emplace(endpoint_name, endpoint);
     }
@@ -136,20 +143,21 @@ protected:
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
     // Add the EDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    eds_upstream_info_.upstream_ = &(*fake_upstreams_[0]);
+    eds_upstream_info_.upstream_ = &addFakeUpstream(FakeHttpConnection::Type::HTTP2);
     // Add the LEDS upstream.
-    addFakeUpstream(FakeHttpConnection::Type::HTTP2);
-    leds_upstream_info_.upstream_ = &(*fake_upstreams_[1]);
+    leds_upstream_info_.upstream_ = &addFakeUpstream(FakeHttpConnection::Type::HTTP2);
 
+    // Create backends and initialize their wrapper.
+    HttpIntegrationTest::createUpstreams();
     // Store all hosts upstreams info in a single place so it would be easily
     // accessible.
-    hosts_upstreams_info_.reserve(fake_upstreams_.size());
-    for (auto& fake_upstream : fake_upstreams_) {
+    ASSERT(fake_upstreams_.size() == fake_upstreams_count_ + 2);
+    hosts_upstreams_info_.reserve(fake_upstreams_count_);
+    // Skip the first 2 fake upstreams as they are reserved for EDS and LEDS.
+    for (size_t i = 2; i < fake_upstreams_.size(); ++i) {
       FakeUpstreamInfo host_info;
-      host_info.upstream_ = &(*fake_upstream);
+      host_info.upstream_ = &(*fake_upstreams_[i]);
       hosts_upstreams_info_.emplace_back(std::move(host_info));
     }
   }
@@ -220,7 +228,7 @@ protected:
   void initializeTest(bool http_active_hc, uint32_t localities_num = 1) {
     // Set up a single upstream host for the LEDS cluster using HTTP2 (gRPC).
     setUpstreamCount(4);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    //setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
 
     config_helper_.addConfigModifier([this, http_active_hc](
                                          envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -347,7 +355,8 @@ protected:
   }
 
   void resetFakeUpstreamInfo(FakeUpstreamInfo& upstream_info) {
-    if (upstream_info.upstream_ == nullptr) {
+    if (upstream_info.connection_ == nullptr || upstream_info.upstream_ == nullptr) {
+      upstream_info.upstream_ = nullptr;
       return;
     }
     AssertionResult result = upstream_info.connection_->close();
@@ -355,6 +364,7 @@ protected:
     result = upstream_info.connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
     upstream_info.connection_.reset();
+    upstream_info.upstream_ = nullptr;
   }
 
   void waitForHealthCheck(uint32_t upstream_info_idx) {
@@ -374,9 +384,9 @@ protected:
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
   envoy::config::cluster::v3::Cluster cluster_;
   std::vector<std::string> localities_prefixes_;
+  std::vector<FakeUpstreamInfo> hosts_upstreams_info_;
   FakeUpstreamInfo eds_upstream_info_;
   FakeUpstreamInfo leds_upstream_info_;
-  std::vector<FakeUpstreamInfo> hosts_upstreams_info_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LedsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS,
