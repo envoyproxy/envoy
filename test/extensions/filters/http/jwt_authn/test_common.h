@@ -193,6 +193,28 @@ const char ExpectedPayloadJSON[] = R"(
 }
 )";
 
+const char ExpectedHeaderJSON[] = R"(
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+)";
+
+const char ExpectedPayloadAndHeaderJSON[] = R"(
+{
+  "my_payload":{
+    "iss":"https://example.com",
+    "exp":2001001001,
+    "sub":"test@example.com",
+    "aud":"example_service"
+  },
+  "my_header":{
+    "typ":"JWT",
+    "alg":"RS256"
+  }
+}
+)";
+
 // Token copied from https://github.com/google/jwt_verify_lib/blob/master/src/verify_jwk_ec_test.cc
 // Use jwt.io to modify payload as:
 // {

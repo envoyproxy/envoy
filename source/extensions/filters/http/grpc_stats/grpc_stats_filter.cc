@@ -275,7 +275,7 @@ private:
   Grpc::FrameInspector response_counter_;
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_names_;
-}; // namespace
+};
 
 } // namespace
 

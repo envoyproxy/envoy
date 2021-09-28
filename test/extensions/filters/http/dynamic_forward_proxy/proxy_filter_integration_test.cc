@@ -131,7 +131,8 @@ typed_config:
       std::string host =
           fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
       std::string value =
-          absl::StrCat(fake_upstreams_[0]->localAddress()->asString(), "|1000000|0");
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+                       fake_upstreams_[0]->localAddress()->ip()->port(), "|1000000|0");
       TestEnvironment::writeStringToFileForTest(
           "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
     }
@@ -171,6 +172,21 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   checkSimpleRequestSuccess(512, 512, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
+// Currently if the first DNS resolution fails, the filter will continue with
+// a null address. Make sure this mode fails gracefully.
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
@@ -381,8 +397,6 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
-#ifndef WIN32
-// TODO(alyssawilk) figure out why this test doesn't pass on windows.
 TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   write_cache_file_ = true;
 
@@ -398,7 +412,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
-#endif
 
 } // namespace
 } // namespace Envoy
