@@ -26,8 +26,8 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                   maybe_resource.has_value()) {
                 maybe_resource->setAsWaitingForServer();
                 removed_resources.Add(std::string(resource));
-              } else if (auto erased_count = wildcard_resource_state_.erase(resource) +
-                                             ambiguous_resource_state_.erase(resource);
+              } else if (const auto erased_count = wildcard_resource_state_.erase(resource) +
+                                                   ambiguous_resource_state_.erase(resource);
                          erased_count > 0) {
                 removed_resources.Add(std::string(resource));
               }
@@ -247,7 +247,7 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (auto maybe_resource = getRequestedResourceState(resource_name);
         maybe_resource.has_value()) {
       maybe_resource->setAsWaitingForServer();
-    } else if (auto erased_count = ambiguous_resource_state_.erase(resource_name);
+    } else if (const auto erased_count = ambiguous_resource_state_.erase(resource_name);
                erased_count == 0) {
       wildcard_resource_state_.erase(resource_name);
     }
