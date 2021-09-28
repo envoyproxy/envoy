@@ -159,6 +159,8 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
     cluster_->statsScope().counterFromStatName(stat_names.ok_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::Error:
+    ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
+                        "rate limit status, status={}", status);
     cluster_->statsScope().counterFromStatName(stat_names.error_).inc();
     break;
   case Filters::Common::RateLimit::LimitStatus::OverLimit:

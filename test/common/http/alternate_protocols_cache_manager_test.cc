@@ -7,6 +7,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::Return;
+
 namespace Envoy {
 namespace Http {
 
@@ -54,6 +56,14 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
   AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_);
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(options1_));
+}
+
+TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
+  EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
+  options1_.mutable_key_value_store_config();
+  initialize();
+  EXPECT_THROW_WITH_REGEX(manager_->getCache(options1_), EnvoyException,
+                          "options has key value store but Envoy has concurrency = 5");
 }
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentOptions) {
