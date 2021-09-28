@@ -21,6 +21,20 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
+TEST(UtilityTest, TestDnsNameMatching) {
+  EXPECT_TRUE(Utility::dnsNameMatch("lyft.com", "lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.lyft.com", "*.lyft.com"));
+  EXPECT_TRUE(Utility::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
+  EXPECT_FALSE(Utility::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("foo.test.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*.lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("alyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("", "*lyft.com"));
+  EXPECT_FALSE(Utility::dnsNameMatch("lyft.com", ""));
+}
+
 TEST(UtilityTest, TestGetSubjectAlternateNamesWithDNS) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
