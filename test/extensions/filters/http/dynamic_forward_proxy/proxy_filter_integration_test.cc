@@ -18,7 +18,8 @@ class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
-  void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024) {
+  void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
+                          const std::string& override_auto_sni_header = "") {
     setUpstreamProtocol(Http::CodecType::HTTP1);
     const std::string filename = TestEnvironment::temporaryPath("dns_cache.txt");
 
@@ -41,7 +42,7 @@ typed_config:
 )EOF",
                                            Network::Test::ipVersionToDnsFamily(GetParam()),
                                            max_hosts, max_pending_requests, filename);
-    config_helper_.addFilter(filter);
+    config_helper_.prependFilter(filter);
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
@@ -53,8 +54,11 @@ typed_config:
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
-        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+        [override_auto_sni_header](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false);
+        });
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
@@ -64,6 +68,10 @@ typed_config:
 
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    if (!override_auto_sni_header.empty()) {
+      protocol_options.mutable_upstream_http_protocol_options()->set_override_auto_sni_header(
+          override_auto_sni_header);
+    }
     protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
     protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
     ConfigHelper::setProtocolOptions(cluster_, protocol_options);
@@ -122,7 +130,9 @@ typed_config:
     if (write_cache_file_) {
       std::string host =
           fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
-      std::string value = fake_upstreams_[0]->localAddress()->asString();
+      std::string value =
+          absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
+                       fake_upstreams_[0]->localAddress()->ip()->port(), "|1000000|0");
       TestEnvironment::writeStringToFileForTest(
           "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
     }
@@ -162,6 +172,21 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   checkSimpleRequestSuccess(512, 512, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+}
+
+// Currently if the first DNS resolution fails, the filter will continue with
+// a null address. Make sure this mode fails gracefully.
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Verify that after we populate the cache and reload the cluster we reattach to the cache with
@@ -279,6 +304,34 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamTls) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
+// Verify that `override_auto_sni_header` can be used along with auto_sni to set
+// SNI from an arbitrary header.
+TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithAltHeaderSni) {
+  upstream_tls_ = true;
+  initializeWithArgs(1024, 1024, "x-host");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("{}:{}", fake_upstreams_[0]->localAddress()->ip()->addressAsString().c_str(),
+                   fake_upstreams_[0]->localAddress()->ip()->port())},
+      {"x-host", "localhost"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  const Extensions::TransportSockets::Tls::SslHandshakerImpl* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ("localhost", SSL_get_servername(ssl_socket->ssl(), TLSEXT_NAMETYPE_host_name));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  checkSimpleRequestSuccess(0, 0, response.get());
+}
+
 TEST_P(ProxyFilterIntegrationTest, UpstreamTlsWithIpHost) {
   upstream_tls_ = true;
   initializeWithArgs();
@@ -344,8 +397,6 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
   EXPECT_EQ("503", response->headers().Status()->value().getStringView());
 }
 
-#ifndef WIN32
-// TODO(alyssawilk) figure out why this test doesn't pass on windows.
 TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   write_cache_file_ = true;
 
@@ -359,10 +410,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
-  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }
-#endif
 
 } // namespace
 } // namespace Envoy

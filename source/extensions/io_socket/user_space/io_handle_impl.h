@@ -143,6 +143,8 @@ public:
     ASSERT(!peer_handle_);
     ASSERT(!write_shutdown_);
     peer_handle_ = writable_peer;
+    ENVOY_LOG(trace, "io handle {} set peer handle to {}.", static_cast<void*>(this),
+              static_cast<void*>(writable_peer));
   }
 
 private:

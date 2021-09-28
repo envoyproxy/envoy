@@ -176,43 +176,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_platform_mem_slice_span_impl_lib",
-    srcs = ["quic_mem_slice_span_impl.cc"],
-    hdrs = ["quic_mem_slice_span_impl.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": ["-Wno-unused-parameter"],
-    }),
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//envoy/buffer:buffer_interface",
-        "@com_github_google_quiche//:quic_core_types_lib",
-        "@com_github_google_quiche//:quic_platform_base",
-    ],
-)
-
-envoy_cc_library(
-    name = "quic_platform_mem_slice_storage_impl_lib",
-    srcs = ["quic_mem_slice_storage_impl.cc"],
-    hdrs = ["quic_mem_slice_storage_impl.h"],
-    copts = select({
-        "//bazel:windows_x86_64": [],
-        "//conditions:default": [
-            "-Wno-error=invalid-offsetof",
-            "-Wno-unused-parameter",
-        ],
-    }),
-    tags = ["nofips"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@com_github_google_quiche//:quic_core_buffer_allocator_lib",
-        "@com_github_google_quiche//:quic_core_utils_lib",
-        "@com_github_google_quiche//:quic_platform_mem_slice_span",
-    ],
-)
-
-envoy_cc_library(
     name = "quic_platform_udp_socket_impl_lib",
     hdrs = select({
         "//bazel:linux": ["quic_udp_socket_platform_impl.h"],

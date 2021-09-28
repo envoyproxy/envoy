@@ -99,7 +99,7 @@ public:
   Server::ResourceMonitorPtr
   createResourceMonitor(const Protobuf::Message&,
                         Server::Configuration::ResourceMonitorFactoryContext& context) override {
-    auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
+    auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher());
     monitor_ = monitor.get();
     return monitor;
   }
@@ -689,6 +689,16 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException, "Duplicate trigger .*");
+}
+
+TEST_F(OverloadManagerImplTest, ShouldThrowIfUsingResetStreamsWithoutBufferFactoryConfig) {
+  const std::string lower_greater_than_upper_config = R"EOF(
+  actions:
+    - name: envoy.overload_actions.reset_high_memory_stream
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(lower_greater_than_upper_config), EnvoyException,
+                          "Overload action .* requires buffer_factory_config.");
 }
 
 TEST_F(OverloadManagerImplTest, Shutdown) {

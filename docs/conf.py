@@ -22,7 +22,7 @@ from sphinx.directives.code import CodeBlock
 import sphinx_rtd_theme
 
 
-class SphinxConfigException(Exception):
+class SphinxConfigError(Exception):
     pass
 
 
@@ -60,7 +60,7 @@ missing_config = (
     or not os.path.exists(os.environ["ENVOY_DOCS_BUILD_CONFIG"]))
 
 if missing_config:
-    raise SphinxConfigException(
+    raise SphinxConfigError(
         "`ENVOY_DOCS_BUILD_CONFIG` env var must be defined, "
         "and point to a valid yaml file")
 
@@ -70,7 +70,7 @@ with open(os.environ["ENVOY_DOCS_BUILD_CONFIG"]) as f:
 
 def _config(key):
     if not configs.get(key):
-        raise SphinxConfigException(f"`{key}` config var must be defined")
+        raise SphinxConfigError(f"`{key}` config var must be defined")
     return configs[key]
 
 

@@ -33,6 +33,7 @@ envoy_cc_library(
         "//envoy/http:codes_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:lifecycle_notifier_interface",
+        "//envoy/stats:custom_stat_namespaces_interface",
         "//envoy/thread_local:thread_local_object",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:datasource_lib",

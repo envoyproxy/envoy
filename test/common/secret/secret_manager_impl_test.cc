@@ -279,7 +279,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   envoy::config::core::v3::ConfigSource config_source;
@@ -362,7 +362,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
 
@@ -408,7 +408,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Init::TargetHandlePtr init_target_handle;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
 
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
@@ -461,7 +461,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -731,7 +731,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -879,7 +879,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string tls_certificate =
@@ -956,7 +956,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string validation_context =
@@ -1004,7 +1004,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string stek_context =
@@ -1085,7 +1085,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
 

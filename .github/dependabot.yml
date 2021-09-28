@@ -7,12 +7,12 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/test/extensions/filters/network/thrift_proxy"
+  directory: "/configs"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/contrib/kafka/filters/network/source"
+  directory: "/test/extensions/filters/network/thrift_proxy"
   schedule:
     interval: "daily"
 
@@ -27,72 +27,12 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/docs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/git"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/github"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/config_validation"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/docker"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/dependency"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_version"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/gpg"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/protodoc"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/deprecate_features"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/code_format"
   schedule:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/ci/flaky_test"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/configs"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
-  directory: "/tools/testing"
+  directory: "/tools/dependency"
   schedule:
     interval: "daily"
 

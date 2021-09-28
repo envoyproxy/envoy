@@ -64,6 +64,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
     "envoy.reloadable_features.enable_compression_without_content_length_header",
+    "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
@@ -90,10 +91,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
+    "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
+    "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.upstream_http2_flood_checks",
@@ -118,8 +121,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // TODO(kbaichoo): Remove when this is no longer test only.
-    "envoy.test_only.per_stream_buffer_accounting",
     // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
     "envoy.reloadable_features.experimental_matching_api",
     // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if

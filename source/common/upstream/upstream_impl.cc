@@ -551,15 +551,17 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
                                   absl::optional<uint32_t> overprovisioning_factor,
                                   HostMapConstSharedPtr cross_priority_host_map) {
+  // Update cross priority host map first. In this way, when the update callbacks of the priority
+  // set are executed, the latest host map can always be obtained.
+  if (cross_priority_host_map != nullptr) {
+    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+  }
+
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
-
-  if (cross_priority_host_map != nullptr) {
-    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
-  }
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -675,12 +677,12 @@ public:
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
       : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
-        local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
+        local_info_(c.localInfo()), dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
         options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   const Server::Options& options() override { return options_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
@@ -1015,14 +1017,14 @@ ClusterImplBase::ClusterImplBase(
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.dispatcher())) {
+          factory_context.singletonManager(), factory_context.mainThreadDispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto* raw_factory_pointer = socket_factory.get();
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  auto& dispatcher = factory_context.dispatcher();
+  auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
@@ -1471,8 +1473,16 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality weights.
-  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  // If we are configured for locality weighted LB we populate the locality weights. We also
+  // populate locality weights if the cluster uses load balancing extensions, since the extension
+  // may want to make use of locality weights and we cannot tell by inspecting the config whether
+  // this is the case.
+  //
+  // TODO: have the load balancing extension indicate, programmatically, whether it needs locality
+  // weights, as an optimization in cases where it doesn't.
+  const bool locality_weighted_lb =
+      parent_.info()->lbConfig().has_locality_weighted_lb_config() ||
+      parent_.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig;
   if (locality_weighted_lb) {
     locality_weights = std::make_shared<LocalityWeights>();
   }
@@ -1757,6 +1767,8 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::V4Only;
   case envoy::config::cluster::v3::Cluster::AUTO:
     return Network::DnsLookupFamily::Auto;
+  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
+    return Network::DnsLookupFamily::V4Preferred;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
