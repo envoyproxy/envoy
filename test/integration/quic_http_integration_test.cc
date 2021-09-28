@@ -158,6 +158,7 @@ public:
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
     // Enable this flag for test coverage.
     SetQuicReloadableFlag(quic_tls_set_signature_algorithm_prefs, true);
+    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
   }
 
   ~QuicHttpIntegrationTest() override {

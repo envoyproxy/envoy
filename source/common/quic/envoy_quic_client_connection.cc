@@ -122,7 +122,7 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::MaybeMigratePort() {
-  if (!IsHandshakeConfirmed() /*|| !connection_migration_use_new_cid()*/ ||
+  if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
       HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
     return;
   }
@@ -149,9 +149,14 @@ void EnvoyQuicClientConnection::OnPathValidationSuccess(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
-  MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
-              envoy_context->ReleaseWriter().release(), true);
-  setConnectionSocket(std::move(probing_socket_));
+
+  if (MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
+                  envoy_context->ReleaseWriter().release(), true)) {
+    setConnectionSocket(std::move(probing_socket_));
+  } else {
+    probing_socket_.reset();
+    probing_socket_raw_ptr_ = nullptr;
+  }
 }
 
 void EnvoyQuicClientConnection::OnPathValidationFailure(
