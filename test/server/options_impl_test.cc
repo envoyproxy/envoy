@@ -604,14 +604,14 @@ TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
                       OptionsImpl::disableExtensions({"no/such.factory"}));
 
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactoryByType("google.protobuf.StringValue"),
             nullptr);
 
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
 
   OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
 
