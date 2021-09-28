@@ -51,9 +51,8 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
         factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
   }
 
-  AlternateProtocolsCacheSharedPtr new_cache =
-      std::make_shared<AlternateProtocolsCacheImpl>(dispatcher.timeSource(), std::move(store),
-                                                    options.max_entries().value());
+  AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
+      dispatcher.timeSource(), std::move(store), options.max_entries().value());
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
