@@ -7,6 +7,17 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+
+struct RegexHolder {
+  RegexHolder() : origin_regex("(.*)://(.*):(\\d+)") {}
+
+  const re2::RE2 origin_regex;
+};
+
+using ConstRegexHolder = ConstSingleton<RegexHolder>;
+
+} // namespace
 
 std::string
 AlternateProtocolsCacheImpl::originToString(const AlternateProtocolsCache::Origin& origin) {
@@ -15,7 +26,7 @@ AlternateProtocolsCacheImpl::originToString(const AlternateProtocolsCache::Origi
 
 absl::optional<AlternateProtocolsCache::Origin>
 AlternateProtocolsCacheImpl::stringToOrigin(const std::string& str) {
-  re2::RE2 origin_regex("(.*)://(.*):(\\d+)");
+  const re2::RE2& origin_regex = ConstRegexHolder::get().origin_regex;
   std::string scheme;
   std::string hostname;
   int port = 0;
@@ -87,10 +98,11 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
       absl::optional<Origin> origin = stringToOrigin(key);
       if (protocols.has_value() && origin.has_value()) {
         setAlternativesImpl(origin.value(), protocols.value(), true);
-        return KeyValueStore::Iterate::Continue;
       } else {
-        return KeyValueStore::Iterate::Break;
+        ENVOY_LOG(warn,
+                  fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
       }
+      return KeyValueStore::Iterate::Continue;
     };
     key_value_store_->iterate(load);
   }
