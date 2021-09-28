@@ -48,6 +48,8 @@ public:
 
   Api::Api& api() const override { return api_; }
 
+  bool crlVerifyAll() const override { return crl_verify_all_; }
+
 private:
   const std::string ca_cert_;
   const std::string ca_cert_path_;
@@ -61,6 +63,7 @@ private:
       TrustChainVerification trust_chain_verification_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   Api::Api& api_;
+  const bool crl_verify_all_;
 };
 
 } // namespace Ssl
