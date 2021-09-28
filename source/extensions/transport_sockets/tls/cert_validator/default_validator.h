@@ -70,14 +70,6 @@ public:
                                         const std::vector<std::vector<uint8_t>>& expected_hashes);
 
   /**
-   * Extracts the X509 certificate validation error information.
-   *
-   * @param ctx the store contex
-   * @return the error details
-   */
-  static std::string extractX509VerificationErrorInfo(X509_STORE_CTX* ctx);
-
-  /**
    * Verifies certificate hash for pinning. The hash is a base64-encoded SHA-256 of the DER-encoded
    * Subject Public Key Information (SPKI) of the certificate.
    *
