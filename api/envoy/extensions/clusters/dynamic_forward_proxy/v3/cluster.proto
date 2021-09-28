@@ -42,6 +42,12 @@ message ClusterConfig {
   // bar.example.com if that also resolved to 1.2.3.4.
   //
   // .. note::
+  //   By design, this feature will maximize reuse of connections. This means that instead
+  //   opening a new connection when an existing connection reaches the maximum number of
+  //   concurrent streams, requests will instead be set to the existing connection.
+  //   TODO(alyssawilk) implement request queueing in connections.
+  //
+  // .. note::
   //
   //   The coalesced connections might be to upstreams that would not be otherwise
   //   selected by Envoy. See the section `Connection Reuse in RFC 7540
