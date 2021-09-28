@@ -1,9 +1,12 @@
 #pragma once
 
 #include "envoy/http/codec.h"
+
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/utility.h"
+
 #include "test/mocks/common.h"
+
 #include "quiche/http2/adapter/http2_adapter.h"
 
 namespace Envoy {
@@ -63,27 +66,25 @@ class TestServerConnectionImpl : public TestCodecStatsProvider,
                                  public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(
-     Network::Connection& connection, ServerConnectionCallbacks& callbacks,
-     Stats::Scope& scope,
+      Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
       Random::RandomGenerator& random, uint32_t max_request_headers_kb,
       uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
       : TestCodecStatsProvider(scope),
-       ServerConnectionImpl(connection, callbacks, http2CodecStats(), random,
-                            http2_options, max_request_headers_kb,
-                            max_request_headers_count,
+        ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
                              headers_with_underscores_action) {}
 
- nghttp2_session* session() {
-   ASSERT(!use_new_codec_wrapper_);
-   return session_;
- }
- http2::adapter::Http2Adapter* adapter() {
-   ASSERT(use_new_codec_wrapper_);
-   return adapter_.get();
- }
+  nghttp2_session* session() {
+    ASSERT(!use_new_codec_wrapper_);
+    return session_;
+  }
+  http2::adapter::Http2Adapter* adapter() {
+    ASSERT(use_new_codec_wrapper_);
+    return adapter_.get();
+  }
   using ServerConnectionImpl::getStream;
   using ServerConnectionImpl::sendPendingFrames;
 
@@ -98,26 +99,25 @@ class TestClientConnectionImpl : public TestCodecStatsProvider,
                                  public TestCodecSettingsProvider,
                                  public ClientConnectionImpl {
 public:
- TestClientConnectionImpl(
-     Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
+  TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                            Random::RandomGenerator& random, uint32_t max_request_headers_kb,
                            uint32_t max_request_headers_count,
                            Nghttp2SessionFactory& http2_session_factory)
       : TestCodecStatsProvider(scope),
-       ClientConnectionImpl(connection, callbacks, http2CodecStats(), random,
-                            http2_options, max_request_headers_kb,
-                            max_request_headers_count, http2_session_factory) {}
+        ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             http2_session_factory) {}
 
- nghttp2_session* session() {
-   ASSERT(!use_new_codec_wrapper_);
-   return session_;
- }
- http2::adapter::Http2Adapter* adapter() {
-   ASSERT(use_new_codec_wrapper_);
-   return adapter_.get();
- }
+  nghttp2_session* session() {
+    ASSERT(!use_new_codec_wrapper_);
+    return session_;
+  }
+  http2::adapter::Http2Adapter* adapter() {
+    ASSERT(use_new_codec_wrapper_);
+    return adapter_.get();
+  }
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
   virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {

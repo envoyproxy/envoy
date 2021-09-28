@@ -33,8 +33,8 @@
 #include "source/common/http/utility.h"
 
 #include "absl/types/optional.h"
-#include "quiche/http2/adapter/http2_adapter.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/http2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -90,9 +90,9 @@ public:
                        const envoy::config::core::v3::Http2ProtocolOptions& options) PURE;
 
   // Returns a new nghttp2_session to be used with |connection|.
-  virtual std::unique_ptr<http2::adapter::Http2Adapter> create(
-      const nghttp2_session_callbacks* callbacks,
-      ConnectionImplType* connection, const nghttp2_option* options) PURE;
+  virtual std::unique_ptr<http2::adapter::Http2Adapter>
+  create(const nghttp2_session_callbacks* callbacks, ConnectionImplType* connection,
+         const nghttp2_option* options) PURE;
 
   // Initializes the |session|.
   virtual void init(ConnectionImplType* connection,
@@ -101,23 +101,22 @@ public:
 
 class ProdNghttp2SessionFactory : public Nghttp2SessionFactory {
 public:
- nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks,
-                            ConnectionImpl* connection,
-                            const nghttp2_option* options) override;
+  nghttp2_session* createOld(const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
+                             const nghttp2_option* options) override;
 
- void initOld(nghttp2_session* session, ConnectionImpl* connection,
-              const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+  void initOld(nghttp2_session* session, ConnectionImpl* connection,
+               const envoy::config::core::v3::Http2ProtocolOptions& options) override;
 
- std::unique_ptr<http2::adapter::Http2Adapter> create(
-     const nghttp2_session_callbacks* callbacks, ConnectionImpl* connection,
-     const nghttp2_option* options) override;
+  std::unique_ptr<http2::adapter::Http2Adapter> create(const nghttp2_session_callbacks* callbacks,
+                                                       ConnectionImpl* connection,
+                                                       const nghttp2_option* options) override;
 
- void init(ConnectionImpl* connection,
-           const envoy::config::core::v3::Http2ProtocolOptions& options) override;
+  void init(ConnectionImpl* connection,
+            const envoy::config::core::v3::Http2ProtocolOptions& options) override;
 
- // Returns a global factory instance. Note that this is possible because no
- // internal state is maintained; the thread safety of create() and init()'s
- // side effects is guaranteed by Envoy's worker based threading model.
+  // Returns a global factory instance. Note that this is possible because no
+  // internal state is maintained; the thread safety of create() and init()'s
+  // side effects is guaranteed by Envoy's worker based threading model.
   static ProdNghttp2SessionFactory& get() {
     static ProdNghttp2SessionFactory* instance = new ProdNghttp2SessionFactory();
     return *instance;
@@ -227,8 +226,7 @@ protected:
     void onDataSourceSend(const uint8_t* framehd, size_t length);
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
-    static std::vector<http2::adapter::Header> buildHeaders(
-        const HeaderMap& headers);
+    static std::vector<http2::adapter::Header> buildHeaders(const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
     virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
@@ -491,12 +489,10 @@ protected:
   bool sendPendingFramesAndHandleError();
   void sendSettings(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
                     bool disable_push);
-  void sendSettingsHelper(
-      const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-      bool disable_push);
-  void sendSettingsHelperOld(
-      const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-      bool disable_push);
+  void sendSettingsHelper(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                          bool disable_push);
+  void sendSettingsHelperOld(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                             bool disable_push);
   // Callback triggered when the peer's SETTINGS frame is received.
   virtual void onSettings(const nghttp2_settings& settings) {
     ReceivedSettingsImpl received_settings(settings);

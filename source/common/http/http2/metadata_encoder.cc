@@ -126,10 +126,9 @@ std::vector<uint8_t> MetadataEncoder::payloadFrameFlagBytes() {
 }
 
 class BufferMetadataSource : public http2::adapter::MetadataSource {
- public:
+public:
   explicit BufferMetadataSource(Buffer::OwnedImpl payload)
-      : payload_(std::move(payload)),
-        original_payload_length_(payload_.length()) {}
+      : payload_(std::move(payload)), original_payload_length_(payload_.length()) {}
 
   size_t NumFrames(size_t max_frame_size) const override {
     // Rounds up, so a trailing partial frame is counted.
@@ -140,23 +139,20 @@ class BufferMetadataSource : public http2::adapter::MetadataSource {
     const size_t to_copy = std::min(dest_len, payload_.length());
     payload_.copyOut(0, to_copy, dest);
     payload_.drain(to_copy);
-    return std::make_pair(static_cast<int64_t>(to_copy),
-                          payload_.length() == 0);
+    return std::make_pair(static_cast<int64_t>(to_copy), payload_.length() == 0);
   }
 
- private:
+private:
   Buffer::OwnedImpl payload_;
   const size_t original_payload_length_;
 };
 
 NewMetadataEncoder::NewMetadataEncoder() {
-  deflater_.SetIndexingPolicy(
-      [](absl::string_view, absl::string_view) { return false; });
+  deflater_.SetIndexingPolicy([](absl::string_view, absl::string_view) { return false; });
 }
 
 std::vector<std::unique_ptr<http2::adapter::MetadataSource>>
-NewMetadataEncoder::createSources(
-    const MetadataMapVector& metadata_map_vector) {
+NewMetadataEncoder::createSources(const MetadataMapVector& metadata_map_vector) {
   MetadataSourceVector v;
   v.reserve(metadata_map_vector.size());
   for (const auto& metadata_map : metadata_map_vector) {
@@ -179,7 +175,7 @@ NewMetadataEncoder::createSource(const MetadataMap& metadata_map) {
   while (progressive_encoder->HasNext()) {
     payload.add(progressive_encoder->Next(kMaxEncodingChunkSize));
   }
-  return absl::make_unique<BufferMetadataSource>(std::move(payload));
+  return std::make_unique<BufferMetadataSource>(std::move(payload));
 }
 
 } // namespace Http2

@@ -12,7 +12,6 @@
 #include "source/common/common/logger.h"
 
 #include "nghttp2/nghttp2.h"
-
 #include "quiche/http2/adapter/data_source.h"
 #include "quiche/spdy/core/hpack/hpack_encoder.h"
 
@@ -102,9 +101,8 @@ private:
  * frame payloads for transmission on the wire.
  */
 class NewMetadataEncoder : Logger::Loggable<Logger::Id::http2> {
- public:
-  using MetadataSourceVector =
-      std::vector<std::unique_ptr<http2::adapter::MetadataSource>>;
+public:
+  using MetadataSourceVector = std::vector<std::unique_ptr<http2::adapter::MetadataSource>>;
   NewMetadataEncoder();
 
   /**
@@ -112,12 +110,10 @@ class NewMetadataEncoder : Logger::Loggable<Logger::Id::http2> {
    * @param metadata_map_vector supplies the metadata map vector to encode.
    * @return whether encoding is successful.
    */
-  MetadataSourceVector createSources(
-      const MetadataMapVector& metadata_map_vector);
+  MetadataSourceVector createSources(const MetadataMapVector& metadata_map_vector);
 
- private:
-  std::unique_ptr<http2::adapter::MetadataSource> createSource(
-      const MetadataMap& metadata_map);
+private:
+  std::unique_ptr<http2::adapter::MetadataSource> createSource(const MetadataMap& metadata_map);
 
   spdy::HpackEncoder deflater_;
 };
