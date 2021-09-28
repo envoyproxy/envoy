@@ -105,6 +105,7 @@ New Features
 * bootstrap: added :ref:`inline_headers <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.inline_headers>` in the bootstrap to make custom inline headers bootstrap configurable.
 * contrib: added new :ref:`contrib images <install_contrib>` which contain contrib extensions.
 * dns: added :ref:`V4_PREFERRED <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.V4_PREFERRED>` option to return V6 addresses only if V4 addresses are not available.
+* ext_authz: added :ref:`dynamic_metadata_from_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.dynamic_metadata_from_headers>` to support emitting dynamic metadata from headers returned by an external authorization service via HTTP.
 * grpc reverse bridge: added a new :ref:`option <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>` to support streaming response bodies when withholding gRPC frames from the upstream.
 * http: added cluster_header in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow routing to the weighted cluster specified in the request_header.
 * http: added :ref:`alternate_protocols_cache_options <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>` for enabling HTTP/3 connections to servers which advertise HTTP/3 support via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_.

@@ -17,5 +17,15 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
 
+    #
+    # Private key providers
+    #
+
+    "envoy.tls.key_providers.cryptomb":                         "//contrib/cryptomb/private_key_providers/source:config",
+
+    #
+    # Socket interface extensions
+    #
+
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
 }

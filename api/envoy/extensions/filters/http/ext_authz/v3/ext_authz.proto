@@ -244,6 +244,7 @@ message AuthorizationRequest {
   repeated config.core.v3.HeaderValue headers_to_add = 2;
 }
 
+// [#next-free-field: 6]
 message AuthorizationResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.AuthorizationResponse";
@@ -270,6 +271,15 @@ message AuthorizationResponse {
   // the authorization response itself is successful, i.e. not failed or denied. When this list is
   // *not* set, no additional headers will be added to the client's response on success.
   type.matcher.v3.ListStringMatcher allowed_client_headers_on_success = 4;
+
+  // When this :ref:`list <envoy_v3_api_msg_type.matcher.v3.ListStringMatcher>` is set, authorization
+  // response headers that have a correspondent match will be emitted as dynamic metadata to be consumed
+  // by the next filter. This metadata lives in a namespace specified by the canonical name of extension filter
+  // that requires it:
+  //
+  // - :ref:`envoy.filters.http.ext_authz <config_http_filters_ext_authz_dynamic_metadata>` for HTTP filter.
+  // - :ref:`envoy.filters.network.ext_authz <config_network_filters_ext_authz_dynamic_metadata>` for network filter.
+  type.matcher.v3.ListStringMatcher dynamic_metadata_from_headers = 5;
 }
 
 // Extra settings on a per virtualhost/route/weighted-cluster level.
