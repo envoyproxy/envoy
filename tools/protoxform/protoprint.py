@@ -28,11 +28,7 @@ from google.protobuf import text_format
 
 from envoy.annotations import deprecation_pb2
 from udpa.annotations import migrate_pb2, status_pb2
-
-PROTO_PACKAGES = (
-    "google.api.annotations", "validate.validate", "envoy.annotations.resource",
-    "udpa.annotations.migrate", "udpa.annotations.security", "udpa.annotations.status",
-    "udpa.annotations.versioning", "udpa.annotations.sensitive")
+from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 NEXT_FREE_FIELD_MIN = 5
 
@@ -233,6 +229,10 @@ def format_header_from_file(
     if file_proto.options.HasExtension(migrate_pb2.file_migrate):
         options.Extensions[migrate_pb2.file_migrate].CopyFrom(
             file_proto.options.Extensions[migrate_pb2.file_migrate])
+
+    if file_proto.options.HasExtension(xds_status_pb2.file_status):
+        options.Extensions[xds_status_pb2.file_status].CopyFrom(
+            file_proto.options.Extensions[xds_status_pb2.file_status])
 
     if file_proto.options.HasExtension(
             status_pb2.file_status) and file_proto.package.endswith('alpha'):
@@ -718,7 +718,7 @@ class ProtoFormatVisitor(visitor.Visitor):
 if __name__ == '__main__':
     proto_desc_path = sys.argv[1]
 
-    utils.load_protos(PROTO_PACKAGES)
+    utils.load_protos()
 
     file_proto = descriptor_pb2.FileDescriptorProto()
     input_text = pathlib.Path(proto_desc_path).read_text()

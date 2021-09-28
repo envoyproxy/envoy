@@ -4,6 +4,8 @@ package envoy.extensions.filters.http.composite.v3;
 
 import "envoy/config/core/v3/extension.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
@@ -25,9 +27,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // where a match tree is specified that indicates (via
 // :ref:`ExecuteFilterAction <envoy_v3_api_msg_extensions.filters.http.composite.v3.ExecuteFilterAction>`)
 // which filter configuration to create and delegate to.
-//
-// [#alpha:]
 message Composite {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
 }
 
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).

@@ -104,12 +104,10 @@ TypeUrlToV3ServiceMap::iterator findV3Service(const std::string& type_url) {
   }
   const auto* message_desc =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(message_name);
-  printf("XXXX %p\n", message_desc);
   if (message_desc != nullptr &&
       message_desc->options().HasExtension(envoy::annotations::resource_alias)) {
     const std::string& resource =
         message_desc->options().GetExtension(envoy::annotations::resource_alias).type();
-    printf("XXXX %s\n", resource.c_str());
     return typeUrlToV3ServiceMap().find(Grpc::Common::typeUrl(resource));
   }
   return typeUrlToV3ServiceMap().end();
@@ -117,26 +115,19 @@ TypeUrlToV3ServiceMap::iterator findV3Service(const std::string& type_url) {
 
 } // namespace
 
-// TODO(alyssawilk) clean up transport_api_version argument.
-const Protobuf::MethodDescriptor&
-deltaGrpcMethod(absl::string_view type_url,
-                envoy::config::core::v3::ApiVersion /*transport_api_version*/) {
+const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
   const auto it = findV3Service(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.delta_grpc_);
 }
 
-const Protobuf::MethodDescriptor&
-sotwGrpcMethod(absl::string_view type_url,
-               envoy::config::core::v3::ApiVersion /*transport_api_version*/) {
+const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
   const auto it = findV3Service(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.sotw_grpc_);
 }
 
-const Protobuf::MethodDescriptor&
-restMethod(absl::string_view type_url,
-           envoy::config::core::v3::ApiVersion /*transport_api_version*/) {
+const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   const auto it = findV3Service(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.rest_);

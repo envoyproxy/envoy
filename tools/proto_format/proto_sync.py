@@ -262,7 +262,11 @@ def get_import_deps(proto_path):
                 if import_path.startswith('xds/type/matcher/v3/'):
                     imports.append('@com_github_cncf_udpa//xds/type/matcher/v3:pkg')
                     continue
-                # Special case handling for UDPA core.
+                # Special case for handling XDS annotations.
+                if import_path.startswith('xds/annotations/v3/'):
+                    imports.append('@com_github_cncf_udpa//xds/annotations/v3:pkg')
+                    continue
+                # Special case handling for XDS core.
                 if import_path.startswith('xds/core/v3/'):
                     imports.append('@com_github_cncf_udpa//xds/core/v3:pkg')
                     continue
