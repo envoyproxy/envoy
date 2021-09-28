@@ -52,3 +52,4 @@ envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
   security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
