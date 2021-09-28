@@ -101,8 +101,12 @@ void Span::finishSpan() {
   // `HttpTracerImpl::startSpan` at source/common/tracing/http_tracer_impl.cc
   // The `substr` operation below will extract only the first word from
   // `operation_name_`, so the `direction` is either "ingress" or "egress".
-  s.mutable_annotations()->insert(
-      {DirectionKey, operation_name_.substr(0, operation_name_.find(" "))});
+  const size_t pos = operation_name_.find(" ");
+  if (pos == std::string::npos) {
+    s.mutable_annotations()->insert({DirectionKey, operation_name_});
+  } else {
+    s.mutable_annotations()->insert({DirectionKey, operation_name_.substr(0, pos)});
+  }
 
   const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
