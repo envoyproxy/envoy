@@ -26,6 +26,8 @@ message Sensitive {
   udpa.type.v1.TypedStruct sensitive_typed_struct = 11 [(udpa.annotations.sensitive) = true];
   repeated udpa.type.v1.TypedStruct sensitive_repeated_typed_struct = 12
       [(udpa.annotations.sensitive) = true];
+  map<string, string> sensitive_string_map = 13 [(udpa.annotations.sensitive) = true];
+  map<string, int64> sensitive_int_map = 14 [(udpa.annotations.sensitive) = true];
 
   string insensitive_string = 101;
   repeated string insensitive_repeated_string = 102;
@@ -39,4 +41,6 @@ message Sensitive {
   repeated google.protobuf.Any insensitive_repeated_any = 110;
   udpa.type.v1.TypedStruct insensitive_typed_struct = 111;
   repeated udpa.type.v1.TypedStruct insensitive_repeated_typed_struct = 112;
+  map<string, string> insensitive_string_map = 113;
+  map<string, int64> insensitive_int_map = 114;
 }

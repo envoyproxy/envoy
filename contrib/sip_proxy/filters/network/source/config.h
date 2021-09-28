@@ -4,12 +4,12 @@
 #include <string>
 
 #include "source/extensions/filters/network/common/factory_base.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
+#include "contrib/sip_proxy/filters/network/source/filters/well_known_names.h"
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
 namespace Envoy {
@@ -42,7 +42,7 @@ class SipProxyFilterConfigFactory
           envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy,
           envoy::extensions::filters::network::sip_proxy::v3alpha::SipProtocolOptions> {
 public:
-  SipProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().SipProxy, true) {}
+  SipProxyFilterConfigFactory() : FactoryBase(SipProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

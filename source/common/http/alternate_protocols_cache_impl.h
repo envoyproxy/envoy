@@ -10,6 +10,8 @@
 #include "envoy/common/time.h"
 #include "envoy/http/alternate_protocols_cache.h"
 
+#include "source/common/common/logger.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -17,7 +19,8 @@ namespace Http {
 
 // An implementation of AlternateProtocolsCache.
 // See: source/docs/http3_upstream.md
-class AlternateProtocolsCacheImpl : public AlternateProtocolsCache {
+class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
+                                    Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
   AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store);
   ~AlternateProtocolsCacheImpl() override;

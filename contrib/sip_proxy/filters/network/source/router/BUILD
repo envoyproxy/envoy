@@ -44,6 +44,7 @@ envoy_cc_library(
         "//contrib/sip_proxy/filters/network/source:encoder_lib",
         "//contrib/sip_proxy/filters/network/source:protocol_interface",
         "//contrib/sip_proxy/filters/network/source/filters:filter_interface",
+        "//contrib/sip_proxy/filters/network/source/filters:well_known_names",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",
@@ -52,7 +53,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/upstream:load_balancer_lib",
-        "//source/extensions/filters/network:well_known_names",
         "@envoy_api//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg_cc_proto",
     ],
 )

@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
-class Encoder : public Logger::Loggable<Logger::Id::sip> {
+class Encoder : public Logger::Loggable<Logger::Id::filter> {
 public:
   virtual ~Encoder() = default;
   virtual void encode(const MessageMetadataSharedPtr& metadata, Buffer::Instance& out) PURE;

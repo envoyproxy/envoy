@@ -8,12 +8,12 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
-#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/match.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.pb.h"
 #include "contrib/sip_proxy/filters/network/source/app_exception_impl.h"
 #include "contrib/sip_proxy/filters/network/source/encoder.h"
+#include "contrib/sip_proxy/filters/network/source/filters/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -142,8 +142,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   const std::shared_ptr<const ProtocolOptionsConfig> options =
-      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
-          NetworkFilterNames::get().SipProxy);
+      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(SipProxy);
 
   auto handle_affinity = [&](const std::shared_ptr<const ProtocolOptionsConfig> options) {
     if (options == nullptr || metadata->msgType() == MsgType::Response) {

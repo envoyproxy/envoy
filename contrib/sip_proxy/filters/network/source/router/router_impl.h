@@ -111,7 +111,7 @@ struct RouterStats {
 };
 
 class UpstreamRequest;
-class TransactionInfoItem : public Logger::Loggable<Logger::Id::sip> {
+class TransactionInfoItem : public Logger::Loggable<Logger::Id::connection> {
 public:
   TransactionInfoItem(SipFilters::DecoderFilterCallbacks* active_trans,
                       std::shared_ptr<UpstreamRequest> upstream_request)
@@ -139,7 +139,7 @@ private:
 };
 
 struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
-                                    public Logger::Loggable<Logger::Id::sip> {
+                                    public Logger::Loggable<Logger::Id::connection> {
   ThreadLocalTransactionInfo(std::shared_ptr<TransactionInfo> parent, Event::Dispatcher& dispatcher,
                              std::chrono::milliseconds transaction_timeout, std::string own_domain,
                              std::string domain_match_parameter_name)
@@ -187,7 +187,7 @@ struct ThreadLocalTransactionInfo : public ThreadLocal::ThreadLocalObject,
 };
 
 class TransactionInfo : public std::enable_shared_from_this<TransactionInfo>,
-                        Logger::Loggable<Logger::Id::sip> {
+                        Logger::Loggable<Logger::Id::connection> {
 public:
   TransactionInfo(const std::string& cluster_name, ThreadLocal::SlotAllocator& tls,
                   std::chrono::milliseconds transaction_timeout, std::string own_domain,
@@ -265,7 +265,7 @@ private:
 class Router : public Upstream::LoadBalancerContextBase,
                public virtual DecoderEventHandler,
                public SipFilters::DecoderFilter,
-               Logger::Loggable<Logger::Id::sip> {
+               Logger::Loggable<Logger::Id::connection> {
 public:
   Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
          Stats::Scope& scope)
@@ -322,7 +322,7 @@ public:
 class ThreadLocalActiveConn;
 class ResponseDecoder : public DecoderCallbacks,
                         public DecoderEventHandler,
-                        public Logger::Loggable<Logger::Id::sip> {
+                        public Logger::Loggable<Logger::Id::connection> {
 public:
   ResponseDecoder(UpstreamRequest& parent)
       : parent_(parent), decoder_(std::make_unique<Decoder>(*this)) {}
@@ -356,7 +356,7 @@ using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public Tcp::ConnectionPool::UpstreamCallbacks,
                         public std::enable_shared_from_this<UpstreamRequest>,
-                        public Logger::Loggable<Logger::Id::sip> {
+                        public Logger::Loggable<Logger::Id::connection> {
 public:
   UpstreamRequest(Upstream::TcpPoolData& pool_data,
                   std::shared_ptr<TransactionInfo> transaction_info);

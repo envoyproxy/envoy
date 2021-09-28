@@ -2,9 +2,13 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ratelimit.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -105,6 +109,214 @@ message RateLimit {
   bool disable_x_envoy_ratelimited_header = 9;
 }
 
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
+// Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
+// [#not-implemented-hide:]
+message RateLimitConfig {
+  // [#next-free-field: 10]
+  message Action {
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("source_cluster", "<local service cluster>")
+    //
+    // <local service cluster> is derived from the :option:`--service-cluster` option.
+    message SourceCluster {
+    }
+
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("destination_cluster", "<routed target cluster>")
+    //
+    // Once a request matches against a route table rule, a routed cluster is determined by one of
+    // the following :ref:`route table configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`
+    // settings:
+    //
+    // * :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` indicates the upstream cluster
+    //   to route to.
+    // * :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>`
+    //   chooses a cluster randomly from a set of clusters with attributed weight.
+    // * :ref:`cluster_header <envoy_v3_api_field_config.route.v3.RouteAction.cluster_header>` indicates which
+    //   header in the request contains the target cluster.
+    message DestinationCluster {
+    }
+
+    // The following descriptor entry is appended when a header contains a key that matches the
+    // *header_name*:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<header_value_queried_from_header>")
+    message RequestHeaders {
+      // The header name to be queried from the request headers. The header’s
+      // value is used to populate the value of the descriptor entry for the
+      // descriptor_key.
+      string header_name = 1
+          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
+
+      // If set to true, Envoy skips the descriptor while calling rate limiting service
+      // when header is not present in the request. By default it skips calling the
+      // rate limiting service if this header is not present in the request.
+      bool skip_if_absent = 3;
+    }
+
+    // The following descriptor entry is appended to the descriptor and is populated using the
+    // trusted address from :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("remote_address", "<trusted address from x-forwarded-for>")
+    message RemoteAddress {
+    }
+
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("generic_key", "<descriptor_value>")
+    message GenericKey {
+      // The value to use in the descriptor entry.
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // An optional key to use in the descriptor entry. If not set it defaults
+      // to 'generic_key' as the descriptor key.
+      string descriptor_key = 2;
+    }
+
+    // The following descriptor entry is appended to the descriptor:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("header_match", "<descriptor_value>")
+    message HeaderValueMatch {
+      // The value to use in the descriptor entry.
+      string descriptor_value = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If set to true, the action will append a descriptor entry when the
+      // request matches the headers. If set to false, the action will append a
+      // descriptor entry when the request does not match the headers. The
+      // default value is true.
+      bool expect_match = 2;
+
+      // Specifies a set of headers that the rate limit action should match
+      // on. The action will check the request’s headers against all the
+      // specified headers in the config. A match will happen if all the
+      // headers in the config are present in the request with the same values
+      // (or based on presence if the value field is not in the config).
+      repeated config.route.v3.HeaderMatcher headers = 3
+          [(validate.rules).repeated = {min_items: 1}];
+    }
+
+    // The following descriptor entry is appended when the metadata contains a key value:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<value_queried_from_metadata>")
+    message MetaData {
+      enum Source {
+        // Query :ref:`dynamic metadata <well_known_dynamic_metadata>`
+        DYNAMIC = 0;
+
+        // Query :ref:`route entry metadata <envoy_v3_api_field_config.route.v3.Route.metadata>`
+        ROUTE_ENTRY = 1;
+      }
+
+      // The key to use in the descriptor entry.
+      string descriptor_key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // Metadata struct that defines the key and path to retrieve the string value. A match will
+      // only happen if the value in the metadata is of type string.
+      type.metadata.v3.MetadataKey metadata_key = 2 [(validate.rules).message = {required: true}];
+
+      // An optional value to use if *metadata_key* is empty. If not set and
+      // no value is present under the metadata_key then no descriptor is generated.
+      string default_value = 3;
+
+      // Source of metadata
+      Source source = 4 [(validate.rules).enum = {defined_only: true}];
+    }
+
+    oneof action_specifier {
+      option (validate.required) = true;
+
+      // Rate limit on source cluster.
+      SourceCluster source_cluster = 1;
+
+      // Rate limit on destination cluster.
+      DestinationCluster destination_cluster = 2;
+
+      // Rate limit on request headers.
+      RequestHeaders request_headers = 3;
+
+      // Rate limit on remote address.
+      RemoteAddress remote_address = 4;
+
+      // Rate limit on a generic key.
+      GenericKey generic_key = 5;
+
+      // Rate limit on the existence of request headers.
+      HeaderValueMatch header_value_match = 6;
+
+      // Rate limit on metadata.
+      MetaData metadata = 8;
+
+      // Rate limit descriptor extension. See the rate limit descriptor extensions documentation.
+      // [#extension-category: envoy.rate_limit_descriptors]
+      config.core.v3.TypedExtensionConfig extension = 9;
+    }
+  }
+
+  message Override {
+    // Fetches the override from the dynamic metadata.
+    message DynamicMetadata {
+      // Metadata struct that defines the key and path to retrieve the struct value.
+      // The value must be a struct containing an integer "requests_per_unit" property
+      // and a "unit" property with a value parseable to :ref:`RateLimitUnit
+      // enum <envoy_v3_api_enum_type.v3.RateLimitUnit>`
+      type.metadata.v3.MetadataKey metadata_key = 1 [(validate.rules).message = {required: true}];
+    }
+
+    oneof override_specifier {
+      option (validate.required) = true;
+
+      // Limit override from dynamic metadata.
+      DynamicMetadata dynamic_metadata = 1;
+    }
+  }
+
+  // Refers to the stage set in the filter. The rate limit configuration only
+  // applies to filters with the same stage number. The default stage number is
+  // 0.
+  //
+  // .. note::
+  //
+  //   The filter supports a range of 0 - 10 inclusively for stage numbers.
+  uint32 stage = 1 [(validate.rules).uint32 = {lte: 10}];
+
+  // The key to be set in runtime to disable this rate limit configuration.
+  string disable_key = 2;
+
+  // A list of actions that are to be applied for this rate limit configuration.
+  // Order matters as the actions are processed sequentially and the descriptor
+  // is composed by appending descriptor entries in that sequence. If an action
+  // cannot append a descriptor entry, no descriptor is generated for the
+  // configuration. See :ref:`composing actions
+  // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
+  repeated Action actions = 3 [(validate.rules).repeated = {min_items: 1}];
+
+  // An optional limit override to be appended to the descriptor produced by this
+  // rate limit configuration. If the override value is invalid or cannot be resolved
+  // from metadata, no override is provided. See :ref:`rate limit override
+  // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  Override limit = 4;
+}
+
 message RateLimitPerRoute {
   enum VhRateLimitsOptions {
     // Use the virtual host rate limits unless the route has a rate limit policy.
@@ -117,6 +329,32 @@ message RateLimitPerRoute {
     IGNORE = 2;
   }
 
+  // The override option determines how the filter handles the cases where there is an override config at a more specific level than this one (from least to most specific: virtual host, route, cluster weight).
+  // [#not-implemented-hide:]
+  enum OverrideOptions {
+    // Client-defined default, typically OVERRIDE_POLICY. If VhRateLimitsOptions is set, that will be used instead.
+    DEFAULT = 0;
+
+    // If there is an override config at a more specific level, use that instead of this one.
+    OVERRIDE_POLICY = 1;
+
+    // If there is an override config at a more specific level, use data from both.
+    INCLUDE_POLICY = 2;
+
+    // If there is an override config at a more specific level, ignore it and use only this one.
+    IGNORE_POLICY = 3;
+  }
+
   // Specifies if the rate limit filter should include the virtual host rate limits.
   VhRateLimitsOptions vh_rate_limits = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Specifies if the rate limit filter should include the lower levels (route level, virtual host level or cluster weight level) rate limits override options.
+  // [#not-implemented-hide:]
+  OverrideOptions override_option = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Rate limit configuration. If not set, uses the
+  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields instead.
+  // [#not-implemented-hide:]
+  repeated RateLimitConfig rate_limits = 3;
 }

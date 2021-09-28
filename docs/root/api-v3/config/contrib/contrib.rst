@@ -8,3 +8,4 @@ Contrib Extensions
   :maxdepth: 2
 
   sip/sip
+  cryptomb/cryptomb

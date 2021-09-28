@@ -46,7 +46,7 @@ private:
 /**
  * DecoderStateMachine is the Sip message state machine
  */
-class DecoderStateMachine : public Logger::Loggable<Logger::Id::sip> {
+class DecoderStateMachine : public Logger::Loggable<Logger::Id::filter> {
 public:
   DecoderStateMachine(MessageMetadataSharedPtr& metadata, DecoderEventHandler& handler)
       : metadata_(metadata), handler_(handler), state_(State::TransportBegin) {}

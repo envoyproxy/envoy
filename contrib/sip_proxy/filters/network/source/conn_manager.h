@@ -55,7 +55,7 @@ public:
 class ConnectionManager : public Network::ReadFilter,
                           public Network::ConnectionCallbacks,
                           public DecoderCallbacks,
-                          Logger::Loggable<Logger::Id::sip> {
+                          Logger::Loggable<Logger::Id::connection> {
 public:
   ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system,

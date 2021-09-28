@@ -45,7 +45,7 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
   for (const auto& alt_svc : altsvc_vector) {
     MonotonicTime expiration;
     if (from_cache) {
-      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age);
+      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age_seconds);
       auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
           time_source.monotonicTime().time_since_epoch());
       if (expire_time_from_epoch < time_since_epoch) {
@@ -54,7 +54,7 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
         expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
       }
     } else {
-      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age);
+      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
     }
     Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
                                                               alt_svc.port, expiration);

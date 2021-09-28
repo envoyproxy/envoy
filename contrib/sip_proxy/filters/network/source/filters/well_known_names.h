@@ -23,6 +23,9 @@ public:
 using SipFilterNames = ConstSingleton<SipFilterNameValues>;
 
 } // namespace SipFilters
+
+const std::string SipProxy = "envoy.filters.network.sip_proxy";
+
 } // namespace SipProxy
 } // namespace NetworkFilters
 } // namespace Extensions
