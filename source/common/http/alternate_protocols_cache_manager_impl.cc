@@ -51,7 +51,7 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
   }
 
   AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
-      data_.dispatcher_.timeSource(), std::move(store));
+      data_.dispatcher_.timeSource(), std::move(store), options.max_entries().value());
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }
