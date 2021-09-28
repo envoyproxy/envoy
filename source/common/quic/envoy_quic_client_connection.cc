@@ -9,8 +9,6 @@
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
-#include "quiche/quic/platform/api/quic_stack_trace.h"
-
 namespace Envoy {
 namespace Quic {
 
