@@ -298,7 +298,7 @@ message RuntimeFeatureFlag {
 
 // Query parameter name/value pair.
 message QueryParameter {
-  // The key of the query parameter.
+  // The key of the query parameter. Case sensitive.
   string key = 1 [(validate.rules).string = {min_len: 1}];
 
   // The value of the query parameter.
