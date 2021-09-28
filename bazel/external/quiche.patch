@@ -1,0 +1,44 @@
+--- http2/adapter/callback_visitor.cc
++++ http2/adapter/callback_visitor.cc
+@@ -112,6 +112,6 @@ bool CallbackVisitor::OnFrameHeader(Http
+ void CallbackVisitor::OnSettingsStart() {}
+
+ void CallbackVisitor::OnSetting(Http2Setting setting) {
+-  settings_.push_back({.settings_id = setting.id, .value = setting.value});
++  settings_.push_back({setting.id, setting.value});
+ }
+
+--- http2/adapter/nghttp2_data_provider.h
++++ http2/adapter/nghttp2_data_provider.h
+@@ -2,6 +2,7 @@
+ #define THIRD_PARTY_HTTP2_ADAPTER_NGHTTP2_DATA_PROVIDER_H_
+
+ #include <cstdint>
++#include <memory>
+
+ #include "third_party/http2/adapter/data_source.h"
+ #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
+--- http2/adapter/nghttp2_session.cc
++++ http2/adapter/nghttp2_session.cc
+@@ -10,7 +10,7 @@ NgHttp2Session::NgHttp2Session(Perspecti
+                                const nghttp2_option* options, void* userdata)
+     : session_(MakeSessionPtr(nullptr)), perspective_(perspective) {
+   nghttp2_session* session;
+-  switch (perspective) {
++  switch (perspective_) {
+     case Perspective::kClient:
+       nghttp2_session_client_new2(&session, callbacks.get(), userdata, options);
+       break;
+--- http2/adapter/nghttp2_callbacks.cc
++++ http2/adapter/nghttp2_callbacks.cc
+@@ -102,8 +102,8 @@ int OnFrameReceived(nghttp2_session* /*
+           nghttp2_settings_entry entry = frame->settings.iv[i];
+           // The nghttp2_settings_entry uses int32_t for the ID; we must cast.
+           visitor->OnSetting(Http2Setting{
+-              .id = static_cast<Http2SettingsId>(entry.settings_id),
+-              .value = entry.value});
++              static_cast<Http2SettingsId>(entry.settings_id),
++              entry.value});
+         }
+         visitor->OnSettingsEnd();
+       }

@@ -86,6 +86,56 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
+    name = "http2_adapter",
+    hdrs = [
+        "quiche/http2/adapter/callback_visitor.h",
+        "quiche/http2/adapter/data_source.h",
+        "quiche/http2/adapter/http2_adapter.h",
+        "quiche/http2/adapter/http2_protocol.h",
+        "quiche/http2/adapter/http2_session.h",
+        "quiche/http2/adapter/http2_util.h",
+        "quiche/http2/adapter/http2_visitor_interface.h",
+        "quiche/http2/adapter/nghttp2_adapter.h",
+        "quiche/http2/adapter/nghttp2_callbacks.h",
+        "quiche/http2/adapter/nghttp2_data_provider.h",
+        "quiche/http2/adapter/nghttp2_session.h",
+        "quiche/http2/adapter/nghttp2_util.h",
+        "quiche/http2/adapter/oghttp2_adapter.h",
+        "quiche/http2/adapter/oghttp2_session.h",
+        "quiche/http2/adapter/oghttp2_util.h",
+        "quiche/http2/adapter/window_manager.h",
+    ],
+    srcs = [
+        "quiche/http2/adapter/callback_visitor.cc",
+        "quiche/http2/adapter/http2_protocol.cc",
+        "quiche/http2/adapter/http2_util.cc",
+        "quiche/http2/adapter/nghttp2_adapter.cc",
+        "quiche/http2/adapter/nghttp2_callbacks.cc",
+        "quiche/http2/adapter/nghttp2_data_provider.cc",
+        "quiche/http2/adapter/nghttp2_session.cc",
+        "quiche/http2/adapter/nghttp2_util.cc",
+        "quiche/http2/adapter/oghttp2_adapter.cc",
+        "quiche/http2/adapter/oghttp2_session.cc",
+        "quiche/http2/adapter/oghttp2_util.cc",
+        "quiche/http2/adapter/window_manager.cc",
+    ],
+    visibility = ["//visibility:public"],
+    external_deps = [
+        "abseil_algorithm",
+        "nghttp2",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":spdy_core_header_block_lib",
+        ":spdy_core_protocol_lib",
+        ":http2_core_priority_write_scheduler_lib",
+        ":spdy_core_http2_deframer_lib",
+        ":spdy_core_framer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http2_core_http2_priority_write_scheduler_lib",
     hdrs = ["quiche/http2/core/http2_priority_write_scheduler.h"],
     copts = quiche_copts,

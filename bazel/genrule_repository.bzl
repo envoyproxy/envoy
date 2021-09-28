@@ -11,7 +11,7 @@ def _genrule_repository(ctx):
         ctx.symlink(patch, patch_input)
         patch_result = ctx.execute(["patch", "-p0", "--input", patch_input])
         if patch_result.return_code != 0:
-            fail("Failed to apply patch %r: %s" % (patch, patch_result.stderr))
+            fail("Failed to apply patch %r: %s, %s" % (patch, patch_result.stderr, patch_result.stdout))
 
     # https://github.com/bazelbuild/bazel/issues/3766
     genrule_cmd_file = Label("@envoy//bazel").relative(str(ctx.attr.genrule_cmd_file))

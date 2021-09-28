@@ -14,6 +14,9 @@ envoy_package()
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
+    external_deps = [
+        "quiche_http2_adapter",
+    ],
     shard_count = 5,
     deps = [
         ":codec_impl_test_util",
@@ -45,7 +48,10 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "codec_impl_test_util",
     hdrs = ["codec_impl_test_util.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "quiche_http2_adapter",
+    ],
     deps = [
         "//source/common/http/http2:codec_lib",
         "//test/mocks:common_lib",
