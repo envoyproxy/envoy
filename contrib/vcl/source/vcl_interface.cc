@@ -39,13 +39,13 @@ MqFileEventsMap& mqFileEventsMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(MqFileEvents
 
 void onMqSocketEvents(uint32_t flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
-  auto wrk_index = vppcom_worker_index();
+  int wrk_index = vppcom_worker_index();
   VCL_LOG("events on worker {}", wrk_index);
   struct epoll_event events[MaxNumEpollEvents];
-  int max_events = MaxNumEpollEvents, n_events;
+  int max_events = MaxNumEpollEvents;
 
   while (max_events > 0) {
-    n_events = vppcom_epoll_wait(epoll_handles[wrk_index], events, max_events, 0);
+    int n_events = vppcom_epoll_wait(epoll_handles[wrk_index], events, max_events, 0);
     if (n_events <= 0) {
       break;
     }
@@ -53,7 +53,7 @@ void onMqSocketEvents(uint32_t flags) {
     VCL_LOG("had {} events", n_events);
 
     for (int i = 0; i < n_events; i++) {
-      VclIoHandle* vcl_handle = reinterpret_cast<VclIoHandle*>(events[i].data.u64);
+      auto vcl_handle = reinterpret_cast<VclIoHandle*>(events[i].data.u64);
       if (vcl_handle->isWrkListener()) {
         vcl_handle = vcl_handle->getParentListener();
       }
@@ -88,9 +88,7 @@ uint32_t vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
 void vclInterfaceWorkerRegister() {
   {
     absl::MutexLock lk(&wrk_lock);
-    if (vppcom_worker_register()) {
-      RELEASE_ASSERT(0, "failed to register VCL worker");
-    }
+    RELEASE_ASSERT(vppcom_worker_register() == VPPCOM_OK, "failed to register VCL worker");
   }
   int epoll_handle = vppcom_epoll_create();
   epoll_handles[vppcom_worker_index()] = epoll_handle;

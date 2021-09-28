@@ -16,7 +16,7 @@ VclEvent::VclEvent(Event::Dispatcher& dispatcher, VclIoHandle& io_handle, Event:
 VclEvent::~VclEvent() {
   // Worker listeners are valid only as long as the event is valid
   if (io_handle_.isWrkListener()) {
-    auto parentListener = io_handle_.getParentListener();
+    VclIoHandle* parentListener = io_handle_.getParentListener();
     if (parentListener) {
       parentListener->clearChildWrkListener();
     }

@@ -11,19 +11,13 @@ namespace Extensions {
 namespace Network {
 namespace Vcl {
 
-#define VCL_DEBUG (0)
 #define VCL_RX_ZC (0)
-
-#if VCL_DEBUG > 0
 #define VCL_LOG(fmt, _args...) ENVOY_LOG_MISC(debug, "[{}] " fmt, vppcom_worker_index(), ##_args)
-#else
-#define VCL_LOG(fmt, _args...)
-#endif
 
 /**
  * VclIoHandle does not rely on linux fds. Constant lower used as invalid fd.
  */
-const int VclInvalidFd = 1 << 23;
+constexpr int VclInvalidFd = 1 << 23;
 
 /**
  * Used to initialize VCL interface when VclSocketInterface extension is loaded.

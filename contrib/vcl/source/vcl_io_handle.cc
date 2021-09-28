@@ -22,26 +22,26 @@ int vclWrkIndexOrRegister() {
   return wrk_index;
 }
 
-int peekVclSession(vcl_session_handle_t sh, vppcom_endpt_t* ep, uint32_t* proto) {
-  auto current_wrk = vppcom_worker_index();
-  auto sh_wrk = vppcom_session_worker(sh);
+bool peekVclSession(vcl_session_handle_t sh, vppcom_endpt_t* ep, uint32_t* proto) {
+  int current_wrk = vppcom_worker_index();
+  int sh_wrk = vppcom_session_worker(sh);
   uint32_t eplen = sizeof(*ep);
 
   // should NOT be used while system is loaded
   vppcom_worker_index_set(sh_wrk);
 
-  if (vppcom_session_attr(sh, VPPCOM_ATTR_GET_LCL_ADDR, ep, &eplen)) {
-    return -1;
+  if (vppcom_session_attr(sh, VPPCOM_ATTR_GET_LCL_ADDR, ep, &eplen) != VPPCOM_OK) {
+    return true;
   }
 
   uint32_t buflen = sizeof(uint32_t);
-  if (vppcom_session_attr(sh, VPPCOM_ATTR_GET_PROTOCOL, proto, &buflen)) {
-    return -1;
+  if (vppcom_session_attr(sh, VPPCOM_ATTR_GET_PROTOCOL, proto, &buflen) != VPPCOM_OK) {
+    return true;
   }
 
   vppcom_worker_index_set(current_wrk);
 
-  return 0;
+  return false;
 }
 
 void vclEndptCopy(sockaddr* addr, socklen_t* addrlen, const vppcom_endpt_t& ep) {
@@ -138,16 +138,16 @@ VclIoHandle::~VclIoHandle() {
 Api::IoCallUint64Result VclIoHandle::close() {
   VCL_LOG("closing sh {:x}", sh_);
   RELEASE_ASSERT(VCL_SH_VALID(sh_), "sh must be valid");
-  int rc = 0, wrk_index;
+  int rc = 0;
 
-  wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
 
   if (is_listener_) {
     if (wrk_index) {
       uint32_t sh = wrk_listener_->sh();
       RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
       clearChildWrkListener();
-      rc = vppcom_session_close(sh);
+      // sh_ not invalidated yet, waiting for destructor on main to call vppcom_session_close
     } else {
       clearChildWrkListener();
       rc = vppcom_session_close(sh_);
@@ -272,7 +272,7 @@ Api::IoCallUint64Result VclIoHandle::write(Buffer::Instance& buffer) {
 
 Api::IoCallUint64Result VclIoHandle::recv(void* buffer, size_t length, int flags) {
   VCL_LOG("recv on sh {:x}", sh_);
-  auto rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
+  int rv = vppcom_session_recvfrom(sh_, buffer, length, flags, nullptr);
   return vclCallResultToIoCallResult(rv);
 }
 
@@ -300,7 +300,7 @@ Api::IoCallUint64Result VclIoHandle::sendmsg(const Buffer::RawSlice* slices, uin
   }
 
   // VCL has no sendmsg semantics- Treat as a session write followed by a flush
-  auto result = 0;
+  int result = 0;
   for (uint64_t i = 0; i < num_slices_to_write; i++) {
     int n;
     if (i < (num_slices_to_write - 1)) {
@@ -347,11 +347,10 @@ Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uin
   vppcom_endpt_t endpt;
   endpt.ip = ipaddr;
   endpt.port = static_cast<uint16_t>(self_port);
-  uint32_t result = 0;
+  int result = 0;
 
   for (uint64_t i = 0; i < num_slices_for_read; i++) {
-    int n;
-    n = vppcom_session_recvfrom(sh_, iov[i].iov_base, iov[i].iov_len, 0, &endpt);
+    int n = vppcom_session_recvfrom(sh_, iov[i].iov_base, iov[i].iov_len, 0, &endpt);
     if (n < 0) {
       result = (num_bytes_recvd == 0) ? n : num_bytes_recvd;
       break;
@@ -382,7 +381,7 @@ Api::SysCallIntResult VclIoHandle::bind(Envoy::Network::Address::InstanceConstSh
     return {-1, VPPCOM_EBADFD};
   }
 
-  auto wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1, "should be initialized");
 
   vppcom_endpt_t endpt;
@@ -392,7 +391,7 @@ Api::SysCallIntResult VclIoHandle::bind(Envoy::Network::Address::InstanceConstSh
 }
 
 Api::SysCallIntResult VclIoHandle::listen(int) {
-  auto wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1, "should be initialized");
 
   VCL_LOG("trying to listen sh {}", sh_);
@@ -409,10 +408,10 @@ Api::SysCallIntResult VclIoHandle::listen(int) {
 }
 
 Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrlen) {
-  auto wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
   RELEASE_ASSERT(wrk_index != -1 && is_listener_, "must have worker and must be listener");
 
-  auto sh = sh_;
+  uint32_t sh = sh_;
   if (wrk_index) {
     sh = wrk_listener_->sh();
     VCL_LOG("trying to accept fd {} sh {:x}", fd_, sh);
@@ -421,7 +420,7 @@ Envoy::Network::IoHandlePtr VclIoHandle::accept(sockaddr* addr, socklen_t* addrl
   vppcom_endpt_t endpt;
   sockaddr_storage ss;
   endpt.ip = reinterpret_cast<uint8_t*>(&ss);
-  auto new_sh = vppcom_session_accept(sh, &endpt, O_NONBLOCK);
+  int new_sh = vppcom_session_accept(sh, &endpt, O_NONBLOCK);
   if (new_sh >= 0) {
     vclEndptCopy(addr, addrlen, endpt);
     return std::make_unique<VclIoHandle>(new_sh, VclInvalidFd);
@@ -474,7 +473,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = 0;
       break;
     default:
-      ENVOY_LOG(error, "ERROR: setOption() SOL_TCP: sh {} optname {} unsupported!", sh_, optname);
+      ENVOY_LOG(error, "setOption() SOL_TCP: sh {} optname {} unsupported!", sh_, optname);
       break;
     }
     break;
@@ -484,7 +483,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_SET_V6ONLY, const_cast<void*>(optval), &optlen);
       break;
     default:
-      ENVOY_LOG(error, "ERROR: setOption() SOL_IPV6: sh {} optname {} unsupported!", sh_, optname);
+      ENVOY_LOG(error, "setOption() SOL_IPV6: sh {} optname {} unsupported!", sh_, optname);
       break;
     }
     break;
@@ -500,8 +499,7 @@ Api::SysCallIntResult VclIoHandle::setOption(int level, int optname, const void*
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_SET_BROADCAST, const_cast<void*>(optval), &optlen);
       break;
     default:
-      ENVOY_LOG(error, "ERROR: setOption() SOL_SOCKET: sh {} optname {} unsupported!", sh_,
-                optname);
+      ENVOY_LOG(error, "setOption() SOL_SOCKET: sh {} optname {} unsupported!", sh_, optname);
       break;
     }
     break;
@@ -537,8 +535,7 @@ Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optva
       break;
     case TCP_INFO:
       if (optval && optlen && (*optlen == sizeof(struct tcp_info))) {
-        ENVOY_LOG(debug, "ERROR: getOption() TCP_INFO: sh %u optname %d unsupported!", sh_,
-                  optname);
+        ENVOY_LOG(error, "getOption() TCP_INFO: sh %u optname %d unsupported!", sh_, optname);
         memset(optval, 0, *optlen);
         rv = VPPCOM_OK;
       } else {
@@ -551,7 +548,7 @@ Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optva
       rv = 0;
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: getOption() SOL_TCP: sh %u optname %d unsupported!", sh_, optname);
+      ENVOY_LOG(error, "getOption() SOL_TCP: sh %u optname %d unsupported!", sh_, optname);
       break;
     }
     break;
@@ -561,7 +558,7 @@ Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optva
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_GET_V6ONLY, optval, optlen);
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: getOption() SOL_IPV6: sh %u optname %d unsupported!", sh_, optname);
+      ENVOY_LOG(error, "getOption() SOL_IPV6: sh %u optname %d unsupported!", sh_, optname);
       break;
     }
     break;
@@ -593,8 +590,7 @@ Api::SysCallIntResult VclIoHandle::getOption(int level, int optname, void* optva
       rv = vppcom_session_attr(sh_, VPPCOM_ATTR_GET_ERROR, optval, optlen);
       break;
     default:
-      ENVOY_LOG(debug, "ERROR: getOption() SOL_SOCKET: sh %u optname %d unsupported!", sh_,
-                optname);
+      ENVOY_LOG(error, "getOption() SOL_SOCKET: sh %u optname %d unsupported!", sh_, optname);
       ;
       break;
     }
@@ -646,7 +642,7 @@ Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::peerAddress() {
 }
 
 void VclIoHandle::updateEvents(uint32_t events) {
-  auto wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
   VclIoHandle* vcl_handle = this;
 
   if (wrk_index && is_listener_) {
@@ -673,9 +669,9 @@ void VclIoHandle::updateEvents(uint32_t events) {
 
 void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                                       Event::FileTriggerType, uint32_t events) {
-  VCL_LOG("adding events for sh {:x} fd {} isListener {}", sh_, fd_, isListener());
+  VCL_LOG("adding events for sh {:x} fd {} isListener {}", sh_, fd_, is_listener_);
 
-  auto wrk_index = vclWrkIndexOrRegister();
+  int wrk_index = vclWrkIndexOrRegister();
   vclInterfaceRegisterEpollEvent(dispatcher);
 
   VclIoHandle* vcl_handle = this;
@@ -689,26 +685,24 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
         ep.ip = addr_buf;
         uint32_t proto;
 
-        if (peekVclSession(sh_, &ep, &proto)) {
-          RELEASE_ASSERT(0, "");
-        }
+        RELEASE_ASSERT(peekVclSession(sh_, &ep, &proto) == false, "peek returned");
 
-        auto address = vclEndptToAddress(ep, -1);
-        auto sh = vppcom_session_create(proto, 1);
+        Address::InstanceConstSharedPtr address = vclEndptToAddress(ep, -1);
+        uint32_t sh = vppcom_session_create(proto, 1);
         wrk_listener_ = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
         wrk_listener_->bind(address);
-        uint32_t rv = vppcom_session_listen(sh, 5);
+        uint32_t rv = vppcom_session_listen(sh, 0 /* ignored */);
         if (rv) {
           VCL_LOG("listen failed sh {:x}", sh);
           return;
         }
-        wrk_listener_->setChildWrkListener(this);
+        wrk_listener_->setParentListener(this);
         VCL_LOG("add worker listener sh {:x} wrk_index {} new sh {:x}", sh_, wrk_index, sh);
       }
       vcl_handle = wrk_listener_.get();
     } else if (not_listened_) {
       // On main worker, no need to create worker listeners
-      vppcom_session_listen(sh_, 5);
+      vppcom_session_listen(sh_, 0 /* ignored */);
       not_listened_ = false;
     }
   }
@@ -734,12 +728,7 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
 }
 
 IoHandlePtr VclIoHandle::duplicate() {
-  auto wrk_index = vclWrkIndexOrRegister();
   VCL_LOG("duplicate called");
-
-  if (vppcom_session_worker(sh_) == wrk_index) {
-    return std::unique_ptr<VclIoHandle>(this);
-  }
 
   // Find what must be duplicated. Assume this is ONLY called for listeners
   vppcom_endpt_t ep;
@@ -747,12 +736,10 @@ IoHandlePtr VclIoHandle::duplicate() {
   ep.ip = addr_buf;
   uint32_t proto;
 
-  if (peekVclSession(sh_, &ep, &proto)) {
-    RELEASE_ASSERT(0, "");
-  }
+  RELEASE_ASSERT(peekVclSession(sh_, &ep, &proto) == false, "peek returned");
 
-  auto address = vclEndptToAddress(ep, -1);
-  auto sh = vppcom_session_create(proto, 1);
+  Address::InstanceConstSharedPtr address = vclEndptToAddress(ep, -1);
+  uint32_t sh = vppcom_session_create(proto, 1);
   IoHandlePtr io_handle = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
 
   io_handle->bind(address);

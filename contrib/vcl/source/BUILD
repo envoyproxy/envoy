@@ -43,6 +43,7 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":vcl_interface_lib",
         "@envoy_api//contrib/envoy/extensions/vcl/v3alpha:pkg_cc_proto",

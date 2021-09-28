@@ -76,23 +76,22 @@ public:
   void setCb(Event::FileReadyCb cb) { cb_ = cb; }
   void updateEvents(uint32_t events);
   uint32_t sh() const { return sh_; }
-  void clearChildWrkListener() {
-    if (wrk_listener_) {
-      wrk_listener_ = nullptr;
-    }
-  }
+  void clearChildWrkListener() { wrk_listener_ = nullptr; }
   VclIoHandle* getParentListener() { return parent_listener_; }
   bool isWrkListener() { return parent_listener_ != nullptr; }
 
 private:
-  void setChildWrkListener(VclIoHandle* parent_listener) { parent_listener_ = parent_listener; }
+  void setParentListener(VclIoHandle* parent_listener) { parent_listener_ = parent_listener; }
 
   uint32_t sh_{VCL_INVALID_SH};
   os_fd_t fd_;
   Event::FileEventPtr file_event_{nullptr};
-  bool is_listener_ = false;
-  bool not_listened_ = false;
+  bool is_listener_{false};
+  bool not_listened_{false};
+  // Listener allocated on main thread and shared with worker. VCL listen not called on it.
   VclIoHandle* parent_listener_{nullptr};
+  // Listener allocated on worker and associated to main thread (parent) listener. VCL listen called
+  // on it.
   std::unique_ptr<VclIoHandle> wrk_listener_{nullptr};
   Event::FileReadyCb cb_;
 };
