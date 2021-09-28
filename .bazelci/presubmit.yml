@@ -16,6 +16,7 @@ tasks:
     name: "Coverage"
     platform: ubuntu1804
     shell_commands:
+    - "apt update && apt install cmake"
     - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
     - "//test/common/common/..."
