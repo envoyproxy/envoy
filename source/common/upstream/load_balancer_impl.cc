@@ -769,9 +769,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
           slow_start_config.has_value() && slow_start_config.value().has_aggression()
               ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
               : absl::nullopt),
-      time_source_(time_source),
-      slow_start_enabled_(slow_start_window_ > std::chrono::milliseconds(0)),
-      latest_host_added_time_(time_source_.monotonicTime()) {
+      time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -781,7 +779,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
   member_update_cb_ = priority_set.addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector&) -> void {
-        if (slow_start_enabled_) {
+        if (isSlowStartEnabled()) {
           recalculateHostsInSlowStart(hosts_added);
         }
       });
@@ -813,7 +811,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
-    if (slow_start_enabled_) {
+    if (isSlowStartEnabled()) {
       recalculateHostsInSlowStart(hosts);
     }
 
@@ -871,8 +869,12 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
+bool EdfLoadBalancerBase::isSlowStartEnabled() {
+  return slow_start_window_ > std::chrono::milliseconds(0);
+}
+
 bool EdfLoadBalancerBase::noHostsAreInSlowStart() {
-  if (!slow_start_enabled_) {
+  if (!isSlowStartEnabled()) {
     return true;
   }
   auto current_time = time_source_.monotonicTime();

@@ -413,6 +413,7 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
+  bool isSlowStartEnabled();
   bool noHostsAreInSlowStart();
 
   virtual void recalculateHostsInSlowStart(const HostVector& hosts_added);
@@ -447,7 +448,6 @@ protected:
   double aggression_{1.0};
   const absl::optional<Runtime::Double> aggression_runtime_;
   TimeSource& time_source_;
-  bool slow_start_enabled_;
   MonotonicTime latest_host_added_time_;
 };
 

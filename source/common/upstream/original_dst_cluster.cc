@@ -118,8 +118,7 @@ OriginalDstCluster::OriginalDstCluster(
       use_http_header_(info_->lbOriginalDstConfig()
                            ? info_->lbOriginalDstConfig().value().use_http_header()
                            : false),
-      host_map_(std::make_shared<HostMap>()),
-      time_source_(factory_context.dispatcher().timeSource()) {
+      host_map_(std::make_shared<HostMap>()) {
   if (config.has_load_assignment()) {
     throw EnvoyException("ORIGINAL_DST clusters must have no load assignment configured");
   }

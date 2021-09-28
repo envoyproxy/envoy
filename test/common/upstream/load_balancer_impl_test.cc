@@ -1,4 +1,3 @@
-#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -40,7 +39,6 @@ public:
     return edf_lb.slow_start_window_;
   }
   static double aggression(EdfLoadBalancerBase& edf_lb) { return edf_lb.aggression_; }
-  static bool isSlowStartEnabled(EdfLoadBalancerBase& edf_lb) { return edf_lb.slow_start_enabled_; }
   static const std::chrono::milliseconds latestHostAddedTime(EdfLoadBalancerBase& edf_lb) {
     return std::chrono::time_point_cast<std::chrono::milliseconds>(edf_lb.latest_host_added_time_)
         .time_since_epoch();
@@ -1586,9 +1584,6 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto aggression =
       EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(1.0, aggression);
-  const auto slow_start_enabled_ =
-      EdfLoadBalancerBasePeer::isSlowStartEnabled(static_cast<EdfLoadBalancerBase&>(*lb_));
-  EXPECT_EQ(false, slow_start_enabled_);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
@@ -2143,9 +2138,6 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   const auto aggression =
       EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(1.0, aggression);
-  const auto slow_start_enabled_ =
-      EdfLoadBalancerBasePeer::isSlowStartEnabled(static_cast<EdfLoadBalancerBase&>(lb_2));
-  EXPECT_EQ(false, slow_start_enabled_);
   const auto latest_host_added_time =
       EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);

@@ -52,11 +52,9 @@ RedisCluster::RedisCluster(
           factory_context.clusterManager(), factory_context.api().timeSource())),
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
-          failure_refresh_threshold_, host_degraded_refresh_threshold_,
-          [&]() {
+          failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
             redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
-          })),
-      time_source_(dispatcher_.timeSource()) {
+          })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
