@@ -18,6 +18,13 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
 
     #
+    # Sip proxy
+    #
+
+    "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
+    "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
     # Private key providers
     #
 

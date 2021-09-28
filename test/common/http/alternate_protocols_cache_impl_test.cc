@@ -15,10 +15,13 @@ class AlternateProtocolsCacheImplTest : public testing::Test, public Event::Test
 public:
   AlternateProtocolsCacheImplTest()
       : store_(new NiceMock<MockKeyValueStore>()),
-        protocols_(simTime(), std::unique_ptr<KeyValueStore>(store_)) {}
+        protocols_(simTime(), std::unique_ptr<KeyValueStore>(store_), max_entries_) {}
+
+  const size_t max_entries_ = 10;
 
   MockKeyValueStore* store_;
   AlternateProtocolsCacheImpl protocols_;
+
   const std::string hostname1_ = "hostname1";
   const std::string hostname2_ = "hostname2";
   const uint32_t port1_ = 1;
@@ -130,6 +133,22 @@ TEST_F(AlternateProtocolsCacheImplTest, FindAlternativesAfterTruncation) {
   ASSERT_TRUE(protocols.has_value());
   EXPECT_EQ(10, protocols->size());
   EXPECT_EQ(expected_protocols, protocols.ref());
+}
+
+TEST_F(AlternateProtocolsCacheImplTest, MaxEntries) {
+  EXPECT_EQ(0, protocols_.size());
+  const std::string hostname = "hostname";
+  for (uint32_t i = 0; i <= max_entries_; ++i) {
+    const AlternateProtocolsCache::Origin origin = {https_, hostname, i};
+    AlternateProtocolsCache::AlternateProtocol protocol = {alpn1_, hostname, i, expiration1_};
+    std::vector<AlternateProtocolsCache::AlternateProtocol> protocols = {protocol};
+    EXPECT_CALL(*store_, addOrUpdate(absl::StrCat("https://hostname:", i),
+                                     absl::StrCat("alpn1=\"hostname:", i, "\"; ma=5")));
+    if (i == max_entries_) {
+      EXPECT_CALL(*store_, remove("https://hostname:0"));
+    }
+    protocols_.setAlternatives(origin, protocols);
+  }
 }
 
 TEST_F(AlternateProtocolsCacheImplTest, ToAndFromString) {

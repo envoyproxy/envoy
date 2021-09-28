@@ -33,6 +33,16 @@ envoy.filters.network.postgres_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: stable
+envoy.filters.network.sip_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.filters.sip.router:
+  categories:
+  - envoy.sip_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.tls.key_providers.cryptomb:
   categories:
   - envoy.tls.key_providers
