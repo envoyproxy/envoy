@@ -34,10 +34,13 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
-* Use a `[#alpha:]` annotation in comments for messages that are considered alpha
-  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
-  of extensions described below, but allows tagging messages that are used as part of the core API
-  as alpha without having to break it into its own file.
+* Use a `(xds.annotations.v3.file_status).work_in_progress`,
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,
+  messages, or fields, respectively, that are considered work in progress and are not subject to the
+  threat model or the breaking change policy. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging protos that are used as part of the core API
+  as work in progress without having to break them into their own file.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 

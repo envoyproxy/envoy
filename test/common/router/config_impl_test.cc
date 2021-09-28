@@ -2891,6 +2891,39 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, WeightedClusterHeader) {
+  const std::string yaml = R"EOF(
+      virtual_hosts:
+        - name: www1
+          domains: ["www1.lyft.com"]
+          routes:
+            - match: { prefix: "/" }
+              route:
+                weighted_clusters:
+                  total_weight: 100
+                  clusters:
+                    - cluster_header: some_header
+                      weight: 30
+                    - name: cluster1
+                      weight: 30
+                    - name: cluster2
+                      weight: 40
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"some_header", "cluster1", "cluster2"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("www1.lyft.com", "/foo", "GET");
+  // The configured cluster header isn't present in the request headers, therefore cluster selection
+  // fails and we get the empty string
+  EXPECT_EQ("", config.route(headers, 115)->routeEntry()->clusterName());
+  // Modify the header mapping.
+  headers.addCopy("some_header", "some_cluster");
+  EXPECT_EQ("some_cluster", config.route(headers, 115)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster1", config.route(headers, 445)->routeEntry()->clusterName());
+  EXPECT_EQ("cluster2", config.route(headers, 560)->routeEntry()->clusterName());
+}
+
 TEST_F(RouteMatcherTest, ContentType) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5643,7 +5676,8 @@ virtual_hosts:
   EXPECT_EQ(opaque_config.find("name2")->second, "value2");
 }
 
-// Test that the deprecated name works for opaque configs.
+// Test that the deprecated name no longer works by default for opaque configs.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestOpaqueConfigUsingDeprecatedName)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5663,13 +5697,8 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"ats"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  const std::multimap<std::string, std::string>& opaque_config =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
-
-  EXPECT_EQ(opaque_config.find("name1")->second, "value1");
-  EXPECT_EQ(opaque_config.find("name2")->second, "value2");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};

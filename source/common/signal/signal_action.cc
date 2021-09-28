@@ -54,12 +54,16 @@ void SignalAction::sigHandler(int sig, siginfo_t* info, void* context) {
 }
 
 void SignalAction::installSigHandlers() {
+  // sigaltstack and backtrace() are incompatible on Apple platforms
+  // https://reviews.llvm.org/D28265
+#if !defined(__APPLE__)
   stack_t stack;
   stack.ss_sp = altstack_ + guard_size_; // Guard page at one end ...
   stack.ss_size = altstack_size_;        // ... guard page at the other
   stack.ss_flags = 0;
 
   RELEASE_ASSERT(sigaltstack(&stack, &previous_altstack_) == 0, "");
+#endif
 
   // Make sure VersionInfo::version() is initialized so we don't allocate std::string in signal
   // handlers.
