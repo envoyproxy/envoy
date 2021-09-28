@@ -20,7 +20,7 @@ On Windows, run the following commands:
 ```cmd
 mkdir %USERPROFILE%\bazel
 powershell Invoke-WebRequest https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-windows-amd64.exe -OutFile %USERPROFILE%\bazel\bazel.exe
-set PATH=%PATH%;%USERPROFILE%\bazel
+set PATH=%USERPROFILE%\bazel;%PATH%
 ```
 
 ## Production environments
@@ -154,8 +154,8 @@ for how to update or override dependencies.
     package.
     ```cmd
     mklink %USERPROFILE%\Python39\python3.exe %USERPROFILE%\Python39\python.exe
-    set PATH=%PATH%;%USERPROFILE%\Python39
-    set PATH=%PATH%;%USERPROFILE%\Python39\Scripts
+    set PATH=%USERPROFILE%\Python39;%PATH%
+    set PATH=%USERPROFILE%\Python39\Scripts;%PATH%
     pip install wheel
     ```
 
@@ -169,7 +169,7 @@ for how to update or override dependencies.
     which is determined by their relative ordering in your PATH.
     ```cmd
     set BAZEL_VC=%USERPROFILE%\VSBT2019\VC
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64
+    set PATH=%USERPROFILE%\VSBT2019\VC\Tools\MSVC\14.26.28801\bin\Hostx64\x64;%PATH%
     ```
 
     The Windows SDK contains header files and libraries you need when building Windows applications. Bazel always uses the latest, but you can specify a different version by setting the environment variable `BAZEL_WINSDK_FULL_VERSION`. See [bazel/windows](https://docs.bazel.build/versions/master/windows.html)
@@ -179,8 +179,8 @@ for how to update or override dependencies.
     the project's GCP CI remote build environment, so 64 bit builds from the CMake and ninja
     projects are used instead.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin
-    set PATH=%PATH%;%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja
+    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%PATH%
+    set PATH=%USERPROFILE%\VSBT2019\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%
     ```
 
     [MSYS2 shell](https://msys2.github.io/): Install to a path with no spaces, e.g. C:\msys64.
@@ -189,7 +189,7 @@ for how to update or override dependencies.
     executable. Additionally, setting the `MSYS2_ARG_CONV_EXCL` environment variable to a value
     of `*` is often advisable to ensure argument parsing in the MSYS2 shell behaves as expected.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\msys64\usr\bin
+    set PATH=%USERPROFILE%\msys64\usr\bin;%PATH%
     set BAZEL_SH=%USERPROFILE%\msys64\usr\bin\bash.exe
     set MSYS2_ARG_CONV_EXCL=*
     set MSYS2_PATH_TYPE=inherit
@@ -216,7 +216,7 @@ for how to update or override dependencies.
     [Git](https://git-scm.com/downloads): This version from the Git project, or the version
     distributed using pacman under MSYS2 will both work, ensure one is on the PATH:.
     ```cmd
-    set PATH=%PATH%;%USERPROFILE%\Git\bin
+    set PATH=%USERPROFILE%\Git\bin;%PATH%
     ```
 
     Lastly, persist environment variable changes.

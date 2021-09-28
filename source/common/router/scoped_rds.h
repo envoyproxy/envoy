@@ -217,8 +217,7 @@ private:
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   // Propagate RDS updates to ScopeConfigImpl in workers.
-  void onRdsConfigUpdate(const std::string& scope_name,
-                         RdsRouteConfigSubscription& rds_subscription);
+  void onRdsConfigUpdate(const std::string& scope_name, ConfigConstSharedPtr new_rds_config);
 
   // ScopedRouteInfo by scope name.
   ScopedRouteMap scoped_route_map_;

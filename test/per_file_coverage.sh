@@ -21,7 +21,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tracing:96.1"
 "source/common/watchdog:42.9" # Death tests don't report LCOV
 "source/exe:94.3"
-"source/extensions/common/crypto:91.5"
 "source/extensions/common/tap:95.9"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/null:77.8"
