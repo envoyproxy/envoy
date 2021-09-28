@@ -598,8 +598,12 @@ TEST_P(LdsIntegrationTest, NewListenerWithBadPostListenSocketOption) {
 }
 
 // Verify the grpc cached logger is available after the initial logger filter is destroyed.
+// Regression test for https://github.com/envoyproxy/envoy/issues/18066
 TEST_P(LdsIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   autonomous_upstream_ = true;
+  // The grpc access logger connection never closes. It's ok to see an incomplete logging stream.
+  autonomous_allow_incomplete_streams_ = true;
+
   const std::string grpc_logger_string = R"EOF(
     name: grpc_accesslog
     typed_config:
@@ -612,6 +616,10 @@ TEST_P(LdsIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
             cluster_name: cluster_0
   )EOF";
 
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->set_stat_prefix("listener_0");
+  });
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) { TestUtility::loadFromYaml(grpc_logger_string, *hcm.add_access_log()); });
@@ -620,14 +628,23 @@ TEST_P(LdsIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
   // the initial LDS file has loaded.
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 
-  // HTTP 1.0 is disabled by default.
+  // HTTP 1.1 is allowed and the connection is kept open until the listener update.
   std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
-  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+  auto connection =
+      createConnectionDriver(lookupPort("http"), "GET / HTTP/1.1\r\nHost: host\r\n\r\n",
+                             [&response, &dispatcher = *dispatcher_](
+                                 Network::ClientConnection&, const Buffer::Instance& data) -> void {
+                               response.append(data.toString());
+                               if (response.find("\r\n\r\n") != std::string::npos) {
+                                 dispatcher.exit();
+                               }
+                             });
+  connection->run();
+  EXPECT_TRUE(response.find("HTTP/1.1 200") == 0);
 
-  test_server_->waitForCounterGe("access_logs.grpc_access_log.logs_written", 1);
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 1);
 
-  // Create a new config with HTTP/1.0 proxying.
+  // Create a new config with HTTP/1.0 proxying. The goal is to trigger a listener update.
   ConfigHelper new_config_helper(
       version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
   new_config_helper.addConfigModifier(
@@ -635,19 +652,27 @@ TEST_P(LdsIntegrationTest, GrpcLoggerSurvivesAfterReloadConfig) {
               hcm) {
         hcm.mutable_http_protocol_options()->set_accept_http_10(true);
         hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
-        TestUtility::loadFromYaml(grpc_logger_string, *hcm.add_access_log());
       });
 
   // Create an LDS response with the new config, and reload config.
   new_config_helper.setLds("1");
   test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForCounterGe("listener_manager.lds.update_success", 2);
+  test_server_->waitForCounterEq("listener_manager.lds.update_success", 2);
 
-  // HTTP 1.0 should now be enabled.
+  // Wait until the http 1.1 connection is destroyed due to the listener update. It indicates the
+  // listener starts draining.
+  test_server_->waitForGaugeEq("listener.listener_0.downstream_cx_active", 0);
+  // Wait until all the draining filter chain is gone. It indicates the old listener and filter
+  // chains are destroyed.
+  test_server_->waitForGaugeEq("listener_manager.total_filter_chains_draining", 0);
+
+  // Verify that the new listener config is applied.
   std::string response2;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, true);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
-  test_server_->waitForCounterGe("access_logs.grpc_access_log.logs_written", 2);
+
+  // Verify that the grpc access logger is available after the listener update.
+  test_server_->waitForCounterEq("access_logs.grpc_access_log.logs_written", 2);
 }
 
 // Sample test making sure our config framework informs on listener failure.
