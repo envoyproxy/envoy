@@ -49,13 +49,13 @@ LogicalDnsCluster::LogicalDnsCluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
-                      factory_context.dispatcher().timeSource()),
+                      factory_context.mainThreadDispatcher().timeSource()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(
-          factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
+          factory_context.mainThreadDispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =

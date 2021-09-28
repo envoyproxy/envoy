@@ -971,6 +971,16 @@ void ClusterManagerImpl::drainConnections() {
   });
 }
 
+void ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
+  const auto& it = active_clusters_.find(cluster);
+  if (it == active_clusters_.end()) {
+    throw EnvoyException(fmt::format("Unknown gRPC client cluster '{}'", cluster));
+  }
+  if (it->second->added_via_api_) {
+    throw EnvoyException(fmt::format("gRPC client cluster '{}' is not static", cluster));
+  }
+}
+
 void ClusterManagerImpl::postThreadLocalRemoveHosts(const Cluster& cluster,
                                                     const HostVector& hosts_removed) {
   tls_.runOnAllThreads([name = cluster.info()->name(),
@@ -1197,10 +1207,10 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(
   // guarding deletion with `do_not_delete_` in the registered idle callback, and then checking
   // afterwards whether it is empty and deleting it if necessary.
   container.do_not_delete_ = true;
-  pools->startDrain();
+  pools->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   container.do_not_delete_ = false;
 
-  if (container.pools_->size() == 0) {
+  if (container.pools_->empty()) {
     host_http_conn_pool_map_.erase(old_host);
   }
 }
@@ -1217,7 +1227,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainTcpConnPools(
 
   container.draining_ = true;
   for (auto pool : pools) {
-    pool->startDrain();
+    pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
   }
 }
 
@@ -1389,10 +1399,11 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
     const auto container = getHttpConnPoolsContainer(host);
     if (container != nullptr) {
       container->do_not_delete_ = true;
-      container->pools_->drainConnections();
+      container->pools_->drainConnections(
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
       container->do_not_delete_ = false;
 
-      if (container->pools_->size() == 0) {
+      if (container->pools_->empty()) {
         host_http_conn_pool_map_.erase(host);
       }
     }
@@ -1417,7 +1428,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainAllConnPoolsWorker(
             ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE) {
           pool->closeConnections();
         } else {
-          pool->drainConnections();
+          pool->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
         }
       }
     }
@@ -1538,7 +1549,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
     // Guard deletion of the container with `do_not_delete_` to avoid deletion while
     // iterating through the container in `container->pools_->startDrain()`. See
     // comment in `ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools`.
-    if (!container->do_not_delete_ && container->pools_->size() == 0) {
+    if (!container->do_not_delete_ && container->pools_->empty()) {
       ENVOY_LOG(trace, "Pool container empty for host {}, erasing host entry", host);
       host_http_conn_pool_map_.erase(
           host); // NOTE: `container` is erased after this point in the lambda.
@@ -1632,8 +1643,9 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
-      bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_, main_thread_dispatcher_,
-      admin_, validation_context_, api_, http_context_, grpc_context_, router_context_)};
+      bootstrap, *this, stats_, tls_, context_.runtime(), context_.localInfo(), log_manager_,
+      context_.mainThreadDispatcher(), context_.admin(), validation_context_, context_.api(),
+      http_context_, grpc_context_, router_context_)};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
@@ -1644,21 +1656,19 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     TimeSource& source, ClusterConnectivityState& state) {
-  if (protocols.size() == 3 && runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+  if (protocols.size() == 3 &&
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
-    if (alternate_protocol_options.has_value()) {
-      alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
-    }
+    ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
+    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
-        dispatcher, api_.randomGenerator(), host, priority, options, transport_socket_options,
-        state, source, alternate_protocols_cache, std::chrono::milliseconds(300), coptions,
-        quic_stat_names_, stats_);
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, source, alternate_protocols_cache,
+        std::chrono::milliseconds(300), coptions, quic_stat_names_, stats_);
 #else
     // Should be blocked by configuration checking at an earlier point.
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1666,20 +1676,20 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   if (protocols.size() >= 2) {
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
-    return std::make_unique<Http::HttpConnPoolImplMixed>(dispatcher, api_.randomGenerator(), host,
-                                                         priority, options,
-                                                         transport_socket_options, state);
+    return std::make_unique<Http::HttpConnPoolImplMixed>(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http2", 100)) {
-    return Http::Http2::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state);
+      context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
+    return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
-      runtime_.snapshot().featureEnabled("upstream.use_http3", 100)) {
+      context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
 #ifdef ENVOY_ENABLE_QUIC
-    return Http::Http3::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority,
-                                         options, transport_socket_options, state, source,
+    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
+                                         priority, options, transport_socket_options, state, source,
                                          quic_stat_names_, stats_);
 #else
     UNREFERENCED_PARAMETER(source);
@@ -1688,8 +1698,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
 #endif
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
-  return Http::Http1::allocateConnPool(dispatcher, api_.randomGenerator(), host, priority, options,
-                                       transport_socket_options, state);
+  return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
+                                       options, transport_socket_options, state);
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
@@ -1711,12 +1721,12 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
     const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
-      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
-      main_thread_dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
-      outlier_event_logger, added_via_api,
+      cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, context_.runtime(),
+      context_.mainThreadDispatcher(), log_manager_, context_.localInfo(), admin_,
+      singleton_manager_, outlier_event_logger, added_via_api,
       added_via_api ? validation_context_.dynamicValidationVisitor()
                     : validation_context_.staticValidationVisitor(),
-      api_, options_);
+      context_.api(), context_.options());
 }
 
 CdsApiPtr

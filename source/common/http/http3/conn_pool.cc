@@ -65,10 +65,15 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names,
        &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), debug,
+                            "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
         if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
+                              "Failed to create Http/3 client. Transport socket "
+                              "factory is not configured correctly.");
           return nullptr;
         }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
@@ -82,7 +87,13 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         data.connection_ =
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
                                               source_address, quic_stat_names, scope);
-        return std::make_unique<ActiveClient>(*pool, data);
+        // Store a handle to connection as it will be moved during client construction.
+        Network::Connection& connection = *data.connection_;
+        auto client = std::make_unique<ActiveClient>(*pool, data);
+        if (connection.state() == Network::Connection::State::Closed) {
+          return nullptr;
+        }
+        return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),

@@ -23,6 +23,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "custom_stat_namespaces_impl_test",
+    srcs = ["custom_stat_namespaces_impl_test.cc"],
+    deps = [
+        "//source/common/stats:custom_stat_namespaces_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [
