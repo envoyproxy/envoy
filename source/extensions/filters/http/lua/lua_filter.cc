@@ -9,6 +9,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/config/datasource.h"
+#include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/http/message_impl.h"
 
@@ -699,7 +700,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.dispatcher()), disabled_(config.disabled()),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
       name_(config.name()) {
   if (disabled_ || !name_.empty()) {
     return;

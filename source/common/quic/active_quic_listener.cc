@@ -221,6 +221,24 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
   return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
 }
 
+void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
+  config_ = &config;
+  dynamic_cast<EnvoyQuicProofSource*>(crypto_config_->proof_source())
+      ->updateFilterChainManager(config.filterChainManager());
+  quic_dispatcher_->updateListenerConfig(config);
+}
+
+void ActiveQuicListener::onFilterChainDraining(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  for (auto* filter_chain : draining_filter_chains) {
+    closeConnectionsWithFilterChain(filter_chain);
+  }
+}
+
+void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
+  quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names)

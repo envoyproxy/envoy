@@ -599,3 +599,22 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )
+
+envoy_cc_test_library(
+    name = "repick_cluster_filter_lib",
+    srcs = [
+        "repick_cluster_filter.cc",
+    ],
+    hdrs = [
+        "repick_cluster_filter.h",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+)

@@ -147,7 +147,13 @@ protected:
   IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
       const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
-      int upstream_index = 0, std::chrono::milliseconds time = TestUtility::DefaultTimeout);
+      uint64_t upstream_index = 0, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  IntegrationStreamDecoderPtr sendRequestAndWaitForResponse(
+      const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
+      const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
+      const std::vector<uint64_t>& upstream_indices,
+      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.

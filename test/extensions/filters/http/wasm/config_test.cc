@@ -38,7 +38,7 @@ protected:
     ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     EXPECT_CALL(context_, initManager()).WillRepeatedly(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
