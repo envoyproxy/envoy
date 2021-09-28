@@ -114,12 +114,6 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
           // break the loop but should not create new connection
           no_error = false;
           break;
-        } else if ((*iter_)->maxReadBytes() == 0) {
-          // The filter return stop the filters iteration and doesn't need to inspect data.
-          // We consider it as the filter reject the connection.
-          socket_->ioHandle().close();
-          continueFilterChain(false);
-          return;
         } else {
           // When reach this branch, the maxReadBytes must greater than 0.
           // the negative maxReadBytes is invalid.

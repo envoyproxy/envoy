@@ -118,23 +118,6 @@ public:
 };
 
 /**
- * The filter return StopIteration and doesn't expect any data.
- */
-TEST_F(ActiveTcpListenerTest, ListenerFilterRejectConnection) {
-  initializeWithFilter();
-
-  // The filter stop the filter iteration and waiting for the data.
-  EXPECT_CALL(*filter_, onAccept(_)).WillOnce(Return(Network::FilterStatus::StopIteration));
-  EXPECT_CALL(io_handle_, isOpen()).WillOnce(Return(true));
-  EXPECT_CALL(io_handle_, close())
-      .WillOnce(Return(
-          ByMove(Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {})))));
-
-  // calling the onAcceptWorker() to create the ActiveTcpSocket.
-  generic_active_listener_->onAcceptWorker(std::move(generic_accepted_socket_), false, true);
-}
-
-/**
  * Execute peek data two times, then filter return successful.
  */
 TEST_F(ActiveTcpListenerTest, ListenerFilterWithInspectData) {

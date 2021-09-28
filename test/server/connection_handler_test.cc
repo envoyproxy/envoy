@@ -1,3 +1,4 @@
+#include "envoy/api/io_error.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
@@ -1032,19 +1033,27 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(512);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  Network::MockIoHandle io_handle;
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                             Event::FileReadyType::Read));
+  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
+    return  Api::IoCallUint64Result(0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                                     Network::IoSocketError::deleteIoError));
+  });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
-  Network::IoSocketHandleImpl io_handle{42};
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
   Event::MockTimer* timeout = new Event::MockTimer(&dispatcher_);
   EXPECT_CALL(*timeout, enableTimer(std::chrono::milliseconds(15000), _));
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
@@ -1219,20 +1228,30 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
       .WillRepeatedly(ReturnRef(local_address_));
   handler_->addListener(absl::nullopt, *test_listener);
 
-  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter();
+  Network::MockListenerFilter* test_filter = new Network::MockListenerFilter(512);
   EXPECT_CALL(factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_, Network::ListenerFilterPtr{test_filter});
         return true;
       }));
+  Network::MockIoHandle io_handle;
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                             Event::FileReadyType::Read));
+  EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
+    return  Api::IoCallUint64Result(0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                                                     Network::IoSocketError::deleteIoError));
+  });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
       }));
-  EXPECT_CALL(*access_log_, log(_, _, _, _));
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+  //EXPECT_CALL(*access_log_, log(_, _, _, _));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*test_filter, destroy_());
-  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
   EXPECT_CALL(*listener, onDestroy());
