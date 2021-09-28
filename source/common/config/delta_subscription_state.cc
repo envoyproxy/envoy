@@ -102,6 +102,10 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (isHeartbeatResponse(resource)) {
       continue;
     }
+    if (!wildcard_ && !resource_state_.contains(resource.name())) {
+      // Only consider tracked resources.
+      continue;
+    }
     non_heartbeat_resources.Add()->CopyFrom(resource);
     // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
     if (!resource.has_resource() && resource.aliases_size() > 0) {
@@ -123,10 +127,8 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    for (const auto& resource : message.resources()) {
-      if (wildcard_ || resource_state_.contains(resource.name())) {
-        addResourceState(resource);
-      }
+    for (const auto& resource : non_heartbeat_resources) {
+      addResourceState(resource);
     }
   }
 

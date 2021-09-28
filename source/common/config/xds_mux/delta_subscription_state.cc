@@ -78,6 +78,10 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (isHeartbeatResource(resource)) {
       continue;
     }
+    if (!wildcard_ && !resource_state_.contains(resource.name())) {
+      // Only consider tracked resources.
+      continue;
+    }
     // TODO (dmitri-d) consider changing onConfigUpdate callback interface to avoid copying of
     // resources
     non_heartbeat_resources.Add()->CopyFrom(resource);
@@ -101,10 +105,8 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    for (const auto& resource : message.resources()) {
-      if (wildcard_ || resource_state_.contains(resource.name())) {
-        addResourceState(resource);
-      }
+    for (const auto& resource : non_heartbeat_resources) {
+      addResourceState(resource);
     }
   }
 
