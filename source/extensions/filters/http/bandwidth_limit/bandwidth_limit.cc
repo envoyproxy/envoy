@@ -164,7 +164,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     // If upstream has trailers, addEncodedTrailers won't be called
     bool trailer_added = false;
     if (end_stream) {
-      trailers = &encoder_callbacks_->addEncodedTrailers();
+      trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
 
@@ -184,9 +184,9 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus
-BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap& responseTrailers) {
+BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap& response_trailers) {
   if (response_limiter_ != nullptr) {
-    trailers = &responseTrailers;
+    trailers_ = &response_trailers;
 
     if (response_limiter_->onTrailers()) {
       return Http::FilterTrailersStatus::StopIteration;
@@ -212,11 +212,11 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
     const auto& config = getConfig();
 
     auto response_duration = response_latency_.get()->elapsed().count();
-    if (trailers != nullptr && request_duration_ > 0) {
-      trailers->setCopy(config.request_delay_trailer(), std::to_string(request_duration_));
+    if (trailers_ != nullptr && request_duration_ > 0) {
+      trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_));
     }
-    if (trailers != nullptr && response_duration > 0) {
-      trailers->setCopy(config.response_delay_trailer(), std::to_string(response_duration));
+    if (trailers_ != nullptr && response_duration > 0) {
+      trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_duration));
     }
     response_latency_->complete();
     response_latency_.reset();

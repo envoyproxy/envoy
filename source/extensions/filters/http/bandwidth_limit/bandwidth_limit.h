@@ -73,8 +73,8 @@ public:
   EnableMode enableMode() const { return enable_mode_; };
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
-  const Http::LowerCaseString& request_delay_trailer() const { return request_delay_trailer_; }
-  const Http::LowerCaseString& response_delay_trailer() const { return response_delay_trailer_; }
+  const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
+  const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
 
 private:
   friend class FilterTest;
@@ -149,7 +149,7 @@ private:
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
   uint64_t request_duration_ = 0;
-  Http::ResponseTrailerMap* trailers;
+  Http::ResponseTrailerMap* trailers_;
 };
 
 } // namespace BandwidthLimitFilter
