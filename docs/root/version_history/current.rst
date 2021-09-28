@@ -132,7 +132,7 @@ New Features
 * thrift_proxy: added support for :ref:`mirroring requests <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies>`.
 * udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 * udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
-* upstream: support max stream duration for upstream connections.
+* upstream: added the ability to :ref:`configure max connection duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` for upstream clusters.
 
 Deprecated
 ----------
