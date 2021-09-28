@@ -260,6 +260,22 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-07",
         cpe = "cpe:2.3:a:grpc:grpc:*",
     ),
+    com_github_intel_ipp_crypto_crypto_mb = dict(
+        project_name = "libipp-crypto",
+        project_desc = "Intel® Integrated Performance Primitives Cryptography",
+        project_url = "https://github.com/intel/ipp-crypto",
+        # The required BoringSSL compatibility patches are present in the
+        # "development" branch, but not yet in the release branch. The target
+        # release for the patches is 2021.4.
+        version = "4048dac1617bf33ff85d37a4b8f68f21342263b7",
+        sha256 = "4316589a7c0afa5788b84b04510283dab0979bf6d3b0aa0e4ef0fe540675af5e",
+        strip_prefix = "ipp-crypto-{version}",
+        urls = ["https://github.com/intel/ipp-crypto/archive/{version}.tar.gz"],
+        release_date = "2021-07-07",
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.tls.key_providers.cryptomb"],
+        cpe = "N/A",
+    ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
         project_desc = "Just-In-Time compiler for Lua",
@@ -640,7 +656,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "69de5c704a05ff37862f7e0f5534d4f479418afc21806c887db544a316f3cb6b",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
         use_category = ["build", "api"],
-        release_date = "2021-03-17",
+        release_date = "2021-03-18",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -822,12 +838,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "744a8d60762acb1b7d73fc4f169bdf2258ca35d8",
-        sha256 = "5840ef8d4767a6d51302c75964f05e77bc9c504b7c6a283b9762980b3892e23f",
+        version = "3ba85b1c85fbd9439cfe3a8adf4d9a9238503d14",
+        sha256 = "7d7d6ce97864e76211dd45372f9285d98141dde83fb81c2ac544a4bdf3a42b9c",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2021-09-15",
+        release_date = "2021-09-22",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
