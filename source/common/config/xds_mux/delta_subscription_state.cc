@@ -105,7 +105,6 @@ void DeltaSubscriptionState::handleGoodResponse(
       if (wildcard_ || resource_state_.contains(resource.name())) {
         addResourceState(resource);
       }
-      addResourceState(resource);
     }
   }
 
