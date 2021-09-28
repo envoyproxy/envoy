@@ -21,11 +21,16 @@ using ProcessingFunc = std::function<void(
     grpc::ServerReaderWriter<envoy::service::ext_proc::v3alpha::ProcessingResponse,
                              envoy::service::ext_proc::v3alpha::ProcessingRequest>*)>;
 
+// An implementation of this function may be called so that a test may verify
+// the gRPC context.
+using ContextProcessingFunc = std::function<void(grpc::ServerContext*)>;
+
 // An implementation of the ExternalProcessor service that may be included
 // in integration tests.
 class ProcessorWrapper : public envoy::service::ext_proc::v3alpha::ExternalProcessor::Service {
 public:
-  ProcessorWrapper(ProcessingFunc& cb) : callback_(cb) {}
+  ProcessorWrapper(ProcessingFunc& cb, absl::optional<ContextProcessingFunc> context_cb)
+      : callback_(cb), context_callback_(context_cb) {}
 
   grpc::Status
   Process(grpc::ServerContext*,
@@ -35,6 +40,7 @@ public:
 
 private:
   ProcessingFunc callback_;
+  absl::optional<ContextProcessingFunc> context_callback_;
 };
 
 // This class starts a gRPC server supporting the ExternalProcessor service.
@@ -45,7 +51,8 @@ public:
   // Start the processor listening on an ephemeral port (port 0) on the local host.
   // All new streams will be delegated to the specified function. The function
   // will be invoked in a background thread controlled by the gRPC server.
-  void start(const Network::Address::IpVersion ip_version, ProcessingFunc cb);
+  void start(const Network::Address::IpVersion ip_version, ProcessingFunc cb,
+             absl::optional<ContextProcessingFunc> context_cb = absl::nullopt);
 
   // Stop the processor from listening once all streams are closed, and exit
   // the listening threads.
