@@ -19,9 +19,9 @@ namespace {
 
 // Test that deprecated names indicate warning or block depending on runtime flags.
 TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedExtensionNameStatus)) {
-  // Validate that no runtime available results in warnings.
+  // Validate that no runtime available results in block.
   {
-    EXPECT_EQ(ExtensionNameUtil::Status::Warn,
+    EXPECT_EQ(ExtensionNameUtil::Status::Block,
               ExtensionNameUtil::deprecatedExtensionNameStatus(nullptr));
   }
 
@@ -54,16 +54,11 @@ TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestDeprecatedExtensionNameS
 
 // Test that deprecated names trigger an exception.
 TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtensionNameThrows)) {
-  // Validate that no runtime available results in warnings.
+  // Validate that no runtime available results in exception.
   {
-    auto test = []() {
-      ExtensionNameUtil::checkDeprecatedExtensionName("XXX", "deprecated", "canonical", nullptr);
-    };
-
-    EXPECT_NO_THROW(test());
-
-    EXPECT_LOG_CONTAINS("warn", "Using deprecated XXX extension name 'deprecated' for 'canonical'.",
-                        test());
+    EXPECT_THROW_WITH_REGEX(
+        ExtensionNameUtil::checkDeprecatedExtensionName("XXX", "deprecated", "canonical", nullptr),
+        EnvoyException, "Using deprecated XXX extension name 'deprecated' for 'canonical'.*");
   }
 
   // If deprecated feature is enabled, warn.
@@ -101,16 +96,15 @@ TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestCheckDeprecatedExtension
 
 // Test that deprecated names are reported as allowed or not, with logging.
 TEST(ExtensionNameUtilTest, DEPRECATED_FEATURE_TEST(TestAllowDeprecatedExtensionName)) {
-  // Validate that no runtime available results in warnings and allows deprecated names.
+  // Validate that no runtime available results in a log message and returns false.
   {
     auto test = []() {
       return ExtensionNameUtil::allowDeprecatedExtensionName("XXX", "deprecated", "canonical",
                                                              nullptr);
     };
-    EXPECT_TRUE(test());
+    EXPECT_FALSE(test());
 
-    EXPECT_LOG_CONTAINS("warn", "Using deprecated XXX extension name 'deprecated' for 'canonical'.",
-                        test());
+    EXPECT_LOG_CONTAINS("error", "#using-runtime-overrides-for-deprecated-features", test());
   }
 
   // If deprecated feature is enabled, log and return true.
