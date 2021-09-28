@@ -102,6 +102,9 @@ void DeltaSubscriptionState::handleGoodResponse(
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     for (const auto& resource : message.resources()) {
+      if (wildcard_ || resource_state_.contains(resource.name())) {
+        addResourceState(resource);
+      }
       addResourceState(resource);
     }
   }
