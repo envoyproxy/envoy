@@ -74,6 +74,8 @@ envoy_network_t Configurator::setPreferredNetwork(envoy_network_t network) {
 
 envoy_network_t Configurator::getPreferredNetwork() { return preferred_network_.load(); }
 
+bool Configurator::overrideInterface(envoy_network_t) { return false; }
+
 void Configurator::refreshDns(envoy_network_t network) {
   // refreshDns is intended to be queued on Envoy's event loop, whereas preferred_network_ is
   // updated synchronously. In the event that multiple refreshes become queued on the event loop,
@@ -100,7 +102,7 @@ std::vector<std::string> Configurator::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6);
 }
 
-Socket::OptionsSharedPtr Configurator::getUpstreamSocketOptions(envoy_network_t network) {
+Socket::OptionsSharedPtr Configurator::getUpstreamSocketOptions(envoy_network_t network, bool) {
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.

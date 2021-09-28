@@ -39,6 +39,11 @@ public:
   envoy_network_t getPreferredNetwork();
 
   /**
+   * @returns whether to override the specified network interface based on internal heuristics.
+   */
+  bool overrideInterface(envoy_network_t network);
+
+  /**
    * Sets the current OS default/preferred network class.
    * @param network, the network preference.
    */
@@ -53,7 +58,8 @@ public:
   /**
    * @returns the current socket options that should be used for connections.
    */
-  Socket::OptionsSharedPtr getUpstreamSocketOptions(envoy_network_t network);
+  Socket::OptionsSharedPtr getUpstreamSocketOptions(envoy_network_t network,
+                                                    bool override_interface);
 
 private:
   std::vector<std::string> enumerateInterfaces(unsigned short family);

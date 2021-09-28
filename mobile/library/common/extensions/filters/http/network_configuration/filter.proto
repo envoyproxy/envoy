@@ -3,4 +3,7 @@ syntax = "proto3";
 package envoymobile.extensions.filters.http.network_configuration;
 
 message NetworkConfiguration {
+  // If set to true, the filter will permit the NetworkConfigurator to provide upstream
+  // socket option that MAY bind a connection to a specific network interface.
+  bool enable_interface_binding = 1;
 }
