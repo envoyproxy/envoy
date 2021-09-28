@@ -2,7 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_contrib_extension",
     "envoy_cc_library",
-    "envoy_cmake_external",
+    "envoy_cmake",
     "envoy_contrib_package",
 )
 load(
@@ -14,7 +14,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
-envoy_cmake_external(
+envoy_cmake(
     name = "ipp-crypto",
     cache_entries = {
         "BORINGSSL": "on",
@@ -23,7 +23,7 @@ envoy_cmake_external(
         "OPENSSL_USE_STATIC_LIBS=TRUE",
     ],
     lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
-    static_libraries = ["libcrypto_mb.a"],
+    out_static_libs = ["libcrypto_mb.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     visibility = ["//visibility:private"],
