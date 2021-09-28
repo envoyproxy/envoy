@@ -493,8 +493,8 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
                                    true);
   EXPECT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  // PING frames should be sent at 1s, 2s, 3s, 4s, 5s, 6s and 8s after entering the wait.
-  EXPECT_EQ(quic_connection_->GetStats().ping_frames_sent, 7u);
+  // First 6 PING frames should be sent every 1s, and the following ones less frequently.
+  EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, 8u);
 }
 
 TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepaliveDisabled) {
