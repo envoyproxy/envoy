@@ -13,7 +13,13 @@ Http::FilterHeadersStatus NetworkConfigurationFilter::decodeHeaders(Http::Reques
   envoy_network_t network = network_configurator_->getPreferredNetwork();
   ENVOY_LOG(debug, "current preferred network: {}", network);
 
-  auto connection_options = network_configurator_->getUpstreamSocketOptions(network);
+  if (enable_interface_binding_) {
+    override_interface_ = network_configurator_->overrideInterface(network);
+  }
+  ENVOY_LOG(debug, "will override interface: {}", override_interface_);
+
+  auto connection_options =
+      network_configurator_->getUpstreamSocketOptions(network, override_interface_);
   decoder_callbacks_->addUpstreamSocketOptions(connection_options);
 
   return Http::FilterHeadersStatus::Continue;
