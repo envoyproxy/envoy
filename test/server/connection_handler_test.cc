@@ -1043,10 +1043,11 @@ TEST_F(ConnectionHandlerTest, ListenerFilterTimeout) {
   Network::MockIoHandle io_handle;
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                             Event::FileReadyType::Read));
+                                          Event::FileReadyType::Read));
   EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
-    return  Api::IoCallUint64Result(0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                                     Network::IoSocketError::deleteIoError));
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
   });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
@@ -1238,10 +1239,11 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                             Event::FileReadyType::Read));
+                                          Event::FileReadyType::Read));
   EXPECT_CALL(io_handle, recv).WillOnce([&](void*, size_t, int) {
-    return  Api::IoCallUint64Result(0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                                     Network::IoSocketError::deleteIoError));
+    return Api::IoCallUint64Result(
+        0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
+                           Network::IoSocketError::deleteIoError));
   });
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
@@ -1249,7 +1251,7 @@ TEST_F(ConnectionHandlerTest, ListenerFilterDisabledTimeout) {
       }));
   EXPECT_CALL(*accepted_socket, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
-  //EXPECT_CALL(*access_log_, log(_, _, _, _));
+  // EXPECT_CALL(*access_log_, log(_, _, _, _));
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*test_filter, destroy_());
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{accepted_socket});
