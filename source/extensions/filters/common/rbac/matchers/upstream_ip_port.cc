@@ -17,8 +17,9 @@ using namespace Filters::Common::RBAC;
 UpstreamIpPortMatcher::UpstreamIpPortMatcher(
     const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto) {
   if (!proto.has_upstream_ip() && !proto.has_upstream_port_range()) {
-    throw EnvoyException("Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` and "
-                         "`upstream_port_range`");
+    throw EnvoyException(
+        "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` and/or"
+        " `upstream_port_range`");
   }
 
   if (proto.has_upstream_ip()) {

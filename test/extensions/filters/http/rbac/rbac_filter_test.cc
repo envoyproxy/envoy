@@ -592,7 +592,7 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
   EXPECT_THROW_WITH_MESSAGE(
       upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
       "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
-      "and `upstream_port_range`");
+      "and/or `upstream_port_range`");
 }
 
 } // namespace
