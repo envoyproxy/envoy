@@ -51,4 +51,4 @@ envoy.tls.key_providers.cryptomb:
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap
-  security_posture: unknown
+  security_posture: requires_trusted_downstream_and_upstream
