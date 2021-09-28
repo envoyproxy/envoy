@@ -8,6 +8,7 @@
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 
 namespace Envoy {
@@ -19,33 +20,37 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, supported_versions,
-                                dispatcher,
-                                createConnectionSocket(initial_peer_address, local_addr, options)) {
-}
+    const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
+    : EnvoyQuicClientConnection(
+          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
+          createConnectionSocket(initial_peer_address, local_addr, options), protocol_config) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
-    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
+    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
+    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
     : EnvoyQuicClientConnection(
           server_connection_id, helper, alarm_factory,
           new EnvoyQuicPacketWriter(
               std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
-          true, supported_versions, dispatcher, std::move(connection_socket)) {}
+          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
+          protocol_config) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
-    Network::ConnectionSocketPtr&& connection_socket)
+    Network::ConnectionSocketPtr&& connection_socket,
+    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
     : quic::QuicConnection(server_connection_id, quic::QuicSocketAddress(),
                            envoyIpAddressToQuicSocketAddress(
                                connection_socket->connectionInfoProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions),
-      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
+      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher),
+      protocol_config_(protocol_config) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -71,7 +76,8 @@ uint64_t EnvoyQuicClientConnection::maxDatagramSize() const {
   return Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE;
 }
 
-void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket& connection_socket, OptRef<PacketsToReadDelegate> delegate) {
+void EnvoyQuicClientConnection::setUpConnectionSocket(Network::ConnectionSocket& connection_socket,
+                                                      OptRef<PacketsToReadDelegate> delegate) {
   delegate_ = delegate;
   if (connection_socket.ioHandle().isOpen()) {
     connection_socket.ioHandle().initializeFileEvent(
@@ -116,12 +122,14 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 }
 
 void EnvoyQuicClientConnection::MaybeMigratePort() {
-  if (!IsHandshakeConfirmed() /*|| !connection_migration_use_new_cid()*/ || HasPendingPathValidation()) {
+  if (!IsHandshakeConfirmed() /*|| !connection_migration_use_new_cid()*/ ||
+      HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
     return;
   }
 
   Network::Address::InstanceConstSharedPtr local_addr;
-  auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(connectionSocket()->connectionInfoProvider().remoteAddress());
+  auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
+      connectionSocket()->connectionInfoProvider().remoteAddress());
   probing_socket_ = createConnectionSocket(remote_address, local_addr, nullptr);
   probing_socket_raw_ptr_ = probing_socket_.get();
   setUpConnectionSocket(*probing_socket_, delegate_);
@@ -132,18 +140,22 @@ void EnvoyQuicClientConnection::MaybeMigratePort() {
   quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
       probing_socket_->connectionInfoProvider().remoteAddress()->ip());
 
-  auto context = std::make_unique<EnvoyQuicPathValidationContext>(self_address, peer_address, std::move(writer));
+  auto context = std::make_unique<EnvoyQuicPathValidationContext>(self_address, peer_address,
+                                                                  std::move(writer));
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this));
 }
 
-void EnvoyQuicClientConnection::OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) {
-  auto envoy_context = static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
-  MigratePath(envoy_context->self_address(), envoy_context->peer_address(), envoy_context->ReleaseWriter().release(), true);
+void EnvoyQuicClientConnection::OnPathValidationSuccess(
+    std::unique_ptr<quic::QuicPathValidationContext> context) {
+  auto envoy_context =
+      static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
+  MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
+              envoy_context->ReleaseWriter().release(), true);
   setConnectionSocket(std::move(probing_socket_));
 }
 
-
-void EnvoyQuicClientConnection::OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
+void EnvoyQuicClientConnection::OnPathValidationFailure(
+    std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
   OnPathValidationFailureAtClient();
   CancelPathValidation();
   probing_socket_.reset();
@@ -165,9 +177,8 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   if (connected() && (events & Event::FileReadyType::Read)) {
     for (auto& socket : connectionSockets()) {
       Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        socket->ioHandle(),
-        *socket->connectionInfoProvider().localAddress(), *this,
-        dispatcher_.timeSource(), true, packets_dropped_);
+          socket->ioHandle(), *socket->connectionInfoProvider().localAddress(), *this,
+          dispatcher_.timeSource(), true, packets_dropped_);
       if (err == nullptr) {
         socket->ioHandle().activateFileEvents(Event::FileReadyType::Read);
       } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
@@ -181,9 +192,8 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
     }
 
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
-        probing_socket_->ioHandle(),
-        *probing_socket_->connectionInfoProvider().localAddress(), *this,
-        dispatcher_.timeSource(), true, packets_dropped_);
+        probing_socket_->ioHandle(), *probing_socket_->connectionInfoProvider().localAddress(),
+        *this, dispatcher_.timeSource(), true, packets_dropped_);
 
     if (err == nullptr && probing_socket_raw_ptr_) {
       probing_socket_raw_ptr_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
@@ -196,28 +206,34 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   }
 }
 
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address, 
-    std::unique_ptr<EnvoyQuicPacketWriter> writer) : QuicPathValidationContext(self_address, peer_address), writer_(std::move(writer)) {}
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(
+    quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address,
+    std::unique_ptr<EnvoyQuicPacketWriter> writer)
+    : QuicPathValidationContext(self_address, peer_address), writer_(std::move(writer)) {}
 
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::~EnvoyQuicPathValidationContext() = default;
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::~EnvoyQuicPathValidationContext() =
+    default;
 
 quic::QuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::WriterToUse() {
   return writer_.get();
 }
 
-std::unique_ptr<EnvoyQuicPacketWriter> EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::ReleaseWriter() {
+std::unique_ptr<EnvoyQuicPacketWriter>
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::ReleaseWriter() {
   return std::move(writer_);
 }
 
-EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection)
-  : connection_(connection) {}
+EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidationResultDelegate(
+    EnvoyQuicClientConnection& connection)
+    : connection_(connection) {}
 
-void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) {
+void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationSuccess(
+    std::unique_ptr<quic::QuicPathValidationContext> context) {
   connection_.OnPathValidationSuccess(std::move(context));
 }
 
-
-void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) {
+void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationFailure(
+    std::unique_ptr<quic::QuicPathValidationContext> context) {
   connection_.OnPathValidationFailure(std::move(context));
 }
 

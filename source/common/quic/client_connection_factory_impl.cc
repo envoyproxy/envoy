@@ -43,12 +43,13 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
 PersistentQuicInfoImpl::PersistentQuicInfoImpl(
     Event::Dispatcher& dispatcher, Network::TransportSocketFactory& transport_socket_factory,
     TimeSource& time_source, Network::Address::InstanceConstSharedPtr server_addr,
-    const quic::QuicConfig& quic_config, uint32_t buffer_limit)
+    const quic::QuicConfig& quic_config, uint32_t buffer_limit,
+    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
       transport_socket_factory_(transport_socket_factory), time_source_(time_source),
-      quic_config_(quic_config), buffer_limit_(buffer_limit) {
+      quic_config_(quic_config), buffer_limit_(buffer_limit), protocol_config_(protocol_config) {
   quiche::FlagRegistry::getInstance();
 }
 
@@ -68,7 +69,8 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr);
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, nullptr,
+      info_impl->protocol_config_);
 
   // QUICHE client session always use the 1st version to start handshake.
   auto ret = std::make_unique<EnvoyQuicClientSession>(

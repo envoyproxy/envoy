@@ -28,7 +28,7 @@ public:
   // Called in session Initialize().
   void setEnvoyConnection(Network::Connection& connection) { envoy_connection_ = &connection; }
 
-  const Network::ConnectionSocketPtr& connectionSocket() const { 
+  const Network::ConnectionSocketPtr& connectionSocket() const {
     return connection_sockets_.back();
   }
 

@@ -55,6 +55,9 @@ message QuicProtocolOptions {
   // window size now, so it's also the minimum.
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
+
+  // If true, EnvoyQuicClientConnection will try migrating to a different port when network path is degrading.
+  bool migrate_port_on_path_degrading = 4;
 }
 
 message UpstreamHttpProtocolOptions {

@@ -67,16 +67,23 @@ public:
 class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
 public:
   TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
-                            Network::Address::InstanceConstSharedPtr& initial_peer_address,
-                            quic::QuicConnectionHelperInterface& helper,
-                            quic::QuicAlarmFactory& alarm_factory,
-                            const quic::ParsedQuicVersionVector& supported_versions,
-                            Network::Address::InstanceConstSharedPtr local_addr,
-                            Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options, bool validation_failure_on_path_response = false)
-  : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory, supported_versions, local_addr, dispatcher, options), dispatcher_(dispatcher), validation_failure_on_path_response_(validation_failure_on_path_response) {}
+                                Network::Address::InstanceConstSharedPtr& initial_peer_address,
+                                quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Network::Address::InstanceConstSharedPtr local_addr,
+                                Event::Dispatcher& dispatcher,
+                                const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                bool validation_failure_on_path_response,
+                                const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
+      : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
+                                  supported_versions, local_addr, dispatcher, options,
+                                  protocol_config),
+        dispatcher_(dispatcher),
+        validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
-  AssertionResult WaitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  AssertionResult
+  WaitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     bool timer_fired = false;
     if (!saw_path_response_) {
       Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
@@ -103,9 +110,10 @@ public:
     }
     CancelPathValidation();
     return connected();
-  }  
+  }
 
-  AssertionResult WaitForHandshakeDone(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  AssertionResult
+  WaitForHandshakeDone(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     bool timer_fired = false;
     if (!saw_handshake_done_) {
       Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
@@ -179,7 +187,8 @@ public:
     // different version set on server side to test that.
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr, validation_failure_on_path_response_);
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
+        validation_failure_on_path_response_, *protocol_config_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
@@ -440,10 +449,10 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   cleanupUpstreamAndDownstream();
 }
 
-
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
+  protocol_config_->set_migrate_port_on_path_degrading(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
@@ -455,7 +464,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   auto response = std::move(encoder_decoder.second);
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
-  
+
   ASSERT_TRUE(quic_connection_->WaitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
   quic_connection_->OnPathDegradingDetected();
@@ -482,6 +491,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   concurrency_ = 2;
   validation_failure_on_path_response_ = true;
   initialize();
+  protocol_config_->set_migrate_port_on_path_degrading(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
@@ -493,7 +503,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   auto response = std::move(encoder_decoder.second);
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
-  
+
   ASSERT_TRUE(quic_connection_->WaitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
   quic_connection_->OnPathDegradingDetected();

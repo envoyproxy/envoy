@@ -266,6 +266,7 @@ protected:
   // Must outlive |codec_client_| because it may not close connection till the end of its life
   // scope.
   std::unique_ptr<Http::PersistentQuicInfo> quic_connection_persistent_info_;
+  std::unique_ptr<envoy::config::core::v3::QuicProtocolOptions> protocol_config_;
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
   // A placeholder for the first upstream connection.
