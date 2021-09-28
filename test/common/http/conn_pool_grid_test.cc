@@ -102,7 +102,7 @@ class ConnectivityGridTest : public Event::TestUsingSimulatedTime, public testin
 public:
   ConnectivityGridTest()
       : options_({Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}),
-        alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr)),
+        alternate_protocols_(std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10)),
         quic_stat_names_(store_.symbolTable()),
         grid_(dispatcher_, random_,
               Upstream::makeTestHost(cluster_, "hostname", "tcp://127.0.0.1:9000", simTime()),
@@ -120,7 +120,7 @@ public:
     if (!use_alternate_protocols) {
       return nullptr;
     }
-    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr);
+    return std::make_shared<AlternateProtocolsCacheImpl>(simTime(), nullptr, 10);
   }
 
   void addHttp3AlternateProtocol() {
