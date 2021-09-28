@@ -582,7 +582,8 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
-  map<string, JwtRequirement> requires = 3;
+  map<string, JwtRequirement>
+  requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.
