@@ -50,7 +50,7 @@ public:
         quic_connection_(new EnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, &writer_,
             /*owns_writer=*/false, {quic_version_}, *dispatcher_,
-            createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            createConnectionSocket(peer_addr_, self_addr_, nullptr), http3_options_.quic_protocol_options())),
         quic_session_(quic_config_, {quic_version_},
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
@@ -89,7 +89,7 @@ public:
 
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket(delegate_);
+    quic_connection_->setUpConnectionSocket(*quic_connection_->connectionSocket(), delegate_);
     spdy_response_headers_[":status"] = "200";
 
     spdy_trailers_["key1"] = "value1";
@@ -133,13 +133,13 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_;
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientStream* quic_stream_;
   Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;

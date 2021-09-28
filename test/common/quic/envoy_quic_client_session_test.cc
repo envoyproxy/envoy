@@ -49,9 +49,9 @@ public:
                                 quic::QuicPacketWriter& writer,
                                 const quic::ParsedQuicVersionVector& supported_versions,
                                 Event::Dispatcher& dispatcher,
-                                Network::ConnectionSocketPtr&& connection_socket)
+                                Network::ConnectionSocketPtr&& connection_socket, const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
-                                  supported_versions, dispatcher, std::move(connection_socket)) {
+                                  supported_versions, dispatcher, std::move(connection_socket), protocol_config) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
     SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
@@ -78,7 +78,7 @@ public:
                                                         54321)),
         quic_connection_(new TestEnvoyQuicClientConnection(
             quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_,
-            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr))),
+            quic_version_, *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr), http3_options_.quic_protocol_options())),
         crypto_config_(std::make_shared<quic::QuicCryptoClientConfig>(
             quic::test::crypto_test_utils::ProofVerifierForTesting())),
         quic_stat_names_(store_.symbolTable()),
@@ -143,6 +143,7 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
@@ -157,7 +158,6 @@ protected:
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::Http3::CodecStats stats_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
 };
 
