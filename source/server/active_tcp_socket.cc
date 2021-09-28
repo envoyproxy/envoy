@@ -93,7 +93,7 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
               continueFilterChain(true);
             },
             listener_filter_max_read_bytes_);
-        // when accept the connection, the socket already has the data, so trigger
+        // The socket may already has the data after the socket accepted. Trigger
         // the data peek manually instead of waiting for next reading event.
         if (listener_filter_buffer_->peekFromSocket() == Network::PeekState::Error) {
           socket_->ioHandle().close();
