@@ -71,7 +71,7 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
-bool Utility::dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern) {
+bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
   const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
   const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
   if (lower_case_dns_name == lower_case_pattern) {

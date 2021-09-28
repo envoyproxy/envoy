@@ -26,7 +26,7 @@ Envoy::Ssl::CertificateDetailsPtr certificateDetails(X509* cert, const std::stri
  * @param pattern the pattern to match against (*.example.com)
  * @return true if the san matches pattern
  */
-bool dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern);
+bool dnsNameMatch(absl::string_view dns_name, absl::string_view pattern);
 
 /**
  * Retrieves the serial number of a certificate.
