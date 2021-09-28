@@ -32,12 +32,12 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
   if (length == 0) {
     return true;
   }
-  // Since we want to drain the data from the socket, so a
-  // temporary buffer need here.
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[length]);
+
+  ASSERT(length <= data_size_);
+
   uint64_t read_size = 0;
   while (1) {
-    auto result = io_handle_.recv(buf.get(), length - read_size, 0);
+    auto result = io_handle_.recv(base_, length - read_size, 0);
     ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
     if (!result.ok()) {
