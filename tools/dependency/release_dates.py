@@ -92,13 +92,12 @@ def create_issues(dep, metadata_version, release_date, latest_release):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
         return
-    else:
-        print('Creating issues...')
-        try:
-            repo.create_issue(title, body=body, labels=LABELS)
-        except github.GithubException as e:
-            print(f'UNABLE to create issue, received error: {e}. Add them to the Envoy proxy org')
-            raise
+    print('Creating issues...')
+    try:
+        repo.create_issue(title, body=body, labels=LABELS)
+    except github.GithubException as e:
+        print(f'Unable to create issue, received error: {e}. Add them to the Envoy proxy org')
+        raise
 
 
 # checks if issue exist
