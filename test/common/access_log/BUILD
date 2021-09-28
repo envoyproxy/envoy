@@ -15,6 +15,7 @@ envoy_cc_test(
         "//source/common/access_log:access_log_lib",
         "//source/common/stream_info:utility_lib",
         "//source/extensions/access_loggers/file:config",
+        "//source/extensions/access_loggers/filters/cel:config",
         "//source/extensions/access_loggers/grpc:http_config",
         "//source/extensions/access_loggers/grpc:tcp_config",
         "//source/extensions/access_loggers/stream:config",
