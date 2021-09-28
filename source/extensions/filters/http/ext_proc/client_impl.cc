@@ -10,14 +10,14 @@ static constexpr char kExternalMethod[] =
 
 ExternalProcessorClientImpl::ExternalProcessorClientImpl(
     Grpc::AsyncClientManager& client_manager,
-    const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope) {
-  factory_ = client_manager.factoryForGrpcService(grpc_service, scope, true);
-}
+    const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope)
+    : client_manager_(client_manager), grpc_service_(grpc_service), scope_(scope) {}
 
 ExternalProcessorStreamPtr
 ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks) {
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
-      factory_->createUncachedRawAsyncClient());
+      client_manager_.getOrCreateRawAsyncClient(grpc_service_, scope_, true,
+                                                Grpc::CacheOption::AlwaysCache));
   return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks);
 }
 
@@ -39,8 +39,9 @@ void ExternalProcessorStreamImpl::send(
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
-    stream_->closeStream();
+    stream_.closeStream();
     stream_closed_ = true;
+    stream_.resetStream();
     return true;
   }
   return false;

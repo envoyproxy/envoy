@@ -39,8 +39,13 @@ TEST(MetadataTest, shouldBeAlwaysReadyForAnswer) {
   // Second topic is not going to have configuration present.
   EXPECT_CALL(configuration, computeClusterConfigForTopic("topic2"))
       .WillOnce(Return(absl::nullopt));
-  const RequestHeader header = {0, 0, 0, absl::nullopt};
-  const MetadataRequest data = {{MetadataRequestTopic{"topic1"}, MetadataRequestTopic{"topic2"}}};
+  const RequestHeader header = {METADATA_REQUEST_API_KEY, METADATA_REQUEST_MAX_VERSION, 0,
+                                absl::nullopt};
+  const MetadataRequestTopic t1 = MetadataRequestTopic{"topic1"};
+  const MetadataRequestTopic t2 = MetadataRequestTopic{"topic2"};
+  // Third topic is not going to have an explicit name.
+  const MetadataRequestTopic t3 = MetadataRequestTopic{Uuid{13, 42}, absl::nullopt, TaggedFields{}};
+  const MetadataRequest data = {{t1, t2, t3}};
   const auto message = std::make_shared<Request<MetadataRequest>>(header, data);
   MetadataRequestHolder testee = {filter, configuration, message};
 
@@ -61,6 +66,7 @@ TEST(MetadataTest, shouldBeAlwaysReadyForAnswer) {
   ASSERT_TRUE(response);
   const auto topics = response->data_.topics_;
   EXPECT_EQ(topics.size(), 1);
+  EXPECT_EQ(topics[0].name_, *(t1.name_));
   EXPECT_EQ(topics[0].partitions_.size(), 42);
 }
 

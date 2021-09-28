@@ -12,11 +12,6 @@ from tools.protoxform import utils
 
 from udpa.annotations import status_pb2
 
-PROTO_PACKAGES = (
-    "google.api.annotations", "validate.validate", "envoy_api.envoy.annotations.deprecation",
-    "envoy_api.envoy.annotations.resource", "udpa.annotations.migrate", "udpa.annotations.security",
-    "udpa.annotations.status", "udpa.annotations.sensitive", "udpa.annotations.versioning")
-
 
 class ProtoXformError(Exception):
     """Base error class for the protoxform module."""
@@ -71,7 +66,7 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 
 def main():
-    utils.load_protos(PROTO_PACKAGES)
+    utils.load_protos()
 
     plugin.plugin([
         plugin.direct_output_descriptor(
