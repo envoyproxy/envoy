@@ -110,7 +110,7 @@ struct ActiveTcpSocket : public Network::ListenerFilterManager,
   bool connected_{false};
 
   Network::ListenerFilterBufferImplPtr listener_filter_buffer_;
-  size_t listener_filter_max_read_bytes_{0};
+  uint64_t listener_filter_max_read_bytes_{0};
 };
 
 } // namespace Server
