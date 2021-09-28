@@ -113,6 +113,8 @@ public:
 
   void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
+  void MaybeMigratePort(Network::Address::InstanceConstSharedPtr& local_address);
+
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -124,7 +126,7 @@ private:
 
   void onFileEvent(uint32_t events);
 
-  void MaybeMigratePort();
+  // void MaybeMigratePort();
 
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};

@@ -116,19 +116,20 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
   QuicConnection::OnPathDegradingDetected();
-  MaybeMigratePort();
+  // MaybeMigratePort();
 }
 
-void EnvoyQuicClientConnection::MaybeMigratePort() {
+void EnvoyQuicClientConnection::MaybeMigratePort(
+    Network::Address::InstanceConstSharedPtr& local_address) {
   if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
       HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
     return;
   }
 
-  Network::Address::InstanceConstSharedPtr local_addr;
+  // Network::Address::InstanceConstSharedPtr local_addr;
   auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
       connectionSocket()->connectionInfoProvider().remoteAddress());
-  probing_socket_ = createConnectionSocket(remote_address, local_addr, nullptr);
+  probing_socket_ = createConnectionSocket(remote_address, local_address, nullptr);
   probing_socket_raw_ptr_ = probing_socket_.get();
   setUpConnectionSocket(*probing_socket_, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
