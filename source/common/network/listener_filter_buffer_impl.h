@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bits/stdint-uintn.h>
 #include <functional>
 #include <memory>
 
@@ -53,9 +54,9 @@ private:
   ListenerFilterBufferOnDataCb on_data_cb_;
 
   // The buffer for the data peeked from the socket.
-  std::unique_ptr<char[]> buffer_;
+  std::unique_ptr<uint8_t[]> buffer_;
   // The start of buffer.
-  char* base_;
+  uint8_t* base_;
   // The size of buffer;
   uint64_t buffer_size_;
   // The size of valid data.

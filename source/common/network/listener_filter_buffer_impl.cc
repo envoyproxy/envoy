@@ -11,7 +11,7 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
                                                    ListenerFilterBufferOnDataCb on_data_cb,
                                                    uint64_t buffer_size)
     : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
-      on_data_cb_(on_data_cb), buffer_(std::make_unique<char[]>(buffer_size)), base_(buffer_.get()),
+      on_data_cb_(on_data_cb), buffer_(std::make_unique<uint8_t[]>(buffer_size)), base_(buffer_.get()),
       buffer_size_(buffer_size) {
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
   ASSERT(buffer_size > 0);
