@@ -16,8 +16,13 @@ using namespace Filters::Common::RBAC;
 
 UpstreamIpPortMatcher::UpstreamIpPortMatcher(
     const envoy::extensions::rbac::matchers::upstream_ip_port::v3::UpstreamIpPortMatcher& proto) {
+  if (!proto.has_upstream_ip() && !proto.has_upstream_port_range()) {
+    throw EnvoyException("Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` and "
+                         "`upstream_port_range`");
+  }
+
   if (proto.has_upstream_ip()) {
-    cidr_ = proto.upstream_ip();
+    cidr_ = Network::Address::CidrRange::create(proto.upstream_ip());
   }
   if (proto.has_upstream_port_range()) {
     port_ = proto.upstream_port_range();
@@ -42,17 +47,14 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
       info.filterState().getDataReadOnly<StreamInfo::UpstreamAddress>(
           StreamInfo::UpstreamAddress::key());
 
-  bool is_match = false;
   if (cidr_) {
-    const auto range = Network::Address::CidrRange::create(*cidr_);
-    if (range.isInRange(*address_obj.address_)) {
+    if (cidr_->isInRange(*address_obj.address_)) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: true",
-                range.asString());
+                cidr_->asString());
 
-      is_match = true;
     } else {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for cidr range: {} evaluated to: false",
-                range.asString());
+                cidr_->asString());
       return false;
     }
   }
@@ -62,7 +64,6 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
     if (port >= port_->start() && port <= port_->end()) {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: true",
                 port_->start(), port_->end());
-      is_match = true;
     } else {
       ENVOY_LOG(debug, "UpstreamIpPort matcher for port range: {{}, {}} evaluated to: false",
                 port_->start(), port_->end());
@@ -70,8 +71,8 @@ bool UpstreamIpPortMatcher::matches(const Network::Connection&,
     }
   }
 
-  ENVOY_LOG(trace, "UpstreamIpPort matcher evaluated to: {}", is_match);
-  return is_match;
+  ENVOY_LOG(trace, "UpstreamIpPort matcher evaluated to: true");
+  return true;
 }
 
 REGISTER_FACTORY(UpstreamIpPortMatcherFactory, MatcherExtensionFactory);

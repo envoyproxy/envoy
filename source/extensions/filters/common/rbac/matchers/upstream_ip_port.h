@@ -26,7 +26,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  absl::optional<envoy::config::core::v3::CidrRange> cidr_;
+  absl::optional<Envoy::Network::Address::CidrRange> cidr_;
   absl::optional<envoy::type::v3::Int64Range> port_;
 };
 

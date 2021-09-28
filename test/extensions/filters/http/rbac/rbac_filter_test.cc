@@ -581,7 +581,7 @@ TEST_F(UpstreamIpPortMatcherTests, UpstreamPortBadRangeDeny) {
   EXPECT_EQ(0, config_->stats().denied_.value());
 }
 
-// Verifies that if no IP or port is configured, the UpstreamIpPort policy is NOT enforced.
+// Verifies that if no IP or port is configured, EnvoyException is thrown.
 TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
   // Setup filter state with the upstream address.
   upstreamIpTestsFilterStateSetup(callbacks_, {"1.2.3.4:123"});
@@ -589,12 +589,10 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
   // Setup policy config.
   const std::vector<UpstreamIpPortMatcherConfig> configs = {{}};
 
-  upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY);
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, false));
-
-  // Expect `allowed` stats to be incremented.
-  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_THROW_WITH_MESSAGE(
+      upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
+      "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
+      "and `upstream_port_range`");
 }
 
 } // namespace
