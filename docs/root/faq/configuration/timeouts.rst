@@ -38,7 +38,7 @@ Connection timeouts apply to the entire HTTP connection and all streams the conn
   kick-in, and the connection will be force-closed after the drain period. The default value of max connection
   duration is *0* or unlimited, which means that the connections will never be closed due to aging. It could
   be helpful in scenarios when you are running a pool of Envoy edge-proxies and would want to close a
-  downstream connection after some time to prevent sticky-ness. It could also help to better load balance the
+  downstream connection after some time to prevent stickiness. It could also help to better load balance the
   overall traffic among this pool, especially if the size of this pool is dynamically changing. Finally, it
   may help with upstream connections when using a DNS name whose resolved addresses may change even if the
   upstreams stay healthly.  Forcing a maximum upstream lifetime in this scenario prevents holding onto healthy
