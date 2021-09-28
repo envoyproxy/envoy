@@ -324,6 +324,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   auto response = std::move(encoder_decoder.second);
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
+  while (!quic_connection_->IsHandshakeConfirmed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
