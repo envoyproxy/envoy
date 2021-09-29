@@ -49,9 +49,9 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
                      *route_config_after_this_update);
 
+  base_.updateConfig(std::move(route_config_after_this_update));
   // No exception, route_config_after_this_update is valid, can update the state.
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
-  base_.updateConfig(std::move(route_config_after_this_update));
   resource_ids_in_last_update_ = added_resource_ids;
   base_.onUpdateCommon(version_info);
 

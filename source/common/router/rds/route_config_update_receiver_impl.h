@@ -30,8 +30,8 @@ public:
   }
 
   void updateConfig(std::unique_ptr<RouteConfiguration>&& route_config_proto) {
+    config_ = config_factory_.createConfig(*route_config_proto);
     route_config_proto_ = std::move(route_config_proto);
-    config_ = config_factory_.createConfig(*route_config_proto_);
   }
 
   void onUpdateCommon(const std::string& version_info) {
