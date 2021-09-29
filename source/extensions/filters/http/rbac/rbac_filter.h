@@ -19,7 +19,8 @@ namespace RBACFilter {
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
-      const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config);
+      const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -39,7 +40,8 @@ class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
       const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
-      const std::string& stats_prefix, Stats::Scope& scope);
+      const std::string& stats_prefix, Stats::Scope& scope,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
   std::string shadowEffectivePolicyIdField() const {

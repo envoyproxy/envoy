@@ -540,5 +540,186 @@ TEST_P(RBACIntegrationTest, HeaderMatchConditionDuplicateHeaderMatch) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Helper for integration testing of RBAC filter with dynamic forward proxy.
+class RbacDynamicForwardProxyIntegrationHelper
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public Event::TestUsingSimulatedTime,
+      public HttpIntegrationTest {
+public:
+  RbacDynamicForwardProxyIntegrationHelper()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeWithFilterConfigs(bool save_filter_state, const std::string& rbac_config) {
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+
+    const std::string save_upstream_config =
+        save_filter_state ? "save_upstream_address: true " : "";
+    const std::string dfp_config =
+        fmt::format(R"EOF(
+name: dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+  {}
+  dns_cache_config:
+    name: foo
+    dns_lookup_family: {}
+)EOF",
+                    save_upstream_config, Network::Test::ipVersionToDnsFamily(GetParam()));
+
+    config_helper_.prependFilter(rbac_config);
+
+    config_helper_.prependFilter(dfp_config);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Switch predefined cluster_0 to CDS filesystem sourcing.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_static_resources()->clear_clusters();
+    });
+
+    // Set validate_clusters to false to allow us to reference a CDS cluster.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+
+    // Setup the initial CDS cluster.
+    cluster_.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+    cluster_.set_name("cluster_0");
+    cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(true);
+    protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
+    protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
+    ConfigHelper::setProtocolOptions(cluster_, protocol_options);
+
+    const std::string cluster_type_config = fmt::format(
+        R"EOF(
+name: envoy.clusters.dynamic_forward_proxy
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
+  dns_cache_config:
+    name: foo
+    dns_lookup_family: {}
+)EOF",
+        Network::Test::ipVersionToDnsFamily(GetParam()));
+
+    TestUtility::loadFromYaml(cluster_type_config, *cluster_.mutable_cluster_type());
+    // Load the CDS cluster and wait for it to initialize.
+    cds_helper_.setCds({cluster_});
+    HttpIntegrationTest::initialize();
+    test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  }
+
+  CdsHelper cds_helper_;
+  envoy::config::cluster::v3::Cluster cluster_;
+  bool write_cache_file_{};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RbacDynamicForwardProxyIntegrationHelper,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verify that if upstream ip matcher is configured, upstream address is saved by a filter(dynamic
+// forward proxy in this case). If not saved, the request would be denied.
+TEST_P(RbacDynamicForwardProxyIntegrationHelper, AllowIpWithNoFilterState) {
+  const std::string rbac_config = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    policies:
+      foo:
+        permissions:
+        - or_rules:
+            rules:
+            - matcher:
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+                  upstream_ip:
+                    address_prefix: 127.0.0.1
+                    prefix_len: 24
+        principals:
+          - any: true
+)EOF";
+
+  initializeWithFilterConfigs(false, rbac_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// Verify that if upstream ip matcher is configured and upstream address is saved by dynamic
+// forward proxy, then RBAC policy is evaluated correctly for `or_rules`.
+#ifndef WIN32
+// TODO(conqerAtapple) figure out why this test doesn't pass on windows.
+TEST_P(RbacDynamicForwardProxyIntegrationHelper, DenyIpOrPortWithFilterState) {
+  const std::string rbac_config = R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+  rules:
+    action: DENY
+    policies:
+      foo:
+        permissions:
+        - or_rules:
+            rules:
+            - matcher:
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+                  upstream_ip:
+                    address_prefix: 127.2.1.1
+                    prefix_len: 24
+            - matcher:
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+                  upstream_ip:
+                    address_prefix: 127.0.0.1
+                    prefix_len: 24
+            - matcher:
+                name: envoy.filters.http.rbac.matchers.upstream_ip_port
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.rbac.matchers.upstream_ip_port.v3.UpstreamIpPortMatcher
+                  upstream_ip:
+                    address_prefix: ::1
+                    prefix_len: 24
+        principals:
+          - any: true
+)EOF";
+
+  initializeWithFilterConfigs(true, rbac_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority",
+       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 1024);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+}
+#endif
+
 } // namespace
 } // namespace Envoy

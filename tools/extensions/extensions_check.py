@@ -54,7 +54,8 @@ EXTENSION_CATEGORIES = (
     "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
     "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.sip_proxy.filters",
     "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
-    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value")
+    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
+    "envoy.rbac.matchers")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.
