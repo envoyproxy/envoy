@@ -103,3 +103,22 @@ rbe_autoconfig(
     },
     create_java_configs = False,
 )
+
+rbe_autoconfig(
+    name = "engflow_remote_config_clang_coverage",
+    digest = "sha256:239015d203837f2bdcd4cfdd710d7db60acc3fb1f002f1c926b92b42c59afdd6",
+    registry = "docker.io",
+    repository = "envoyproxy/envoy-build-ubuntu",
+    use_legacy_platform_definition = False,
+    env = {
+        "CC": "/opt/llvm/bin/clang",
+        "CXX": "/opt/llvm/bin/clang++",
+        "GCOV": "/opt/llvm/bin/llvm-profdata",
+        "BAZEL_LLVM_COV": "/opt/llvm/bin/llvm-cov",
+        "BAZEL_USE_LLVM_NATIVE_COVERAGE": "1",
+    },
+    exec_properties = {
+        "Pool": "linux",
+    },
+    create_java_configs = False,
+)
