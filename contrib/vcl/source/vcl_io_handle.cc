@@ -147,7 +147,7 @@ Api::IoCallUint64Result VclIoHandle::close() {
       uint32_t sh = wrk_listener_->sh();
       RELEASE_ASSERT(wrk_index == vppcom_session_worker(sh), "listener close on wrong thread");
       clearChildWrkListener();
-      // sh_ not invalidated yet, waiting for destructor on main to call vppcom_session_close
+      // sh_ not invalidated yet, waiting for destructor on main to call `vppcom_session_close`
     } else {
       clearChildWrkListener();
       rc = vppcom_session_close(sh_);
@@ -172,7 +172,8 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
 
   VCL_LOG("reading on sh {:x}", sh_);
 
-  int32_t result = 0, rv = 0, num_bytes_read = 0;
+  uint64_t num_bytes_read = 0;
+  int32_t result = 0, rv = 0;
   size_t slice_length;
 
   for (uint64_t i = 0; i < num_slice; i++) {
@@ -182,7 +183,7 @@ Api::IoCallUint64Result VclIoHandle::readv(uint64_t max_length, Buffer::RawSlice
       break;
     }
     num_bytes_read += rv;
-    if (uint64_t(num_bytes_read) == max_length) {
+    if (num_bytes_read == max_length) {
       break;
     }
   }
@@ -689,7 +690,7 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
 
         Address::InstanceConstSharedPtr address = vclEndptToAddress(ep, -1);
         uint32_t sh = vppcom_session_create(proto, 1);
-        wrk_listener_ = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
+        wrk_listener_ = std::make_unique<VclIoHandle>(sh, VclInvalidFd);
         wrk_listener_->bind(address);
         uint32_t rv = vppcom_session_listen(sh, 0 /* ignored */);
         if (rv) {
@@ -740,7 +741,7 @@ IoHandlePtr VclIoHandle::duplicate() {
 
   Address::InstanceConstSharedPtr address = vclEndptToAddress(ep, -1);
   uint32_t sh = vppcom_session_create(proto, 1);
-  IoHandlePtr io_handle = std::make_unique<VclIoHandle>(static_cast<uint32_t>(sh), VclInvalidFd);
+  IoHandlePtr io_handle = std::make_unique<VclIoHandle>(sh, VclInvalidFd);
 
   io_handle->bind(address);
 
