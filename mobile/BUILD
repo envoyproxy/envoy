@@ -41,6 +41,7 @@ genrule(
     done
     touch $@
     """,
+    local = True,
     stamp = True,
     tools = ["//bazel:zipper"],
     visibility = ["//visibility:public"],

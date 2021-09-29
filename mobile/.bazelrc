@@ -106,6 +106,7 @@ build:remote-ci-common --bes_results_url=https://envoy.cluster.engflow.com/invoc
 build:remote-ci-common --bes_lifecycle_events
 build:remote-ci-common --jobs=40
 build:remote-ci-common --verbose_failures
+build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 # Avoid hanging if the remote side closes the connection without a TCP RST. Only
 # sends a keepalive if we don't receive any messages (server updates every 60s).
 build:remote-ci-common --grpc_keepalive_time=61s
@@ -120,7 +121,6 @@ build:remote-ci-linux --experimental_inmemory_dotd_files
 build:remote-ci-linux --experimental_inmemory_jdeps_files
 build:remote-ci-linux --incompatible_strict_action_env=true
 build:remote-ci-linux --remote_timeout=600
-build:remote-ci-linux --spawn_strategy=remote,local
 # GCC toolchain options
 build:remote-ci-linux --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:remote-ci-linux --crosstool_top=@engflow_remote_config//cc:toolchain

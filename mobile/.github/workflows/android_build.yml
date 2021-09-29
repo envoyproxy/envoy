@@ -30,12 +30,19 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
+      - name: 'Install dependencies'
         if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Install dependencies'
-      - run: bazelisk build --fat_apk_cpu=x86 //:android_dist_ci
+        run: ./ci/mac_ci_setup.sh
+      - name: 'Build envoy.aar distributable'
         if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Build envoy.aar distributable'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bazelisk build \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --fat_apk_cpu=x86 \
+            //:android_dist_ci
   javahelloworld:
     name: java_helloworld
     needs: androidbuild
@@ -60,19 +67,24 @@ jobs:
         name: 'Download aar'
       - run: exit 1
         if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Short-circuit'
-      - name: start simulator
+      - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
       #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
       # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
-      - run: |
-          bazelisk build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+      - name: 'Start java app'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bazelisk build \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --fat_apk_cpu=x86 \
+            //examples/java/hello_world:hello_envoy
           adb install -r --no-incremental bazel-bin/examples/java/hello_world/hello_envoy.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoy/.MainActivity
-        name: 'Start java app'
-      - run: 'adb logcat -e "received headers with status 200" -m 1'
-        name: 'Check connectivity'
+      - name: 'Check connectivity'
+        run: adb logcat -e "received headers with status 200" -m 1
   kotlinhelloworld:
     name: kotlin_helloworld
     needs: androidbuild
@@ -87,26 +99,32 @@ jobs:
           java-version: '8'
           java-package: jdk
           architecture: x64
-      - run: ./ci/mac_ci_setup.sh
-        name: 'Install dependencies'
-      - uses: actions/cache@v2
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - name: 'Download aar'
+        uses: actions/cache@v2
         id: check-cache
         with:
           key: aar-${{ github.sha }}
           path: dist/envoy.aar
-        name: 'Download aar'
-      - run: exit 1
+      - name: 'Short-circuit'
         if: steps.check-cache.outputs.cache-hit != 'true'
-        name: 'Short-circuit'
-      - name: start simulator
+        run: exit 1
+      - name: 'Start simulator'
         run: ./ci/mac_start_emulator.sh
       # Return to using:
       #   bazelisk mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
       # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
-      - run: |
-          bazelisk build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+      - name: 'Start kotlin app'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bazelisk build \
+            --config=remote-ci-macos \
+            --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
+            --fat_apk_cpu=x86 \
+            //examples/kotlin/hello_world:hello_envoy_kt
           adb install -r --no-incremental bazel-bin/examples/kotlin/hello_world/hello_envoy_kt.apk
           adb shell am start -n io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
-        name: 'Start kotlin app'
-      - run: 'adb logcat -e "received headers with status 200" -m 1'
-        name: 'Check connectivity'
+      - name: 'Check connectivity'
+        run: adb logcat -e "received headers with status 200" -m 1
