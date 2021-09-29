@@ -13,6 +13,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/strings/str_cat.h"
 #include "grpcpp/support/proto_buffer_reader.h"
 
 namespace Envoy {
