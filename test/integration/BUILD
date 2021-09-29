@@ -943,7 +943,6 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
-        "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:clear_route_cache_filter_lib",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
@@ -957,7 +956,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/grpc_http1_bridge/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
@@ -970,15 +968,9 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//source/extensions/internal_redirect/allow_listed_routes:config",
-        "//source/extensions/internal_redirect/previous_routes:config",
-        "//source/extensions/internal_redirect/safe_cross_scheme:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/allow_listed_routes/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/previous_routes/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/internal_redirect/safe_cross_scheme/v3:pkg_cc_proto",
     ],
 )
 
@@ -1331,12 +1323,14 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "tcp_tunneling_integration_test",
+    size = "large",
     srcs = [
         "tcp_tunneling_integration_test.cc",
     ],
     data = [
         "//test/config/integration/certs",
     ],
+    shard_count = 3,
     deps = [
         ":http_integration_lib",
         ":http_protocol_integration_lib",
@@ -1833,5 +1827,18 @@ envoy_cc_test(
         "//source/extensions/http/original_ip_detection/custom_header:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/original_ip_detection/custom_header/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "weighted_cluster_integration_test",
+    srcs = ["weighted_cluster_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        ":integration_lib",
+        "//test/integration/filters:repick_cluster_filter_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

@@ -34,10 +34,13 @@ In addition, the following conventions should be followed:
   implementation. These indicate that the entity is not implemented in Envoy and the entity
   should be hidden from the Envoy documentation.
 
-* Use a `[#alpha:]` annotation in comments for messages that are considered alpha
-  and are not subject to the threat model. This is similar to the work-in-progress/alpha tagging
-  of extensions described below, but allows tagging messages that are used as part of the core API
-  as alpha without having to break it into its own file.
+* Use a `(xds.annotations.v3.file_status).work_in_progress`,
+  `(xds.annotations.v3.message_status).work_in_progress`, or
+  `(xds.annotations.v3.field_status).work_in_progress` option annotation for files,
+  messages, or fields, respectively, that are considered work in progress and are not subject to the
+  threat model or the breaking change policy. This is similar to the work-in-progress/alpha tagging
+  of extensions described below, but allows tagging protos that are used as part of the core API
+  as work in progress without having to break them into their own file.
 
 * Always use plural field names for `repeated` fields, such as `filters`.
 
@@ -144,9 +147,8 @@ To add an extension config to the API, the steps below should be followed:
    (`option (udpa.annotations.file_status).package_version_status = ACTIVE;`).
    This is required to automatically include the config proto in [api/versioning/BUILD](versioning/BUILD).
 1. Add a reference to the v3 extension config in (1) in [api/versioning/BUILD](versioning/BUILD) under `active_protos`.
-1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file,
-   reformat `foobar.proto` as needed and also generate the shadow API protos.
-1. `git add api/ generated_api_shadow/` to add any new files to your Git index.
+1. Run `./tools/proto_format/proto_format.sh fix`. This should regenerate the `BUILD` file and
+   reformat `foobar.proto` as needed.
 
 ## API annotations
 

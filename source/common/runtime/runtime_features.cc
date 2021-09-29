@@ -55,7 +55,6 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
-    "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
@@ -92,10 +91,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
     "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
+    "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
+    "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
     "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.upstream_http2_flood_checks",

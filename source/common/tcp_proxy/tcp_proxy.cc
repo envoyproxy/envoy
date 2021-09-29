@@ -37,51 +37,8 @@ const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
-Config::RouteImpl::RouteImpl(
-    const Config& parent,
-    const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
-        config)
-    : parent_(parent) {
-  cluster_name_ = config.cluster();
-
-  source_ips_ = Network::Address::IpList(config.source_ip_list());
-  destination_ips_ = Network::Address::IpList(config.destination_ip_list());
-
-  if (!config.source_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.source_ports(), source_port_ranges_);
-  }
-
-  if (!config.destination_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.destination_ports(), destination_port_ranges_);
-  }
-}
-
-bool Config::RouteImpl::matches(Network::Connection& connection) const {
-  if (!source_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().remoteAddress(),
-                                         source_port_ranges_)) {
-    return false;
-  }
-
-  if (!source_ips_.empty() &&
-      !source_ips_.contains(*connection.connectionInfoProvider().remoteAddress())) {
-    return false;
-  }
-
-  if (!destination_port_ranges_.empty() &&
-      !Network::Utility::portInRangeList(*connection.connectionInfoProvider().localAddress(),
-                                         destination_port_ranges_)) {
-    return false;
-  }
-
-  if (!destination_ips_.empty() &&
-      !destination_ips_.contains(*connection.connectionInfoProvider().localAddress())) {
-    return false;
-  }
-
-  // if we made it past all checks, the route matches
-  return true;
-}
+Config::SimpleRouteImpl::SimpleRouteImpl(const Config& parent, absl::string_view cluster_name)
+    : parent_(parent), cluster_name_(cluster_name) {}
 
 Config::WeightedClusterEntry::WeightedClusterEntry(
     const Config& parent, const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::
@@ -139,10 +96,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
   });
 
   if (!config.cluster().empty()) {
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
-        default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(std::make_shared<const RouteImpl>(*this, default_route));
+    default_route_ = std::make_shared<const SimpleRouteImpl>(*this, config.cluster());
   }
 
   if (config.has_metadata_match()) {
@@ -156,9 +110,8 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProx
     }
   }
 
-  // Weighted clusters will be enabled only if both the default cluster and
-  // deprecated v1 routes are absent.
-  if (routes_.empty() && config.has_weighted_clusters()) {
+  // Weighted clusters will be enabled only if the default cluster is absent.
+  if (default_route_ == nullptr && config.has_weighted_clusters()) {
     total_cluster_weight_ = 0;
     for (const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
@@ -186,16 +139,11 @@ RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& conn
         connection.streamInfo().filterState()->getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::key());
 
-    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute
-        per_connection_route;
-    per_connection_route.set_cluster(per_connection_cluster.value());
-    return std::make_shared<const RouteImpl>(*this, per_connection_route);
+    return std::make_shared<const SimpleRouteImpl>(*this, per_connection_cluster.value());
   }
 
-  for (const RouteConstSharedPtr& route : routes_) {
-    if (route->matches(connection)) {
-      return route;
-    }
+  if (default_route_ != nullptr) {
+    return default_route_;
   }
 
   // no match, no more routes to try

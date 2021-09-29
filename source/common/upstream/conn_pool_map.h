@@ -47,6 +47,11 @@ public:
   size_t size() const;
 
   /**
+   * @return true if the pools are empty.
+   */
+  bool empty() const;
+
+  /**
    * Destroys all mapped pools.
    */
   void clear();

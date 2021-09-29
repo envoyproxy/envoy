@@ -11,12 +11,6 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test(
-    name = "api_shadow_test",
-    srcs = ["api_shadow_test.cc"],
-    deps = ["@envoy_api//envoy/config/cluster/v3:pkg_cc_proto"],
-)
-
-envoy_cc_test(
     name = "decoded_resource_impl_test",
     srcs = ["decoded_resource_impl_test.cc"],
     deps = [
@@ -492,9 +486,9 @@ envoy_cc_test(
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/runtime:runtime_mocks",

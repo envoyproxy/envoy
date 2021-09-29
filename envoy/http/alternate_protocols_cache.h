@@ -92,10 +92,11 @@ public:
    * Sets the possible alternative protocols which can be used to connect to the
    * specified origin. Expires after the specified expiration time.
    * @param origin The origin to set alternate protocols for.
-   * @param protocols A list of alternate protocols.
+   * @param protocols A list of alternate protocols. This list may be truncated
+   * by the cache.
    */
   virtual void setAlternatives(const Origin& origin,
-                               const std::vector<AlternateProtocol>& protocols) PURE;
+                               std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the

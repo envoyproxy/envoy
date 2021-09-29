@@ -104,7 +104,7 @@ public:
                                  Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -177,7 +177,7 @@ public:
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -376,8 +376,7 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency);
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog();
   void buildInternalListener();
@@ -425,7 +424,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
+  std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   std::unique_ptr<Network::InternalListenerConfig> internal_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;

@@ -14,6 +14,11 @@ namespace Random {
 
 MockRandomGenerator::MockRandomGenerator() { ON_CALL(*this, uuid()).WillByDefault(Return(uuid_)); }
 
+MockRandomGenerator::MockRandomGenerator(uint64_t value) : value_(value) {
+  ON_CALL(*this, random()).WillByDefault(Return(value_));
+  ON_CALL(*this, uuid()).WillByDefault(Return(uuid_));
+}
+
 MockRandomGenerator::~MockRandomGenerator() = default;
 
 } // namespace Random

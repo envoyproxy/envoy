@@ -84,7 +84,7 @@ public:
    * Update the listener config. The follow up connections will see the new config. The existing
    * connections are not impacted.
    */
-  void updateListenerConfig(Network::ListenerConfig& config);
+  void updateListenerConfig(Network::ListenerConfig& config) override;
 };
 
 } // namespace Server
