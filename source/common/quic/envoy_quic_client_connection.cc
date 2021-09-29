@@ -119,7 +119,7 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
   // MaybeMigratePort();
 }
 
-void EnvoyQuicClientConnection::MaybeMigratePort(
+void EnvoyQuicClientConnection::maybeMigratePort(
     Network::Address::InstanceConstSharedPtr& local_address) {
   if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
       HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
@@ -144,13 +144,13 @@ void EnvoyQuicClientConnection::MaybeMigratePort(
   ValidatePath(std::move(context), std::make_unique<EnvoyPathValidationResultDelegate>(*this));
 }
 
-void EnvoyQuicClientConnection::OnPathValidationSuccess(
+void EnvoyQuicClientConnection::onPathValidationSuccess(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
   auto envoy_context =
       static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(context.get());
 
   if (MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
-                  envoy_context->ReleaseWriter().release(), true)) {
+                  envoy_context->releaseWriter().release(), true)) {
     setConnectionSocket(std::move(probing_socket_));
   } else {
     probing_socket_.reset();
@@ -158,7 +158,7 @@ void EnvoyQuicClientConnection::OnPathValidationSuccess(
   }
 }
 
-void EnvoyQuicClientConnection::OnPathValidationFailure(
+void EnvoyQuicClientConnection::onPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
   OnPathValidationFailureAtClient();
   CancelPathValidation();
@@ -223,7 +223,7 @@ quic::QuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContex
 }
 
 std::unique_ptr<EnvoyQuicPacketWriter>
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::ReleaseWriter() {
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseWriter() {
   return std::move(writer_);
 }
 
@@ -233,12 +233,12 @@ EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidatio
 
 void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationSuccess(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
-  connection_.OnPathValidationSuccess(std::move(context));
+  connection_.onPathValidationSuccess(std::move(context));
 }
 
 void EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::OnPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> context) {
-  connection_.OnPathValidationFailure(std::move(context));
+  connection_.onPathValidationFailure(std::move(context));
 }
 
 } // namespace Quic

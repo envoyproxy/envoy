@@ -83,7 +83,7 @@ public:
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
   AssertionResult
-  WaitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  waitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     bool timer_fired = false;
     if (!saw_path_response_) {
       Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
@@ -113,7 +113,7 @@ public:
   }
 
   AssertionResult
-  WaitForHandshakeDone(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+  waitForHandshakeDone(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     bool timer_fired = false;
     if (!saw_handshake_done_) {
       Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
@@ -469,12 +469,12 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
 
-  ASSERT_TRUE(quic_connection_->WaitForHandshakeDone());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->MaybeMigratePort(local_addr);
-  ASSERT_TRUE(quic_connection_->WaitForPathResponse());
+  quic_connection_->maybeMigratePort(local_addr);
+  ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();
   EXPECT_NE(old_self_addr, self_addr);
 
@@ -510,12 +510,12 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
 
-  ASSERT_TRUE(quic_connection_->WaitForHandshakeDone());
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->MaybeMigratePort(local_addr);
-  ASSERT_TRUE(quic_connection_->WaitForPathResponse());
+  quic_connection_->maybeMigratePort(local_addr);
+  ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();
   // The path validation will fail and thus client self address will not change.
   EXPECT_EQ(old_self_addr, self_addr);

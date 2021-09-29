@@ -44,7 +44,7 @@ public:
 
     quic::QuicPacketWriter* WriterToUse() override;
 
-    std::unique_ptr<EnvoyQuicPacketWriter> ReleaseWriter();
+    std::unique_ptr<EnvoyQuicPacketWriter> releaseWriter();
 
   private:
     Network::ConnectionSocketPtr socket_;
@@ -109,11 +109,11 @@ public:
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
 
-  void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context);
+  void onPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context);
 
-  void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
+  void onPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
-  void MaybeMigratePort(Network::Address::InstanceConstSharedPtr& local_address);
+  void maybeMigratePort(Network::Address::InstanceConstSharedPtr& local_address);
 
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
