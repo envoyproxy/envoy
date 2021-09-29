@@ -221,7 +221,7 @@ TEST_P(ListenerIntegrationTest, CleanlyRejectsUnknownFilterConfigProto) {
   test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
 }
 
-TEST_P(ListenerIntegrationTest, DISABLED_RejectsUnsupportedTypedPerFilterConfig) { // FIXME
+TEST_P(ListenerIntegrationTest, RejectsUnsupportedTypedPerFilterConfig) {
   on_server_init_function_ = [&]() {
     createLdsStream();
     envoy::config::listener::v3::Listener listener =
@@ -250,14 +250,14 @@ TEST_P(ListenerIntegrationTest, DISABLED_RejectsUnsupportedTypedPerFilterConfig)
                         route:
                           cluster: cluster_0
                     typed_per_filter_config:
-                      envoy.filters.http.health_check:
-                        "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-                        pass_through_mode: false
+                      set-response-code:
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 403
               http_filters:
-                - name: envoy.filters.http.health_check
+                - name: set-response-code
                   typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-                    pass_through_mode: false
+                    "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                    code: 402
           - name: envoy.filters.http.router
         )EOF");
     sendLdsResponse({listener}, "2");

@@ -1628,6 +1628,8 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:v2_link_hacks",
         "//test/integration/filters:address_restore_listener_filter_lib",
+        "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
+        "//test/integration/filters:set_response_code_filter_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
