@@ -90,6 +90,10 @@ void KafkaMeshFilter::onRequestReadyForAnswer() {
   }
 }
 
+Event::Dispatcher& KafkaMeshFilter::dispatcher() {
+  return read_filter_callbacks_->connection().dispatcher();
+}
+
 void KafkaMeshFilter::abandonAllInFlightRequests() {
   for (const auto& request : requests_in_flight_) {
     request->abandon();

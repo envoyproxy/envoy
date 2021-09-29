@@ -16,6 +16,7 @@ class MockAbstractRequestListener : public AbstractRequestListener {
 public:
   MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
 };
 
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
