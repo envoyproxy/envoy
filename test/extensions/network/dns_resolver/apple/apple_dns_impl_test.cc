@@ -38,6 +38,13 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+void expectAppleTypedDnsResolverConfig(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
 class MockDnsService : public Network::DnsService {
 public:
   MockDnsService() = default;
@@ -62,8 +69,9 @@ public:
 
   void SetUp() override {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
-    resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config);
+    Network::DnsResolverFactory* dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
@@ -128,11 +136,8 @@ protected:
 TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::config::cluster::v3::Cluster config;
-  Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
-  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
-  EXPECT_EQ(
-      typed_dns_resolver_config.typed_config().type_url(),
-      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
 }
 
 // If typed apple DNS resolver config exits, use it.
@@ -147,24 +152,65 @@ TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
   EXPECT_TRUE(config.has_typed_dns_resolver_config());
   EXPECT_TRUE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
   typed_dns_resolver_config.Clear();
-
-  Envoy::Network::makeDnsResolverConfig(config, typed_dns_resolver_config);
-  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
-  EXPECT_EQ(
-      typed_dns_resolver_config.typed_config().type_url(),
-      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
 }
 
-// Test empty DNS resolver typed config creation based on build system and configuration is
+// Test default DNS resolver typed config creation based on build system and configuration is
 // expected.
-TEST_F(AppleDnsImplTest, MakeEmptyDnsResolverTestInApple) {
+TEST_F(AppleDnsImplTest, MakeDefaultDnsResolverTestInApple) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Envoy::Network::makeEmptyDnsResolverConfig(typed_dns_resolver_config);
-  // In this test case, makeEmptyDnsResolverConfig() creates an empty apple DNS typed config.
-  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
-  EXPECT_EQ(
-      typed_dns_resolver_config.typed_config().type_url(),
-      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  Network::makeDefaultDnsResolverConfig(typed_dns_resolver_config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test default DNS resolver factory creation based on build system and configuration is
+// expected.
+TEST_F(AppleDnsImplTest, MakeDefaultDnsResolverFactoryTestInApple) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto without typed config.
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithoutTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(
+          envoy::config::bootstrap::v3::Bootstrap(), typed_dns_resolver_config);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto with valid typed config
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithGoodTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto with invalid typed config
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithInvalidTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/foo");
+  typed_dns_resolver_config.set_name("bar");
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_THROW_WITH_MESSAGE(Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
+                            Envoy::EnvoyException,
+                            "Didn't find a registered implementation for name: 'bar'");
 }
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,

@@ -3,31 +3,31 @@
 namespace Envoy {
 namespace Network {
 
-// Create an empty c-ares DNS resolver typed config.
-void makeEmptyCaresDnsResolverConfig(
+// Create a default c-ares DNS resolver typed config.
+void makeDefaultCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
-// Create an empty apple DNS resolver typed config.
-void makeEmptyAppleDnsResolverConfig(
+// Create a default apple DNS resolver typed config.
+void makeDefaultAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig apple;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(apple);
   typed_dns_resolver_config.set_name(std::string(AppleDnsResolver));
 }
 
-// Create an empty DNS resolver typed config based on build system and configuration.
-void makeEmptyDnsResolverConfig(
+// Create a default DNS resolver typed config based on build system and configuration.
+void makeDefaultDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   // If use apple API for DNS lookups, create an AppleDnsResolverConfig typed config.
   if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
     return;
   }
-  // Otherwise, create an CaresDnsResolverConfig typed config.
-  makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+  // Otherwise, create a CaresDnsResolverConfig typed config.
+  makeDefaultCaresDnsResolverConfig(typed_dns_resolver_config);
 }
 
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
@@ -37,7 +37,7 @@ bool checkUseAppleApiForDnsLookups(
   if ((Config::Utility::getAndCheckFactoryByName<Network::DnsResolverFactory>(
            std::string(AppleDnsResolver), true) != nullptr) &&
       Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
-    makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+    makeDefaultAppleDnsResolverConfig(typed_dns_resolver_config);
     return true;
   }
   return false;
@@ -48,7 +48,7 @@ void handleLegacyDnsResolverData(
     const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
         ClientContextConfig&,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+  makeDefaultCaresDnsResolverConfig(typed_dns_resolver_config);
 }
 
 // Overloading the template function for Cluster config type, which need to copy
@@ -64,6 +64,24 @@ void handleLegacyDnsResolverData(
   }
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
+}
+
+// Create the DNS resolver factory from typed config.
+Network::DnsResolverFactory* createDnsResolverFactoryFromTypedConfig(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  Network::DnsResolverFactory* dns_resolver_factory =
+      &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
+  return dns_resolver_factory;
+}
+
+// Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
+// This function can be called in main or worker threads.
+Network::DnsResolverFactory* createDefaultDnsResolverFactory(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  Network::makeDefaultDnsResolverConfig(typed_dns_resolver_config);
+  // The default typed_dns_resolver_config is for sure valid, thus the registry
+  // lookup below will always succeed.
+  return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
 }
 
 } // namespace Network

@@ -222,10 +222,12 @@ public:
    * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
    * dispatcher.
    * @param typed_dns_resolver_config contains the resolvers data and dns_resolver_options.
+   * @param dns_resolver_factory contains the DNS resolver factory pointer.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr createDnsResolver(
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+      const void* dns_resolver_factory) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

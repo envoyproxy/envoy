@@ -389,37 +389,6 @@ TEST_F(DispatcherImplTest, InitializeStats) {
   dispatcher_->initializeStats(scope_, "test.");
 }
 
-// createDnsResolver test with unregistered typed_dns_resolver_config.
-// Verify it throws an EnvoyException as expected.
-TEST_F(DispatcherImplTest, CreateDnsResolverTestWithUnregisteredType) {
-  // Need to call createDnsResolver within the dispatcher thread's context
-  // to pass the check: ASSERT(isThreadSafe()).
-  dispatcher_->post([this]() {
-    Thread::LockGuard lock(mu_);
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    typed_dns_resolver_config.mutable_typed_config()->set_type_url("type.googleapis.com/foo");
-    typed_dns_resolver_config.set_name("foo");
-    EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver(typed_dns_resolver_config),
-                              Envoy::EnvoyException,
-                              "Didn't find a registered implementation for name: 'foo'");
-  });
-}
-
-// createDnsResolver test with registered typed_dns_resolver_config.
-// Verify it successfully creates the dns_resolver.
-TEST_F(DispatcherImplTest, CreateDnsResolverTestWithRegisteredType) {
-  // Need to call createDnsResolver within the dispatcher thread's context
-  // to pass the check: ASSERT(isThreadSafe()).
-  dispatcher_->post([this]() {
-    Thread::LockGuard lock(mu_);
-    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
-    Network::DnsResolverSharedPtr dns_resolver = nullptr;
-    dns_resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config);
-    EXPECT_TRUE(dns_resolver != nullptr);
-  });
-}
-
 TEST_F(DispatcherImplTest, Post) {
   dispatcher_->post([this]() {
     {

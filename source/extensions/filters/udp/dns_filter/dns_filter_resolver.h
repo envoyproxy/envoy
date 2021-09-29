@@ -2,7 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
-
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 namespace Envoy {
@@ -20,9 +20,11 @@ class DnsFilterResolver : Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilterResolver(DnsFilterResolverCallback& callback, std::chrono::milliseconds timeout,
                     Event::Dispatcher& dispatcher, uint64_t max_pending_lookups,
-                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config)
+                    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+                    const Network::DnsResolverFactory* dns_resolver_factory)
       : timeout_(timeout), dispatcher_(dispatcher),
-        resolver_(dispatcher.createDnsResolver(typed_dns_resolver_config)), callback_(callback),
+        resolver_(dispatcher.createDnsResolver(typed_dns_resolver_config, dns_resolver_factory)),
+        callback_(callback),
         max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord

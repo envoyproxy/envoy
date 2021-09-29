@@ -22,6 +22,7 @@ constexpr absl::string_view DnsResolverCategory = "envoy.network.dns_resolver";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
+  virtual ~DnsResolverFactory() = default;
   /**
    * @returns a DnsResolver object.
    * @param dispatcher: the local dispatcher thread
@@ -30,21 +31,21 @@ public:
    */
   virtual DnsResolverSharedPtr createDnsResolverImpl(
       Event::Dispatcher& dispatcher, Api::Api& api,
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) PURE;
+      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
 
   std::string category() const override { return std::string(DnsResolverCategory); }
 };
 
-// Create an empty c-ares DNS resolver typed config.
-void makeEmptyCaresDnsResolverConfig(
+// Create a default c-ares DNS resolver typed config.
+void makeDefaultCaresDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
-// Create an empty apple DNS resolver typed config.
-void makeEmptyAppleDnsResolverConfig(
+// Create a default apple DNS resolver typed config.
+void makeDefaultAppleDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
-// Create an empty DNS resolver typed config based on build system and configuration.
-void makeEmptyDnsResolverConfig(
+// Create a default DNS resolver typed config based on build system and configuration.
+void makeDefaultDnsResolverConfig(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // If it is MacOS and the run time flag: envoy.restart_features.use_apple_api_for_dns_lookups
@@ -61,7 +62,6 @@ bool checkTypedDnsResolverConfigExist(
     typed_dns_resolver_config.MergeFrom(config.typed_dns_resolver_config());
     return true;
   }
-  // If typed_dns_resolver_config is missing, fall back to default case.
   return false;
 }
 
@@ -110,30 +110,54 @@ void handleLegacyDnsResolverData(
     const envoy::config::cluster::v3::Cluster& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
-// Retrieve the DNS related configurations in the passed in @param config, and store the data into
-// @param typed_dns_resolver_config.
+// Make typed_dns_resolver_config from the passed @param config.
 template <class ConfigType>
-void makeDnsResolverConfig(
-    const ConfigType& config,
-    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+envoy::config::core::v3::TypedExtensionConfig makeDnsResolverConfig(const ConfigType& config) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+
   // typed_dns_resolver_config takes precedence
   if (checkTypedDnsResolverConfigExist(config, typed_dns_resolver_config)) {
-    return;
+    return typed_dns_resolver_config;
   }
 
   // If use apple API for DNS lookups, create an AppleDnsResolverConfig typed config.
   if (checkUseAppleApiForDnsLookups(typed_dns_resolver_config)) {
-    return;
+    return typed_dns_resolver_config;
   }
 
   // If dns_resolution_config exits, create a CaresDnsResolverConfig typed config based on it.
   if (checkDnsResolutionConfigExist(config, typed_dns_resolver_config)) {
-    return;
+    return typed_dns_resolver_config;
   }
 
   // Handle legacy DNS resolver fields for backward compatibility.
   // Different config type has different fields to copy.
   handleLegacyDnsResolverData(config, typed_dns_resolver_config);
+  return typed_dns_resolver_config;
+}
+
+// Create the DNS resolver factory from typed config.
+Network::DnsResolverFactory* createDnsResolverFactoryFromTypedConfig(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
+// Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
+// This function can be called in main or worker threads.
+Network::DnsResolverFactory* createDefaultDnsResolverFactory(
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
+
+// Create the DNS resolver factory from the proto config.
+// Retrieve the DNS related configurations in the passed in @param config, and store the data into
+// @param typed_dns_resolver_config.
+// Output: the DNS resolver factory.
+template <class ConfigType>
+Network::DnsResolverFactory* createDnsResolverFactoryFromProto(
+    const ConfigType& config,
+    envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+
+  // This function has to be called in main thread.
+  ASSERT(Thread::MainThread::isMainThread());
+  typed_dns_resolver_config = makeDnsResolverConfig(config);
+  return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
 }
 
 } // namespace Network

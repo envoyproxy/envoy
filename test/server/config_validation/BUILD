@@ -72,6 +72,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/server/config_validation:api_lib",
         "//source/server/config_validation:dns_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",

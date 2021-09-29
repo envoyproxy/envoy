@@ -20,8 +20,8 @@ public:
     typed_dns_resolver_config.typed_config().UnpackTo(&cares);
   }
 
-  // Verify the c-ares object is empty.
-  void verifyCaresDnsConfigEmpty(
+  // Verify the c-ares object is default.
+  void verifyCaresDnsConfigDefault(
       const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& cares) {
     EXPECT_EQ(false, cares.dns_resolver_options().use_tcp_for_dns_lookups());
     EXPECT_EQ(false, cares.dns_resolver_options().no_default_search_domain());
@@ -29,34 +29,34 @@ public:
   }
 };
 
-// Test empty c-ares DNS resolver typed config creation is expected.
-TEST_F(DnsFactoryTest, MakeEmptyCaresDnsResolverTest) {
+// Test default c-ares DNS resolver typed config creation is expected.
+TEST_F(DnsFactoryTest, MakeDefaultCaresDnsResolverTest) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  makeEmptyCaresDnsResolverConfig(typed_dns_resolver_config);
+  makeDefaultCaresDnsResolverConfig(typed_dns_resolver_config);
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  verifyCaresDnsConfigEmpty(cares);
+  verifyCaresDnsConfigDefault(cares);
 }
 
-// Test empty apple DNS resolver typed config creation is expected.
-TEST_F(DnsFactoryTest, MakeEmptyAppleDnsResolverTest) {
+// Test default apple DNS resolver typed config creation is expected.
+TEST_F(DnsFactoryTest, MakeDefaultAppleDnsResolverTest) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  makeEmptyAppleDnsResolverConfig(typed_dns_resolver_config);
+  makeDefaultAppleDnsResolverConfig(typed_dns_resolver_config);
   EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
 }
 
-// Test empty DNS resolver typed config creation based on build system and configuration is
+// Test default DNS resolver typed config creation based on build system and configuration is
 // expected.
-TEST_F(DnsFactoryTest, MakeEmptyDnsResolverTest) {
+TEST_F(DnsFactoryTest, MakeDefaultDnsResolverTest) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-  makeEmptyDnsResolverConfig(typed_dns_resolver_config);
-  // In this test case, makeEmptyDnsResolverConfig() creates an empty c-ares DNS typed config.
+  makeDefaultDnsResolverConfig(typed_dns_resolver_config);
+  // In this test case, makeDefaultDnsResolverConfig() creates an default c-ares DNS typed config.
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  verifyCaresDnsConfigEmpty(cares);
+  verifyCaresDnsConfigDefault(cares);
 }
 
 // Test handleLegacyDnsResolverData() function with DnsFilterConfig type.
@@ -67,21 +67,21 @@ TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsFilterConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   handleLegacyDnsResolverData(dns_filter_config, typed_dns_resolver_config);
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  verifyCaresDnsConfigEmpty(cares);
+  verifyCaresDnsConfigDefault(cares);
 }
 
-// Test handleLegacyDnsResolverData() function with Cluster type, and empty config.
-TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigEmpty) {
+// Test handleLegacyDnsResolverData() function with Cluster type, and default config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigDefault) {
   envoy::config::cluster::v3::Cluster cluster_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   handleLegacyDnsResolverData(cluster_config, typed_dns_resolver_config);
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
-  verifyCaresDnsConfigEmpty(cares);
+  verifyCaresDnsConfigDefault(cares);
 }
 
-// Test handleLegacyDnsResolverData() function with Cluster type, and non-empty config.
-TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigNonEmpty) {
+// Test handleLegacyDnsResolverData() function with Cluster type, and non-default config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigNonDefault) {
   envoy::config::cluster::v3::Cluster cluster_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -98,8 +98,8 @@ TEST_F(DnsFactoryTest, LegacyDnsResolverDataClusterConfigNonEmpty) {
   EXPECT_EQ(true, TestUtility::protoEqual(cares.resolvers(0), resolvers));
 }
 
-// Test handleLegacyDnsResolverData() function with Bootstrap type, and non-empty config.
-TEST_F(DnsFactoryTest, LegacyDnsResolverDataBootstrapConfigNonEmpty) {
+// Test handleLegacyDnsResolverData() function with Bootstrap type, and non-default config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataBootstrapConfigNonDefault) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -111,8 +111,8 @@ TEST_F(DnsFactoryTest, LegacyDnsResolverDataBootstrapConfigNonEmpty) {
   EXPECT_TRUE(cares.resolvers().empty());
 }
 
-// Test handleLegacyDnsResolverData() function with DnsCacheConfig type, and non-empty config.
-TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsCacheConfigNonEmpty) {
+// Test handleLegacyDnsResolverData() function with DnsCacheConfig type, and non-default config.
+TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsCacheConfigNonDefault) {
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig dns_cache_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
@@ -212,13 +212,69 @@ TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWron
 
   EXPECT_TRUE(checkTypedDnsResolverConfigExist(bootstrap_config, typed_dns_resolver_config));
   EXPECT_FALSE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
-  makeDnsResolverConfig(bootstrap_config, typed_dns_resolver_config);
+  typed_dns_resolver_config = makeDnsResolverConfig(bootstrap_config);
 
   // verify the typed_dns_resolver_config data matching DNS resolution config
   EXPECT_EQ(typed_dns_resolver_config.name(), "baz");
   EXPECT_EQ(typed_dns_resolver_config.typed_config().type_url(), "type.googleapis.com/foo");
   EXPECT_EQ(typed_dns_resolver_config.typed_config().value(), "bar");
 }
+
+// Test default DNS resolver factory creation based on build system and configuration is
+// expected.
+TEST_F(DnsFactoryTest, MakeDefaultDnsResolverFactoryTestInCares) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigDefault(cares);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+}
+
+// Test DNS resolver factory creation from proto without typed config.
+TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithoutTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(
+          envoy::config::bootstrap::v3::Bootstrap(), typed_dns_resolver_config);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigDefault(cares);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+}
+
+// Test DNS resolver factory creation from proto with valid typed config
+TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithGoodTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  Network::DnsResolverFactory* dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
+  verifyCaresDnsConfigDefault(cares);
+  EXPECT_NE(dns_resolver_factory, nullptr);
+}
+
+// Test DNS resolver factory creation from proto with invalid typed config
+TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithInvalidTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/foo");
+  typed_dns_resolver_config.set_name("bar");
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_THROW_WITH_MESSAGE(Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
+                            Envoy::EnvoyException,
+                            "Didn't find a registered implementation for name: 'bar'");
+}
+
 
 } // namespace Network
 } // namespace Envoy

@@ -77,7 +77,7 @@ public:
     ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
-    ON_CALL(dispatcher_, createDnsResolver(_))
+    ON_CALL(dispatcher_, createDnsResolver(_, _))
         .WillByDefault(DoAll(SaveArg<0>(&typed_dns_resolver_config_), Return(resolver_)));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
