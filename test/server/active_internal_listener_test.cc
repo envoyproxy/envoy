@@ -1,27 +1,17 @@
 #include <memory>
 
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/common/utility.h"
-#include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/connection_balancer_impl.h"
-#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
-#include "source/common/network/utility.h"
 #include "source/server/active_internal_listener.h"
 #include "source/server/connection_handler_impl.h"
 
-#include "test/mocks/access_log/mocks.h"
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
