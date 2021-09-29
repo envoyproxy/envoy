@@ -714,3 +714,8 @@ envoy.network.dns_resolver.apple:
   - envoy.network.dns_resolver
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.rbac.matchers.upstream_ip_port:
+  categories:
+  - envoy.rbac.matchers
+  security_posture: unknown
+  status: alpha
