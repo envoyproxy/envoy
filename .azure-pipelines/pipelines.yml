@@ -244,8 +244,9 @@ stages:
       matrix:
         api:
           CI_TARGET: "bazel.api"
-        api_compat:
-          CI_TARGET: "bazel.api_compat"
+        # Disabled due to https://github.com/envoyproxy/envoy/pull/18218
+        # api_compat:
+        #  CI_TARGET: "bazel.api_compat"
         gcc:
           CI_TARGET: "bazel.gcc"
         clang_tidy:

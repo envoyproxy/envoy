@@ -8,6 +8,8 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -508,8 +510,8 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
-  // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
-  bool allow_extended_connect = 5;
+  // Note that HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // A message to control transformations to the :scheme header

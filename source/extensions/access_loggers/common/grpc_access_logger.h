@@ -172,7 +172,7 @@ public:
     flush_timer_->enableTimer(buffer_flush_interval_msec_);
   }
 
-  void log(HttpLogProto&& entry) {
+  void log(HttpLogProto&& entry) override {
     if (!canLogMore()) {
       return;
     }
@@ -183,7 +183,7 @@ public:
     }
   }
 
-  void log(TcpLogProto&& entry) {
+  void log(TcpLogProto&& entry) override {
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {

@@ -78,7 +78,6 @@ Notes
 Given that this filter does its own processing of received requests, there are some changes
 in behaviour compared to explicit connection to a Kafka cluster:
 
-#. Record headers are not sent upstream.
 #. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are
    not going to be supported).
 #. Python producers need to set API version of at least 1.0.0, so that the produce requests they

@@ -190,6 +190,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
     _com_github_grpc_grpc()
+    _com_github_intel_ipp_crypto_crypto_mb()
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
@@ -226,8 +227,16 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_build_tools")
-    external_http_archive("rules_cc")
+    external_http_archive(
+        name = "envoy_build_tools",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
+    )
+    external_http_archive(
+        "rules_cc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:rules_cc.patch"],
+    )
     external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
@@ -374,6 +383,12 @@ def _com_github_google_libsxg():
     native.bind(
         name = "libsxg",
         actual = "@envoy//bazel/foreign_cc:libsxg",
+    )
+
+def _com_github_intel_ipp_crypto_crypto_mb():
+    external_http_archive(
+        name = "com_github_intel_ipp_crypto_crypto_mb",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _com_github_jbeder_yaml_cpp():
