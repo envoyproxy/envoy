@@ -80,8 +80,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              const envoy::config::core::v3::GrpcService& config,
                                              Api::Api& api, const StatNames& stat_names)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
-      target_uri_(config.google_grpc().target_uri()),
-      scope_(scope),
+      target_uri_(config.google_grpc().target_uri()), scope_(scope),
       per_stream_buffer_limit_bytes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config.google_grpc(), per_stream_buffer_limit_bytes, DefaultBufferLimitBytes)),
       metadata_parser_(
@@ -426,9 +425,10 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
     Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options)
     : GoogleAsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
-  current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
-                                         absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
-                                         parent.timeSource().systemTime());
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.stat_prefix_);
   current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.target_uri_);
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
