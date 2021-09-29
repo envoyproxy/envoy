@@ -28,6 +28,7 @@ namespace Logger {
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
@@ -332,9 +333,10 @@ template <Id id> class Loggable {
 protected:
   /**
    * Do not use this directly, use macros defined below.
+   * See source/docs/logging.md for more details.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& __log_do_not_use_read_comment() {
+  static spdlog::logger& __log_do_not_use_read_comment() { // NOLINT(readability-identifier-naming)
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }

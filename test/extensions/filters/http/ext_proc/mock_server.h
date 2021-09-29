@@ -13,7 +13,8 @@ class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
   ~MockClient() override;
-  MOCK_METHOD(ExternalProcessorStreamPtr, start, (ExternalProcessorCallbacks&));
+  MOCK_METHOD(ExternalProcessorStreamPtr, start,
+              (ExternalProcessorCallbacks&, const StreamInfo::StreamInfo& stream_info));
 };
 
 class MockStream : public ExternalProcessorStream {

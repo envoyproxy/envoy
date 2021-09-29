@@ -4,7 +4,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/header_map_impl.h"
@@ -622,38 +621,6 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
-}
-
-// Test hitting the bridge filter with too many response bytes to buffer. Given
-// the headers are not proxied, the connection manager will send a local error reply.
-TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.prependFilter(
-      "{ name: grpc_http1_bridge, typed_config: { \"@type\": "
-      "type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"content-type", "application/grpc"},
-                                     {"x-envoy-retry-grpc-on", "cancelled"}});
-  waitForNextUpstreamRequest();
-
-  // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are exceeded, this will be translated into an unknown gRPC error.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(1024 * 65, false);
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(),
-              HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
