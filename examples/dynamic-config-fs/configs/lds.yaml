@@ -7,12 +7,12 @@ resources:
       port_value: 10000
   filter_chains:
   - filters:
-      name: envoy.http_connection_manager
+      name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         stat_prefix: ingress_http
         http_filters:
-        - name: envoy.router
+        - name: envoy.filters.http.router
         route_config:
           name: local_route
           virtual_hosts:
