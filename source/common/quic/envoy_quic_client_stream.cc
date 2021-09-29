@@ -275,12 +275,12 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   runResetCallbacks(quicRstErrorToEnvoyRemoteResetReason(frame.error_code));
 }
 
-void EnvoyQuicClientStream::Reset(quic::QuicRstStreamErrorCode error) {
-  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error);
+void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
+  ENVOY_STREAM_LOG(debug, "sending reset code={}", *this, error.internal_code());
   stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
-  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error));
-  quic::QuicSpdyClientStream::Reset(error);
+  runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()));
+  quic::QuicSpdyClientStream::ResetWithError(error);
 }
 
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,

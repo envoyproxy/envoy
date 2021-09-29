@@ -46,7 +46,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/extensions/common/wasm:wasm_runtime",
