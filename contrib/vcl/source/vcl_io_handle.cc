@@ -666,6 +666,7 @@ void VclIoHandle::updateEvents(uint32_t events) {
   ev.data.u64 = reinterpret_cast<uint64_t>(vcl_handle);
 
   vppcom_epoll_ctl(vclEpollHandle(wrk_index), EPOLL_CTL_MOD, vcl_handle->sh(), &ev);
+  vclInterfaceDrainEvents();
 }
 
 void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -726,6 +727,20 @@ void VclIoHandle::initializeFileEvent(Event::Dispatcher& dispatcher, Event::File
   vppcom_epoll_ctl(vclEpollHandle(wrk_index), EPOLL_CTL_ADD, vcl_handle->sh(), &ev);
 
   file_event_ = Event::FileEventPtr{new VclEvent(dispatcher, *vcl_handle, cb)};
+  vclInterfaceDrainEvents();
+}
+
+void VclIoHandle::resetFileEvents() {
+  if (!file_event_) {
+    return;
+  }
+  // Remove session from epoll fd. This makes sure that when the even is recreated events already
+  // consumed are regenerated.
+  int wrk_index = vclWrkIndexOrRegister();
+  if (VCL_SH_VALID(sh_) && wrk_index == vppcom_session_worker(sh_)) {
+    vppcom_epoll_ctl(vclEpollHandle(wrk_index), EPOLL_CTL_DEL, sh_, nullptr);
+  }
+  file_event_.reset();
 }
 
 IoHandlePtr VclIoHandle::duplicate() {

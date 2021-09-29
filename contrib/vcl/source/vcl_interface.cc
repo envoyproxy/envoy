@@ -118,6 +118,12 @@ void vclInterfaceInit(Event::Dispatcher& dispatcher) {
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
+void vclInterfaceDrainEvents() {
+  MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
+  const int wrk_index = vppcom_worker_index();
+  mq_fevts_map[wrk_index]->activate(Event::FileReadyType::Read | Event::FileReadyType::Write);
+}
+
 } // namespace Vcl
 } // namespace Network
 } // namespace Extensions

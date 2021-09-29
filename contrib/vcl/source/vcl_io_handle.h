@@ -69,7 +69,7 @@ public:
                            Event::FileTriggerType trigger, uint32_t events) override;
   void activateFileEvents(uint32_t events) override { file_event_->activate(events); }
   void enableFileEvents(uint32_t events) override { file_event_->setEnabled(events); }
-  void resetFileEvents() override { file_event_.reset(); }
+  void resetFileEvents() override;
   IoHandlePtr duplicate() override;
 
   void cb(uint32_t events) { cb_(events); }

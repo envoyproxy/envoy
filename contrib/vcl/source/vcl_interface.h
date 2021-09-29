@@ -41,6 +41,11 @@ void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher);
  */
 uint32_t vclEpollHandle(uint32_t wrk_index);
 
+/**
+ * Force drain of events on current worker
+ */
+void vclInterfaceDrainEvents();
+
 } // namespace Vcl
 } // namespace Network
 } // namespace Extensions
