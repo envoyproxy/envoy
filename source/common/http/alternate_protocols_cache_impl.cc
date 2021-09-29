@@ -97,7 +97,7 @@ AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
           protocolsFromString(value, time_source_, true);
       absl::optional<Origin> origin = stringToOrigin(key);
       if (protocols.has_value() && origin.has_value()) {
-        setAlternativesImpl(origin.value(), protocols.value(), true);
+        setAlternativesImpl(origin.value(), protocols.value());
       } else {
         ENVOY_LOG(warn,
                   fmt::format("Unable to parse cache entry with key: {} value: {}", key, value));
@@ -112,12 +112,15 @@ AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
 void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
                                                   std::vector<AlternateProtocol>& protocols) {
-  setAlternativesImpl(origin, protocols, false);
+  setAlternativesImpl(origin, protocols);
+  if (key_value_store_) {
+    key_value_store_->addOrUpdate(originToString(origin),
+                                  protocolsToStringForCache(protocols, time_source_));
+  }
 }
 
 void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
-                                                      std::vector<AlternateProtocol>& protocols,
-                                                      bool from_cache) {
+                                                      std::vector<AlternateProtocol>& protocols) {
   static const size_t max_protocols = 10;
   if (protocols.size() > max_protocols) {
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
@@ -129,10 +132,6 @@ void AlternateProtocolsCacheImpl::setAlternativesImpl(const Origin& origin,
     protocols_.erase(iter);
   }
   protocols_[origin] = protocols;
-  if (key_value_store_ && !from_cache) {
-    key_value_store_->addOrUpdate(originToString(origin),
-                                  protocolsToStringForCache(protocols, time_source_));
-  }
 }
 
 OptRef<const std::vector<AlternateProtocolsCache::AlternateProtocol>>

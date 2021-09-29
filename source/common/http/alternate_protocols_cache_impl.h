@@ -55,8 +55,7 @@ public:
   size_t size() const override;
 
 private:
-  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols,
-                           bool from_cache);
+  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
