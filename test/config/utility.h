@@ -127,13 +127,13 @@ public:
   static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
-  // A string for a basic buffer filter, which can be used with addFilter()
+  // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
-  // A string for a small buffer filter, which can be used with addFilter()
+  // A string for a small buffer filter, which can be used with prependFilter()
   static std::string smallBufferFilter();
-  // A string for a health check filter which can be used with addFilter()
+  // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with addFilter()
+  // A string for a squash filter which can be used with prependFilter()
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
@@ -146,8 +146,9 @@ public:
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
-                                                                const std::string& address);
+  static envoy::config::cluster::v3::Cluster
+  buildStaticCluster(const std::string& name, int port, const std::string& address,
+                     const std::string& lb_policy = "ROUND_ROBIN");
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster
@@ -213,6 +214,10 @@ public:
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
+  void prependFilter(const std::string& filter_yaml);
+
+  // Add an HTTP filter prior to existing filters.
+  // TODO(rgs1): remove once envoy-filter-example has been updated.
   void addFilter(const std::string& filter_yaml);
 
   // Add a network filter prior to existing filters.
@@ -309,7 +314,8 @@ public:
 
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
-  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post);
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
+                               bool http3 = false);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
@@ -359,10 +365,6 @@ private:
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
-
-  // Configure a tap transport socket for a cluster/filter chain.
-  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;

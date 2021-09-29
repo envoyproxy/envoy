@@ -297,9 +297,16 @@ EXTENSIONS = {
     #
 
     "envoy.key_value.file_based":     "//source/extensions/key_value/file_based:config_lib",
+
+    #
+    # RBAC matchers
+    #
+
+    "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]

@@ -1,6 +1,6 @@
-load("@pylint_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_binary")
 
 licenses(["notice"])  # Apache 2
 
@@ -12,14 +12,11 @@ exports_files([
     "envoy_build_fixer.py",
 ])
 
-envoy_py_binary(
-    name = "tools.code_format.python_check",
+py_binary(
+    name = "python_check",
+    srcs = ["python_check.py"],
     deps = [
-        "//tools/base:aio",
-        "//tools/base:checker",
-        "//tools/base:utils",
-        requirement("flake8"),
-        requirement("pep8-naming"),
-        requirement("yapf"),
+        "@envoy_repo",
+        requirement("envoy.code_format.python_check"),
     ],
 )

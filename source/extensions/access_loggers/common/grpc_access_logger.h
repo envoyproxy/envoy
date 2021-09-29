@@ -172,7 +172,7 @@ public:
     flush_timer_->enableTimer(buffer_flush_interval_msec_);
   }
 
-  void log(HttpLogProto&& entry) {
+  void log(HttpLogProto&& entry) override {
     if (!canLogMore()) {
       return;
     }
@@ -183,7 +183,7 @@ public:
     }
   }
 
-  void log(TcpLogProto&& entry) {
+  void log(TcpLogProto&& entry) override {
     approximate_message_size_bytes_ += entry.ByteSizeLong();
     addEntry(std::move(entry));
     if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
@@ -268,10 +268,14 @@ public:
     if (it != cache.access_loggers_.end()) {
       return it->second;
     }
+    // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
+    // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
+    // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
+    // the main thread if necessary.
+    auto client = async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true)
+                      ->createUncachedRawAsyncClient();
     const auto logger = createLogger(
-        config,
-        async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, false)
-            ->createUncachedRawAsyncClient(),
+        config, std::move(client),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
         scope);

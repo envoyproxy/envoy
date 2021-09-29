@@ -73,11 +73,13 @@ public:
 template <class T>
 std::unique_ptr<T>
 quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
-                          uint32_t max_headers_allowed, absl::string_view& details) {
+                          uint32_t max_headers_allowed, absl::string_view& details,
+                          quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create();
   for (const auto& entry : header_list) {
     if (max_headers_allowed == 0) {
       details = Http3ResponseCodeDetailValues::too_many_headers;
+      rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
       return nullptr;
     }
     max_headers_allowed--;
@@ -85,6 +87,7 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
         validator.validateHeader(entry.first, entry.second);
     switch (result) {
     case Http::HeaderUtility::HeaderValidationResult::REJECT:
+      rst = quic::QUIC_BAD_APPLICATION_PAYLOAD;
       // The validator sets the details to Http3ResponseCodeDetailValues::invalid_underscore
       return nullptr;
     case Http::HeaderUtility::HeaderValidationResult::DROP:
@@ -105,13 +108,14 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
 }
 
 template <class T>
-std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
-                                                  uint32_t max_headers_allowed,
-                                                  HeaderValidator& validator,
-                                                  absl::string_view& details) {
+std::unique_ptr<T>
+spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& header_block,
+                               uint32_t max_headers_allowed, HeaderValidator& validator,
+                               absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create();
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
+    rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
     return nullptr;
   }
   for (auto entry : header_block) {
@@ -122,6 +126,7 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& h
     for (const absl::string_view& value : values) {
       if (max_headers_allowed == 0) {
         details = Http3ResponseCodeDetailValues::too_many_trailers;
+        rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
         return nullptr;
       }
       max_headers_allowed--;
@@ -129,6 +134,7 @@ std::unique_ptr<T> spdyHeaderBlockToEnvoyTrailers(const spdy::SpdyHeaderBlock& h
           validator.validateHeader(entry.first, value);
       switch (result) {
       case Http::HeaderUtility::HeaderValidationResult::REJECT:
+        rst = quic::QUIC_BAD_APPLICATION_PAYLOAD;
         return nullptr;
       case Http::HeaderUtility::HeaderValidationResult::DROP:
         continue;

@@ -194,7 +194,6 @@ struct MainThread {
    */
   static void clear();
   static bool isMainThread();
-  static bool isWorkerThread();
 
 private:
   std::thread::id main_thread_id_;

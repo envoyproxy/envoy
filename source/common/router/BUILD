@@ -65,6 +65,7 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/common/upstream:retry_factory_lib",
         "//source/extensions/filters/http/common:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

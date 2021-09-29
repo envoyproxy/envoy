@@ -17,23 +17,36 @@ Incompatible Behavior Changes
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`MySQL proxy filter <config_network_filters_mysql_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
+* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+  protobuf fields have been renumbered to restore compatibility with Envoy
+  1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
+  numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to
+  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+  provided they skip over Envoy 1.19.0 and 1.19.1.
+  Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
+  vendor the corresponding protobuf definitions to ensure that the
+  renumbered fields have the types expected by those releases.
 * ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
+* extensions: deprecated extension names now default to triggering a configuration error.
+  The previous warning-only behavior may be temporarily reverted by setting the runtime key
+  ``envoy.deprecated_features.allow_deprecated_extension_names`` to true.
 
 Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* client_ssl_auth filter: now sets additional termination details and **UAEX** response flag when the client certificate is not in the allowed-list.
 * config: configuration files ending in .yml now load as YAML.
 * config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON file load as JSON.
 * config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
-* grpc: gRPC async client can be cached and shared accross filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
+* grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
   can be reverted by setting runtime guard ``correct_scheme_and_xfp`` to false.
-* http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of request
+* http: reject requests with #fragment in the URI path. The fragment is not allowed to be part of the request
   URI according to RFC3986 (3.5), RFC7230 (5.1) and RFC 7540 (8.1.2.3). Rejection of requests can be changed
   to stripping the #fragment instead by setting the runtime guard ``envoy.reloadable_features.http_reject_path_with_fragment``
   to false. This behavior can further be changed to the deprecated behavior of keeping the fragment by setting the runtime guard
@@ -47,30 +60,36 @@ Minor Behavior Changes
 * http: stop processing pending H/2 frames if connection transitioned to a closed state. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` to false.
 * listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
   field and changed the default for reuse_port from false to true, as the feature is now well
-  supported on the majority of production Linux kernels in use. The default change is aware of hot
-  restart, as otherwise the change would not be backwards compatible between restarts. This means
-  that hot restarting on to a new binary will retain the default of false until the binary undergoes
+  supported on the majority of production Linux kernels in use. The default change is aware of the hot
+  restart, as otherwise, the change would not be backward compatible between restarts. This means
+  that hot restarting onto a new binary will retain the default of false until the binary undergoes
   a full restart. To retain the previous behavior, either explicitly set the new configuration
   field to false, or set the runtime feature flag ``envoy.reloadable_features.listener_reuse_port_default_enabled``
   to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
+* listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
+* quic: enables IETF connection migration. This feature requires a stable UDP packet routine in the L4 load balancer with the same first-4-bytes in connection id. It can be turned off by setting runtime guard ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_connection_migration_use_new_cid_v2`` to false.
 
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * access log: fix ``%UPSTREAM_CLUSTER%`` when used in http upstream access logs. Previously, it was always logging as an unset value.
-* access log: fix ``%UPSTREAM_CLUSTER%`` when used in http upstream access logs. Previously, it was always logging as an unset value.
-* aws request signer: fix the AWS Request Signer extension to correctly normalize the path and query string to be signed according to AWS' guidelines, so that the hash on the server side matches. See `AWS SigV4 documentaion <https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html>`_.
+* aws request signer: fix the AWS Request Signer extension to correctly normalize the path and query string to be signed according to AWS' guidelines, so that the hash on the server side matches. See `AWS SigV4 documentation <https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html>`_.
 * cluster: delete pools when they're idle to fix unbounded memory use when using PROXY protocol upstream with tcp_proxy. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.conn_pool_delete_when_idle`` runtime guard to false.
+* cluster: finish cluster warming even if hosts are removed before health check initialization. This only affected clusters with :ref:`ignore_health_on_host_removal <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>`.
+* compressor: fix a bug where if trailers were added and a subsequent filter paused the filter chain, the request could be stalled. This behavior can be reverted by setting ``envoy.reloadable_features.fix_added_trailers`` to false.
 * dynamic forward proxy: fixing a validation bug where san and sni checks were not applied setting :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>` via :ref:`typed_extension_protocol_options <envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`.
 * ext_authz: fix the ext_authz filter to correctly merge multiple same headers using the ',' as separator in the check request to the external authorization service.
-* ext_authz: the network ext_authz filter now correctly sets dynamic metdata returned by the authorization service for non-OK responses. This behavior now matches the http ext_authz filter.
+* ext_authz: fix the use of ``append`` field of :ref:`response_headers_to_add <envoy_v3_api_field_service.auth.v3.OkHttpResponse.response_headers_to_add>` to set or append encoded response headers from a gRPC auth server.
+* ext_authz: fix the HTTP ext_authz filter to respond with ``403 Forbidden`` when a gRPC auth server sends a denied check response with an empty HTTP status code.
+* ext_authz: the network ext_authz filter now correctly sets dynamic metadata returned by the authorization service for non-OK responses. This behavior now matches the http ext_authz filter.
 * hcm: remove deprecation for :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>` and forbid mixing ip detection extensions with old related knobs.
 * http: limit use of deferred resets in the http2 codec to server-side connections. Use of deferred reset for client connections can result in incorrect behavior and performance problems.
 * listener: fixed an issue on Windows where connections are not handled by all worker threads.
-* xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under 'annotations' section of the segment data.
+* lua: fix ``BodyBuffer`` setting a Lua string and printing Lua string containing hex characters. Previously, ``BodyBuffer`` setting a Lua string or printing strings with hex characters will be truncated.
+* xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under the 'annotations' section of the segment data.
 
 Removed Config or Runtime
 -------------------------
@@ -88,15 +107,36 @@ New Features
 * access_log: added :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` token to handle all types of metadata (DYNAMIC, CLUSTER, ROUTE).
 * bootstrap: added :ref:`inline_headers <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.inline_headers>` in the bootstrap to make custom inline headers bootstrap configurable.
 * contrib: added new :ref:`contrib images <install_contrib>` which contain contrib extensions.
+* dns: added :ref:`V4_PREFERRED <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.V4_PREFERRED>` option to return V6 addresses only if V4 addresses are not available.
+* ext_authz: added :ref:`dynamic_metadata_from_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.AuthorizationResponse.dynamic_metadata_from_headers>` to support emitting dynamic metadata from headers returned by an external authorization service via HTTP.
 * grpc reverse bridge: added a new :ref:`option <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>` to support streaming response bodies when withholding gRPC frames from the upstream.
+* http: added cluster_header in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow routing to the weighted cluster specified in the request_header.
+* http: added :ref:`alternate_protocols_cache_options <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>` for enabling HTTP/3 connections to servers which advertise HTTP/3 support via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_.
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
+* http: added :ref:`x-envoy-upstream-stream-duration-ms <config_http_filters_router_x-envoy-upstream-stream-duration-ms>` that allows configuring the max stream duration via a request header.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
 * http: sanitizing the referer header as documented :ref:`here <config_http_conn_man_headers_referer>`. This feature can be temporarily turned off by setting runtime guard ``envoy.reloadable_features.sanitize_http_header_referer`` to false.
+* http: validating outgoing HTTP/2 CONNECT requests to ensure that if ``:path`` is set that ``:protocol`` is present. This behavior can be temporarily turned off by setting runtime guard ``envoy.reloadable_features.validate_connect`` to false.
 * jwt_authn: added support for :ref:`Jwt Cache <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.jwt_cache_config>` and its size can be specified by :ref:`jwt_cache_size <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtCacheConfig.jwt_cache_size>`.
+* jwt_authn: added support for extracting JWTs from request cookies using :ref:`from_cookies <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.from_cookies>`.
+* jwt_authn: added support for setting the extracted headers from a successfully verified JWT using :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>` to dynamic metadata.
 * listener: new listener metric ``downstream_cx_transport_socket_connect_timeout`` to track transport socket timeouts.
+* lua: added ``header:getAtIndex()`` and ``header:getNumValues()`` methods to :ref:`header object <config_http_filters_lua_header_wrapper>` for retrieving the value of a header at certain index and get the total number of values for a given header.
+* matcher: added :ref:`invert <envoy_v3_api_field_type.matcher.v3.MetadataMatcher.invert>` for inverting the match result in the metadata matcher.
+* overload: add a new overload action that resets streams using a lot of memory. To enable the tracking of allocated bytes in buffers that a stream is using we need to configure the minimum threshold for tracking via:ref:`buffer_factory_config <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`. We have an overload action ``Envoy::Server::OverloadActionNameValues::ResetStreams`` that takes advantage of the tracking to reset the most expensive stream first.
 * rbac: added :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>` for matching range of destination ports.
+* rbac: added :ref:`matcher<envoy_v3_api_field_config.rbac.v3.Permission.matcher>` along with extension category ``extension_category_envoy.rbac.matchers`` for custom RBAC permission matchers. Added reference implementation for matchers :ref:`envoy.rbac.matchers.upstream_ip_port <extension_envoy.rbac.matchers.upstream_ip_port>`.
 * route config: added :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>` for routing based on dynamic metadata.
+* router: added retry options predicate extensions configured via
+  :ref:` <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_options_predicates>`. These
+  extensions allow modification of requests between retries at the router level. There are not
+  currently any built-in extensions that implement this extension point.
+* router: added :ref:`per_try_idle_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_idle_timeout>` timeout configuration.
+* router: added an optional :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` to support setting SNI value from an arbitrary header other than host/authority.
+* sxg_filter: added filter to transform response to SXG package to :ref:`contrib images <install_contrib>`. This can be enabled by setting :ref:`SXG <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>` configuration.
 * thrift_proxy: added support for :ref:`mirroring requests <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies>`.
+* udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
+* udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 
 Deprecated
 ----------

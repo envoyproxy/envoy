@@ -26,7 +26,7 @@ public:
       const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context)
-      : InjectedResourceMonitor(config, context), dispatcher_(context.dispatcher()) {}
+      : InjectedResourceMonitor(config, context), dispatcher_(context.mainThreadDispatcher()) {}
 
 protected:
   void onFileChanged() override {

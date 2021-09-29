@@ -300,7 +300,7 @@ public:
    * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid. And a flag to control return nullptr or throw an exception.
    * @param message proto that contains fields 'name' and 'typed_config'.
-   * @param is_optional an exception will be throw when the value is true and no factory found.
+   * @param is_optional an exception will be throw when the value is false and no factory found.
    * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory, class ProtoMessage>
@@ -443,10 +443,8 @@ public:
                                 Stats::Scope& scope, bool skip_cluster_check);
 
   /**
-   * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
-   * message.
+   * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
-   * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
