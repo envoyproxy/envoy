@@ -175,11 +175,57 @@ build:remote-ci-linux-local-java8 --host_java_toolchain=@bazel_tools//tools/jdk:
 build:remote-ci-linux-local-java8 --java_toolchain=@bazel_tools//tools/jdk:toolchain_java8
 build:remote-ci-linux-local-java8 --config=remote-ci-common
 #############################################################################
+# remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
+#############################################################################
+# Clang environment variables (keep in sync with @engflow_remote_config_clang_coverage)
+build:remote-ci-linux-coverage --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote-ci-linux-coverage --action_env=CC=/opt/llvm/bin/clang
+build:remote-ci-linux-coverage --test_env=CC=/opt/llvm/bin/clang
+build:remote-ci-linux-coverage --action_env=CXX=/opt/llvm/bin/clang++
+build:remote-ci-linux-coverage --test_env=CXX=/opt/llvm/bin/clang++
+# Coverage environment variables (keep in sync with @engflow_remote_config_clang_coverage)
+build:remote-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:remote-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
+build:remote-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:remote-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
+build:remote-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+build:remote-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
+# Toolchain flags (Java is required for C++ coverage due to Bazel's LCOV merger)
+build:remote-ci-linux-coverage --crosstool_top=@engflow_remote_config_clang_coverage//cc:toolchain
+build:remote-ci-linux-coverage --extra_execution_platforms=@engflow_remote_config_clang_coverage//config:platform
+build:remote-ci-linux-coverage --extra_toolchains=@engflow_remote_config_clang_coverage//config:cc-toolchain
+build:remote-ci-linux-coverage --host_platform=@engflow_remote_config_clang_coverage//config:platform
+build:remote-ci-linux-coverage --platforms=@engflow_remote_config_clang_coverage//config:platform
+build:remote-ci-linux-coverage --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+build:remote-ci-linux-coverage --java_toolchain=@bazel_tools//tools/jdk:toolchain_java11
+# Flags to run tests locally which are necessary since Bazel C++ LLVM coverage isn't fully supported for remote builds
+# TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote test execution and LLVM coverage.
+build:remote-ci-linux-coverage --remote_download_outputs=all
+build:remote-ci-linux-coverage --strategy=TestRunner=local,remote
+build:remote-ci-linux-coverage --strategy=CoverageReport=local,remote
+# Bazel remote caching is incompatible with C++ LLVM coverage so we need to deactivate it for coverage builds
+# TODO(lfpino): Reference upstream Bazel issue here on the incompatibility of remote caching and LLVM coverage.
+build:remote-ci-linux-coverage --noremote_accept_cached
+build:remote-ci-linux-coverage --config=remote-ci-common
+# IPv6 tests fail on CI
+build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+#############################################################################
 # remote-ci-macos: These options are macOS-only
 # TODO(lfpino): Add --remote_default_exec_properties=Pool=macos once the pool is defined
 #############################################################################
 build:remote-ci-macos --config=remote-ci-common
 build:remote-ci-macos --xcode_version_config=//ci:xcode_config
+#############################################################################
+# remote-ci-debug: Various Bazel debugging flags
+#############################################################################
+common:remote-ci-debug --announce_rc
+common:remote-ci-debug -s
+common:remote-ci-debug -c dbg
+common:remote-ci-debug --verbose_failures
+common:remote-ci-debug --sandbox_debug
+common:remote-ci-debug --action_env=VERBOSE_COVERAGE=true
+common:remote-ci-debug --test_env=VERBOSE_COVERAGE=true
+common:remote-ci-debug --test_env=DISPLAY_LCOV_CMD=true
 #############################################################################
 # Experimental EngFlow Remote Execution Configs
 #############################################################################

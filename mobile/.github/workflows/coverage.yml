@@ -11,13 +11,11 @@ jobs:
     name: coverage
     runs-on: ubuntu-18.04
     timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
     container:
       image: envoyproxy/envoy-build-ubuntu:b51ac7a0f2cb5dd729984a379a301ce029ac765d
-      env:
-        BAZEL_BUILD_OPTIONS: "--test_env=ENVOY_IP_TEST_VERSIONS=v4only"
-        CC: /opt/llvm/bin/clang
-        CXX: /opt/llvm/bin/clang++
-        COVERAGE_THRESHOLD: 95
     steps:
       - uses: actions/checkout@v1
         with:
@@ -25,7 +23,7 @@ jobs:
       - id: check_context
         name: 'Check whether to run'
         run: |
-          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -q common/ ; then
+          if git rev-parse --abbrev-ref HEAD | grep -q ^main$ || git diff --name-only origin/main | grep -qe common/ -e ^.github/workflows/coverage.yml ; then
             echo "Coverage will run."
             echo "::set-output name=run_coverage::true"
           else
@@ -35,7 +33,12 @@ jobs:
       - name: 'Run coverage'
         if: steps.check_context.outputs.run_coverage == 'true'
         continue-on-error: true
-        run: "PATH=/opt/llvm/bin:${PATH} ./envoy/test/run_envoy_bazel_coverage.sh //test/common/..."
+        run: |
+          echo "build --remote_header=\"Authorization=Bearer ${{ secrets.GITHUB_TOKEN }}\"" > ~/.bazelrc
+          BAZEL_BUILD_OPTIONS="--config=remote-ci-linux-coverage" \
+            PATH=/opt/llvm/bin:${PATH} \
+            COVERAGE_THRESHOLD=95 \
+            ./envoy/test/run_envoy_bazel_coverage.sh //test/common/...
       - name: 'Package coverage'
         if: steps.check_context.outputs.run_coverage == 'true'
         run: |
