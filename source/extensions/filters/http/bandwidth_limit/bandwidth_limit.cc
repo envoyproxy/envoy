@@ -38,7 +38,8 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
       response_delay_trailer_(config.response_trailer_prefix().empty()
                                   ? DefaultResponseDelayTrailer
                                   : Http::LowerCaseString(config.response_trailer_prefix() + "-" +
-                                                          DefaultResponseDelayTrailer.get())) {
+                                                          DefaultResponseDelayTrailer.get())),
+      enable_response_trailer_(config.enable_response_trailer()) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
   }
@@ -163,7 +164,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     // Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
     // If upstream has trailers, addEncodedTrailers won't be called
     bool trailer_added = false;
-    if (end_stream) {
+    if (config.enableResponseTrailer() && end_stream) {
       trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
@@ -211,13 +212,16 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
   if (response_latency_) {
     const auto& config = getConfig();
 
-    auto response_duration = response_latency_.get()->elapsed().count();
-    if (trailers_ != nullptr && request_duration_ > 0) {
-      trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_));
+    if (config.enableResponseTrailer() && trailers_ != nullptr) {
+      auto response_duration = response_latency_.get()->elapsed().count();
+      if (request_duration_ > 0) {
+        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_));
+      }
+      if (response_duration > 0) {
+        trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_duration));
+      }
     }
-    if (trailers_ != nullptr && response_duration > 0) {
-      trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_duration));
-    }
+
     response_latency_->complete();
     response_latency_.reset();
     config.stats().response_pending_.dec();

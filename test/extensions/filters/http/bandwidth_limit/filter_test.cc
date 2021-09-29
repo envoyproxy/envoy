@@ -203,6 +203,7 @@ TEST_F(FilterTest, LimitOnEncode) {
     runtime_key: foo_key
   enable_mode: RESPONSE
   limit_kbps: 1
+  enable_response_trailer: true
   response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -315,6 +316,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
+  enable_response_trailer: true
   response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -511,9 +513,8 @@ TEST_F(FilterTest, WithTrailers) {
               injectEncodedDataToFilterChain(BufferStringEqual(std::string(5, 'e')), false));
   response_timer->invokeCallback();
   EXPECT_EQ(0, findGauge("test.http_bandwidth_limit.response_pending"));
-
-  EXPECT_EQ("50", response_trailers_.get_("test-bandwidth-request-delay-ms"));
-  EXPECT_EQ("150", response_trailers_.get_("test-bandwidth-response-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-request-delay-ms"));
+  EXPECT_EQ(false, response_trailers_.has("test-bandwidth-response-delay-ms"));
 }
 
 TEST_F(FilterTest, WithTrailersNoEndStream) {
@@ -524,6 +525,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
+  enable_response_trailer: true
   )";
   setup(fmt::format(config_yaml, "1"));
 
