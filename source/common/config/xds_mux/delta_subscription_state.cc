@@ -102,7 +102,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
     for (const auto& resource : message.resources()) {
-      if (!wildcard_ && !resource_state_.contains(resource.name())) {
+      if (wildcard_ || resource_state_.contains(resource.name())) {
         // Only consider tracked resources.
         // NOTE: This is not gonna work for xdstp resources with glob resource matching.
         addResourceState(resource);
