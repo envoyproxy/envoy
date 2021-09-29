@@ -12,10 +12,11 @@ namespace StatSinks {
 namespace MetricsService {
 namespace {
 
-// Test that the deprecated extension name still functions.
+// Test that the extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(MetricsServiceConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         MetricsServiceName));
+  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
+                         "envoy.metrics_service"));
 }
 
 } // namespace

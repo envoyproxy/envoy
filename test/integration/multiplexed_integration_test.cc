@@ -1720,16 +1720,14 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   // This test uses an Http2Frame and not the encoder's encodeMetadata method,
   // because encodeMetadata fails when an empty metadata map is sent.
   beginSession();
-  FakeHttpConnectionPtr fake_upstream_connection;
-  FakeStreamPtr fake_upstream_request;
 
   const uint32_t client_stream_idx = 1;
   // Send request.
   const Http2Frame request =
       Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url");
   sendFrame(request);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send metadata frame with empty metadata map.
   const Http::MetadataMap empty_metadata_map;
@@ -1743,9 +1741,9 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   sendFrame(empty_data_frame);
 
   // Upstream sends a reply.
-  ASSERT_TRUE(fake_upstream_request->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  fake_upstream_request->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(response_headers, true);
 
   // Make sure that a response from upstream is received by the client, and
   // close the connection.
@@ -1754,7 +1752,10 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
   EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
 
-  // Cleanup.
+  // Cleanup. Closing upstream connection first to avoid a race between the
+  // client FIN and the connection closure (see comment in
+  // HttpIntegrationTest::cleanupUpstreamAndDownstream).
+  cleanupUpstreamAndDownstream();
   tcp_client_->close();
 }
 
