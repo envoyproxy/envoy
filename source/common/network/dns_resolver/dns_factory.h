@@ -22,7 +22,6 @@ constexpr absl::string_view DnsResolverCategory = "envoy.network.dns_resolver";
 
 class DnsResolverFactory : public Config::TypedFactory {
 public:
-  virtual ~DnsResolverFactory() = default;
   /**
    * @returns a DnsResolver object.
    * @param dispatcher: the local dispatcher thread
