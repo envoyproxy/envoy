@@ -1,5 +1,11 @@
+.. _api-v3_config_contrib:
+
+Contrib Extensions
+==================
+
 .. toctree::
   :glob:
   :maxdepth: 2
 
-  ../../extensions/private_key_providers/cryptomb/v3alpha/*
+  sip/sip
+  cryptomb/cryptomb

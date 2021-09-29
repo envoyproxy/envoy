@@ -1,0 +1,13 @@
+diff --git a/cc/private/toolchain/unix_cc_toolchain_config.bzl b/cc/private/toolchain/unix_cc_toolchain_config.bzl
+index c3cf3ba..d207bbd 100644
+--- a/cc/private/toolchain/unix_cc_toolchain_config.bzl
++++ b/cc/private/toolchain/unix_cc_toolchain_config.bzl
+@@ -313,7 +313,7 @@ def _impl(ctx):
+                 ],
+                 flag_groups = [
+                     flag_group(
+-                        flags = ["-gsplit-dwarf"],
++                        flags = ["-gsplit-dwarf", "-g"],
+                         expand_if_available = "per_object_debug_info_file",
+                     ),
+                 ],
