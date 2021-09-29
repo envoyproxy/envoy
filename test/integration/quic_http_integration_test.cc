@@ -471,9 +471,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
-  Network::Address::InstanceConstSharedPtr local_addr =
-      Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->maybeMigratePort(local_addr);
+  quic_connection_->OnPathDegradingDetected();
   ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();
   EXPECT_NE(old_self_addr, self_addr);
@@ -512,9 +510,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
 
   ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
   auto old_self_addr = quic_connection_->self_address();
-  Network::Address::InstanceConstSharedPtr local_addr =
-      Network::Test::getCanonicalLoopbackAddress(version_);
-  quic_connection_->maybeMigratePort(local_addr);
+  quic_connection_->OnPathDegradingDetected();
   ASSERT_TRUE(quic_connection_->waitForPathResponse());
   auto self_addr = quic_connection_->self_address();
   // The path validation will fail and thus client self address will not change.

@@ -116,20 +116,29 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
 
 void EnvoyQuicClientConnection::OnPathDegradingDetected() {
   QuicConnection::OnPathDegradingDetected();
-  // MaybeMigratePort();
+  maybeMigratePort();
 }
 
-void EnvoyQuicClientConnection::maybeMigratePort(
-    Network::Address::InstanceConstSharedPtr& local_address) {
+void EnvoyQuicClientConnection::maybeMigratePort() {
   if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
       HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
     return;
   }
 
-  // Network::Address::InstanceConstSharedPtr local_addr;
+  Network::Address::InstanceConstSharedPtr current_local_address =
+      connectionSocket()->connectionInfoProvider().localAddress();
+  Network::Address::InstanceConstSharedPtr new_local_address;
+  if (current_local_address->ip()->version() == Network::Address::IpVersion::v4) {
+    new_local_address = std::make_shared<Network::Address::Ipv4Instance>(
+        current_local_address->ip()->addressAsString());
+  } else {
+    new_local_address = std::make_shared<Network::Address::Ipv6Instance>(
+        current_local_address->ip()->addressAsString());
+  }
+
   auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
       connectionSocket()->connectionInfoProvider().remoteAddress());
-  probing_socket_ = createConnectionSocket(remote_address, local_address, nullptr);
+  probing_socket_ = createConnectionSocket(remote_address, new_local_address, nullptr);
   probing_socket_raw_ptr_ = probing_socket_.get();
   setUpConnectionSocket(*probing_socket_, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
