@@ -17,6 +17,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -96,10 +97,10 @@ message VirtualHost {
   // The match tree to use when resolving route actions for incoming requests. Only one of this and `routes`
   // can be specified.
   //
-  // Note that this API is experimental and must be explicitly enabled by setting the runtime
+  // Note that this API is a work in progress and must be explicitly enabled by setting the runtime
   // "envoy.reloadable_features.experimental_matching_api" to "true".
-  // [#alpha:]
-  xds.type.matcher.v3.Matcher matcher = 21;
+  xds.type.matcher.v3.Matcher matcher = 21
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
