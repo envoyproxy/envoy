@@ -56,8 +56,8 @@ private:
 
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
-  std::unique_ptr<Formatter::StructFormatter> body_formatter_;
-  std::unique_ptr<Formatter::StructFormatter> attributes_formatter_;
+  std::unique_ptr<Formatter::OpenTelemetryFormatter> body_formatter_;
+  std::unique_ptr<Formatter::OpenTelemetryFormatter> attributes_formatter_;
 };
 
 using AccessLogPtr = std::unique_ptr<AccessLog>;
