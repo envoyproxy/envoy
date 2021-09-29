@@ -442,6 +442,9 @@ public:
 
 using UdpListenerPtr = std::unique_ptr<UdpListener>;
 
+/**
+ * Internal listener callbacks.
+ */
 class InternalListenerCallbacks {
 public:
   virtual ~InternalListenerCallbacks() = default;
@@ -451,8 +454,6 @@ public:
    * @param socket supplies the socket that is moved into the callee.
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
-
-  // virtual Event::Dispatcher& dispatcher() PURE;
 };
 using InternalListenerCallbacksOptRef =
     absl::optional<std::reference_wrapper<InternalListenerCallbacks>>;
@@ -462,9 +463,18 @@ class InternalListener {};
 using InternalListenerPtr = std::unique_ptr<InternalListener>;
 using InternalListenerOptRef = absl::optional<std::reference_wrapper<InternalListener>>;
 
+/**
+ * The query interface of the registered internal listener callbacks.
+ */
 class InternalListenerManager {
 public:
   virtual ~InternalListenerManager() = default;
+
+  /**
+   * Return the internal listener binding the listener address.
+   *
+   * @param listen_address the internal address of the expected internal listener.
+   */
   virtual InternalListenerCallbacksOptRef
   findByAddress(const Address::InstanceConstSharedPtr& listen_address) PURE;
 };
