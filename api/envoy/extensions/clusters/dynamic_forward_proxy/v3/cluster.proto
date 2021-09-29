@@ -49,7 +49,6 @@ message ClusterConfig {
   //   TODO(alyssawilk) implement request queueing in connections.
   //
   // .. note::
-  //
   //   The coalesced connections might be to upstreams that would not be otherwise
   //   selected by Envoy. See the section `Connection Reuse in RFC 7540
   //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
