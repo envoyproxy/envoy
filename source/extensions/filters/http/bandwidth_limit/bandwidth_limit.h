@@ -75,7 +75,7 @@ public:
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
   const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
   const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
-  bool enableResponseTrailer() const {return enable_response_trailer_; }
+  bool enableResponseTrailer() const { return enable_response_trailer_; }
 
 private:
   friend class FilterTest;
