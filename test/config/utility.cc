@@ -404,9 +404,12 @@ admin:
 }
 
 // TODO(samflattery): bundle this up with buildCluster
-envoy::config::cluster::v3::Cluster
-ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
+envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::string& name,
+                                                                     int port,
+                                                                     const std::string& address,
+                                                                     const std::string& lb_policy) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+      fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: STATIC
@@ -419,15 +422,14 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                 socket_address:
                   address: {}
                   port_value: {}
-      lb_policy: ROUND_ROBIN
+      lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                                                                                 name, name,
-                                                                                 address, port));
+                  name, name, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,

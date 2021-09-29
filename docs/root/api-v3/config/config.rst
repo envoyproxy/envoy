@@ -31,3 +31,4 @@ Extensions
   stat_sinks/stat_sinks
   quic/quic_extensions
   formatter/formatter
+  contrib/contrib
