@@ -6,7 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
 
@@ -21,11 +21,15 @@ public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
       : fd_(fd), socket_v6only_(socket_v6only), domain_(domain),
-        buffer_(std::make_unique<Buffer::OwnedImpl>()) {}
+        buffer_(dispatcher.getWatermarkFactory().createBuffer(
+            [this]() -> void { this->onReadBufferLowWatermark(); },
+            [this]() -> void { this->onReadBufferHighWatermark(); }, []() -> void {})) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
 
+  void onReadBufferLowWatermark();
+  void onReadBufferHighWatermark();
   // TODO(sbelair2)  To be removed when the fd is fully abstracted from clients.
   os_fd_t fdDoNotUse() const override { return fd_; }
 
