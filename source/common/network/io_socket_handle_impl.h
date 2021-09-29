@@ -6,6 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
 
@@ -19,7 +20,8 @@ class IoSocketHandleImpl : public IoHandle, protected Logger::Loggable<Logger::I
 public:
   explicit IoSocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                               absl::optional<int> domain = absl::nullopt)
-      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain) {}
+      : fd_(fd), socket_v6only_(socket_v6only), domain_(domain),
+        buffer_(std::make_unique<Buffer::OwnedImpl>()) {}
 
   // Close underlying socket if close() hasn't been call yet.
   ~IoSocketHandleImpl() override;
@@ -104,6 +106,7 @@ protected:
   int socket_v6only_{false};
   const absl::optional<int> domain_;
   Event::FileEventPtr file_event_{nullptr};
+  std::unique_ptr<Buffer::Instance> buffer_;
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4

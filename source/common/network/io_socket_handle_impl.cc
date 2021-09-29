@@ -114,6 +114,13 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
   if (max_length == 0) {
     return Api::ioCallUint64ResultNoError();
   }
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    if (buffer_->length() > 0) {
+      auto move_length = std::min(buffer_->length(), max_length);
+      buffer_->move(buffer);
+      return Api::IoCallUint64Result(move_length, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+    }
+  }
   Buffer::Reservation reservation = buffer.reserveForRead();
   Api::IoCallUint64Result result = readv(std::min(reservation.length(), max_length),
                                          reservation.slices(), reservation.numSlices());
@@ -502,6 +509,35 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    if (flags & MSG_PEEK) {
+      Buffer::Reservation reservation = buffer_->reserveForRead();
+      Api::IoCallUint64Result result = readv(std::min(reservation.length(), length),
+                                             reservation.slices(), reservation.numSlices());
+      uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
+      reservation.commit(bytes_to_commit);
+      // Emulated edge events need to registered if the socket operation did not complete
+      // because the socket would block.
+      if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+        if (result.wouldBlock() && file_event_) {
+          file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+        }
+      }
+      buffer_->copyOut(0, bytes_to_commit, buffer);
+      return result;
+    } else {
+      if (buffer_->length() > 0) {
+        auto copy_size = std::min(buffer_->length(), length);
+        buffer_->copyOut(0, copy_size, buffer);
+        buffer_->drain(copy_size);
+        if (copy_size < length) {
+          length = length - copy_size;
+        } else {
+          return Api::IoCallUint64Result(copy_size, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
+        }
+      }
+    }
+  }
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
   auto io_result = sysCallResultToIoCallResult(result);
