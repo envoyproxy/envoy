@@ -7,6 +7,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -95,8 +96,15 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   }
 
   const std::string access_token{PROTOBUF_GET_WRAPPED_REQUIRED(response, access_token)};
+  const std::string id_token{PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, id_token, EMPTY_STRING)};
+  const std::string refresh_token{PROTOBUF_GET_WRAPPED_OR_DEFAULT(response, refresh_token, EMPTY_STRING)};
   const std::chrono::seconds expires_in{PROTOBUF_GET_WRAPPED_REQUIRED(response, expires_in)};
-  parent_->onGetAccessTokenSuccess(access_token, expires_in);
+  
+  ENVOY_LOG(debug, "access_token: {}", access_token);
+  ENVOY_LOG(debug, "refresh_token: {}", refresh_token);
+  ENVOY_LOG(debug, "id_token: {}", id_token);
+  
+  parent_->onGetAccessTokenSuccess(access_token, id_token, refresh_token, expires_in);
 }
 
 void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
