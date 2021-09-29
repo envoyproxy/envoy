@@ -1386,8 +1386,11 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
-  EXPECT_THROW_WITH_MESSAGE(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException, "hello");
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
+      "only match on request headers, saw "
+      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.

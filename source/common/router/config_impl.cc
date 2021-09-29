@@ -124,7 +124,8 @@ public:
       return absl::OkStatus();
     }
 
-    return absl::InvalidArgumentError("Route table can only match on request headers");
+    return absl::InvalidArgumentError(
+        fmt::format("Route table can only match on request headers, saw {}", type_url));
   }
 };
 
@@ -1327,9 +1328,9 @@ VirtualHostImpl::VirtualHostImpl(
   }
 
   constexpr absl::string_view feature_flag = "envoy.reloadable_features.experimental_matching_api";
-  if (virtual_host.has_matcher() &&
-      !Runtime::runtimeFeatureEnabled(feature_flag)) {
-    throw EnvoyException(fmt::format("Experimental matching API is not enabled: set `{}` to true to enable", feature_flag));
+  if (virtual_host.has_matcher() && !Runtime::runtimeFeatureEnabled(feature_flag)) {
+    throw EnvoyException(fmt::format(
+        "Experimental matching API is not enabled: set `{}` to true to enable", feature_flag));
   }
 
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
@@ -1343,6 +1344,12 @@ VirtualHostImpl::VirtualHostImpl(
         context, factory_context, validation_visitor);
 
     matcher_ = factory.create(virtual_host.matcher())();
+
+    if (!validation_visitor.errors().empty()) {
+      // TODO(snowp): Output all violations.
+      throw EnvoyException(fmt::format("requirement violation while creating route match tree: {}",
+                                       validation_visitor.errors()[0]));
+    }
   } else {
     for (const auto& route : virtual_host.routes()) {
       routes_.emplace_back(createAndValidateRoute(route, *this, optional_http_filters,
