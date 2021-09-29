@@ -2,10 +2,12 @@
 
 #include <map>
 #include <memory>
+#include <utility>
 
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
+#include "contrib/kafka/filters/network/source/mesh/outbound_record.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,15 +59,9 @@ public:
    * (error code, offset).
    *
    * @param origin origin of payload to be notified when delivery finishes.
-   * @param topic Kafka topic.
-   * @param partition Kafka partition (as clients do partitioning, we just reuse what downstream
-   * gave us).
-   * @param key Kafka message key.
-   * @param value Kafka message value.
+   * @param record record data to be sent.
    */
-  virtual void send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-                    const int32_t partition, const absl::string_view key,
-                    const absl::string_view value) PURE;
+  virtual void send(const ProduceFinishCbSharedPtr origin, const OutboundRecord& record) PURE;
 
   // Impl leakage: real implementations of Kafka Producer need to stop a monitoring thread, then
   // they can close the producer. Because the polling thread should not be interrupted, we just mark
