@@ -25,6 +25,18 @@ message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
 
+  // Defines the version of the standard to use for X-RateLimit headers.
+  // This field is deprecated in favor of :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_field_extensions.common.ratelimit.v3.XRateLimitHeadersRFCVersion>`.
+  enum XRateLimitHeadersRFCVersion {
+    option deprecated = true;
+
+    // X-RateLimit headers disabled.
+    OFF = 0;
+
+    // Use `draft RFC Version 03 <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
+    DRAFT_VERSION_03 = 1;
+  }
+
   // The rate limit domain to use when calling the rate limit service.
   string domain = 1 [(validate.rules).string = {min_len: 1}];
 
