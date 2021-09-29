@@ -96,7 +96,7 @@ def create_issues(dep, metadata_version, release_date, latest_release):
     try:
         repo.create_issue(title, body=body, labels=LABELS)
     except github.GithubException as e:
-        print(f'Unable to create issue, received error: {e}. Add them to the Envoy proxy org')
+        print(f'Unable to create issue, received error: {e}')
         raise
 
 
@@ -108,10 +108,7 @@ def issues_exist(title, git):
     except github.GithubException as e:
         print(f'There is a problem looking for issue title: {title}, received {e}')
         raise
-    if issues.totalCount > 0:
-        return True
-    else:
-        return False
+    return issues.totalCount > 0
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
