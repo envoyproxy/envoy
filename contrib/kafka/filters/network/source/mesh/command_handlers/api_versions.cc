@@ -38,10 +38,10 @@ AbstractResponseSharedPtr ApiVersionsRequestHolder::computeAnswer() const {
                                      request_header_.correlation_id_};
 
   const int16_t error_code = 0;
-  const ApiVersionsResponseKey produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,
-                                                MAX_PRODUCE_SUPPORTED};
-  const ApiVersionsResponseKey metadata_entry = {METADATA_REQUEST_API_KEY, MIN_METADATA_SUPPORTED,
-                                                 MAX_METADATA_SUPPORTED};
+  const ApiVersion produce_entry = {PRODUCE_REQUEST_API_KEY, MIN_PRODUCE_SUPPORTED,
+                                    MAX_PRODUCE_SUPPORTED};
+  const ApiVersion metadata_entry = {METADATA_REQUEST_API_KEY, MIN_METADATA_SUPPORTED,
+                                     MAX_METADATA_SUPPORTED};
   const ApiVersionsResponse real_response = {error_code, {produce_entry, metadata_entry}};
 
   return std::make_shared<Response<ApiVersionsResponse>>(metadata, real_response);

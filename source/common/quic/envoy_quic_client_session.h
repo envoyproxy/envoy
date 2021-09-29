@@ -66,7 +66,7 @@ public:
   void OnCanWrite() override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
@@ -99,7 +99,8 @@ private:
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
-  const absl::string_view host_name_;
+  // TODO(danzh) deprecate this field once server_id() is made const.
+  const std::string host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
