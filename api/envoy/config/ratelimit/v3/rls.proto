@@ -17,6 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Rate limit service]
 
 // Rate limit :ref:`configuration overview <config_rate_limit_service>`.
+// [#next-free-field: 6]
 message RateLimitServiceConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.ratelimit.v2.RateLimitServiceConfig";
@@ -31,4 +32,8 @@ message RateLimitServiceConfig {
   // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
   // version of messages used on the wire.
   core.v3.ApiVersion transport_api_version = 4 [(validate.rules).enum = {defined_only: true}];
+
+  // Specifies whether the RPC communication with RLS server should be unary or streaming RPC.
+  // [#not-implemented-hide:]
+  bool use_stream_api = 5;
 }

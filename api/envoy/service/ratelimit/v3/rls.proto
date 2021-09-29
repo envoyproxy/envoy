@@ -25,6 +25,11 @@ service RateLimitService {
   // Determine whether rate limiting should take place.
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
   }
+
+  // Determine whether rate limiting should take place (Stream RPC version).
+  // [#not-implemented-hide:]
+  rpc ShouldRateLimitStream(stream RateLimitRequest) returns (stream RateLimitResponse) {
+  }
 }
 
 // Main message for a rate limit request. The rate limit service is designed to be fully generic
