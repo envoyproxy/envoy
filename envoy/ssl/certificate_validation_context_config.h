@@ -82,7 +82,7 @@ public:
   /**
    * @return whether to validate certificate chain with all CRL or not.
    */
-  virtual bool crlVerifyAll() const PURE;
+  virtual bool onlyVerifyFinalCertificateCrl() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

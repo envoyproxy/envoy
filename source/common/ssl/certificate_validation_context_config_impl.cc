@@ -36,7 +36,9 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                     config.custom_validator_config())
               : absl::nullopt),
       api_(api),
-      crl_verify_all_(!config.has_crl_verify_all() ? true : config.crl_verify_all().value()) {
+      only_verify_final_certificate_crl_(!config.has_only_verify_final_certificate_crl()
+                                             ? false
+                                             : config.only_verify_final_certificate_crl().value()) {
   if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",

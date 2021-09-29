@@ -292,7 +292,9 @@ message CertificateValidationContext {
   // that if a CRL is provided for any certificate authority in a trust chain, a CRL must be
   // provided for all certificate authorities in that chain. Failure to do so will result in
   // verification failure for both revoked and unrevoked certificates from that chain.
-  // This behavior is disabled by configuring :ref:`crl_verify_all <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.custom_validator_config>` false.
+  // The behavior of requiring all certificates to contain CRLs if any do can be altered by
+  // setting :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>`
+  // true. If set to true, only the final certificate in the chain undergoes CRL verification.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
@@ -418,7 +420,9 @@ message CertificateValidationContext {
   // for any certificate authority in a trust chain, a CRL must be provided
   // for all certificate authorities in that chain. Failure to do so will
   // result in verification failure for both revoked and unrevoked certificates
-  // from that chain.
+  // from that chain. This default behavior can be altered by setting
+  // :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>`
+  // true.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.
@@ -435,7 +439,7 @@ message CertificateValidationContext {
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
 
-  // This option is true by default. If false, only the certificate at the end of the
+  // This option is false by default. If true, only the certificate at the end of the
   // certificate chain will be subject to validation by CRL.
-  google.protobuf.BoolValue crl_verify_all = 14;
+  google.protobuf.BoolValue only_verify_final_certificate_crl = 14;
 }
