@@ -66,9 +66,9 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
-      const void*) override;
+  Network::DnsResolverSharedPtr
+  createDnsResolver(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+                    const void*) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

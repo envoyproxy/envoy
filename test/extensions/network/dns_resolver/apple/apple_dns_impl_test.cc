@@ -38,7 +38,8 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-void expectAppleTypedDnsResolverConfig(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+void expectAppleTypedDnsResolverConfig(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
   EXPECT_EQ(
       typed_dns_resolver_config.typed_config().type_url(),
@@ -178,8 +179,8 @@ TEST_F(AppleDnsImplTest, MakeDefaultDnsResolverFactoryTestInApple) {
 TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithoutTypedConfig) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory* dns_resolver_factory =
-      Envoy::Network::createDnsResolverFactoryFromProto(
-          envoy::config::bootstrap::v3::Bootstrap(), typed_dns_resolver_config);
+      Envoy::Network::createDnsResolverFactoryFromProto(envoy::config::bootstrap::v3::Bootstrap(),
+                                                        typed_dns_resolver_config);
   EXPECT_NE(dns_resolver_factory, nullptr);
   expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
 }
@@ -190,7 +191,7 @@ TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithGoodTyped
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
   typed_dns_resolver_config.mutable_typed_config()->set_type_url(
-       "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
   typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   Network::DnsResolverFactory* dns_resolver_factory =
@@ -204,13 +205,12 @@ TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithInvalidTy
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
-      "type.googleapis.com/foo");
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url("type.googleapis.com/foo");
   typed_dns_resolver_config.set_name("bar");
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
-  EXPECT_THROW_WITH_MESSAGE(Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
-                            Envoy::EnvoyException,
-                            "Didn't find a registered implementation for name: 'bar'");
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
+      Envoy::EnvoyException, "Didn't find a registered implementation for name: 'bar'");
 }
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,

@@ -67,9 +67,11 @@ TEST_F(ConfigValidation, SharedDnsResolver) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory* dns_resolver_factory =
       Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-  Network::DnsResolverSharedPtr dns1 = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+  Network::DnsResolverSharedPtr dns1 =
+      dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
   long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+  Network::DnsResolverSharedPtr dns2 =
+      dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
 
   EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
   EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.

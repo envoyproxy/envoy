@@ -225,9 +225,9 @@ public:
    * @param dns_resolver_factory contains the DNS resolver factory pointer.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
-  virtual Network::DnsResolverSharedPtr createDnsResolver(
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
-      const void* dns_resolver_factory) PURE;
+  virtual Network::DnsResolverSharedPtr
+  createDnsResolver(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+                    const void* dns_resolver_factory) PURE;
 
   /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.

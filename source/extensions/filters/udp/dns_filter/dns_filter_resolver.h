@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
+
 #include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
@@ -24,8 +25,7 @@ public:
                     const Network::DnsResolverFactory* dns_resolver_factory)
       : timeout_(timeout), dispatcher_(dispatcher),
         resolver_(dispatcher.createDnsResolver(typed_dns_resolver_config, dns_resolver_factory)),
-        callback_(callback),
-        max_pending_lookups_(max_pending_lookups) {}
+        callback_(callback), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord
    *

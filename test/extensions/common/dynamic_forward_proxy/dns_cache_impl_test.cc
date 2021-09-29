@@ -1113,7 +1113,8 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   expected_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
-  EXPECT_CALL(context.dispatcher_, createDnsResolver(ProtoEq(expected_typed_dns_resolver_config), _))
+  EXPECT_CALL(context.dispatcher_,
+              createDnsResolver(ProtoEq(expected_typed_dns_resolver_config), _))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(context, config);
 }

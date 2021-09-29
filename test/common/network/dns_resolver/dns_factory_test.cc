@@ -236,8 +236,8 @@ TEST_F(DnsFactoryTest, MakeDefaultDnsResolverFactoryTestInCares) {
 TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithoutTypedConfig) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory* dns_resolver_factory =
-      Envoy::Network::createDnsResolverFactoryFromProto(
-          envoy::config::bootstrap::v3::Bootstrap(), typed_dns_resolver_config);
+      Envoy::Network::createDnsResolverFactoryFromProto(envoy::config::bootstrap::v3::Bootstrap(),
+                                                        typed_dns_resolver_config);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   verifyCaresDnsConfigDefault(cares);
@@ -250,7 +250,7 @@ TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithGoodTypedCo
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
   typed_dns_resolver_config.mutable_typed_config()->set_type_url(
-       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
   Network::DnsResolverFactory* dns_resolver_factory =
@@ -266,15 +266,13 @@ TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithInvalidType
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
 
-  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
-      "type.googleapis.com/foo");
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url("type.googleapis.com/foo");
   typed_dns_resolver_config.set_name("bar");
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
-  EXPECT_THROW_WITH_MESSAGE(Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
-                            Envoy::EnvoyException,
-                            "Didn't find a registered implementation for name: 'bar'");
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
+      Envoy::EnvoyException, "Didn't find a registered implementation for name: 'bar'");
 }
-
 
 } // namespace Network
 } // namespace Envoy

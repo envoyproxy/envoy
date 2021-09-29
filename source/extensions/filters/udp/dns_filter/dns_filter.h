@@ -93,9 +93,7 @@ public:
   const envoy::config::core::v3::TypedExtensionConfig& typedDnsResolverConfig() const {
     return typed_dns_resolver_config_;
   }
-  const Network::DnsResolverFactory* dnsResolverFactory() const {
-    return dns_resolver_factory_;
-  }
+  const Network::DnsResolverFactory* dnsResolverFactory() const { return dns_resolver_factory_; }
   const Api::Api& api() const { return api_; }
   const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
     return dns_lookup_trie_;

@@ -341,9 +341,9 @@ public:
         new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
   }
 
-  DnsResolverSharedPtr createDnsResolverImpl(
-      Event::Dispatcher& dispatcher, Api::Api&,
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const override {
+  DnsResolverSharedPtr createDnsResolverImpl(Event::Dispatcher& dispatcher, Api::Api&,
+                                             const envoy::config::core::v3::TypedExtensionConfig&
+                                                 typed_dns_resolver_config) const override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;

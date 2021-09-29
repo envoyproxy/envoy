@@ -545,7 +545,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
       {
         Network::DnsResolverFactory* dns_resolver_factory =
             createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+        auto resolver =
+            dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
       },
       EnvoyException, "DNS resolver 'foo' is not an IP address");
 }
@@ -592,8 +593,8 @@ public:
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
 
     if (setResolverInConstructor()) {
-      typed_dns_resolver_config =
-          getTypedDnsResolverConfig({socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
+      typed_dns_resolver_config = getTypedDnsResolverConfig(
+          {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
     } else {
       typed_dns_resolver_config = getTypedDnsResolverConfig({}, dns_resolver_options);
     }

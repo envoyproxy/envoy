@@ -252,8 +252,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
 
   resolver_ = std::make_unique<DnsFilterResolver>(
       resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
-      config->maxPendingLookups(), config->typedDnsResolverConfig(),
-      config->dnsResolverFactory());
+      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {

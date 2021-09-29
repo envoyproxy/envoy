@@ -161,8 +161,8 @@ Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
     const void* dns_resolver_factory) {
   ASSERT(isThreadSafe());
   ENVOY_LOG(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return (static_cast<const Network::DnsResolverFactory*>(dns_resolver_factory))->
-      createDnsResolverImpl(*this, api_, typed_dns_resolver_config);
+  return (static_cast<const Network::DnsResolverFactory*>(dns_resolver_factory))
+      ->createDnsResolverImpl(*this, api_, typed_dns_resolver_config);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
