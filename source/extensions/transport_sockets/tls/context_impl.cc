@@ -1171,8 +1171,7 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_init";
     return false;
   }
-  // Currently only EnvoyQuicProofVerifier, which is used by the client code, calls this method. So
-  // hard-code "ssl_server" for now.
+  // Currently this method is only used to verify server certs, so hard-code "ssl_server" for now.
   if (!X509_STORE_CTX_set_default(ctx.get(), "ssl_server")) {
     error_details = "Failed to verify certificate chain: X509_STORE_CTX_set_default";
     return false;
