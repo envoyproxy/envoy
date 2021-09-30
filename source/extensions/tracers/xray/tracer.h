@@ -68,7 +68,7 @@ public:
    * Sets the current direction on the Span.
    * This information will be included in the X-Ray span's annotation.
    */
-  void setDirection(std::string direction) { direction_ = direction; }
+  void setDirection(absl::string_view direction) { direction_ = std::string(direction); }
 
   /**
    * Sets the name of the Span.
