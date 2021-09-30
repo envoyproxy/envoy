@@ -75,7 +75,7 @@ public:
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
   const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
   const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
-  bool enableResponseTrailer() const { return enable_response_trailer_; }
+  bool enableResponseTrailers() const { return enable_response_trailers_; }
 
 private:
   friend class FilterTest;
@@ -93,7 +93,7 @@ private:
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
   const Http::LowerCaseString request_delay_trailer_;
   const Http::LowerCaseString response_delay_trailer_;
-  const bool enable_response_trailer_;
+  const bool enable_response_trailers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

@@ -68,16 +68,18 @@ message BandwidthLimit {
   // to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
-  // Optional flag to enabled response trailers.
-  // Default is false.
-  bool enable_response_trailer = 6;
+  // Optional Flag to enabled response trailers.
+  //
+  // .. note::
+  //   If set true, the response trailer "bandwidth-request-delay-ms" and "bandwidth-response-delay-ms"
+  //   will be added.
+  //   bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer.
+  //   bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer.
+  //   If enable_mode is DISABLED or REQUEST, the trailers will not be set.
+  //   If the request/response delay time is 0, the trailers will not be set.
+  //
+  bool enable_response_trailers = 6;
 
-  // Optional the prefix for the response trailers of bandwidth decode/encode delays for stream transfer.
-  // If not set, use the default value "bandwidth-request-delay-ms" and "bandwidth-response-delay-ms".
-  // If set, the trailer name will be set as:
-  // request: response_trailer_prefix + "-bandwidth-request-delay-ms"
-  // response: response_trailer_prefix + "-bandwidth-response-delay-ms"
-  // If enable_mode is DISABLED or REQUEST or delay time = 0, the trailer will not be set.
-  // If enable_response_trailer is false, the trailer will not be set.
+  // Optional The prefix for the response trailers.
   string response_trailer_prefix = 7;
 }

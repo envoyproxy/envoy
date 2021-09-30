@@ -39,7 +39,7 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
                                   ? DefaultResponseDelayTrailer
                                   : Http::LowerCaseString(config.response_trailer_prefix() + "-" +
                                                           DefaultResponseDelayTrailer.get())),
-      enable_response_trailer_(config.enable_response_trailer()) {
+      enable_response_trailers_(config.enable_response_trailers()) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
   }
@@ -164,7 +164,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     // Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
     // If upstream has trailers, addEncodedTrailers won't be called
     bool trailer_added = false;
-    if (config.enableResponseTrailer() && end_stream) {
+    if (end_stream) {
       trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
@@ -212,7 +212,7 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
   if (response_latency_) {
     const auto& config = getConfig();
 
-    if (config.enableResponseTrailer() && trailers_ != nullptr) {
+    if (config.enableResponseTrailers() && trailers_ != nullptr) {
       auto response_duration = response_latency_.get()->elapsed().count();
       if (request_duration_ > 0) {
         trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_));

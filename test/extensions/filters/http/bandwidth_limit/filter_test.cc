@@ -70,6 +70,7 @@ TEST_F(FilterTest, Disabled) {
   enable_mode: DISABLED
   limit_kbps: 10
   fill_interval: 1s
+  enable_response_trailers: true
   )";
   setup(fmt::format(config_yaml, "1"));
 
@@ -95,6 +96,7 @@ TEST_F(FilterTest, LimitOnDecode) {
     runtime_key: foo_key
   enable_mode: REQUEST
   limit_kbps: 1
+  enable_response_trailers: true
   response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -203,7 +205,7 @@ TEST_F(FilterTest, LimitOnEncode) {
     runtime_key: foo_key
   enable_mode: RESPONSE
   limit_kbps: 1
-  enable_response_trailer: true
+  enable_response_trailers: true
   response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -316,7 +318,7 @@ TEST_F(FilterTest, LimitOnDecodeAndEncode) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
-  enable_response_trailer: true
+  enable_response_trailers: true
   response_trailer_prefix: test
   )";
   setup(fmt::format(config_yaml, "1"));
@@ -525,7 +527,7 @@ TEST_F(FilterTest, WithTrailersNoEndStream) {
     runtime_key: foo_key
   enable_mode: REQUEST_AND_RESPONSE
   limit_kbps: 1
-  enable_response_trailer: true
+  enable_response_trailers: true
   )";
   setup(fmt::format(config_yaml, "1"));
 
