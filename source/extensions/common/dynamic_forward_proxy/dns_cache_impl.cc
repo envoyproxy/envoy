@@ -230,7 +230,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
   auto& primary_host = getPrimaryHost(host);
-  ENVOY_LOG(debug, "host='{}' resolution timeout", host);
+  ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
