@@ -5,6 +5,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/http/common/utility.h"
 
+#include "test/test_common/registry.h"
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
 
@@ -125,8 +126,10 @@ void UberFilterFuzzer::perFilterSetup() {
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
-      .WillByDefault(testing::Return(resolver_));
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  ON_CALL(dns_resolver_factory, createDnsResolverImpl(_, _, _))
+          .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.
   ON_CALL(factory_context_, admin()).WillByDefault(testing::ReturnRef(factory_context_.admin_));
