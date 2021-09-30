@@ -88,6 +88,8 @@ public:
 
 private:
   void erasePendingMessage(uint64_t message_id) {
+    // This case will be considered if `onSuccess` had called with message id that is not received
+    // by envoy as response.
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
