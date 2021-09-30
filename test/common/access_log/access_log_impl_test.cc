@@ -1592,42 +1592,37 @@ typed_config:
   }
 }
 
-// Test that the deprecated extension names still function.
+// Test that the deprecated extension names are disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.access_loggers.file");
-
-    EXPECT_NO_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
-  }
-
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.file_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.http_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.tcp_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 }
 

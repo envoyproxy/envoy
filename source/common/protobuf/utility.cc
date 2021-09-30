@@ -651,7 +651,25 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
-      if (field_descriptor->is_repeated()) {
+      if (field_descriptor->is_map()) {
+        // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
+        // keys.
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          Protobuf::Message* map_pair =
+              reflection->MutableRepeatedMessage(message, field_descriptor, i);
+          auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
+          if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+                            value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
+            map_pair->GetReflection()->SetString(map_pair, value_field_desc, "[redacted]");
+          } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+            redact(map_pair->GetReflection()->MutableMessage(map_pair, value_field_desc),
+                   sensitive);
+          } else if (sensitive) {
+            map_pair->GetReflection()->ClearField(map_pair, value_field_desc);
+          }
+        }
+      } else if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
           redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);

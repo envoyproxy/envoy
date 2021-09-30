@@ -45,7 +45,7 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
   for (const auto& alt_svc : altsvc_vector) {
     MonotonicTime expiration;
     if (from_cache) {
-      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age);
+      auto expire_time_from_epoch = std::chrono::seconds(alt_svc.max_age_seconds);
       auto time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(
           time_source.monotonicTime().time_since_epoch());
       if (expire_time_from_epoch < time_since_epoch) {
@@ -54,7 +54,7 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
         expiration = time_source.monotonicTime() + (expire_time_from_epoch - time_since_epoch);
       }
     } else {
-      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age);
+      expiration = time_source.monotonicTime() + std::chrono::seconds(alt_svc.max_age_seconds);
     }
     Http::AlternateProtocolsCache::AlternateProtocol protocol(alt_svc.protocol_id, alt_svc.host,
                                                               alt_svc.port, expiration);
@@ -64,8 +64,9 @@ AlternateProtocolsCacheImpl::protocolsFromString(absl::string_view alt_svc_strin
 }
 
 AlternateProtocolsCacheImpl::AlternateProtocolsCacheImpl(
-    TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store)
-    : time_source_(time_source), key_value_store_(std::move(key_value_store)) {}
+    TimeSource& time_source, std::unique_ptr<KeyValueStore>&& key_value_store, size_t max_entries)
+    : time_source_(time_source), key_value_store_(std::move(key_value_store)),
+      max_entries_(max_entries > 0 ? max_entries : 1024) {}
 
 AlternateProtocolsCacheImpl::~AlternateProtocolsCacheImpl() = default;
 
@@ -75,6 +76,11 @@ void AlternateProtocolsCacheImpl::setAlternatives(const Origin& origin,
   if (protocols.size() > max_protocols) {
     ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
     protocols.erase(protocols.begin() + max_protocols, protocols.end());
+  }
+  while (protocols_.size() >= max_entries_) {
+    auto iter = protocols_.begin();
+    key_value_store_->remove(originToString(iter->first));
+    protocols_.erase(iter);
   }
   protocols_[origin] = protocols;
   if (key_value_store_) {

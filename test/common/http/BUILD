@@ -482,6 +482,7 @@ envoy_cc_test(
         "//source/common/http:alternate_protocols_cache",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],

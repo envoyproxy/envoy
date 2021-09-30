@@ -152,15 +152,17 @@ OutboundRecord RecordExtractorImpl::extractRecord(const std::string& topic, cons
     throw EnvoyException(fmt::format("invalid header count in record for [{}-{}]: {}", topic,
                                      partition, headers_count));
   }
+  std::vector<Header> headers;
+  headers.reserve(headers_count);
   for (int32_t i = 0; i < headers_count; ++i) {
-    // For now, we ignore headers.
-    extractByteArray(data); // Header key.
-    extractByteArray(data); // Header value.
+    const absl::string_view header_key = extractByteArray(data);
+    const absl::string_view header_value = extractByteArray(data);
+    headers.emplace_back(header_key, header_value);
   }
 
   if (data == expected_end_of_record) {
     // We have consumed everything nicely.
-    return OutboundRecord{topic, partition, key, value};
+    return OutboundRecord{topic, partition, key, value, headers};
   } else {
     // Bad data - there are bytes left.
     throw EnvoyException(fmt::format("data left after consuming record for [{}-{}]: {}", topic,
