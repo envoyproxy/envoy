@@ -574,46 +574,19 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   return AssertionFailure() << "Timeout waiting for port availability";
 }
 
-// Compares the given actual request against the expected request, and returns a
-// failure and the reason if they do not match. Note that the actual_sub and
-// actual_unsub parameters are the set representation of the actual_request
-// subscribed and unsubscribed requests, and are needed to avoid recreation of
-// these sets for a single request comparison against multiple expected requests.
-AssertionResult BaseIntegrationTest::internalCompareDeltaDiscoveryRequest(
-    const DeltaDiscoveryRequestExpectedContents& expected_request,
-    const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
-    const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub) {
-
-  if (actual_request.type_url() != expected_request.type_url_) {
-    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
-                                             actual_request.type_url(), expected_request.type_url_);
-  }
-  auto sub_result =
-      compareSets(expected_request.subscriptions_, actual_sub, "expected_resource_subscriptions");
-  if (!sub_result) {
-    return sub_result;
-  }
-  auto unsub_result = compareSets(expected_request.unsubscriptions_, actual_unsub,
-                                  "expected_resource_unsubscriptions");
-  if (!unsub_result) {
-    return unsub_result;
-  }
-  // (We don't care about response_nonce or initial_resource_versions.)
-
-  if (actual_request.error_detail().code() != expected_request.error_code_) {
-    return AssertionFailure() << fmt::format(
-               "error code {} does not match expected {}. (Error message is {}).",
-               actual_request.error_detail().code(), expected_request.error_code_,
-               actual_request.error_detail().message());
-  }
-  if (expected_request.error_code_ != Grpc::Status::WellKnownGrpcStatus::Ok &&
-      actual_request.error_detail().message().find(expected_request.error_substring_) ==
-          std::string::npos) {
-    return AssertionFailure() << "\"" << expected_request.error_substring_
-                              << "\" is not a substring of actual error message \""
-                              << actual_request.error_detail().message() << "\"";
-  }
-  return AssertionSuccess();
+envoy::service::discovery::v3::DeltaDiscoveryResponse
+BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
+    const std::string& type_url,
+    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+    const std::vector<std::string>& removed) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info("system_version_info_this_is_a_test");
+  response.set_type_url(type_url);
+  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
+  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+  static int next_nonce_counter = 0;
+  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+  return response;
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
@@ -629,93 +602,43 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     return AssertionFailure() << "Weird node field";
   }
   last_node_.CopyFrom(request.node());
-  // Convert subscribed/unsubscribed names into sets to ignore ordering.
+  if (request.type_url() != expected_type_url) {
+    return AssertionFailure() << fmt::format("type_url {} does not match expected {}.",
+                                             request.type_url(), expected_type_url);
+  }
+  // Sort to ignore ordering.
+  std::set<std::string> expected_sub{expected_resource_subscriptions.begin(),
+                                     expected_resource_subscriptions.end()};
+  std::set<std::string> expected_unsub{expected_resource_unsubscriptions.begin(),
+                                       expected_resource_unsubscriptions.end()};
   std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
                                    request.resource_names_subscribe().end()};
   std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
                                      request.resource_names_unsubscribe().end()};
+  auto sub_result = compareSets(expected_sub, actual_sub, "expected_resource_subscriptions");
+  if (!sub_result) {
+    return sub_result;
+  }
+  auto unsub_result =
+      compareSets(expected_unsub, actual_unsub, "expected_resource_unsubscriptions");
+  if (!unsub_result) {
+    return unsub_result;
+  }
+  // (We don't care about response_nonce or initial_resource_versions.)
 
-  return internalCompareDeltaDiscoveryRequest(
-      DeltaDiscoveryRequestExpectedContents(expected_type_url, expected_resource_subscriptions,
-                                            expected_resource_unsubscriptions, expected_error_code,
-                                            expected_error_substring),
-      request, actual_sub, actual_unsub);
-}
-
-AssertionResult BaseIntegrationTest::compareMultipleDeltaDiscoveryRequests(
-    const std::vector<DeltaDiscoveryRequestExpectedContents>& expected_requests_contents,
-    FakeStreamPtr& xds_stream) {
-  // The indices of the requests that were already detected.
-  absl::flat_hash_set<size_t> detected_requests_idxs;
-
-  // Wait for all requests to be found.
-  while (detected_requests_idxs.size() < expected_requests_contents.size()) {
-    bool request_found = false;
-    // Stores all the failed comparisons, and will only be returned in case no
-    // matching expected request is found.
-    AssertionResult failed_request_comparison_result =
-        AssertionFailure() << "Could not find matching expected request:\n";
-    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
-    VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
-
-    // Verify all we care about node.
-    if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
-      return AssertionFailure() << "Weird node field";
-    }
-    last_node_.CopyFrom(request.node());
-
-    // Convert subscribed/unsubscribed names into sets to ignore ordering.
-    const std::set<std::string> actual_sub{request.resource_names_subscribe().begin(),
-                                           request.resource_names_subscribe().end()};
-    const std::set<std::string> actual_unsub{request.resource_names_unsubscribe().begin(),
-                                             request.resource_names_unsubscribe().end()};
-
-    for (size_t expected_request_idx = 0;
-         !request_found && expected_request_idx < expected_requests_contents.size();
-         ++expected_request_idx) {
-      // Check if the expected request was already found as part of the batch.
-      if (detected_requests_idxs.find(expected_request_idx) != detected_requests_idxs.end()) {
-        continue;
-      }
-
-      const auto& expected_request = expected_requests_contents[expected_request_idx];
-
-      const auto comparison_result =
-          internalCompareDeltaDiscoveryRequest(expected_request, request, actual_sub, actual_unsub);
-      if (comparison_result) {
-        // The request matches one of the expected requests, mark it as found and
-        // move to the next request.
-        detected_requests_idxs.emplace(expected_request_idx);
-        request_found = true;
-      } else {
-        failed_request_comparison_result
-            << fmt::format("Expected message index {}: ", expected_request_idx)
-            << comparison_result.failure_message() << "\n";
-      }
-    }
-
-    if (!request_found) {
-      // The request didn't match with any of the remaining expected messages. Return
-      // a failure status with the comparison against all expected messages.
-      return failed_request_comparison_result;
-    }
+  if (request.error_detail().code() != expected_error_code) {
+    return AssertionFailure() << fmt::format(
+               "error code {} does not match expected {}. (Error message is {}).",
+               request.error_detail().code(), expected_error_code,
+               request.error_detail().message());
+  }
+  if (expected_error_code != Grpc::Status::WellKnownGrpcStatus::Ok &&
+      request.error_detail().message().find(expected_error_substring) == std::string::npos) {
+    return AssertionFailure() << "\"" << expected_error_substring
+                              << "\" is not a substring of actual error message \""
+                              << request.error_detail().message() << "\"";
   }
   return AssertionSuccess();
-}
-
-envoy::service::discovery::v3::DeltaDiscoveryResponse
-BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
-    const std::string& type_url,
-    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
-    const std::vector<std::string>& removed) {
-  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-  response.set_system_version_info("system_version_info_this_is_a_test");
-  response.set_type_url(type_url);
-  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
-  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-  static int next_nonce_counter = 0;
-  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-  return response;
 }
 
 } // namespace Envoy

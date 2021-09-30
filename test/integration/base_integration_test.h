@@ -44,26 +44,6 @@ class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
 
-  // The contents of a single expected DeltaDiscoveryRequest.
-  struct DeltaDiscoveryRequestExpectedContents {
-    DeltaDiscoveryRequestExpectedContents(
-        const std::string& type_url, const std::vector<std::string>& subscriptions,
-        const std::vector<std::string>& unsubscriptions,
-        const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-        const std::string& error_substring = "")
-        : type_url_(type_url),
-          // Convert subscribed/unsubscribed names into sets to ignore ordering.
-          subscriptions_(subscriptions.begin(), subscriptions.end()),
-          unsubscriptions_(unsubscriptions.begin(), unsubscriptions.end()), error_code_(error_code),
-          error_substring_(error_substring) {}
-
-    const std::string& type_url_;
-    const std::set<std::string> subscriptions_;
-    const std::set<std::string> unsubscriptions_;
-    const Protobuf::int32 error_code_;
-    const std::string& error_substring_;
-  };
-
   // Creates a test fixture with an upstream bound to INADDR_ANY on an unspecified port using the
   // provided IP |version|.
   BaseIntegrationTest(Network::Address::IpVersion version,
@@ -189,12 +169,6 @@ public:
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
-  // Wait for a batch of requests to arrive. This is useful if the order of
-  // expected requests is non-deterministic.
-  AssertionResult compareMultipleDeltaDiscoveryRequests(
-      const std::vector<DeltaDiscoveryRequestExpectedContents>& expected_requests_contents,
-      FakeStreamPtr& xds_stream);
-
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = false,
@@ -278,11 +252,6 @@ private:
       return m.name();
     }
   }
-
-  AssertionResult internalCompareDeltaDiscoveryRequest(
-      const DeltaDiscoveryRequestExpectedContents& expected_request,
-      const envoy::service::discovery::v3::DeltaDiscoveryRequest& actual_request,
-      const std::set<std::string>& actual_sub, const std::set<std::string>& actual_unsub);
 
   Event::GlobalTimeSystem time_system_;
 

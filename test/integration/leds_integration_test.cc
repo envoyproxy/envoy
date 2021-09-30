@@ -50,18 +50,6 @@ protected:
     resetFakeUpstreamInfo(eds_upstream_info_);
   }
 
-  // Printing all counters and their values
-  void printAllCounters() {
-    std::cerr << "Counters:" << std::endl;
-    for (const auto& c : test_server_->counters()) {
-      std::cerr << "\t" << c->name() << ": " << c->value() << std::endl;
-    }
-    std::cerr << "Gauges:" << std::endl;
-    for (const auto& c : test_server_->gauges()) {
-      std::cerr << "\t" << c->name() << ": " << c->value() << std::endl;
-    }
-  }
-
   // A helper function to set the endpoints health status.
   void setEndpointsHealthStatus(
       const absl::flat_hash_set<uint32_t>& endpoints_idxs,
