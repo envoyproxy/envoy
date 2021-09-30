@@ -22,12 +22,16 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           current_release_version=$(git describe --tag --abbrev=0)
           bazelisk build \
               --config=release-android \
               --fat_apk_cpu=x86 \
               --define=pom_version=$current_release_version \
+              --config=remote-ci-macos \
+              --remote_header="Authorization=Bearer $GITHUB_TOKEN" \
               //:android_dist_ci
       - name: 'Tar artifacts'
         run: tar -czvf envoy_mobile.tar.gz dist/envoy.aar dist/envoy-pom.xml dist/envoy-javadoc.jar dist/envoy-sources.jar
