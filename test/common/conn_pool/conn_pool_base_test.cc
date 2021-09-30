@@ -333,7 +333,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   newActiveClientAndStream();
 
-  // Verify that advancing to just before the connection duration timeout doesn't drain the connection.
+  // Verify that advancing to just before the connection duration timeout doesn't drain the
+  // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
@@ -353,7 +354,8 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   closeStream();
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
 
-  // Verify that advancing to just before the connection duration timeout doesn't close the connection.
+  // Verify that advancing to just before the connection duration timeout doesn't close the
+  // connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
   EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
@@ -393,17 +395,19 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileClosedB
   // Expect an ENVOY_BUG if the connection duration callback fires while in the CLOSED state.
   // We forcibly call the connection duration callback here because under normal circumstances there
   // is no timer set up.
-  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(), "max connection duration reached while closed");
+  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(),
+                   "max connection duration reached while closed");
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileConnectingBug) {
   // Start with a connecting client
   newConnectingClient();
 
-  // Expect an ENVOY_BUG if the connection duration callback fires while still in the CONNECTING state.
-  // We forcibly call the connection duration callback here because under normal circumstances there
-  // is no timer set up.
-  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(), "max connection duration reached while connecting");
+  // Expect an ENVOY_BUG if the connection duration callback fires while still in the CONNECTING
+  // state. We forcibly call the connection duration callback here because under normal
+  // circumstances there is no timer set up.
+  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(),
+                   "max connection duration reached while connecting");
 
   // Finish the test as if the connection was never successful.
   EXPECT_CALL(pool_, onPoolFailure);
