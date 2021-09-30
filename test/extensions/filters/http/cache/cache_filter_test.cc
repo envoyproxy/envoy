@@ -32,10 +32,10 @@ public:
 namespace {
 
 envoy::extensions::filters::http::cache::v3alpha::CacheConfig
-getConfig(bool extraAllowedVaryHeaders) {
+getConfig(bool extra_allowed_vary_headers) {
   // Allows 'accept' to be varied in the tests.
   envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
-  if (extraAllowedVaryHeaders) {
+  if (extra_allowed_vary_headers) {
     const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
     add_accept->set_exact("accept");
   }
