@@ -487,8 +487,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     const absl::optional<std::chrono::milliseconds> max_connection_duration =
         client.parent_.host()->cluster().maxConnectionDuration();
     if (max_connection_duration.has_value()) {
-      client.connection_duration_timer_ =
-          client.parent_.dispatcher().createTimer([&client]() { client.onConnectionDurationTimeout(); });
+      client.connection_duration_timer_ = client.parent_.dispatcher().createTimer(
+          [&client]() { client.onConnectionDurationTimeout(); });
       client.connection_duration_timer_->enableTimer(max_connection_duration.value());
     }
 
@@ -621,7 +621,8 @@ void ActiveClient::onConnectTimeout() {
 
 void ActiveClient::onConnectionDurationTimeout() {
   // The connection duration timer should only have started after we left the CONNECTING state.
-  ENVOY_BUG(state_ != ActiveClient::State::CONNECTING, "max connection duration reached while connecting");
+  ENVOY_BUG(state_ != ActiveClient::State::CONNECTING,
+            "max connection duration reached while connecting");
 
   // The connection duration timer should have been disabled and reset in onConnectionEvent
   // for closing connections.
