@@ -68,7 +68,7 @@ message BandwidthLimit {
   // to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
-  // Optional Flag to enabled response trailers.
+  // Optional Flag to enable response trailers.
   //
   // .. note::
   //   If set true, the response trailer "bandwidth-request-delay-ms" and "bandwidth-response-delay-ms"
