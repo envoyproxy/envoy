@@ -376,9 +376,10 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-  auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+  auto resolver =
+      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -434,10 +435,10 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-  auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
-
+  auto resolver =
+      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -515,10 +516,10 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-  auto resolver = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
-
+  auto resolver =
+      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -543,10 +544,10 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   EXPECT_THROW_WITH_MESSAGE(
       {
-        Network::DnsResolverFactory* dns_resolver_factory =
+        Network::DnsResolverFactory& dns_resolver_factory =
             createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver =
-            dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+        auto resolver = dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_,
+                                                                   typed_dns_resolver_config);
       },
       EnvoyException, "DNS resolver 'foo' is not an IP address");
 }
@@ -598,9 +599,10 @@ public:
     } else {
       typed_dns_resolver_config = getTypedDnsResolverConfig({}, dns_resolver_options);
     }
-    Network::DnsResolverFactory* dns_resolver_factory =
+    Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-    resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+    resolver_ =
+        dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

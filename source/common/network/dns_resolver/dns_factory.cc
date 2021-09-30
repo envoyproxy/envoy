@@ -66,21 +66,21 @@ void handleLegacyDnsResolverData(
   typed_dns_resolver_config.set_name(std::string(CaresDnsResolver));
 }
 
-// Create the DNS resolver factory from typed config.
-Network::DnsResolverFactory* createDnsResolverFactoryFromTypedConfig(
+// Create the DNS resolver factory from the typed config. This is the underline
+// function which performs the registry lookup based on typed config.
+Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  Network::DnsResolverFactory* dns_resolver_factory =
-      &Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(typed_dns_resolver_config);
-  return dns_resolver_factory;
+  ENVOY_LOG_MISC(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
+  return Config::Utility::getAndCheckFactory<Network::DnsResolverFactory>(
+      typed_dns_resolver_config);
 }
 
 // Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
+// The default registry lookup will always succeed, thus no exception throwing.
 // This function can be called in main or worker threads.
-Network::DnsResolverFactory* createDefaultDnsResolverFactory(
+Network::DnsResolverFactory& createDefaultDnsResolverFactory(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   Network::makeDefaultDnsResolverConfig(typed_dns_resolver_config);
-  // The default typed_dns_resolver_config is for sure valid, thus the registry
-  // lookup below will always succeed.
   return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
 }
 

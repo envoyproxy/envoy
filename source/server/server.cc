@@ -597,9 +597,10 @@ void InstanceImpl::initialize(const Options& options,
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
-  dns_resolver_ = dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+  dns_resolver_ =
+      dns_resolver_factory.createDnsResolverImpl(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,

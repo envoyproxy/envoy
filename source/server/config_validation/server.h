@@ -78,9 +78,10 @@ public:
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-    Network::DnsResolverFactory* dns_resolver_factory =
+    Network::DnsResolverFactory& dns_resolver_factory =
         Envoy::Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-    return dispatcher().createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+    return dns_resolver_factory.createDnsResolverImpl(dispatcher(), api(),
+                                                      typed_dns_resolver_config);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

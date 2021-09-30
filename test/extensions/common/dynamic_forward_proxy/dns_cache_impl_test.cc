@@ -34,6 +34,7 @@ namespace {
 
 class DnsCacheImplTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
+  DnsCacheImplTest() : registered_dns_factory_(dns_resolver_factory_) {}
   void initialize(std::vector<std::string> preresolve_hostnames = {}, uint32_t max_hosts = 1024) {
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::V4_ONLY);
@@ -48,7 +49,7 @@ public:
 
     EXPECT_CALL(context_.dispatcher_, isThreadSafe).WillRepeatedly(Return(true));
 
-    EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).WillOnce(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(context_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }
@@ -80,6 +81,8 @@ public:
   std::unique_ptr<DnsCache> dns_cache_;
   MockUpdateCallbacks update_callbacks_;
   DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
 
 MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {
@@ -901,8 +904,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSetDeprecatedField) {
   initialize();
   config_.set_use_tcp_for_dns_lookups(true);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(context_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
@@ -916,8 +919,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionSet) {
       ->mutable_dns_resolver_options()
       ->set_use_tcp_for_dns_lookups(true);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(context_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
@@ -931,8 +934,8 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
       ->mutable_dns_resolver_options()
       ->set_no_default_search_domain(true);
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(context_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
@@ -943,8 +946,8 @@ TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionSet) {
 TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionUnSet) {
   initialize();
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(context_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
@@ -955,8 +958,8 @@ TEST_F(DnsCacheImplTest, UseTcpForDnsLookupsOptionUnSet) {
 TEST_F(DnsCacheImplTest, NoDefaultSearchDomainOptionUnSet) {
   initialize();
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(context_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(resolver_)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(resolver_)));
   DnsCacheImpl dns_cache_(context_, config_);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
@@ -1017,7 +1020,10 @@ TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   empty_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   empty_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_CALL(context.dispatcher_, createDnsResolver(ProtoEq(empty_typed_dns_resolver_config), _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory,
+              createDnsResolverImpl(_, _, ProtoEq(empty_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(context, config);
 }
@@ -1036,7 +1042,10 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfig) {
   cares.add_resolvers()->MergeFrom(resolvers);
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-  EXPECT_CALL(context.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory, createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(context, config);
 }
@@ -1071,7 +1080,9 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyDnsResolutionConfigOverridingUseTcp) {
   typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
 
-  EXPECT_CALL(context.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory, createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(context, config);
 }
@@ -1112,9 +1123,10 @@ TEST(DnsCacheConfigOptionsTest, NonEmptyTypedDnsResolverConfig) {
   envoy::config::core::v3::TypedExtensionConfig expected_typed_dns_resolver_config;
   expected_typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
   expected_typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
-
-  EXPECT_CALL(context.dispatcher_,
-              createDnsResolver(ProtoEq(expected_typed_dns_resolver_config), _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory,
+              createDnsResolverImpl(_, _, ProtoEq(expected_typed_dns_resolver_config)))
       .WillOnce(Return(resolver));
   DnsCacheImpl dns_cache_(context, config);
 }

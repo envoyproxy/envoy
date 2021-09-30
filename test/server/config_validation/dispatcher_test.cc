@@ -6,7 +6,6 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/server/config_validation/api.h"
@@ -59,22 +58,6 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
                 Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat(0.5f))), [] {}),
             nullptr);
   SUCCEED();
-}
-
-// Make sure that creating DnsResolver does not cause crash and each call to create
-// DNS resolver returns the same shared_ptr.
-TEST_F(ConfigValidation, SharedDnsResolver) {
-  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory* dns_resolver_factory =
-      Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
-  Network::DnsResolverSharedPtr dns1 =
-      dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
-  long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 =
-      dispatcher_->createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
-
-  EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
-  EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,

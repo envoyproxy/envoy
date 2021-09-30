@@ -85,7 +85,8 @@ class ClusterManagerImplTest : public testing::Test {
 public:
   ClusterManagerImplTest()
       : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
-        router_context_(factory_.stats_.symbolTable()) {}
+        router_context_(factory_.stats_.symbolTable()),
+        registered_dns_factory_(dns_resolver_factory_) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     cluster_manager_ = std::make_unique<TestClusterManagerImpl>(
@@ -189,6 +190,8 @@ public:
   Http::ContextImpl http_context_;
   Grpc::ContextImpl grpc_context_;
   Router::ContextImpl router_context_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };
 
 envoy::config::bootstrap::v3::Bootstrap defaultConfig() {
@@ -2211,7 +2214,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2348,7 +2351,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2563,7 +2566,7 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   // As custom resolvers are not specified in config, this method should not be called,
   // resolver from context should be used instead.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).Times(0);
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).Times(0);
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2599,7 +2602,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedField) {
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  EXPECT_CALL(dns_resolver_factory_,
+              createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2642,7 +2646,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedViaDeprecatedFieldMulti
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   // As custom resolver is specified via deprecated field `dns_resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  EXPECT_CALL(dns_resolver_factory_,
+              createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2679,7 +2684,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecified) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  EXPECT_CALL(dns_resolver_factory_,
+              createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2724,7 +2730,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedMultipleResolvers) {
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  EXPECT_CALL(dns_resolver_factory_,
+              createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2767,7 +2774,8 @@ TEST_F(ClusterManagerImplTest, CustomDnsResolverSpecifiedOveridingDeprecatedReso
 
   // As custom resolver is specified via field `dns_resolution_config.resolvers` in clusters
   // config, the method `createDnsResolver` is called once.
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(ProtoEq(typed_dns_resolver_config), _))
+  EXPECT_CALL(dns_resolver_factory_,
+              createDnsResolverImpl(_, _, ProtoEq(typed_dns_resolver_config)))
       .WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
@@ -2796,8 +2804,8 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2829,8 +2837,8 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverViaDeprecatedField) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2866,8 +2874,8 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolverDeprecatedFieldOverrid
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2902,8 +2910,8 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolverDeprecatedFieldOverrid
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2938,8 +2946,8 @@ TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -2971,8 +2979,8 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolver) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3006,8 +3014,8 @@ TEST_F(ClusterManagerImplTest, DefaultSearchDomainWithCustomDnsResolverWithConfi
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3041,8 +3049,8 @@ TEST_F(ClusterManagerImplTest, NoDefaultSearchDomainWithCustomDnsResolver) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3079,8 +3087,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecified) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3119,8 +3127,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolversSpecified) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3162,8 +3170,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigMultipleResolversSpecified)
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3204,8 +3212,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigResolverOptionsSpecified) {
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3262,8 +3270,8 @@ TEST_F(ClusterManagerImplTest, TypedDnsResolverConfigSpecifiedOveridingDeprecate
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _))
-      .WillOnce(DoAll(SaveArg<0>(&typed_dns_resolver_config), Return(dns_resolver)));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+      .WillOnce(DoAll(SaveArg<2>(&typed_dns_resolver_config), Return(dns_resolver)));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
@@ -3314,7 +3322,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -3406,7 +3414,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);

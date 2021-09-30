@@ -23,15 +23,8 @@ public:
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr
-  createDnsResolver(const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
-                    const void*) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
                                       bool bind_to_port) override;
-
-protected:
-  std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{
-      std::make_shared<Network::ValidationDnsResolver>()};
 };
 
 } // namespace Event

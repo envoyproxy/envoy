@@ -17,7 +17,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/stats:isolated_store_lib",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks:common_lib",
         "//test/mocks/server:watch_dog_mocks",
         "//test/mocks/stats:stats_mocks",

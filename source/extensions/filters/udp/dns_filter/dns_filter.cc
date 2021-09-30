@@ -161,15 +161,14 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   if (forward_queries_) {
     const auto& client_config = config.client_config();
     dns_resolver_factory_ =
-        Network::createDnsResolverFactoryFromProto(client_config, typed_dns_resolver_config_);
-
+        &Network::createDnsResolverFactoryFromProto(client_config, typed_dns_resolver_config_);
     // Set additional resolving options from configuration
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
   } else {
     // In case client_config doesn't exist, create default DNS resolver factory and save it.
-    dns_resolver_factory_ = Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
   }
 }
 
@@ -252,7 +251,8 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
 
   resolver_ = std::make_unique<DnsFilterResolver>(
       resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
-      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory());
+      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory(),
+      config->api());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {

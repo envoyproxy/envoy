@@ -348,6 +348,7 @@ public:
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
+    ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
     Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);

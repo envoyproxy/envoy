@@ -22,7 +22,7 @@ DnsCacheImpl::DnsCacheImpl(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(context.mainThreadDispatcher()),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context)),
       tls_slot_(context.threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
@@ -74,11 +74,12 @@ DnsCacheImpl::~DnsCacheImpl() {
 
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Event::Dispatcher& main_thread_dispatcher) {
+    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::FactoryContextBase& context) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
-  return main_thread_dispatcher.createDnsResolver(typed_dns_resolver_config, dns_resolver_factory);
+  return dns_resolver_factory.createDnsResolverImpl(main_thread_dispatcher, context.api(),
+                                                    typed_dns_resolver_config);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {

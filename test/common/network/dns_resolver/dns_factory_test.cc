@@ -224,24 +224,24 @@ TEST_F(DnsFactoryTest, CheckBothTypedAndDnsResolutionConfigExistWithBoostrapWron
 // expected.
 TEST_F(DnsFactoryTest, MakeDefaultDnsResolverFactoryTestInCares) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       Envoy::Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   verifyCaresDnsConfigDefault(cares);
-  EXPECT_NE(dns_resolver_factory, nullptr);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(CaresDnsResolver));
 }
 
 // Test DNS resolver factory creation from proto without typed config.
 TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithoutTypedConfig) {
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       Envoy::Network::createDnsResolverFactoryFromProto(envoy::config::bootstrap::v3::Bootstrap(),
                                                         typed_dns_resolver_config);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   verifyCaresDnsConfigDefault(cares);
-  EXPECT_NE(dns_resolver_factory, nullptr);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(CaresDnsResolver));
 }
 
 // Test DNS resolver factory creation from proto with valid typed config
@@ -253,12 +253,12 @@ TEST_F(DnsFactoryTest, MakeDnsResolverFactoryFromProtoTestInCaresWithGoodTypedCo
       "type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig");
   typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
   config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
-  Network::DnsResolverFactory* dns_resolver_factory =
+  Network::DnsResolverFactory& dns_resolver_factory =
       Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   verifyCaresDnsConfigAndUnpack(typed_dns_resolver_config, cares);
   verifyCaresDnsConfigDefault(cares);
-  EXPECT_NE(dns_resolver_factory, nullptr);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(CaresDnsResolver));
 }
 
 // Test DNS resolver factory creation from proto with invalid typed config

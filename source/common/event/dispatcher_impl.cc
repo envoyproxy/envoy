@@ -24,7 +24,6 @@
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -152,17 +151,6 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                          std::move(transport_socket), options);
-}
-
-// Create DNS resolver based on the @param typed_dns_resolver_config, which could be
-// c-ares DNS resolver, Apple DNS resolver, or any other DNS resolver type.
-Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
-    const void* dns_resolver_factory) {
-  ASSERT(isThreadSafe());
-  ENVOY_LOG(debug, "create DNS resolver type: {}", typed_dns_resolver_config.name());
-  return (static_cast<const Network::DnsResolverFactory*>(dns_resolver_factory))
-      ->createDnsResolverImpl(*this, api_, typed_dns_resolver_config);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

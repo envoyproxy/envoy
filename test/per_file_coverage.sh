@@ -14,7 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/http:96.5"
 "source/common/json:90.1"
 "source/common/matcher:94.2"
-"source/common/network:94.8" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
+"source/common/network:94.0" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
 "source/common/network/dns_resolver:92.0"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
@@ -54,7 +54,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/thrift_proxy/router:96.4"
 "source/extensions/filters/network/wasm:95.7"
 "source/extensions/filters/udp:96.4"
-"source/extensions/filters/udp/dns_filter:96.2"
+"source/extensions/filters/udp/dns_filter:96.0"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
 "source/extensions/io_socket:96.2"

@@ -52,7 +52,8 @@ public:
   static DnsCacheStats generateDnsCacheStats(Stats::Scope& scope);
   static Network::DnsResolverSharedPtr selectDnsResolver(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-      Event::Dispatcher& main_thread_dispatcher);
+      Event::Dispatcher& main_thread_dispatcher,
+      Server::Configuration::FactoryContextBase& context);
 
   // DnsCache
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,

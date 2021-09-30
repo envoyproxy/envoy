@@ -9,6 +9,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "dns_filter_test_utils.h"
@@ -77,8 +78,11 @@ public:
     ON_CALL(listener_factory_, random()).WillByDefault(ReturnRef(random_));
 
     resolver_ = std::make_shared<Network::MockDnsResolver>();
-    ON_CALL(dispatcher_, createDnsResolver(_, _))
-        .WillByDefault(DoAll(SaveArg<0>(&typed_dns_resolver_config_), Return(resolver_)));
+    NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+    Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_(
+        dns_resolver_factory_);
+    ON_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+        .WillByDefault(DoAll(SaveArg<2>(&typed_dns_resolver_config_), Return(resolver_)));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);
     filter_ = std::make_unique<DnsFilter>(callbacks_, config_);

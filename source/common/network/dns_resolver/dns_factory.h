@@ -135,25 +135,27 @@ envoy::config::core::v3::TypedExtensionConfig makeDnsResolverConfig(const Config
   return typed_dns_resolver_config;
 }
 
-// Create the DNS resolver factory from typed config.
-Network::DnsResolverFactory* createDnsResolverFactoryFromTypedConfig(
+// Create the DNS resolver factory from the typed config. This is the underline
+// function which performs the registry lookup based on typed config.
+Network::DnsResolverFactory& createDnsResolverFactoryFromTypedConfig(
     const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Create the default DNS resolver factory. apple for MacOS or c-ares for all others.
+// The default registry lookup will always succeed, thus no exception throwing.
 // This function can be called in main or worker threads.
-Network::DnsResolverFactory* createDefaultDnsResolverFactory(
+Network::DnsResolverFactory& createDefaultDnsResolverFactory(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Create the DNS resolver factory from the proto config.
-// Retrieve the DNS related configurations in the passed in @param config, and store the data into
-// @param typed_dns_resolver_config.
-// Output: the DNS resolver factory.
+// Retrieve the DNS related configurations in the passed in @param config, and store the
+// data into @param typed_dns_resolver_config. Output: the DNS resolver factory.
+// The passed in @param config may contain invalid typed_dns_resolver_config.
+// In that case, the underline registry lookup may throw an exception.
+// This function has to be called in main thread.
 template <class ConfigType>
-Network::DnsResolverFactory* createDnsResolverFactoryFromProto(
+Network::DnsResolverFactory& createDnsResolverFactoryFromProto(
     const ConfigType& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-
-  // This function has to be called in main thread.
   ASSERT(Thread::MainThread::isMainThread());
   typed_dns_resolver_config = makeDnsResolverConfig(config);
   return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
