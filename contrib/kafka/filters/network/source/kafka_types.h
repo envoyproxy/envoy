@@ -31,6 +31,20 @@ using NullableBytes = absl::optional<Bytes>;
  */
 template <typename T> using NullableArray = absl::optional<std::vector<T>>;
 
+/**
+ * Analogous to:
+ * https://github.com/apache/kafka/blob/2.8.1/clients/src/main/java/org/apache/kafka/common/Uuid.java#L28
+ */
+struct Uuid {
+
+  const int64_t msb_;
+  const int64_t lsb_;
+
+  Uuid(const int64_t msb, const int64_t lsb) : msb_{msb}, lsb_{lsb} {};
+
+  bool operator==(const Uuid& rhs) const { return msb_ == rhs.msb_ && lsb_ == rhs.lsb_; };
+};
+
 } // namespace Kafka
 } // namespace NetworkFilters
 } // namespace Extensions

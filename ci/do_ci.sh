@@ -135,7 +135,7 @@ function bazel_binary_build() {
   fi
 
   # Build su-exec utility
-  bazel build external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" external:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -150,7 +150,7 @@ function bazel_contrib_binary_build() {
 function run_process_test_result() {
   if [[ -z "$CI_SKIP_PROCESS_TEST_RESULTS" ]] && [[ $(find "$TEST_TMPDIR" -name "*_attempt.xml" 2> /dev/null) ]]; then
       echo "running flaky test reporting script"
-      "${ENVOY_SRCDIR}"/ci/flaky_test/run_process_xml.sh "$CI_TARGET"
+      bazel run "${BAZEL_BUILD_OPTIONS[@]}" //ci/flaky_test:process_xml "$CI_TARGET"
   else
       echo "no flaky test results found"
   fi
@@ -375,14 +375,12 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" -c fastbuild @envoy_api//envoy/...
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api_compat" ]]; then
-  echo "Building buf..."
-  bazel build @com_github_bufbuild_buf//:buf
-  BUF_PATH=$(realpath "bazel-source/external/com_github_bufbuild_buf/bin/buf")
   echo "Checking API for breaking changes to protobuf backwards compatibility..."
   BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
   COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
   echo -e "\tUsing base commit ${COMMIT_TITLE}"
-  "${ENVOY_SRCDIR}"/tools/api_proto_breaking_change_detector/detector_ci.sh "${BUF_PATH}" "${BASE_BRANCH_REF}"
+  # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/api_proto_breaking_change_detector:detector_ci "${BASE_BRANCH_REF}"
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" || "$CI_TARGET" == "bazel.fuzz_coverage" ]]; then
   setup_clang_toolchain
@@ -459,7 +457,7 @@ elif [[ "$CI_TARGET" == "deps" ]]; then
   "${ENVOY_SRCDIR}"/ci/check_repository_locations.sh
 
   # Run pip requirements tests
-  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check "${ENVOY_SRCDIR}"
+  bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:pip_check
 
   exit 0
 elif [[ "$CI_TARGET" == "cve_scan" ]]; then

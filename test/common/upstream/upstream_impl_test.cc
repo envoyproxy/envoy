@@ -3503,6 +3503,8 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
           http3_protocol_options:
             quic_protocol_options:
               max_concurrent_streams: 2
+          alternate_protocols_cache_options:
+            name: default
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";

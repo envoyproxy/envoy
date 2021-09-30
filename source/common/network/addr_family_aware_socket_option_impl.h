@@ -18,15 +18,26 @@ public:
   AddrFamilyAwareSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
                                   SocketOptionName ipv4_optname, SocketOptionName ipv6_optname,
                                   int value)
-      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
-        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
+      : AddrFamilyAwareSocketOptionImpl(in_state, ipv4_optname, value, ipv6_optname, value) {}
+  AddrFamilyAwareSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
+                                  SocketOptionName ipv4_optname, int ipv4_value,
+                                  SocketOptionName ipv6_optname, int ipv6_value)
+      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, ipv4_value)),
+        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, ipv6_value)) {}
+  AddrFamilyAwareSocketOptionImpl(envoy::config::core::v3::SocketOption::SocketState in_state,
+                                  SocketOptionName ipv4_optname, absl::string_view ipv4_value,
+                                  SocketOptionName ipv6_optname, absl::string_view ipv6_value)
+      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, ipv4_value)),
+        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, ipv6_value)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
-  // The common socket options don't require a hash key.
-  void hashKey(std::vector<uint8_t>&) const override {}
-
+  void hashKey(std::vector<uint8_t>& hash_key) const override {
+    // Add both sub-options to the hash.
+    ipv4_option_->hashKey(hash_key);
+    ipv6_option_->hashKey(hash_key);
+  }
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState state) const override;

@@ -69,8 +69,8 @@ Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
   return parent_context_.clusterManager();
 }
 
-Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
-  return parent_context_.dispatcher();
+Event::Dispatcher& PerFilterChainFactoryContextImpl::mainThreadDispatcher() {
+  return parent_context_.mainThreadDispatcher();
 }
 
 const Server::Options& PerFilterChainFactoryContextImpl::options() {
@@ -755,7 +755,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
 }
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
-Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+Event::Dispatcher& FactoryContextImpl::mainThreadDispatcher() { return server_.dispatcher(); }
 const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }

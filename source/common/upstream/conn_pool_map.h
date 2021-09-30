@@ -49,7 +49,7 @@ public:
   /**
    * @return true if the pools are empty.
    */
-  size_t empty() const;
+  bool empty() const;
 
   /**
    * Destroys all mapped pools.
