@@ -74,8 +74,8 @@ public:
   }
 
   /**
-   * This is a non-constructing getter only for use on instances when the caller can deal with
-   * circumstances where the singleton being access has not being constructed yet.
+   * This is a non-constructing getter. Use when the caller can deal with
+   * the singleton may not have been constructed yet.
    */
   template <class T> std::shared_ptr<T> getTyped(const std::string& name) {
     return std::dynamic_pointer_cast<T>(get(name, [] { return nullptr; }));
