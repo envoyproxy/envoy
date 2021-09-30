@@ -209,21 +209,19 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
 
   // Create a init_manager to create a rds provider.
   // No transitive warming dependency here because only on demand update reach this point.
-  std::unique_ptr<Init::ManagerImpl> srds_init_mgr =
-      std::make_unique<Init::ManagerImpl>(fmt::format("SRDS on demand init manager."));
-  std::unique_ptr<Cleanup> srds_initialization_continuation =
-      std::make_unique<Cleanup>([this, &srds_init_mgr] {
-        Init::WatcherImpl noop_watcher(
-            fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
-            []() { /*Do nothing.*/ });
-        srds_init_mgr->initialize(noop_watcher);
-      });
+  Init::ManagerImpl srds_init_mgr("SRDS on demand init manager.");
+  Cleanup srds_initialization_continuation([this, &srds_init_mgr] {
+    Init::WatcherImpl noop_watcher(
+        fmt::format("SRDS on demand ConfigUpdate watcher: {}", scope_name_),
+        []() { /*Do nothing.*/ });
+    srds_init_mgr.initialize(noop_watcher);
+  });
   // Create route provider.
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(parent_.rds_config_source_);
   rds.set_route_config_name(
       parent_.scoped_route_map_[scope_name_]->configProto().route_configuration_name());
-  initRdsConfigProvider(rds, *srds_init_mgr);
+  initRdsConfigProvider(rds, srds_init_mgr);
   ENVOY_LOG(debug, fmt::format("Scope on demand update: {}", scope_name_));
   // If RouteConfiguration hasn't been initialized, routeConfig() return a shared_ptr to
   // NullConfigImpl. The name of NullConfigImpl is an empty string.
