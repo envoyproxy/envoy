@@ -85,8 +85,13 @@ struct ThreadIds {
   }
 
 private:
-  std::atomic<std::thread::id> main_thread_id_; // IDs are read without a mutex, but are written
-  std::atomic<std::thread::id> test_thread_id_; // a mutex to lock the use-count.
+  // The atomic thread IDs can be read without a mutex, but they are written
+  // under a mutex so that they are consistent with their use_counts. this
+  // avoids the possibility of two threads racing to claim being the main/test
+  // thraed.
+  std::atomic<std::thread::id> main_thread_id_;
+  std::atomic<std::thread::id> test_thread_id_;
+
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
   int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
