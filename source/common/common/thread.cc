@@ -88,7 +88,7 @@ private:
   // The atomic thread IDs can be read without a mutex, but they are written
   // under a mutex so that they are consistent with their use_counts. this
   // avoids the possibility of two threads racing to claim being the main/test
-  // thraed.
+  // thread.
   std::atomic<std::thread::id> main_thread_id_;
   std::atomic<std::thread::id> test_thread_id_;
 
