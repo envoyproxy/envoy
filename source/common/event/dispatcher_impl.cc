@@ -16,7 +16,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
-#include "source/common/config/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
