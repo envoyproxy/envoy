@@ -533,9 +533,10 @@ message RouteMatch {
   // .. note::
   //
   //    If query parameters are used to pass request message fields when
-  //    grpc_json_transcoder is used, transcoded the message fields may be different
-  //    with the query parameters since the query parameters MUST be url_encoded,
-  //    but message fields are not.
+  //    `grpc_json_transcoder <https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_json_transcoder_filter>`_
+  //    is used, the transcoded message fields maybe different. The query parameters are
+  //    url encoded, but the message fields are not. For example, if a query
+  //    parameter is "foo%20bar", the message field will be "foo bar".
   repeated QueryParameterMatcher query_parameters = 7;
 
   // If specified, only gRPC requests will be matched. The router will check
