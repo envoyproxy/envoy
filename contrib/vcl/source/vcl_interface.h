@@ -22,7 +22,7 @@ constexpr int VclInvalidFd = 1 << 23;
 /**
  * Used to initialize VCL interface when VclSocketInterface extension is loaded.
  */
-void vclInterfaceInit(Event::Dispatcher& dispatcher);
+void vclInterfaceInit(Event::Dispatcher& dispatcher, uint32_t concurrency);
 
 /**
  * Register Envoy worker with VCL and allocate epoll session handle to be used to retrieve per

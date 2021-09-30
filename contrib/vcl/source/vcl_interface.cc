@@ -13,11 +13,6 @@ namespace Vcl {
 namespace {
 
 /**
- * Max number of workers supported. Used in declaration of epoll_handles array
- */
-const int MaxNumWorkers = 128;
-
-/**
  * Max number of epoll events to drain from VCL per `vppcom_epoll_wait` call
  */
 const int MaxNumEpollEvents = 128;
@@ -26,7 +21,7 @@ const int MaxNumEpollEvents = 128;
  * Envoy worker epoll session handles by VCL worker index, i.e., `vppcom_worker_index()`. Each
  * worker uses its respective handle to retrieve session events from VCL via `vppcom_epoll_wait()`.
  */
-uint32_t epoll_handles[MaxNumWorkers];
+std::vector<uint32_t> epoll_handles;
 
 /**
  * Mutex only used during VCL worker registration
@@ -90,10 +85,11 @@ void vclInterfaceWorkerRegister() {
     absl::MutexLock lk(&wrk_lock);
     RELEASE_ASSERT(vppcom_worker_register() == VPPCOM_OK, "failed to register VCL worker");
   }
+  const int wrk_index = vppcom_worker_index();
   int epoll_handle = vppcom_epoll_create();
-  epoll_handles[vppcom_worker_index()] = epoll_handle;
-  VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", vppcom_worker_index(),
-          epoll_handle, vppcom_mq_epoll_fd());
+  epoll_handles[wrk_index] = epoll_handle;
+  VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", wrk_index, epoll_handle,
+          vppcom_mq_epoll_fd());
 }
 
 void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
@@ -108,10 +104,12 @@ void vclInterfaceRegisterEpollEvent(Envoy::Event::Dispatcher& dispatcher) {
       Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
 }
 
-void vclInterfaceInit(Event::Dispatcher& dispatcher) {
+void vclInterfaceInit(Event::Dispatcher& dispatcher, uint32_t concurrency) {
   MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
   vppcom_app_create("envoy");
   const int wrk_index = vppcom_worker_index();
+  // Assume we may have additional threads that request network access
+  epoll_handles.reserve(concurrency * 2);
   epoll_handles[wrk_index] = vppcom_epoll_create();
   mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
       vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
