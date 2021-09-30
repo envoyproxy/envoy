@@ -9,6 +9,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/event/dispatcher.h"
 
 #include "absl/strings/string_view.h"
 
@@ -128,9 +129,11 @@ public:
    * Get an alternate protocols cache.
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
+   * @param dispatcher supplies the current thread's dispatcher, for cache creation.
    */
   virtual AlternateProtocolsCacheSharedPtr
-  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
+           Event::Dispatcher& dispatcher) PURE;
 };
 
 using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;
