@@ -24,14 +24,13 @@ public:
 
   virtual ~BufferedAsyncClient() { cleanup(); }
 
-  virtual uint64_t publishId(RequestType&) { return next_message_id_++; }
-
-  void bufferMessage(uint64_t id, RequestType& message) {
+  void bufferMessage(RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
     if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
       return;
     }
 
+    auto id = publishId();
     message_buffer_[id] = std::make_pair(BufferState::Buffered, message);
     current_buffer_bytes_ += buffer_size;
   }
@@ -104,6 +103,8 @@ private:
       message_buffer_.erase(message_id);
     }
   }
+
+  uint64_t publishId() { return next_message_id_++; }
 
   const uint32_t max_buffer_bytes_ = 0;
   const Protobuf::MethodDescriptor& service_method_;

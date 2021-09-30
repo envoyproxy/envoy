@@ -57,20 +57,19 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  auto id = buffered_client.publishId(request);
-  buffered_client.bufferMessage(id, request);
-  EXPECT_EQ(1, buffered_client.sendBufferedMessages().size());
+  buffered_client.bufferMessage(request);
+  const auto inflight_message_ids = buffered_client.sendBufferedMessages();
+  EXPECT_EQ(1, inflight_message_ids.size());
 
   // Re-buffer, and transport.
-  buffered_client.onError(id);
+  buffered_client.onError(*inflight_message_ids.begin());
 
   EXPECT_CALL(http_stream, sendData(_, _)).Times(2);
   EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
 
   helloworld::HelloRequest request2;
   request2.set_name("Bob");
-  auto id2 = buffered_client.publishId(request2);
-  buffered_client.bufferMessage(id2, request2);
+  buffered_client.bufferMessage(request2);
   auto ids2 = buffered_client.sendBufferedMessages();
   EXPECT_EQ(2, ids2.size());
 
@@ -102,8 +101,7 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  auto id = buffered_client.publishId(request);
-  buffered_client.bufferMessage(id, request);
+  buffered_client.bufferMessage(request);
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
 }
@@ -125,8 +123,7 @@ TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  auto id = buffered_client.publishId(request);
-  buffered_client.bufferMessage(id, request);
+  buffered_client.bufferMessage(request);
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
 }
