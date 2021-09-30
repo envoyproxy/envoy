@@ -39,6 +39,11 @@ public:
   size_t size() const;
 
   /**
+   * @return true if the pools across all priorities are empty.
+   */
+  bool empty() const;
+
+  /**
    * Destroys all mapped pools.
    */
   void clear();
@@ -52,14 +57,9 @@ public:
   void addIdleCallback(const IdleCb& cb);
 
   /**
-   * See `Envoy::ConnectionPool::Instance::startDrain()`.
-   */
-  void startDrain();
-
-  /**
    * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
   size_t getPriorityIndex(ResourcePriority priority) const;

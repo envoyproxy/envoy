@@ -33,14 +33,12 @@ namespace {
 constexpr std::chrono::milliseconds FlushInterval(10);
 constexpr char MOCK_HTTP_LOG_FIELD_NAME[] = "http_log_entry";
 constexpr char MOCK_TCP_LOG_FIELD_NAME[] = "tcp_log_entry";
-constexpr auto TRANSPORT_API_VERSION = envoy::config::core::v3::ApiVersion::AUTO;
 
 const Protobuf::MethodDescriptor& mockMethodDescriptor() {
   // The mock logger doesn't have its own API, but we only care about the method descriptor so we
   // use the ALS protos.
-  return Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
-                                "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
-      .getMethodDescriptorForVersion(TRANSPORT_API_VERSION);
+  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+      "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs");
 }
 
 // We don't care about the actual log entries, as this logger just adds them to the proto, but we
@@ -55,11 +53,10 @@ public:
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
       std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, std::string access_log_prefix,
-      const Protobuf::MethodDescriptor& service_method,
-      envoy::config::core::v3::ApiVersion transport_api_version)
+      const Protobuf::MethodDescriptor& service_method)
       : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
                          dispatcher, scope, access_log_prefix, service_method,
-                         config.grpc_stream_retry_policy(), transport_api_version) {}
+                         config.grpc_stream_retry_policy()) {}
 
   int numInits() const { return num_inits_; }
 
@@ -123,7 +120,7 @@ public:
     logger_ = std::make_unique<MockGrpcAccessLoggerImpl>(
         Grpc::RawAsyncClientPtr{async_client_}, config_, buffer_flush_interval_msec,
         buffer_size_bytes, dispatcher_, stats_store_, "mock_access_log_prefix.",
-        mockMethodDescriptor(), TRANSPORT_API_VERSION);
+        mockMethodDescriptor());
   }
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
@@ -347,12 +344,12 @@ private:
   // Common::GrpcAccessLoggerCache
   MockGrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion, const Grpc::RawAsyncClientSharedPtr& client,
+               const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
                Event::Dispatcher& dispatcher, Stats::Scope& scope) override {
     return std::make_shared<MockGrpcAccessLoggerImpl>(
         std::move(client), config, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher,
-        scope, "mock_access_log_prefix.", mockMethodDescriptor(), config.transport_api_version());
+        scope, "mock_access_log_prefix.", mockMethodDescriptor());
   }
 };
 
@@ -363,7 +360,7 @@ public:
   void expectClientCreation() {
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
@@ -388,36 +385,31 @@ TEST_F(GrpcAccessLoggerCacheTest, Deduplication) {
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-1");
 
   expectClientCreation();
-  MockGrpcAccessLoggerImpl::SharedPtr logger1 = logger_cache_.getOrCreateLogger(
-      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope);
+  MockGrpcAccessLoggerImpl::SharedPtr logger1 =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope);
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
-                                            Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Do not deduplicate different types of logger
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
-                                            Common::GrpcAccessLoggerType::TCP, scope));
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::TCP, scope));
 
   // Changing log name leads to another logger.
   config.set_log_name("log-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
-                                            Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   config.set_log_name("log-1");
   EXPECT_EQ(logger1,
-            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
-                                            Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 
   // Changing cluster name leads to another logger.
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("cluster-2");
   expectClientCreation();
   EXPECT_NE(logger1,
-            logger_cache_.getOrCreateLogger(config, envoy::config::core::v3::ApiVersion::V3,
-                                            Common::GrpcAccessLoggerType::HTTP, scope));
+            logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope));
 }
 
 } // namespace

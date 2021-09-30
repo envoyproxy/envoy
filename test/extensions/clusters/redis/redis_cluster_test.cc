@@ -95,11 +95,10 @@ protected:
     return addresses;
   }
 
-  void setupFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+  void setupFromV3Yaml(const std::string& yaml) {
     expectRedisSessionCreated();
     NiceMock<Upstream::MockClusterManager> cm;
-    envoy::config::cluster::v3::Cluster cluster_config =
-        Upstream::parseClusterFromV3Yaml(yaml, avoid_boosting);
+    envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -109,7 +108,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
     cluster_ = std::make_shared<RedisCluster>(
@@ -139,7 +137,6 @@ protected:
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
                                            validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;

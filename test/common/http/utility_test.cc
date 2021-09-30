@@ -310,10 +310,9 @@ TEST(HttpUtility, createSslRedirectPath) {
 
 namespace {
 
-envoy::config::core::v3::Http2ProtocolOptions
-parseHttp2OptionsFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+envoy::config::core::v3::Http2ProtocolOptions parseHttp2OptionsFromV3Yaml(const std::string& yaml) {
   envoy::config::core::v3::Http2ProtocolOptions http2_options;
-  TestUtility::loadFromYamlAndValidate(yaml, http2_options, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, http2_options);
   return ::Envoy::Http2::Utility::initializeAndValidateOptions(http2_options);
 }
 
@@ -549,6 +548,16 @@ TEST(HttpUtility, TestParseCookie) {
   EXPECT_EQ(value, "abc123");
 }
 
+TEST(HttpUtility, TestParseCookieDuplicates) {
+  TestRequestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
+                                   {"cookie", "a=; b=1; a=2"},
+                                   {"cookie", "a=3; b=2"},
+                                   {"cookie", "b=3"}};
+
+  EXPECT_EQ(Utility::parseCookieValue(headers, "a"), "");
+  EXPECT_EQ(Utility::parseCookieValue(headers, "b"), "1");
+}
+
 TEST(HttpUtility, TestParseSetCookie) {
   TestRequestHeaderMapImpl headers{
       {"someheader", "10.0.0.1"},
@@ -596,6 +605,33 @@ TEST(HttpUtility, TestParseCookieWithQuotes) {
   EXPECT_EQ(Utility::parseCookieValue(headers, "dquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "quoteddquote"), "\"");
   EXPECT_EQ(Utility::parseCookieValue(headers, "leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseCookies) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "dquote=\"; quoteddquote=\"\"\""},
+      {"cookie", "leadingdquote=\"foobar;"},
+      {"cookie", "abc=def; token=\"abc123\"; Expires=Wed, 09 Jun 2021 10:18:14 GMT"}};
+
+  const auto& cookies = Utility::parseCookies(headers);
+
+  EXPECT_EQ(cookies.at("token"), "abc123");
+  EXPECT_EQ(cookies.at("dquote"), "\"");
+  EXPECT_EQ(cookies.at("quoteddquote"), "\"");
+  EXPECT_EQ(cookies.at("leadingdquote"), "\"foobar");
+}
+
+TEST(HttpUtility, TestParseCookiesDuplicates) {
+  TestRequestHeaderMapImpl headers{{"someheader", "10.0.0.1"},
+                                   {"cookie", "a=; b=1; a=2"},
+                                   {"cookie", "a=3; b=2"},
+                                   {"cookie", "b=3"}};
+
+  const auto& cookies = Utility::parseCookies(headers);
+
+  EXPECT_EQ(cookies.at("a"), "");
+  EXPECT_EQ(cookies.at("b"), "1");
 }
 
 TEST(HttpUtility, TestParseSetCookieWithQuotes) {
@@ -970,6 +1006,37 @@ TEST(HttpUtility, CheckIsIpAddress) {
     EXPECT_EQ(expect_host, host_attributes.host_);
     EXPECT_EQ(expect_port, host_attributes.port_);
   }
+}
+
+TEST(HttpUtility, TestConvertCoreToRouteRetryPolicy) {
+  const std::string core_policy = R"(
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy;
+  TestUtility::loadFromYaml(core_policy, core_retry_policy);
+
+  const envoy::config::route::v3::RetryPolicy route_retry_policy =
+      Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
+                                             "5xx,gateway-error,connect-failure,reset");
+  EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
+  EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  const std::string core_policy2 = R"(
+retry_back_off:
+  base_interval: 32s
+  max_interval: 1s
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy2;
+  TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
+  EXPECT_THROW_WITH_MESSAGE(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"),
+                            EnvoyException,
+                            "max_interval must be greater than or equal to the base_interval");
 }
 
 // Validates TE header is stripped if it contains an unsupported value

@@ -270,11 +270,12 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
   testHealthCheckHeaderMatch(config, headers, false);
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(HealthCheckFilterConfig, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.health_check";
 
-  ASSERT_NE(
+  ASSERT_EQ(
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
           deprecated_name));

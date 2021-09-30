@@ -187,7 +187,7 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
   auto upstream = std::make_unique<TcpUpstream>(std::move(conn_data), upstream_callbacks_);
   callbacks_->onGenericPoolReady(
       &connection.streamInfo(), std::move(upstream), host,
-      latched_data->connection().addressProvider().localAddress(),
+      latched_data->connection().connectionInfoProvider().localAddress(),
       latched_data->connection().streamInfo().downstreamAddressProvider().sslConnection());
 }
 
@@ -196,8 +196,14 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecType type)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks) {
-  conn_pool_data_ = thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default,
-                                                      absl::nullopt, context);
+  absl::optional<Http::Protocol> protocol;
+  if (type_ == Http::CodecType::HTTP3) {
+    protocol = Http::Protocol::Http3;
+  } else if (type_ == Http::CodecType::HTTP2) {
+    protocol = Http::Protocol::Http2;
+  }
+  conn_pool_data_ =
+      thread_local_cluster.httpConnPool(Upstream::ResourcePriority::Default, protocol, context);
 }
 
 HttpConnPool::~HttpConnPool() {

@@ -48,6 +48,13 @@ server
 The *server* header will be set during encoding to the value in the :ref:`server_name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.server_name>` option.
 
+.. _config_http_conn_man_headers_referer:
+
+referer
+-------
+
+The *referer* header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed.
+
 .. _config_http_conn_man_headers_x-client-trace-id:
 
 x-client-trace-id

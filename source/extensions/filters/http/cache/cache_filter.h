@@ -89,7 +89,7 @@ private:
   // of doing it per-request. A good example of such config is found in the gzip filter:
   // source/extensions/filters/http/gzip/gzip_filter.h.
   // Stores the allow list rules that decide if a header can be varied upon.
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.

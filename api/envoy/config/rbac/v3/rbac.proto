@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.rbac.v3;
 
 import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/path.proto";
@@ -146,7 +147,7 @@ message Policy {
 }
 
 // Permission defines an action (or actions) that a principal can take.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message Permission {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Permission";
 
@@ -218,6 +219,10 @@ message Permission {
     // Please refer to :ref:`this FAQ entry <faq_how_to_setup_sni>` to learn to
     // setup SNI.
     type.matcher.v3.StringMatcher requested_server_name = 9;
+
+    // Extension for configuring custom matchers for RBAC.
+    // [#extension-category: envoy.rbac.matchers]
+    core.v3.TypedExtensionConfig matcher = 12;
   }
 }
 

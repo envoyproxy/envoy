@@ -19,15 +19,12 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-    envoy::config::core::v3::ApiVersion transport_api_version)
-    : GrpcAccessLogger(
-          std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-          GRPC_LOG_STATS_PREFIX,
-          Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
-                                 "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
-              .getMethodDescriptorForVersion(transport_api_version),
-          config.grpc_stream_retry_policy(), transport_api_version),
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : GrpcAccessLogger(std::move(client), buffer_flush_interval_msec, max_buffer_size_bytes,
+                       dispatcher, scope, GRPC_LOG_STATS_PREFIX,
+                       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                           "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs"),
+                       config.grpc_stream_retry_policy()),
       log_name_(config.log_name()), local_info_(local_info) {}
 
 void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
@@ -56,13 +53,12 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    envoy::config::core::v3::ApiVersion transport_version,
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, Stats::Scope& scope) {
   return std::make_shared<GrpcAccessLoggerImpl>(client, config, buffer_flush_interval_msec,
                                                 max_buffer_size_bytes, dispatcher, local_info_,
-                                                scope, transport_version);
+                                                scope);
 }
 
 } // namespace GrpcCommon

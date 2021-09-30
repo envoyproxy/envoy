@@ -64,15 +64,13 @@ REAL_TIME_ALLOWLIST = (
 # perform temporary registrations.
 REGISTER_FACTORY_TEST_ALLOWLIST = (
     "./test/common/config/registry_test.cc", "./test/integration/clusters/",
-    "./test/integration/filters/")
+    "./test/integration/filters/", "./test/integration/load_balancers/")
 
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_ALLOWLIST = (
-    "./source/common/config/version_converter.cc",
     "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
-    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
     "./test/extensions/filters/common/expr/context_test.cc",
@@ -153,8 +151,6 @@ EXCEPTION_ALLOWLIST = ("./source/common/config/utility.h")
 # Please DO NOT extend this allow list without consulting
 # @envoyproxy/dependency-shepherds.
 BUILD_URLS_ALLOWLIST = (
-    "./generated_api_shadow/bazel/repository_locations.bzl",
-    "./generated_api_shadow/bazel/envoy_http_archive.bzl",
     "./bazel/repository_locations.bzl",
     "./bazel/external/cargo/crates.bzl",
     "./api/bazel/repository_locations.bzl",
@@ -177,7 +173,7 @@ MANGLED_PROTOBUF_NAME_REGEX = re.compile(r"envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*
 HISTOGRAM_SI_SUFFIX_REGEX = re.compile(r"(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)")
 TEST_NAME_STARTING_LOWER_CASE_REGEX = re.compile(r"TEST(_.\(.*,\s|\()[a-z].*\)\s\{")
 EXTENSIONS_CODEOWNERS_REGEX = re.compile(r'.*(extensions[^@]*\s+)(@.*)')
-CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/\w+/\s+)(@.*)')
+CONTRIB_CODEOWNERS_REGEX = re.compile(r'(/contrib/[^@]*\s+)(@.*)')
 COMMENT_REGEX = re.compile(r"//|\*")
 DURATION_VALUE_REGEX = re.compile(r'\b[Dd]uration\(([0-9.]+)')
 PROTO_VALIDATION_STRING = re.compile(r'\bmin_bytes\b')
@@ -259,6 +255,8 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
   "extensions/filters/network/kafka/broker",
+  "extensions/filters/network/kafka/mesh",
+  "extensions/filters/network/kafka/mesh/command_handlers",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -282,7 +280,6 @@ class FormatChecker:
         self.operation_type = args.operation_type
         self.target_path = args.target_path
         self.api_prefix = args.api_prefix
-        self.api_shadow_root = args.api_shadow_prefix
         self.envoy_build_rule_check = not args.skip_envoy_build_rule_check
         self.namespace_check = args.namespace_check
         self.namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
@@ -486,7 +483,7 @@ class FormatChecker:
         return file_path in BUILD_URLS_ALLOWLIST
 
     def is_api_file(self, file_path):
-        return file_path.startswith(self.api_prefix) or file_path.startswith(self.api_shadow_root)
+        return file_path.startswith(self.api_prefix)
 
     def is_build_file(self, file_path):
         basename = os.path.basename(file_path)
@@ -869,7 +866,7 @@ class FormatChecker:
                 + "https://github.com/LuaJIT/LuaJIT/issues/450#issuecomment-433659873 for details.")
 
         if file_path.endswith(PROTO_SUFFIX):
-            exclude_path = ['v1', 'v2', 'generated_api_shadow']
+            exclude_path = ['v1', 'v2']
             result = PROTO_VALIDATION_STRING.search(line)
             if result is not None:
                 if not any(x in file_path for x in exclude_path):
@@ -926,8 +923,7 @@ class FormatChecker:
             error_messages += self.execute_command(
                 command, "envoy_build_fixer check failed", file_path)
 
-        if self.is_build_file(file_path) and (file_path.startswith(self.api_prefix + "envoy") or
-                                              file_path.startswith(self.api_shadow_root + "envoy")):
+        if self.is_build_file(file_path) and file_path.startswith(self.api_prefix + "envoy"):
             found = False
             for line in self.read_lines(file_path):
                 if "api_proto_package(" in line:
@@ -1053,21 +1049,6 @@ class FormatChecker:
             error_messages.append(
                 "New directory %s appears to not have owners in CODEOWNERS" % dir_name)
 
-    def check_api_shadow_starlark_files(self, file_path, error_messages):
-        command = "diff -u "
-        command += file_path + " "
-        api_shadow_starlark_path = self.api_shadow_root + re.sub(r"\./api/", '', file_path)
-        command += api_shadow_starlark_path
-
-        error_message = self.execute_command(
-            command, "invalid .bzl in generated_api_shadow", file_path)
-        if self.operation_type == "check":
-            error_messages += error_message
-        elif self.operation_type == "fix" and len(error_message) != 0:
-            shutil.copy(file_path, api_shadow_starlark_path)
-
-        return error_messages
-
     def check_format_visitor(self, arg, dir_name, names):
         """Run check_format in parallel for the given files.
     Args:
@@ -1103,11 +1084,6 @@ class FormatChecker:
             self.check_owners(str(top_level), owned_directories, error_messages)
 
         for file_name in names:
-            if dir_name.startswith("./api") and self.is_starlark_file(file_name):
-                result = pool.apply_async(
-                    self.check_api_shadow_starlark_files,
-                    args=(dir_name + "/" + file_name, error_messages))
-                result_list.append(result)
             result = pool.apply_async(
                 self.check_format_return_trace_on_error, args=(dir_name + "/" + file_name,))
             result_list.append(result)
@@ -1147,11 +1123,6 @@ if __name__ == "__main__":
         default=multiprocessing.cpu_count(),
         help="number of worker processes to use; defaults to one per core.")
     parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
-    parser.add_argument(
-        "--api-shadow-prefix",
-        type=str,
-        default="./generated_api_shadow/",
-        help="path of the shadow API tree.")
     parser.add_argument(
         "--skip_envoy_build_rule_check",
         action="store_true",
@@ -1225,7 +1196,22 @@ if __name__ == "__main__":
 
                     m = CONTRIB_CODEOWNERS_REGEX.search(line)
                     if m is not None and not line.startswith('#'):
-                        owned.append(m.group(1).strip())
+                        stripped_path = m.group(1).strip()
+                        if not stripped_path.endswith('/'):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must end in '/'".format(
+                                    stripped_path))
+                            continue
+
+                        if not (stripped_path.count('/') == 3 or
+                                (stripped_path.count('/') == 4
+                                 and stripped_path.startswith('/contrib/common/'))):
+                            error_messages.append(
+                                "Contrib CODEOWNERS entry '{}' must be 2 directories deep unless in /contrib/common/ and then it can be 3 directories deep"
+                                .format(stripped_path))
+                            continue
+
+                        owned.append(stripped_path)
                         owners = re.findall('@\S+', m.group(2).strip())
                         if len(owners) < 2:
                             error_messages.append(
@@ -1240,9 +1226,15 @@ if __name__ == "__main__":
     error_messages = []
     owned_directories = owned_directories(error_messages)
     if os.path.isfile(args.target_path):
-        if not args.target_path.startswith(EXCLUDED_PREFIXES) and args.target_path.endswith(
-                SUFFIXES):
-            error_messages += format_checker.check_format("./" + args.target_path)
+        # All of our EXCLUDED_PREFIXES start with "./", but the provided
+        # target path argument might not. Add it here if it is missing,
+        # and use that normalized path for both lookup and `check_format`.
+        normalized_target_path = args.target_path
+        if not normalized_target_path.startswith("./"):
+            normalized_target_path = "./" + normalized_target_path
+        if not normalized_target_path.startswith(
+                EXCLUDED_PREFIXES) and normalized_target_path.endswith(SUFFIXES):
+            error_messages += format_checker.check_format(normalized_target_path)
     else:
         results = []
 

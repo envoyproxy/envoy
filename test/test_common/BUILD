@@ -55,6 +55,18 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "real_threads_test_helper_lib",
+    srcs = ["real_threads_test_helper.cc"],
+    hdrs = ["real_threads_test_helper.h"],
+    deps = [
+        "utility_lib",
+        "//source/common/common:thread_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/thread_local:thread_local_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "network_utility_test",
     srcs = ["network_utility_test.cc"],
@@ -124,7 +136,6 @@ envoy_cc_test_library(
         "//source/common/common:utility_lib",
         "//source/common/config:decoded_resource_lib",
         "//source/common/config:opaque_resource_decoder_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",

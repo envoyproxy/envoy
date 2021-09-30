@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
 
-import subprocess
 import os
+import ssl
+import subprocess
+import sys
+from typing import Iterable
 import xml.etree.ElementTree as ET
+
 import slack
 from slack.errors import SlackApiError
-import sys
-import ssl
+
+import envoy_repo
 
 well_known_timeouts = [60, 300, 900, 3600]
 section_delimiter = "---------------------------------------------------------------------------------------------------\n"
+
+
+def run_in_repo(command: Iterable) -> str:
+    """Run a command in the repo root"""
+    return subprocess.check_output(command, encoding="utf-8", cwd=envoy_repo.PATH)
 
 
 # Returns a boolean indicating if a test passed.
@@ -192,7 +201,7 @@ def get_git_info(CI_TARGET):
     elif os.getenv('BUILD_REASON'):
         ret += "Build reason:   {}\n".format(os.environ['BUILD_REASON'])
 
-    output = subprocess.check_output(['git', 'log', '--format=%H', '-n', '1'], encoding='utf-8')
+    output = run_in_repo(['git', 'log', '--format=%H', '-n', '1'])
     ret += "Commmit:        {}/commit/{}".format(os.environ['REPO_URI'], output)
 
     build_id = os.environ['BUILD_URI'].split('/')[-1]
@@ -200,23 +209,23 @@ def get_git_info(CI_TARGET):
 
     ret += "\n"
 
-    remotes = subprocess.check_output(['git', 'remote'], encoding='utf-8').splitlines()
+    remotes = run_in_repo(['git', 'remote']).splitlines()
 
     if ("origin" in remotes):
-        output = subprocess.check_output(['git', 'remote', 'get-url', 'origin'], encoding='utf-8')
+        output = run_in_repo(['git', 'remote', 'get-url', 'origin'])
         ret += "Origin:         {}".format(output.replace('.git', ''))
 
     if ("upstream" in remotes):
-        output = subprocess.check_output(['git', 'remote', 'get-url', 'upstream'], encoding='utf-8')
+        output = run_in_repo(['git', 'remote', 'get-url', 'upstream'])
         ret += "Upstream:       {}".format(output.replace('.git', ''))
 
-    output = subprocess.check_output(['git', 'describe', '--all', '--always'], encoding='utf-8')
+    output = run_in_repo(['git', 'describe', '--all', '--always'])
     ret += "Latest ref:     {}".format(output)
 
     ret += "\n"
 
     ret += "Last commit:\n"
-    output = subprocess.check_output(['git', 'show', '-s'], encoding='utf-8')
+    output = run_in_repo(['git', 'show', '-s'])
     for line in output.splitlines():
         ret += "\t" + line + "\n"
 
@@ -225,7 +234,7 @@ def get_git_info(CI_TARGET):
     return ret
 
 
-if __name__ == "__main__":
+def main():
     CI_TARGET = ""
     if len(sys.argv) == 2:
         CI_TARGET = sys.argv[1]
@@ -286,3 +295,10 @@ if __name__ == "__main__":
         print('No flaky tests found.\n')
 
     os.remove(os.environ["TMP_OUTPUT_PROCESS_XML"])
+
+
+if __name__ == "__main__":
+    if os.getenv("ENVOY_BUILD_ARCH") == "aarch64":
+        os.environ["MULTIDICT_NO_EXTENSIONS"] = 1
+        os.environ["YARL_NO_EXTENSIONS"] = 1
+    main()

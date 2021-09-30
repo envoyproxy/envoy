@@ -115,8 +115,8 @@ public:
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), shadow_writer_);
     } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), "test",
-                                                               context_.scope(), dispatcher_);
+      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
+          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal());
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
                                          context_.runtime(), *shadow_writer_impl_);
     }
@@ -414,6 +414,13 @@ public:
       EXPECT_CALL(*protocol, writeSetEnd(_));
     }
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
+  }
+
+  void sendPassthroughData() {
+    Buffer::OwnedImpl buffer;
+    buffer.add("hello");
+
+    EXPECT_EQ(FilterStatus::Continue, router_->passthroughData(buffer));
   }
 
   void completeRequest() {
@@ -1115,7 +1122,7 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
 
   startRequest(MessageType::Call);
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_CALL(cluster_scope,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
       .Times(0);
@@ -1212,7 +1219,7 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   sendTrivialStruct(field_type);
   completeRequest();
 
-  dispatcher_.time_system_.advanceTimeWait(std::chrono::milliseconds(500));
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
   EXPECT_CALL(cluster_scope,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
@@ -1587,6 +1594,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   sendTrivialMap();
   sendTrivialList();
   sendTrivialSet();
+  sendPassthroughData();
 
   completeRequest();
   returnResponse();

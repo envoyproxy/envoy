@@ -24,15 +24,12 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const Grpc::RawAsyncClientSharedPtr& client,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-    envoy::config::core::v3::ApiVersion transport_api_version)
-    : GrpcAccessLogger(
-          client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
-          GRPC_LOG_STATS_PREFIX,
-          Grpc::VersionedMethods("opentelemetry.proto.collector.logs.v1.LogsService.Export",
-                                 "opentelemetry.proto.collector.logs.v1.LogsService.Export")
-              .getMethodDescriptorForVersion(transport_api_version),
-          config.grpc_stream_retry_policy(), transport_api_version) {
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : GrpcAccessLogger(client, buffer_flush_interval_msec, max_buffer_size_bytes, dispatcher, scope,
+                       GRPC_LOG_STATS_PREFIX,
+                       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                           "opentelemetry.proto.collector.logs.v1.LogsService.Export"),
+                       config.grpc_stream_retry_policy()) {
   initMessageRoot(config.log_name(), local_info);
 }
 
@@ -79,13 +76,12 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& a
 
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-    envoy::config::core::v3::ApiVersion transport_version,
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
     Event::Dispatcher& dispatcher, Stats::Scope& scope) {
   return std::make_shared<GrpcAccessLoggerImpl>(client, config, buffer_flush_interval_msec,
                                                 max_buffer_size_bytes, dispatcher, local_info_,
-                                                scope, transport_version);
+                                                scope);
 }
 
 } // namespace OpenTelemetry

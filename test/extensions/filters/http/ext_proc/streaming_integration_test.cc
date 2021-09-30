@@ -57,7 +57,7 @@ protected:
                           ->mutable_endpoint()
                           ->mutable_address()
                           ->mutable_socket_address();
-      address->set_address("127.0.0.1");
+      address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
       address->set_port_value(test_processor_.port());
 
       // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
@@ -66,15 +66,21 @@ protected:
       ConfigHelper::setHttp2(*processor_cluster);
 
       // Make sure both flavors of gRPC client use the right address.
-      const auto addr =
-          std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", test_processor_.port());
-      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
+      const auto addr = Network::Test::getCanonicalLoopbackAddress(ipVersion());
+      const auto addr_port = Network::Utility::getAddressWithPort(*addr, test_processor_.port());
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr_port);
+      // Insert some extra metadata. This ensures that we are actually passing the
+      // "stream info" from the original HTTP request all the way down to the
+      // ext_proc stream.
+      auto* metadata = proto_config_.mutable_grpc_service()->mutable_initial_metadata()->Add();
+      metadata->set_key("x-request-id");
+      metadata->set_value("%REQ(x-request-id)%");
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
 
     // Make sure that we have control over when buffers will fill up.
@@ -134,13 +140,14 @@ INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
-// after the headers come in.
+// after the headers come in. Also check the metadata in this test.
 TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
   uint32_t num_chunks = 150;
   uint32_t chunk_size = 1000;
 
   // This starts the gRPC server in the background. It'll be shut down when we stop the tests.
   test_processor_.start(
+      ipVersion(),
       [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         // This is the same gRPC stream processing code that a "user" of ext_proc
         // would write. In this case, we expect to receive a request_headers
@@ -154,12 +161,20 @@ TEST_P(StreamingIntegrationTest, PostAndProcessHeadersOnly) {
         stream->Write(header_resp);
         // Returning here closes the stream, unless we had an ASSERT failure
         // previously.
+      },
+      [](grpc::ServerContext* ctx) {
+        // Verify that the metadata set in the grpc client configuration
+        // above is actually sent to our RPC.
+        auto request_id = ctx->client_metadata().find("x-request-id");
+        ASSERT_NE(request_id, ctx->client_metadata().end());
+        EXPECT_EQ(request_id->second, "sent some metadata");
       });
 
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto& encoder = sendClientRequestHeaders([num_chunks, chunk_size](Http::HeaderMap& headers) {
     headers.addCopy(LowerCaseString("expect_request_size_bytes"), num_chunks * chunk_size);
+    headers.addCopy(LowerCaseString("x-request-id"), "sent some metadata");
   });
 
   for (uint32_t i = 0; i < num_chunks; i++) {
@@ -183,6 +198,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBody) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
+      ipVersion(),
       [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
@@ -223,6 +239,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBody) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
+      ipVersion(),
       [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         // Expect a request_headers message as the first message on the stream,
         // and send back an empty response.
@@ -274,7 +291,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyPartially) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
-      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
         ASSERT_TRUE(header_req.has_request_headers());
@@ -332,6 +349,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
+      ipVersion(),
       [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
@@ -372,6 +390,7 @@ TEST_P(StreamingIntegrationTest, GetAndProcessBufferedResponseBody) {
   uint32_t response_size = 90000;
 
   test_processor_.start(
+      ipVersion(),
       [response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
@@ -409,8 +428,8 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   uint32_t response_size = 170000;
 
   test_processor_.start(
-      [this,
-       response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(), [this, response_size](
+                       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
         ASSERT_TRUE(header_req.has_request_headers());
@@ -467,8 +486,8 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamBothBodies) {
   uint32_t response_size = 1700000;
 
   test_processor_.start(
-      [this, request_size,
-       response_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(), [this, request_size, response_size](
+                       grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
         ASSERT_TRUE(header_req.has_request_headers());
@@ -554,7 +573,7 @@ TEST_P(StreamingIntegrationTest, PostAndStreamAndTransformBothBodies) {
   uint32_t response_size = 180000;
 
   test_processor_.start(
-      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
         ASSERT_TRUE(header_req.has_request_headers());
@@ -631,7 +650,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedRequestBodyTooBig) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
-      [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+      ipVersion(), [](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
         ASSERT_TRUE(header_req.has_request_headers());
@@ -667,6 +686,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedPartialRequestBody) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
+      ipVersion(),
       [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));
@@ -709,6 +729,7 @@ TEST_P(StreamingIntegrationTest, PostAndProcessBufferedPartialBigRequestBody) {
   uint32_t total_size = num_chunks * chunk_size;
 
   test_processor_.start(
+      ipVersion(),
       [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         ProcessingRequest header_req;
         ASSERT_TRUE(stream->Read(&header_req));

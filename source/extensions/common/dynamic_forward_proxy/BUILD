@@ -43,6 +43,7 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:key_value_store_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",

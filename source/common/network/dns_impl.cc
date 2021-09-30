@@ -105,6 +105,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // callback_ target _should_ still be around. In that case, raise the callback_ so the target
     // can be done with this query and initiate a new one.
     if (!cancelled_) {
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
+                      dns_name_);
+
       callback_(ResolutionStatus::Failure, {});
     }
     delete this;
@@ -180,6 +183,10 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       // portFromTcpUrl().
       // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
       // exception in fuzz tests.
+      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+                      "dns resolution for {} completed with status {}", dns_name_,
+                      resolution_status);
+
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
         ENVOY_LOG(critical, "EnvoyException in c-ares callback: {}", e.what());
@@ -202,7 +209,14 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (!completed_ && fallback_if_failed_) {
     fallback_if_failed_ = false;
-    getAddrInfo(AF_INET);
+
+    if (dns_lookup_family_ == DnsLookupFamily::Auto) {
+      getAddrInfo(AF_INET);
+    } else {
+      ASSERT(dns_lookup_family_ == DnsLookupFamily::V4Preferred);
+      getAddrInfo(AF_INET6);
+    }
+
     // Note: Nothing can follow this call to getAddrInfo due to deletion of this
     // object upon synchronous resolution.
     return;
@@ -253,6 +267,8 @@ void DnsResolverImpl::onAresSocketStateChange(os_fd_t fd, int read, int write) {
 
 ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
                                          DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_start", "dns resolution for {} started", dns_name);
+
   // TODO(hennna): Add DNS caching which will allow testing the edge case of a
   // failed initial call to getAddrInfo followed by a synchronous IPv4
   // resolution.
@@ -264,13 +280,15 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  auto pending_resolution =
-      std::make_unique<PendingResolution>(*this, callback, dispatcher_, channel_, dns_name);
-  if (dns_lookup_family == DnsLookupFamily::Auto) {
+  auto pending_resolution = std::make_unique<PendingResolution>(
+      *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
+  if (dns_lookup_family == DnsLookupFamily::Auto ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->fallback_if_failed_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4Only) {
+  if (dns_lookup_family == DnsLookupFamily::V4Only ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred) {
     pending_resolution->getAddrInfo(AF_INET);
   } else {
     pending_resolution->getAddrInfo(AF_INET6);

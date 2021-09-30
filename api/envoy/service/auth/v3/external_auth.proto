@@ -46,9 +46,9 @@ message DeniedHttpResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.DeniedHttpResponse";
 
-  // This field allows the authorization service to send a HTTP response status
-  // code to the downstream client other than 403 (Forbidden).
-  type.v3.HttpStatus status = 1 [(validate.rules).message = {required: true}];
+  // This field allows the authorization service to send an HTTP response status code to the
+  // downstream client. If not set, Envoy sends ``403 Forbidden`` HTTP status code by default.
+  type.v3.HttpStatus status = 1;
 
   // This field allows the authorization service to send HTTP response headers
   // to the downstream client. Note that the :ref:`append field in HeaderValueOption <envoy_v3_api_field_config.core.v3.HeaderValueOption.append>` defaults to
@@ -110,7 +110,9 @@ message CheckResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.CheckResponse";
 
-  // Status `OK` allows the request. Any other status indicates the request should be denied.
+  // Status `OK` allows the request. Any other status indicates the request should be denied, and
+  // for HTTP filter, if not overridden by :ref:`denied HTTP response status <envoy_v3_api_field_service.auth.v3.DeniedHttpResponse.status>`
+  // Envoy sends ``403 Forbidden`` HTTP status code by default.
   google.rpc.Status status = 1;
 
   // An message that contains HTTP response attributes. This message is

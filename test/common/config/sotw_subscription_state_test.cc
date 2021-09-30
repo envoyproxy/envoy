@@ -28,9 +28,8 @@ protected:
   SotwSubscriptionStateTest() : resource_decoder_("cluster_name") {
     ttl_timer_ = new Event::MockTimer(&dispatcher_);
     state_ = std::make_unique<XdsMux::SotwSubscriptionState>(
-        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-            envoy::config::core::v3::ApiVersion::V3),
-        callbacks_, dispatcher_, resource_decoder_);
+        Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(), callbacks_,
+        dispatcher_, resource_decoder_);
     state_->updateSubscriptionInterest({"name1", "name2", "name3"}, {});
     auto cur_request = getNextDiscoveryRequestAckless();
     EXPECT_THAT(cur_request->resource_names(), UnorderedElementsAre("name1", "name2", "name3"));
@@ -71,8 +70,7 @@ protected:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version_info);
     response.set_nonce(nonce);
-    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        envoy::config::core::v3::ApiVersion::V3));
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
     for (const auto& resource_name : resource_names) {
       response.add_resources()->PackFrom(resource(resource_name));
     }
@@ -87,8 +85,7 @@ protected:
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version_info);
     response.set_nonce(nonce);
-    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        envoy::config::core::v3::ApiVersion::V3));
+    response.set_type_url(Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>());
     response.add_resources()->PackFrom(resource);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, version_info));
     return state_->handleResponse(response);

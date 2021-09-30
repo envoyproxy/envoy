@@ -55,6 +55,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
+        "//source/extensions/key_value/file_based:config_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

@@ -37,7 +37,6 @@ constexpr char SERVER_ADDR[] = "sa";
 constexpr char SAMPLED[] = "1";
 constexpr char NOT_SAMPLED[] = "0";
 
-constexpr char DEFAULT_COLLECTOR_ENDPOINT[] = "/api/v1/spans";
 constexpr bool DEFAULT_SHARED_SPAN_CONTEXT = true;
 
 } // namespace

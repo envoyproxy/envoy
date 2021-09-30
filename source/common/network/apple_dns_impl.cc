@@ -55,7 +55,7 @@ AppleDnsResolverStats AppleDnsResolverImpl::generateAppleDnsResolverStats(Stats:
 AppleDnsResolverImpl::StartResolutionResult
 AppleDnsResolverImpl::startResolution(const std::string& dns_name,
                                       DnsLookupFamily dns_lookup_family, ResolveCb callback) {
-  ENVOY_LOG(debug, "DNS resolver resolve={}", dns_name);
+  ENVOY_LOG_EVENT(debug, "apple_dns_start", "DNS resolution for {} started", dns_name);
 
   // When an IP address is submitted to c-ares in DnsResolverImpl, c-ares synchronously returns
   // the IP without submitting a DNS query. Because Envoy has come to rely on this behavior, this
@@ -64,18 +64,19 @@ AppleDnsResolverImpl::startResolution(const std::string& dns_name,
   auto address = Utility::parseInternetAddressNoThrow(dns_name);
 
   if (address != nullptr) {
-    ENVOY_LOG(debug, "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
-              dns_name, address->asString());
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_resolution",
+                    "DNS resolver resolved ({}) to ({}) without issuing call to Apple API",
+                    dns_name, address->asString());
     callback(DnsResolver::ResolutionStatus::Success,
              {DnsResponse(address, std::chrono::seconds(60))});
     return {nullptr, true};
   }
 
   ENVOY_LOG(trace, "Performing DNS resolution via Apple APIs");
-  auto pending_resolution =
-      std::make_unique<PendingResolution>(*this, callback, dispatcher_, dns_name);
+  auto pending_resolution = std::make_unique<PendingResolution>(*this, callback, dispatcher_,
+                                                                dns_name, dns_lookup_family);
 
-  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo(dns_lookup_family);
+  DNSServiceErrorType error = pending_resolution->dnsServiceGetAddrInfo();
   if (error != kDNSServiceErr_NoError) {
     ENVOY_LOG(warn, "DNS resolver error ({}) in dnsServiceGetAddrInfo for {}", error, dns_name);
     chargeGetAddrInfoErrorStats(error);
@@ -106,6 +107,8 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
   // If we synchronously failed the resolution, trigger a failure callback.
   if (!pending_resolution_and_success.second) {
+    ENVOY_LOG_EVENT(debug, "apple_dns_immediate_failure", "DNS resolution for {} failed", dns_name);
+
     callback(DnsResolver::ResolutionStatus::Failure, {});
     return nullptr;
   }
@@ -133,9 +136,10 @@ void AppleDnsResolverImpl::chargeGetAddrInfoErrorStats(DNSServiceErrorType error
 AppleDnsResolverImpl::PendingResolution::PendingResolution(AppleDnsResolverImpl& parent,
                                                            ResolveCb callback,
                                                            Event::Dispatcher& dispatcher,
-                                                           const std::string& dns_name)
+                                                           const std::string& dns_name,
+                                                           DnsLookupFamily dns_lookup_family)
     : parent_(parent), callback_(callback), dispatcher_(dispatcher), dns_name_(dns_name),
-      pending_cb_({ResolutionStatus::Success, {}}) {}
+      pending_cb_({ResolutionStatus::Success, {}, {}}), dns_lookup_family_(dns_lookup_family) {}
 
 AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
   ENVOY_LOG(debug, "Destroying PendingResolution for {}", dns_name_);
@@ -182,8 +186,32 @@ void AppleDnsResolverImpl::PendingResolution::onEventCallback(uint32_t events) {
   }
 }
 
+std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressList() {
+  switch (dns_lookup_family_) {
+  case DnsLookupFamily::V4Only:
+    return pending_cb_.v4_responses_;
+  case DnsLookupFamily::V6Only:
+    return pending_cb_.v6_responses_;
+  case DnsLookupFamily::Auto:
+    // Per API docs only give v4 if v6 is not available.
+    if (pending_cb_.v6_responses_.empty()) {
+      return pending_cb_.v4_responses_;
+    }
+    return pending_cb_.v6_responses_;
+  case DnsLookupFamily::V4Preferred:
+    // Per API docs only give v6 if v4 is not available.
+    if (pending_cb_.v4_responses_.empty()) {
+      return pending_cb_.v6_responses_;
+    }
+    return pending_cb_.v4_responses_;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
-  callback_(pending_cb_.status_, std::move(pending_cb_.responses_));
+  ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
+                  "dns resolution for {} completed with status {}", dns_name_, pending_cb_.status_);
+  callback_(pending_cb_.status_, std::move(finalAddressList()));
 
   if (owned_) {
     ENVOY_LOG(debug, "Resolution for {} completed (async)", dns_name_);
@@ -194,10 +222,9 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   }
 }
 
-DNSServiceErrorType
-AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily dns_lookup_family) {
+DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo() {
   DNSServiceProtocol protocol;
-  switch (dns_lookup_family) {
+  switch (dns_lookup_family_) {
   case DnsLookupFamily::V4Only:
     protocol = kDNSServiceProtocol_IPv4;
     break;
@@ -205,6 +232,7 @@ AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrInfo(DnsLookupFamily d
     protocol = kDNSServiceProtocol_IPv6;
     break;
   case DnsLookupFamily::Auto:
+  case DnsLookupFamily::V4Preferred:
     protocol = kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6;
     break;
   }
@@ -250,7 +278,8 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     parent_.chargeGetAddrInfoErrorStats(error_code);
 
     pending_cb_.status_ = ResolutionStatus::Failure;
-    pending_cb_.responses_.clear();
+    pending_cb_.v4_responses_.clear();
+    pending_cb_.v6_responses_.clear();
 
     finishResolve();
     // Note: Nothing can follow this call to flushPendingQueries due to deletion of this
@@ -266,7 +295,12 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     auto dns_response = buildDnsResponse(address, ttl);
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
               dns_response.address_->ip()->addressAsString(), ttl);
-    pending_cb_.responses_.push_back(dns_response);
+    if (dns_response.address_->ip()->ipv4()) {
+      pending_cb_.v4_responses_.push_back(dns_response);
+    } else {
+      ASSERT(dns_response.address_->ip()->ipv6());
+      pending_cb_.v6_responses_.push_back(dns_response);
+    }
   }
 
   if (!(flags & kDNSServiceFlagsMoreComing)) {

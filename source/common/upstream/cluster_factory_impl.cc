@@ -113,7 +113,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return context.dispatcher().createDnsResolver(resolvers, dns_resolver_options);
+    return context.mainThreadDispatcher().createDnsResolver(resolvers, dns_resolver_options);
   }
 
   return context.dnsResolver();
@@ -123,13 +123,16 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {
   auto stats_scope = generateStatsScope(cluster, context.stats());
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
-      context.localInfo(), context.dispatcher(), context.stats(), context.singletonManager(),
-      context.tls(), context.messageValidationVisitor(), context.api(), context.options());
+  std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
+      transport_factory_context =
+          std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
+              context.admin(), context.sslContextManager(), *stats_scope, context.clusterManager(),
+              context.localInfo(), context.mainThreadDispatcher(), context.stats(),
+              context.singletonManager(), context.threadLocal(), context.messageValidationVisitor(),
+              context.api(), context.options());
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
-      createClusterImpl(cluster, context, factory_context, std::move(stats_scope));
+      createClusterImpl(cluster, context, *transport_factory_context, std::move(stats_scope));
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
@@ -138,14 +141,16 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     } else {
       new_cluster_pair.first->setHealthChecker(HealthCheckerFactory::create(
           cluster.health_checks()[0], *new_cluster_pair.first, context.runtime(),
-          context.dispatcher(), context.logManager(), context.messageValidationVisitor(),
+          context.mainThreadDispatcher(), context.logManager(), context.messageValidationVisitor(),
           context.api()));
     }
   }
 
   new_cluster_pair.first->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
-      *new_cluster_pair.first, cluster, context.dispatcher(), context.runtime(),
+      *new_cluster_pair.first, cluster, context.mainThreadDispatcher(), context.runtime(),
       context.outlierEventLogger()));
+
+  new_cluster_pair.first->setTransportFactoryContext(std::move(transport_factory_context));
   return new_cluster_pair;
 }
 
