@@ -247,13 +247,6 @@ settings:
       filter_->stats_.response_exception_.inc();
       EXPECT_EQ(2U, filter_->stats_.response_exception_.value());
     }
-    /*
-        // metadata = nullptr
-        std::string transid = trans->transactionId();
-        trans->metadata_ = nullptr;
-        filter_->transactions_.emplace(transid, std::move(trans));
-        filter_->transactions_.at(transid)->upstreamData(filter_->decoder_->metadata_);
-    */
 
     // transportEnd throw envoyException
     filter_->read_callbacks_->connection().setDelayedCloseTimeout(std::chrono::milliseconds(1));
@@ -263,7 +256,8 @@ settings:
     try {
       ConnectionManager::ResponseDecoder response_decoder(*trans1);
       response_decoder.newDecoderEventHandler(filter_->decoder_->metadata());
-      response_decoder.transportEnd();
+      // transportEnd throw envoyException
+      response_decoder.onData(filter_->decoder_->metadata());
     } catch (const EnvoyException& ex) {
       filter_->stats_.response_exception_.inc();
       EXPECT_EQ(2U, filter_->stats_.response_exception_.value());

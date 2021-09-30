@@ -23,7 +23,6 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
       current_(pool_it) {}
 
-// TODO(#15649) add trace logging.
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
     : parent_(parent), pool_it_(it), cancellable_(nullptr) {}
@@ -54,7 +53,6 @@ void ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::onPoolFailu
 void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptFailed(
     ConnectionAttemptCallbacks* attempt, ConnectionPool::PoolFailureReason reason,
     absl::string_view transport_failure_reason, Upstream::HostDescriptionConstSharedPtr host) {
-  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool failed to create connection to host '{}'.",
             describePool(attempt->pool()), host->hostname());
   if (grid_.isPoolHttp3(attempt->pool())) {
@@ -107,7 +105,6 @@ void ConnectivityGrid::WrapperCallbacks::onConnectionAttemptReady(
     ConnectionAttemptCallbacks* attempt, RequestEncoder& encoder,
     Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
     absl::optional<Http::Protocol> protocol) {
-  ASSERT(host == grid_.host_);
   ENVOY_LOG(trace, "{} pool successfully connected to host '{}'.", describePool(attempt->pool()),
             host->hostname());
   if (!grid_.isPoolHttp3(attempt->pool())) {
