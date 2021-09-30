@@ -100,7 +100,7 @@ void EnvoyQuicClientConnection::switchConnectionSocket(
   quic::QuicSocketAddress peer_address = envoyIpAddressToQuicSocketAddress(
       connection_socket->connectionInfoProvider().remoteAddress()->ip());
 
-  // The old socket is not closed in this call.
+  // The old socket is not closed in this call, because it could still receive useful packets.
   setConnectionSocket(std::move(connection_socket));
   setUpConnectionSocket(*connectionSocket(), delegate_);
   if (connection_migration_use_new_cid()) {
