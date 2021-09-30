@@ -74,6 +74,14 @@ public:
   }
 
   /**
+   * This is a non-constructing getter only for use on instances when the caller can deal with
+   * circumstances where the singleton being access has not being constructed yet.
+   */
+  template <class T> std::shared_ptr<T> getTyped(const std::string& name) {
+    return std::dynamic_pointer_cast<T>(get(name, [] { return nullptr; }));
+  }
+
+  /**
    * Get a singleton and create it if it does not exist.
    * @param name supplies the singleton name. Must be registered via RegistrationImpl.
    * @param singleton supplies the singleton creation callback. This will only be called if the
