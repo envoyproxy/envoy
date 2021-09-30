@@ -167,17 +167,17 @@ build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 
 build:rbe-toolchain-clang --config=rbe-toolchain
-build:rbe-toolchain-clang --platforms=@rbe_ubuntu_clang//config:platform
-build:rbe-toolchain-clang --host_platform=@rbe_ubuntu_clang//config:platform
-build:rbe-toolchain-clang --crosstool_top=@rbe_ubuntu_clang//cc:toolchain
-build:rbe-toolchain-clang --extra_toolchains=@rbe_ubuntu_clang//config:cc-toolchain
+build:rbe-toolchain-clang --platforms=@envoy_build_tools//toolchains:rbe_linux_clang_platform
+build:rbe-toolchain-clang --host_platform=@envoy_build_tools//toolchains:rbe_linux_clang_platform
+build:rbe-toolchain-clang --crosstool_top=@envoy_build_tools//toolchains/configs/linux/clang/cc:toolchain
+build:rbe-toolchain-clang --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/clang/config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
 
 build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-clang-libc++ --platforms=@rbe_ubuntu_clang_libcxx//config:platform
-build:rbe-toolchain-clang-libc++ --host_platform=@rbe_ubuntu_clang_libcxx//config:platform
-build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
-build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
+build:rbe-toolchain-clang-libc++ --platforms=@envoy_build_tools//toolchains:rbe_linux_clang_libcxx_platform
+build:rbe-toolchain-clang-libc++ --host_platform=@envoy_build_tools//toolchains:rbe_linux_clang_libcxx_platform
+build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy_build_tools//toolchains/configs/linux/clang_libcxx/cc:toolchain
+build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/clang_libcxx/config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
@@ -202,20 +202,20 @@ build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
 build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
-build:rbe-toolchain-gcc --platforms=@rbe_ubuntu_gcc//config:platform
-build:rbe-toolchain-gcc --host_platform=@rbe_ubuntu_gcc//config:platform
-build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
-build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
+build:rbe-toolchain-gcc --platforms=@envoy_build_tools//toolchains:rbe_linux_gcc_platform
+build:rbe-toolchain-gcc --host_platform=@envoy_build_tools//toolchains:rbe_linux_gcc_platform
+build:rbe-toolchain-gcc --crosstool_top=@envoy_build_tools//toolchains/configs/linux/gcc/cc:toolchain
+build:rbe-toolchain-gcc --extra_toolchains=@envoy_build_tools//toolchains/configs/linux/gcc/config:cc-toolchain
 
-build:rbe-toolchain-msvc-cl --host_platform=@rbe_windows_msvc_cl//config:platform
-build:rbe-toolchain-msvc-cl --platforms=@rbe_windows_msvc_cl//config:platform
-build:rbe-toolchain-msvc-cl --crosstool_top=@rbe_windows_msvc_cl//cc:toolchain
-build:rbe-toolchain-msvc-cl --extra_toolchains=@rbe_windows_msvc_cl//config:cc-toolchain
+build:rbe-toolchain-msvc-cl --host_platform=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
+build:rbe-toolchain-msvc-cl --platforms=@envoy_build_tools//toolchains:rbe_windows_msvc_cl_platform
+build:rbe-toolchain-msvc-cl --crosstool_top=@envoy_build_tools//toolchains/configs/windows/msvc-cl/cc:toolchain
+build:rbe-toolchain-msvc-cl --extra_toolchains=@envoy_build_tools//toolchains/configs/windows/msvc-cl/config:cc-toolchain
 
-build:rbe-toolchain-clang-cl --host_platform=@rbe_windows_clang_cl//config:platform
-build:rbe-toolchain-clang-cl --platforms=@rbe_windows_clang_cl//config:platform
-build:rbe-toolchain-clang-cl --crosstool_top=@rbe_windows_clang_cl//cc:toolchain
-build:rbe-toolchain-clang-cl --extra_toolchains=@rbe_windows_clang_cl//config:cc-toolchain
+build:rbe-toolchain-clang-cl --host_platform=@envoy_build_tools//toolchains:rbe_windows_clang_cl_platform
+build:rbe-toolchain-clang-cl --platforms=@envoy_build_tools//toolchains:rbe_windows_clang_cl_platform
+build:rbe-toolchain-clang-cl --crosstool_top=@envoy_build_tools//toolchains/configs/windows/clang-cl/cc:toolchain
+build:rbe-toolchain-clang-cl --extra_toolchains=@envoy_build_tools//toolchains/configs/windows/clang-cl/config:cc-toolchain
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -265,7 +265,7 @@ build:remote-clang-cl --config=rbe-toolchain-clang-cl
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:55d9e4719d2bd0accce8f829b44dab70cd42112a
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:8ca107a75ee98b255aa59db2ab40fd0800a3ce99
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker

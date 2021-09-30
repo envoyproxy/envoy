@@ -1339,14 +1339,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbLeastRequestConfig(), cluster->lbConfig());
+        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
+        parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
           priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1358,9 +1360,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                     cluster->stats(), parent.parent_.runtime_,
-                                                     parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::ClusterProvided:
