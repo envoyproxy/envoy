@@ -421,7 +421,7 @@ message CertificateValidationContext {
   // for all certificate authorities in that chain. Failure to do so will
   // result in verification failure for both revoked and unrevoked certificates
   // from that chain. This default behavior can be altered by setting
-  // :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>`
+  // :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>` to
   // true.
   config.core.v3.DataSource crl = 7;
 
@@ -439,7 +439,7 @@ message CertificateValidationContext {
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
 
-  // This option is false by default. If true, only the certificate at the end of the
-  // certificate chain will be subject to validation by CRL.
-  google.protobuf.BoolValue only_verify_final_certificate_crl = 14;
+  // If this option is set to true, only the certificate at the end of the
+  // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
+  bool only_verify_final_certificate_crl = 14;
 }

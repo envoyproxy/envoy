@@ -4585,8 +4585,8 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
-  // This should succeed, since the crl chain is incomplete but only_verify_final_certificate_crl is
-  // configured true.
+  // The test checks that revoked certificate will makes the validation fails even if we set
+  // only_verify_final_certificate_crl to true.
   //
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
@@ -4624,8 +4624,8 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
 }
 
 TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
-  // This should succeed, since the crl chain is incomplete but only_verify_final_certificate_crl is
-  // configured true.
+  // The test checks that revoked certificate will makes the validation fails even if we set
+  // only_verify_final_certificate_crl to true.
   //
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
