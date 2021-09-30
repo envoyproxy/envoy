@@ -37,19 +37,14 @@ constexpr absl::string_view DirectionKey = "direction";
 std::string generateTraceId(SystemTime point_in_time, Random::RandomGenerator& random) {
   using std::chrono::seconds;
   using std::chrono::time_point_cast;
-  const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
-  std::string out;
-  out.reserve(35);
-  out += std::string(XRaySerializationVersion);
-  out.push_back('-');
   // epoch in seconds represented as 8 hexadecimal characters
-  out += Hex::uint32ToHex(epoch);
-  out.push_back('-');
+  const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
   std::string uuid = random.uuid();
   // unique id represented as 24 hexadecimal digits and no dashes
   uuid.erase(std::remove(uuid.begin(), uuid.end(), '-'), uuid.end());
   ASSERT(uuid.length() >= 24);
-  out += uuid.substr(0, 24);
+  const std::string out =
+      absl::StrCat(XRaySerializationVersion, "-", Hex::uint32ToHex(epoch), "-", uuid.substr(0, 24));
   return out;
 }
 
