@@ -175,8 +175,9 @@ TEST(UtilityTest, TestGetX509ErrorInfo) {
   X509StorePtr ssl_ctx = X509_STORE_new();
   EXPECT_TRUE(X509_STORE_CTX_init(store_ctx.get(), ssl_ctx.get(), cert.get(), nullptr));
   X509_STORE_CTX_set_error(store_ctx.get(), X509_V_ERR_UNSPECIFIED);
-  EXPECT_THAT(Utility::getX509VerificationErrorInfo(store_ctx.get()),
-              testing::HasSubstr("unknown certificate verification error"));
+  EXPECT_EQ(Utility::getX509VerificationErrorInfo(store_ctx.get()),
+            "X509_verify_cert: certificate verification error at depth 0: unknown certificate "
+            "verification error");
 }
 
 } // namespace
