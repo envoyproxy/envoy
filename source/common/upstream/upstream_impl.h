@@ -639,6 +639,10 @@ public:
   clusterType() const override {
     return cluster_type_;
   }
+  const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+  lbRoundRobinConfig() const override {
+    return lb_round_robin_config_;
+  }
   const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
   lbLeastRequestConfig() const override {
     return lb_least_request_config_;
@@ -779,6 +783,7 @@ private:
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       lb_least_request_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
