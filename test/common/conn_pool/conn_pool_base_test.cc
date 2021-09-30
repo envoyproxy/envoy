@@ -130,9 +130,9 @@ public:
     ASSERT_EQ(1, clients_.size());
     EXPECT_EQ(ActiveClient::State::CONNECTING, clients_.back()->state());
 
-    // Verify that the lifetime timer isn't set yet. This shouldn't happen
+    // Verify that the connection duration timer isn't set yet. This shouldn't happen
     // until after connect.
-    EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+    EXPECT_EQ(nullptr, clients_.back()->connection_duration_timer_);
   }
 
   void newActiveClientAndStream(ActiveClient::State expected_state = ActiveClient::State::BUSY) {
@@ -144,12 +144,12 @@ public:
     clients_.back()->onEvent(Network::ConnectionEvent::Connected);
     EXPECT_EQ(expected_state, clients_.back()->state());
 
-    // Verify that the lifetime timer is consistent with the max connection duration opt
+    // Verify that the connect duration timer is consistent with the max connection duration opt
     if (max_connection_duration_opt_.has_value()) {
-      EXPECT_TRUE(clients_.back()->lifetime_timer_ != nullptr);
-      EXPECT_TRUE(clients_.back()->lifetime_timer_->enabled());
+      EXPECT_TRUE(clients_.back()->connection_duration_timer_ != nullptr);
+      EXPECT_TRUE(clients_.back()->connection_duration_timer_->enabled());
     } else {
-      EXPECT_EQ(nullptr, clients_.back()->lifetime_timer_);
+      EXPECT_EQ(nullptr, clients_.back()->connection_duration_timer_);
     }
   }
 
@@ -317,7 +317,7 @@ TEST_F(ConnPoolImplBaseTest, ExplicitPreconnectNotHealthy) {
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
   // Force a null max connection duration optional.
-  // newActiveClientAndStream() will expect the lifetime timer to remain null.
+  // newActiveClientAndStream() will expect the connection duration timer to remain null.
   max_connection_duration_opt_ = absl::nullopt;
   newActiveClientAndStream();
   closeStreamAndDrainClient();
@@ -325,7 +325,7 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerNull) {
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
   // Use the default max connection duration opt.
-  // newActiveClientAndStream() will expect the lifetime timer to be non-null.
+  // newActiveClientAndStream() will expect the connection duration timer to be non-null.
   newActiveClientAndStream();
   closeStreamAndDrainClient();
 }
@@ -333,15 +333,15 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationTimerEnabled) {
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationBusy) {
   newActiveClientAndStream();
 
-  // Verify that advancing to just before the lifetime timeout doesn't drain the connection.
+  // Verify that advancing to just before the connection duration timeout doesn't drain the connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
-  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
 
-  // Verify that advancing past the lifetime timeout drains the connection,
+  // Verify that advancing past the connection duration timeout drains the connection,
   // because there's a busy client.
   advanceTimeAndRun(2);
-  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
   closeStream();
 }
@@ -353,25 +353,25 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationReady) {
   closeStream();
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
 
-  // Verify that advancing to just before the lifetime timeout doesn't close the connection.
+  // Verify that advancing to just before the connection duration timeout doesn't close the connection.
   advanceTimeAndRun(max_connection_duration_ - 1);
-  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::READY, clients_.back()->state());
 
-  // Verify that advancing past the lifetime timeout closes the connection,
+  // Verify that advancing past the connection duration timeout closes the connection,
   // because there's nothing to drain.
   advanceTimeAndRun(2);
-  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(1, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
 }
 
 TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyDraining) {
   // Start with a client that is already draining.
   newDrainingClient();
 
-  // Verify that advancing past the lifetime timeout does nothing to an active client
+  // Verify that advancing past the connection duration timeout does nothing to an active client
   // that is already draining.
   advanceTimeAndRun(max_connection_duration_ + 1);
-  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
   EXPECT_EQ(ActiveClient::State::DRAINING, clients_.back()->state());
   closeStream();
 }
@@ -380,20 +380,30 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationAlreadyClosed) {
   // Start with a client that is already closed.
   newClosedClient();
 
-  // Verify that advancing past the lifetime timeout does nothing to the active
+  // Verify that advancing past the connection duration timeout does nothing to the active
   // client that is already closed.
   advanceTimeAndRun(max_connection_duration_ + 1);
-  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_exceeded_.value());
+  EXPECT_EQ(0, pool_.host()->cluster().stats().upstream_cx_max_duration_reached_.value());
 }
 
-TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationWhileConnectingBug) {
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileClosedBug) {
+  // Start with a connecting client
+  newClosedClient();
+
+  // Expect an ENVOY_BUG if the connection duration callback fires while in the CLOSED state.
+  // We forcibly call the connection duration callback here because under normal circumstances there
+  // is no timer set up.
+  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(), "max connection duration reached while closed");
+}
+
+TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileConnectingBug) {
   // Start with a connecting client
   newConnectingClient();
 
-  // Expect an ENVOY_BUG if the lifetime timeout fires while still in the CONNECTING state.
-  // We forcibly call the lifetime timeout here because under normal circumstances there
+  // Expect an ENVOY_BUG if the connection duration callback fires while still in the CONNECTING state.
+  // We forcibly call the connection duration callback here because under normal circumstances there
   // is no timer set up.
-  EXPECT_ENVOY_BUG(clients_.back()->onLifetimeTimeout(), "lifetime timeout while connecting");
+  EXPECT_ENVOY_BUG(clients_.back()->onConnectionDurationTimeout(), "max connection duration reached while connecting");
 
   // Finish the test as if the connection was never successful.
   EXPECT_CALL(pool_, onPoolFailure);
