@@ -193,6 +193,7 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
+  // Override the CA cert with test/config/integration/certs/ca.pem
   root_ca_cert_ = R"(-----BEGIN CERTIFICATE-----
 MIID3TCCAsWgAwIBAgIUdCu/mLip3X/We37vh3BA9u/nxakwDQYJKoZIhvcNAQEL
 BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
@@ -216,7 +217,7 @@ jxpQSR32nx6oNN/6kVKlgmBjlWrOy7JyDXGim6Z97TzmS6Clctewmw/5gZ9g+M8e
 g0ZdFbFkNUjzSNm44hiDX8nR6yJRn+gLaARaJvp1dnT+MlvofZuER17WYKH4OyMs
 ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
 -----END CERTIFICATE-----)";
-  configCertVerificationDetails(true);
+  configCertVerificationDetails(false);
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
