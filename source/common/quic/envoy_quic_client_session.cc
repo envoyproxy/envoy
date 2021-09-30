@@ -2,6 +2,8 @@
 
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include "quic_filter_manager_connection_impl.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -122,6 +124,16 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
   return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
+}
+
+void EnvoyQuicClientSession::setHttp3Options(
+    const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
+  if (http3_options_->has_quic_protocol_options()) {
+    static_cast<EnvoyQuicClientConnection*>(connection())
+        ->setMigratePortOnPathDegrading(
+            http3_options.quic_protocol_options().migrate_port_on_path_degrading());
+  }
 }
 
 } // namespace Quic

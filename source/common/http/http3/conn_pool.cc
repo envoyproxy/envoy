@@ -48,8 +48,7 @@ Http3ConnPoolImpl::Http3ConnPoolImpl(
   setQuicConfigFromClusterConfig(host_->cluster(), quic_config);
   quic_info_ = std::make_unique<Quic::PersistentQuicInfoImpl>(
       dispatcher, transport_socket_factory, time_source, source_address, quic_config,
-      host->cluster().perConnectionBufferLimitBytes(),
-      host_->cluster().http3Options().quic_protocol_options());
+      host->cluster().perConnectionBufferLimitBytes());
 }
 
 // Make sure all connections are torn down before quic_info_ is deleted.

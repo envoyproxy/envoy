@@ -340,10 +340,8 @@ void HttpIntegrationTest::initialize() {
       "udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
   // Needs to outlive all QUIC connections.
   quic::QuicConfig config;
-  protocol_config_ = std::make_unique<envoy::config::core::v3::QuicProtocolOptions>();
   auto quic_connection_persistent_info = std::make_unique<Quic::PersistentQuicInfoImpl>(
-      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0,
-      *protocol_config_);
+      *dispatcher_, *quic_transport_socket_factory_, timeSystem(), server_addr, config, 0);
   // Config IETF QUIC flow control window.
   quic_connection_persistent_info->quic_config_
       .SetInitialMaxStreamDataBytesIncomingBidirectionalToSend(

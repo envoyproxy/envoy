@@ -72,8 +72,7 @@ public:
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             Event::Dispatcher& dispatcher,
-                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                            const envoy::config::core::v3::QuicProtocolOptions& protocol_config);
+                            const Network::ConnectionSocket::OptionsSharedPtr& options);
 
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
@@ -81,8 +80,7 @@ public:
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket,
-                            const envoy::config::core::v3::QuicProtocolOptions& protocol_config);
+                            Network::ConnectionSocketPtr&& connection_socket);
 
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
@@ -113,14 +111,17 @@ public:
 
   void onPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
+  void setMigratePortOnPathDegrading(bool migrate_port_on_path_degrading) {
+    migrate_port_on_path_degrading_ = migrate_port_on_path_degrading;
+  }
+
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Event::Dispatcher& dispatcher,
-                            Network::ConnectionSocketPtr&& connection_socket,
-                            const envoy::config::core::v3::QuicProtocolOptions& protocol_config);
+                            Network::ConnectionSocketPtr&& connection_socket);
 
   void onFileEvent(uint32_t events);
 
@@ -129,9 +130,9 @@ private:
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
-  const envoy::config::core::v3::QuicProtocolOptions& protocol_config_;
   Network::ConnectionSocketPtr probing_socket_;
   Network::ConnectionSocket* probing_socket_raw_ptr_{nullptr};
+  bool migrate_port_on_path_degrading_{false};
 };
 
 } // namespace Quic

@@ -53,9 +53,7 @@ TEST_F(QuicNetworkConnectionTest, BufferLimits) {
   initialize();
 
   quic::QuicConfig config;
-  envoy::config::core::v3::QuicProtocolOptions options;
-  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_,
-                              config,      45,        options};
+  PersistentQuicInfoImpl info{dispatcher_, *factory_, simTime(), test_address_, config, 45};
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, dispatcher_, test_address_, test_address_, quic_stat_names_, store_);

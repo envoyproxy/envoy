@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -30,7 +31,6 @@
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -74,11 +74,9 @@ public:
                                 Network::Address::InstanceConstSharedPtr local_addr,
                                 Event::Dispatcher& dispatcher,
                                 const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                bool validation_failure_on_path_response,
-                                const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
+                                bool validation_failure_on_path_response)
       : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
-                                  supported_versions, local_addr, dispatcher, options,
-                                  protocol_config),
+                                  supported_versions, local_addr, dispatcher, options),
         dispatcher_(dispatcher),
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
@@ -189,7 +187,7 @@ public:
     auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
-        validation_failure_on_path_response_, *protocol_config_);
+        validation_failure_on_path_response_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
@@ -208,11 +206,31 @@ public:
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    IntegrationCodecClientPtr codec =
-        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    if (!codec->disconnected()) {
-      codec->setCodecClientCallbacks(client_codec_callback_);
+    std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+    cluster->max_response_headers_count_ = 200;
+    if (http2_options.has_value()) {
+      cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+          http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
+    cluster->http3_options_.set_allow_extended_connect(true);
+    *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
+    Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+        timeSystem())};
+    // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
+    // in-connection version negotiation.
+    auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                          host_description, downstream_protocol_);
+    if (codec->disconnected()) {
+      // Connection may get closed during version negotiation or handshake.
+      // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
+      // INVALID_VERSION error to caller and let caller to use server advertised version list to
+      // create a new connection with mutually supported version and make client codec again.
+      ENVOY_LOG(error, "Fail to connect to server with error: {}",
+                codec->connection()->transportFailureReason());
+      return codec;
+    }
+    codec->setCodecClientCallbacks(client_codec_callback_);
     return codec;
   }
 
@@ -312,6 +330,7 @@ protected:
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
+  envoy::config::core::v3::QuicProtocolOptions client_quic_options_;
   TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
@@ -456,7 +475,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
-  protocol_config_->set_migrate_port_on_path_degrading(true);
+  client_quic_options_.set_migrate_port_on_path_degrading(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
@@ -495,7 +514,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   concurrency_ = 2;
   validation_failure_on_path_response_ = true;
   initialize();
-  protocol_config_->set_migrate_port_on_path_degrading(true);
+  client_quic_options_.set_migrate_port_on_path_degrading(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =

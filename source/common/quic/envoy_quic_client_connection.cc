@@ -18,37 +18,33 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
     const quic::ParsedQuicVersionVector& supported_versions,
     Network::Address::InstanceConstSharedPtr local_addr, Event::Dispatcher& dispatcher,
-    const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
-    : EnvoyQuicClientConnection(
-          server_connection_id, helper, alarm_factory, supported_versions, dispatcher,
-          createConnectionSocket(initial_peer_address, local_addr, options), protocol_config) {}
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, supported_versions,
+                                dispatcher,
+                                createConnectionSocket(initial_peer_address, local_addr, options)) {
+}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, const quic::ParsedQuicVersionVector& supported_versions,
-    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket,
-    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
+    Event::Dispatcher& dispatcher, Network::ConnectionSocketPtr&& connection_socket)
     : EnvoyQuicClientConnection(
           server_connection_id, helper, alarm_factory,
           new EnvoyQuicPacketWriter(
               std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
-          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
-          protocol_config) {}
+          /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket)) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
     quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer, bool owns_writer,
     const quic::ParsedQuicVersionVector& supported_versions, Event::Dispatcher& dispatcher,
-    Network::ConnectionSocketPtr&& connection_socket,
-    const envoy::config::core::v3::QuicProtocolOptions& protocol_config)
+    Network::ConnectionSocketPtr&& connection_socket)
     : quic::QuicConnection(server_connection_id, quic::QuicSocketAddress(),
                            envoyIpAddressToQuicSocketAddress(
                                connection_socket->connectionInfoProvider().remoteAddress()->ip()),
                            &helper, &alarm_factory, writer, owns_writer,
                            quic::Perspective::IS_CLIENT, supported_versions),
-      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher),
-      protocol_config_(protocol_config) {}
+      QuicNetworkConnection(std::move(connection_socket)), dispatcher_(dispatcher) {}
 
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
@@ -121,7 +117,7 @@ void EnvoyQuicClientConnection::OnPathDegradingDetected() {
 
 void EnvoyQuicClientConnection::maybeMigratePort() {
   if (!IsHandshakeConfirmed() || !connection_migration_use_new_cid() ||
-      HasPendingPathValidation() || !protocol_config_.migrate_port_on_path_degrading()) {
+      HasPendingPathValidation() || !migrate_port_on_path_degrading_) {
     return;
   }
 
