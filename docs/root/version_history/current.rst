@@ -139,6 +139,10 @@ New Features
 * udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 * udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 * xds: re-introduced unified delta and sotw xDS multiplexers that share most of the implementation. Added a new runtime config ``envoy.reloadable_features.unified_mux`` (disabled by default) that when enabled, switches xDS to use unified multiplexers.
+* upstream: added support for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`, which allows to progresively increase traffic for new endpoints.
+* upstream: extended :ref:`Round Robin load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.round_robin_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>` support.
+* upstream: extended :ref:`Least Request load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.least_request_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` support.
+
 
 Deprecated
 ----------
