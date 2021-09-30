@@ -62,12 +62,12 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
              parent_.leds_localities_[leds_config]->isUpdated());
       for (const auto& [_, lb_endpoint] :
            parent_.leds_localities_[leds_config]->getEndpointsMap()) {
-        UpdateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
+        updateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
                                 all_new_hosts);
       }
     } else {
       for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-        UpdateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
+        updateLocalityEndpoints(lb_endpoint, locality_lb_endpoint, priority_state_manager,
                                 all_new_hosts);
       }
     }
@@ -127,7 +127,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   parent_.onPreInitComplete();
 }
 
-void EdsClusterImpl::BatchUpdateHelper::UpdateLocalityEndpoints(
+void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
     PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {

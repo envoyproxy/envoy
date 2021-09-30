@@ -72,7 +72,7 @@ private:
     void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override;
 
   private:
-    void UpdateLocalityEndpoints(
+    void updateLocalityEndpoints(
         const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
         const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
         PriorityStateManager& priority_state_manager,

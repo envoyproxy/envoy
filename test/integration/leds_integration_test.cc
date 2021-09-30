@@ -39,7 +39,7 @@ protected:
     sotw_or_delta_ = Grpc::SotwOrDelta::Delta;
   }
 
-  ~LedsIntegrationTest() {
+  ~LedsIntegrationTest() override {
     // First disconnect upstream connections to avoid FIN messages causing unexpected
     // disconnects on the fake servers.
     for (auto& host_upstream_info : hosts_upstreams_info_) {
