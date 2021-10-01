@@ -473,10 +473,11 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
-  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_value(
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval_seconds()->set_value(
       max_interval_sec);
-  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_value(
-      initial_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()
+      ->mutable_initial_interval_seconds()
+      ->set_value(initial_interval_sec);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -505,10 +506,11 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepaliveDisabled) {
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
-  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_value(
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval_seconds()->set_value(
       max_interval_sec);
-  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_value(
-      initial_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()
+      ->mutable_initial_interval_seconds()
+      ->set_value(initial_interval_sec);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();

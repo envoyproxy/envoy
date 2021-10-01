@@ -153,10 +153,14 @@ void EnvoyQuicServerSession::setHttp3Options(
   QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
   if (http3_options_->has_quic_protocol_options() &&
       http3_options_->quic_protocol_options().has_connection_keepalive()) {
-    const uint32_t initial_interval =
-        http3_options_->quic_protocol_options().connection_keepalive().initial_interval().value();
-    const uint32_t max_interval =
-        http3_options_->quic_protocol_options().connection_keepalive().max_interval().value();
+    const uint32_t initial_interval = http3_options_->quic_protocol_options()
+                                          .connection_keepalive()
+                                          .initial_interval_seconds()
+                                          .value();
+    const uint32_t max_interval = http3_options_->quic_protocol_options()
+                                      .connection_keepalive()
+                                      .max_interval_seconds()
+                                      .value();
     if (max_interval == 0) {
       return;
     }
