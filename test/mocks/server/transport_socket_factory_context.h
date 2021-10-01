@@ -8,6 +8,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/server/options.h"
 
 #include "config_tracker.h"
 #include "gmock/gmock.h"
@@ -42,6 +43,7 @@ public:
   testing::NiceMock<MockConfigTracker> config_tracker_;
   testing::NiceMock<Ssl::MockContextManager> context_manager_;
   testing::NiceMock<Stats::MockStore> store_;
+  testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 } // namespace Configuration
