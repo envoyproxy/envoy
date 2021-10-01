@@ -367,25 +367,42 @@ TEST_F(SimpleHttpCacheTest, UpdateHeadersForMissingKey) {
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersForVaryHeaders) {
   const std::string request_path_1("/name");
+  const Http::LowerCaseString accept_field("accept");
   const std::string time_value_1 = formatter_.fromTime(time_source_.systemTime());
-  Http::TestResponseHeaderMapImpl response_headers_1{{"date", time_value_1},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"accept", "image/*"},
-                                                     {"vary", "accept"}};
-  insert(request_path_1, response_headers_1, "body");
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_1));
+  request_headers_.setCopy(accept_field, "image/*");
+  Http::TestResponseHeaderMapImpl response_headers{{"date", time_value_1},
+                                                   {"cache-control", "public,max-age=3600"},
+                                                   {"accept", "image/*"},
+                                                   {"vary", "accept"}};
+  insert(request_path_1, response_headers, "body");
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
 
   // Update the date field in the headers
   time_source_.advanceTimeWait(Seconds(3600));
   const SystemTime time_2 = time_source_.systemTime();
   const std::string time_value_2 = formatter_.fromTime(time_2);
-  Http::TestResponseHeaderMapImpl response_headers_2{{"date", time_value_2},
-                                                     {"cache-control", "public,max-age=3600"},
-                                                     {"accept", "image/*"},
-                                                     {"vary", "accept"}};
-  updateHeaders(request_path_1, response_headers_2, {time_2});
+  Http::TestResponseHeaderMapImpl response_headers_vary_mismatch{
+      {"date", time_value_2},
+      {"cache-control", "public,max-age=3600"},
+      {"accept", "text/*"},
+      {"vary", "accept"}};
 
-  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_2));
+  Http::TestResponseHeaderMapImpl response_headers_vary_match{
+      {"date", time_value_2},
+      {"cache-control", "public,max-age=3600"},
+      {"accept", "image/*"},
+      {"vary", "accept"}};
+
+  // Update headers with non-existent key should have no effect
+  request_headers_.setCopy(accept_field, "text/*");
+  updateHeaders(request_path_1, response_headers_vary_mismatch, {time_2});
+  request_headers_.setCopy(accept_field, "image/*");
+  EXPECT_TRUE(expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers));
+
+  // Update headers with correct vary key should update the entry
+  updateHeaders(request_path_1, response_headers_vary_match, {time_2});
+  EXPECT_TRUE(
+      expectLookupSuccessWithHeaders(lookup(request_path_1).get(), response_headers_vary_match));
 }
 
 TEST_F(SimpleHttpCacheTest, UpdateHeadersSkipEtagHeader) {
