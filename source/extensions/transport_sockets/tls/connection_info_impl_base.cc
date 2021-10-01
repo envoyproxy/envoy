@@ -1,4 +1,4 @@
-#include "source/extensions/transport_sockets/tls/connection_info_impl.h"
+#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
 
 #include "source/common/common/hex.h"
 
@@ -11,12 +11,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-bool ConnectionInfoImpl::peerCertificatePresented() const {
+bool ConnectionInfoImplBase::peerCertificatePresented() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   return cert != nullptr;
 }
 
-absl::Span<const std::string> ConnectionInfoImpl::uriSanLocalCertificate() const {
+absl::Span<const std::string> ConnectionInfoImplBase::uriSanLocalCertificate() const {
   if (!cached_uri_san_local_certificate_.empty()) {
     return cached_uri_san_local_certificate_;
   }
@@ -31,7 +31,7 @@ absl::Span<const std::string> ConnectionInfoImpl::uriSanLocalCertificate() const
   return cached_uri_san_local_certificate_;
 }
 
-absl::Span<const std::string> ConnectionInfoImpl::dnsSansLocalCertificate() const {
+absl::Span<const std::string> ConnectionInfoImplBase::dnsSansLocalCertificate() const {
   if (!cached_dns_san_local_certificate_.empty()) {
     return cached_dns_san_local_certificate_;
   }
@@ -45,7 +45,7 @@ absl::Span<const std::string> ConnectionInfoImpl::dnsSansLocalCertificate() cons
   return cached_dns_san_local_certificate_;
 }
 
-const std::string& ConnectionInfoImpl::sha256PeerCertificateDigest() const {
+const std::string& ConnectionInfoImplBase::sha256PeerCertificateDigest() const {
   if (!cached_sha_256_peer_certificate_digest_.empty()) {
     return cached_sha_256_peer_certificate_digest_;
   }
@@ -63,7 +63,7 @@ const std::string& ConnectionInfoImpl::sha256PeerCertificateDigest() const {
   return cached_sha_256_peer_certificate_digest_;
 }
 
-const std::string& ConnectionInfoImpl::sha1PeerCertificateDigest() const {
+const std::string& ConnectionInfoImplBase::sha1PeerCertificateDigest() const {
   if (!cached_sha_1_peer_certificate_digest_.empty()) {
     return cached_sha_1_peer_certificate_digest_;
   }
@@ -81,7 +81,7 @@ const std::string& ConnectionInfoImpl::sha1PeerCertificateDigest() const {
   return cached_sha_1_peer_certificate_digest_;
 }
 
-const std::string& ConnectionInfoImpl::urlEncodedPemEncodedPeerCertificate() const {
+const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate() const {
   if (!cached_url_encoded_pem_encoded_peer_certificate_.empty()) {
     return cached_url_encoded_pem_encoded_peer_certificate_;
   }
@@ -103,7 +103,7 @@ const std::string& ConnectionInfoImpl::urlEncodedPemEncodedPeerCertificate() con
   return cached_url_encoded_pem_encoded_peer_certificate_;
 }
 
-const std::string& ConnectionInfoImpl::urlEncodedPemEncodedPeerCertificateChain() const {
+const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateChain() const {
   if (!cached_url_encoded_pem_encoded_peer_cert_chain_.empty()) {
     return cached_url_encoded_pem_encoded_peer_cert_chain_;
   }
@@ -133,7 +133,7 @@ const std::string& ConnectionInfoImpl::urlEncodedPemEncodedPeerCertificateChain(
   return cached_url_encoded_pem_encoded_peer_cert_chain_;
 }
 
-absl::Span<const std::string> ConnectionInfoImpl::uriSanPeerCertificate() const {
+absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {
   if (!cached_uri_san_peer_certificate_.empty()) {
     return cached_uri_san_peer_certificate_;
   }
@@ -147,7 +147,7 @@ absl::Span<const std::string> ConnectionInfoImpl::uriSanPeerCertificate() const 
   return cached_uri_san_peer_certificate_;
 }
 
-absl::Span<const std::string> ConnectionInfoImpl::dnsSansPeerCertificate() const {
+absl::Span<const std::string> ConnectionInfoImplBase::dnsSansPeerCertificate() const {
   if (!cached_dns_san_peer_certificate_.empty()) {
     return cached_dns_san_peer_certificate_;
   }
@@ -161,7 +161,7 @@ absl::Span<const std::string> ConnectionInfoImpl::dnsSansPeerCertificate() const
   return cached_dns_san_peer_certificate_;
 }
 
-uint16_t ConnectionInfoImpl::ciphersuiteId() const {
+uint16_t ConnectionInfoImplBase::ciphersuiteId() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return 0xffff;
@@ -173,7 +173,7 @@ uint16_t ConnectionInfoImpl::ciphersuiteId() const {
   return static_cast<uint16_t>(SSL_CIPHER_get_id(cipher));
 }
 
-std::string ConnectionInfoImpl::ciphersuiteString() const {
+std::string ConnectionInfoImplBase::ciphersuiteString() const {
   const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl());
   if (cipher == nullptr) {
     return {};
@@ -182,7 +182,7 @@ std::string ConnectionInfoImpl::ciphersuiteString() const {
   return SSL_CIPHER_get_name(cipher);
 }
 
-const std::string& ConnectionInfoImpl::tlsVersion() const {
+const std::string& ConnectionInfoImplBase::tlsVersion() const {
   if (!cached_tls_version_.empty()) {
     return cached_tls_version_;
   }
@@ -190,7 +190,7 @@ const std::string& ConnectionInfoImpl::tlsVersion() const {
   return cached_tls_version_;
 }
 
-const std::string& ConnectionInfoImpl::serialNumberPeerCertificate() const {
+const std::string& ConnectionInfoImplBase::serialNumberPeerCertificate() const {
   if (!cached_serial_number_peer_certificate_.empty()) {
     return cached_serial_number_peer_certificate_;
   }
@@ -203,7 +203,7 @@ const std::string& ConnectionInfoImpl::serialNumberPeerCertificate() const {
   return cached_serial_number_peer_certificate_;
 }
 
-const std::string& ConnectionInfoImpl::issuerPeerCertificate() const {
+const std::string& ConnectionInfoImplBase::issuerPeerCertificate() const {
   if (!cached_issuer_peer_certificate_.empty()) {
     return cached_issuer_peer_certificate_;
   }
@@ -216,7 +216,7 @@ const std::string& ConnectionInfoImpl::issuerPeerCertificate() const {
   return cached_issuer_peer_certificate_;
 }
 
-const std::string& ConnectionInfoImpl::subjectPeerCertificate() const {
+const std::string& ConnectionInfoImplBase::subjectPeerCertificate() const {
   if (!cached_subject_peer_certificate_.empty()) {
     return cached_subject_peer_certificate_;
   }
@@ -229,7 +229,7 @@ const std::string& ConnectionInfoImpl::subjectPeerCertificate() const {
   return cached_subject_peer_certificate_;
 }
 
-const std::string& ConnectionInfoImpl::subjectLocalCertificate() const {
+const std::string& ConnectionInfoImplBase::subjectLocalCertificate() const {
   if (!cached_subject_local_certificate_.empty()) {
     return cached_subject_local_certificate_;
   }
@@ -242,7 +242,7 @@ const std::string& ConnectionInfoImpl::subjectLocalCertificate() const {
   return cached_subject_local_certificate_;
 }
 
-absl::optional<SystemTime> ConnectionInfoImpl::validFromPeerCertificate() const {
+absl::optional<SystemTime> ConnectionInfoImplBase::validFromPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     return absl::nullopt;
@@ -250,7 +250,7 @@ absl::optional<SystemTime> ConnectionInfoImpl::validFromPeerCertificate() const 
   return Utility::getValidFrom(*cert);
 }
 
-absl::optional<SystemTime> ConnectionInfoImpl::expirationPeerCertificate() const {
+absl::optional<SystemTime> ConnectionInfoImplBase::expirationPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl()));
   if (!cert) {
     return absl::nullopt;
@@ -258,7 +258,7 @@ absl::optional<SystemTime> ConnectionInfoImpl::expirationPeerCertificate() const
   return Utility::getExpirationTime(*cert);
 }
 
-const std::string& ConnectionInfoImpl::sessionId() const {
+const std::string& ConnectionInfoImplBase::sessionId() const {
   if (!cached_session_id_.empty()) {
     return cached_session_id_;
   }

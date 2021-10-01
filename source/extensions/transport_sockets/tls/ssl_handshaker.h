@@ -13,7 +13,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
-#include "source/extensions/transport_sockets/tls/connection_info_impl.h"
+#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
@@ -36,14 +36,14 @@ private:
       Envoy::Ssl::ClientValidationStatus::NotValidated};
 };
 
-class SslHandshakerImpl : public ConnectionInfoImpl,
+class SslHandshakerImpl : public ConnectionInfoImplBase,
                           public Ssl::Handshaker,
                           protected Logger::Loggable<Logger::Id::connection> {
 public:
   SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                     Ssl::HandshakeCallbacks* handshake_callbacks);
 
-  // ConnectionInfoImpl
+  // ConnectionInfoImplBase
   bool peerCertificateValidated() const override;
 
   // Ssl::Handshaker

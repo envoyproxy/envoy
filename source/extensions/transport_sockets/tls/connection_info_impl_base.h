@@ -16,9 +16,9 @@ namespace TransportSockets {
 namespace Tls {
 
 // An implementation wraps struct SSL in BoringSSL.
-class ConnectionInfoImpl : public Ssl::ConnectionInfo {
+class ConnectionInfoImplBase : public Ssl::ConnectionInfo {
 public:
-  ConnectionInfoImpl(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
+  ConnectionInfoImplBase(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
