@@ -63,16 +63,17 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date, c
         # check for --check_deps flag, To run this only on github action schedule
         # and it does not bloat CI on every push
         if create_issue:
-            create_issues(dep, metadata_version, release_date, latest_release)
+            create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
 # create issue for stale dependency
-def create_issues(dep, metadata_version, release_date, latest_release):
+def create_issues(dep, package_repo, metadata_version, release_date, latest_release):
     """Create issues in GitHub.
 
     Args:
         dep : name of the deps
-        metadata_version :
+        package_repo: package Url
+        metadata_version: current version information
         release_date : old release_date
         latest_release : latest_release (name and date )
     """
@@ -86,8 +87,13 @@ def create_issues(dep, metadata_version, release_date, latest_release):
             labels.append(label.name)
     if len(labels) != len(LABELS):
         raise DependencyUpdateError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
-    body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
-    title = f'Newer release available {dep}: {latest_release.tag_name}'
+    body = f'''\
+            Package Name: {dep}
+            Current Version: {metadata_version}@{release_date}
+            Available Version: {latest_release.tag_name}@{latest_release.created_at}
+            Upstream link: https://github.com/{package_repo.full_name}\
+            '''
+    title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
