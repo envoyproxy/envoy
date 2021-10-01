@@ -441,9 +441,6 @@ public:
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
         error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
-      // We use the validation visitor but have hard coded behavior below for deprecated fields.
-      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
       if (!error_msg.empty()) {
         validation_visitor_.onUnknownField("type " + message.GetTypeName() +
                                            " with unknown field set {" + error_msg + "}");

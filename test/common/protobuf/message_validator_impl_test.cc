@@ -23,8 +23,9 @@ TEST(NullValidationVisitorImpl, UnknownField) {
 // The warning validation visitor logs and bumps stats on unknown fields
 TEST(WarningValidationVisitorImpl, UnknownField) {
   Stats::TestUtil::TestStore stats;
-  Stats::Counter& unknown_counter = stats.counter("counter");
-  WarningValidationVisitorImpl warning_validation_visitor;
+  Stats::Counter& unknown_counter = stats.counter("unknown_counter");
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  WarningValidationVisitorImpl warning_validation_visitor(unknown_counter, wip_counter);
   // we want to be executed.
   EXPECT_FALSE(warning_validation_visitor.skipValidation());
   // First time around we should log.
@@ -36,9 +37,6 @@ TEST(WarningValidationVisitorImpl, UnknownField) {
   // Unrelated variable increments.
   EXPECT_LOG_CONTAINS("warn", "Unknown field: bar",
                       warning_validation_visitor.onUnknownField("bar"));
-  // When we set the stats counter, the above increments are transferred.
-  EXPECT_EQ(0, unknown_counter.value());
-  warning_validation_visitor.setUnknownCounter(unknown_counter);
   EXPECT_EQ(2, unknown_counter.value());
   // A third unknown field is tracked in stats post-initialization.
   EXPECT_LOG_CONTAINS("warn", "Unknown field: baz",

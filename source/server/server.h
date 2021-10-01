@@ -71,6 +71,7 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(wip_protos)                                                                              \
   COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
@@ -135,13 +136,10 @@ public:
    * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
    * @param options supplies the server options.
-   * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    */
   static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  const Options& options,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                                  Api::Api& api);
+                                  const Options& options, Api::Api& api);
 };
 
 /**
@@ -283,7 +281,7 @@ public:
     return server_contexts_;
   }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
-    return validation_context_;
+    return *validation_context_;
   }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -303,7 +301,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();

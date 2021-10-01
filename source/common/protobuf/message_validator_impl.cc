@@ -24,8 +24,11 @@ void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecatio
   }
 }
 
-void onWorkInProgressCommon(absl::string_view description) {
+void onWorkInProgressCommon(absl::string_view description, Stats::Counter* counter) {
   ENVOY_LOG_MISC(warn, "{}", description);
+  if (counter != nullptr) {
+    counter->inc();
+  }
 }
 } // namespace
 
@@ -48,7 +51,7 @@ void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view descripti
 }
 
 void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
-  onWorkInProgressCommon(description);
+  onWorkInProgressCommon(description, &wip_counter_);
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
@@ -62,7 +65,7 @@ void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view descriptio
 }
 
 void StrictValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
-  onWorkInProgressCommon(description);
+  onWorkInProgressCommon(description, wip_counter_);
 }
 
 ValidationVisitor& getNullValidationVisitor() {

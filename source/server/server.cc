@@ -103,7 +103,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory);
+    initialize(std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -331,9 +331,7 @@ void registerCustomInlineHeadersFromBootstrap(
 } // namespace
 
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                       const Options& options,
-                                       ProtobufMessage::ValidationVisitor& validation_visitor,
-                                       Api::Api& api) {
+                                       const Options& options, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
@@ -345,25 +343,27 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    MessageUtil::loadFromFile(config_path, bootstrap, ProtobufMessage::getNullValidationVisitor(),
+                              api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override,
+                              ProtobufMessage::getNullValidationVisitor());
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
-  MessageUtil::validate(bootstrap, validation_visitor);
+  // fixfix
+  MessageUtil::validate(bootstrap, ProtobufMessage::getNullValidationVisitor());
 }
 
-void InstanceImpl::initialize(const Options& options,
-                              Network::Address::InstanceConstSharedPtr local_address,
+void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
-            options.restartEpoch(), restarter_.baseId(), restarter_.version());
+            options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -371,8 +371,7 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
-                                    messageValidationContext().staticValidationVisitor(), *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options_, *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
@@ -410,13 +409,17 @@ void InstanceImpl::initialize(const Options& options,
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
-  validation_context_ = std::make_unique<>(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
-  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
-      server_stats_->static_unknown_fields_);
-  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
-      server_stats_->dynamic_unknown_fields_);
+  validation_context_ = std::make_unique<ProtobufMessage::ProdValidationContextImpl>(
+      options_.allowUnknownStaticFields(), !options_.rejectUnknownDynamicFields(),
+      options_.ignoreUnknownDynamicFields(), server_stats_->static_unknown_fields_,
+      server_stats_->dynamic_unknown_fields_, server_stats_->wip_protos_);
+
+  // Now that starts up and we have a validation context, we can perform proper non-PGV validation
+  // on bootstrap.
+  envoy::config::bootstrap::v3::Bootstrap test;
+  MessageUtil::loadFromFile(options_.configPath(), test,
+                            validation_context_->staticValidationVisitor(), *api_);
+  MessageUtil::checkForUnexpectedFields(bootstrap_, validation_context_->staticValidationVisitor());
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -472,7 +475,7 @@ void InstanceImpl::initialize(const Options& options,
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+      options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -496,7 +499,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -579,7 +582,7 @@ void InstanceImpl::initialize(const Options& options,
   initial_config.initAdminAccessLog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));

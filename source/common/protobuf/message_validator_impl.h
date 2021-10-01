@@ -75,10 +75,12 @@ public:
 
   // Envoy::ProtobufMessage::ValidationContext
   ValidationVisitor& staticValidationVisitor() override {
-    return allow_unknown_static_fields_ ? static_warning_validation_visitor_
-                                        : strict_validation_visitor_;
+    return allow_unknown_static_fields_
+               ? static_cast<ValidationVisitor&>(static_warning_validation_visitor_)
+               : strict_validation_visitor_;
   }
   ValidationVisitor& dynamicValidationVisitor() override {
+    // fixfix doc about using ignore
     return allow_unknown_dynamic_fields_
                ? (ignore_unknown_dynamic_fields_ ? ProtobufMessage::getNullValidationVisitor()
                                                  : dynamic_warning_validation_visitor_)

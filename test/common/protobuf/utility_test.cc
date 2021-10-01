@@ -1617,7 +1617,10 @@ TEST_F(ProtobufUtilityTest, MessageInWipFile) {
 }
 
 TEST_F(ProtobufUtilityTest, MessageWip) {
-  ProtobufMessage::WarningValidationVisitorImpl validation_visitor;
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& unknown_counter = stats.counter("unknown_counter");
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::WarningValidationVisitorImpl validation_visitor(unknown_counter, wip_counter);
 
   utility_test::message_field_wip::Foo foo;
   EXPECT_LOG_CONTAINS(
@@ -1639,6 +1642,8 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
       "threat model, are not supported by the security team, and are subject to breaking changes. "
       "Do not use this feature without understanding each of the previous points.",
       MessageUtil::checkForUnexpectedFields(bar, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
 }
 
 class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {
