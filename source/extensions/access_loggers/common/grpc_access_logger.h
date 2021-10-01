@@ -68,9 +68,8 @@ public:
    * @param config supplies the configuration for the logger.
    * @return GrpcAccessLoggerSharedPtr ready for logging requests.
    */
-  virtual typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                                 GrpcAccessLoggerType logger_type,
-                                                                 Stats::Scope& scope) PURE;
+  virtual typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config, GrpcAccessLoggerType logger_type) PURE;
 };
 
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
@@ -252,15 +251,14 @@ public:
 
   GrpcAccessLoggerCache(Grpc::AsyncClientManager& async_client_manager, Stats::Scope& scope,
                         ThreadLocal::SlotAllocator& tls)
-      : async_client_manager_(async_client_manager), scope_(scope), tls_slot_(tls.allocateSlot()) {
+      : scope_(scope), async_client_manager_(async_client_manager), tls_slot_(tls.allocateSlot()) {
     tls_slot_->set([](Event::Dispatcher& dispatcher) {
       return std::make_shared<ThreadLocalCache>(dispatcher);
     });
   }
 
-  typename GrpcAccessLogger::SharedPtr getOrCreateLogger(const ConfigProto& config,
-                                                         GrpcAccessLoggerType logger_type,
-                                                         Stats::Scope& scope) override {
+  typename GrpcAccessLogger::SharedPtr
+  getOrCreateLogger(const ConfigProto& config, GrpcAccessLoggerType logger_type) override {
     // TODO(euroelessar): Consider cleaning up loggers.
     auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
     const auto cache_key = std::make_pair(MessageUtil::hash(config), logger_type);
@@ -277,11 +275,13 @@ public:
     const auto logger = createLogger(
         config, std::move(client),
         std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, buffer_flush_interval, 1000)),
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_,
-        scope);
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, buffer_size_bytes, 16384), cache.dispatcher_);
     cache.access_loggers_.emplace(cache_key, logger);
     return logger;
   }
+
+protected:
+  Stats::Scope& scope_;
 
 private:
   /**
@@ -301,10 +301,9 @@ private:
   virtual typename GrpcAccessLogger::SharedPtr
   createLogger(const ConfigProto& config, const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope) PURE;
+               Event::Dispatcher& dispatcher) PURE;
 
   Grpc::AsyncClientManager& async_client_manager_;
-  Stats::Scope& scope_;
   ThreadLocal::SlotPtr tls_slot_;
 };
 

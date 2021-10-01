@@ -66,6 +66,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
@@ -151,6 +152,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return server_.stats(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;

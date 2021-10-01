@@ -183,6 +183,50 @@ TEST_P(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   }
 }
 
+// Resources has no subscriptions should not be tracked.
+TEST_P(DeltaSubscriptionStateTest, NewPushDoesntAddUntrackedResources) {
+  { // Add "name4", "name5", "name6" and remove "name1", "name2", "name3".
+    updateSubscriptionInterest({"name4", "name5", "name6"}, {"name1", "name2", "name3"});
+    auto cur_request = getNextRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre("name4", "name5", "name6"));
+    EXPECT_THAT(cur_request->resource_names_unsubscribe(),
+                UnorderedElementsAre("name1", "name2", "name3"));
+  }
+  {
+    // On Reconnection, only "name4", "name5", "name6" are sent.
+    markStreamFresh();
+    auto cur_request = getNextRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre("name4", "name5", "name6"));
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+    EXPECT_TRUE(cur_request->initial_resource_versions().empty());
+  }
+  // The xDS server's first response includes removed items name1 and 2, and a
+  // completely unrelated resource "bluhbluh".
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
+        populateRepeatedResource({{"name1", "version1A"},
+                                  {"bluhbluh", "bluh"},
+                                  {"name6", "version6A"},
+                                  {"name2", "version2A"}});
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
+    EXPECT_EQ("nonce1", ack.nonce_);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+  }
+  { // Simulate a stream reconnection, just to see the current resource_state_.
+    markStreamFresh();
+    auto cur_request = getNextRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre("name4", "name5", "name6"));
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+    ASSERT_EQ(cur_request->initial_resource_versions().size(), 1);
+    EXPECT_TRUE(cur_request->initial_resource_versions().contains("name6"));
+    EXPECT_EQ(cur_request->initial_resource_versions().at("name6"), "version6A");
+  }
+}
+
 // Delta xDS reliably queues up and sends all discovery requests, even in situations where it isn't
 // strictly necessary. E.g.: if you subscribe but then unsubscribe to a given resource, all before a
 // request was able to be sent, two requests will be sent. The following tests demonstrate this.
@@ -423,6 +467,50 @@ TEST_P(WildcardDeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect
   //        must be with no resources.
   EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
   EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+}
+
+// All resources from the server should be tracked.
+TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWildcardXDS) {
+  { // Add "name4", "name5", "name6" and remove "name1", "name2", "name3".
+    updateSubscriptionInterest({"name4", "name5", "name6"}, {"name1", "name2", "name3"});
+    auto cur_request = getNextRequestAckless();
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre("name4", "name5", "name6"));
+    EXPECT_THAT(cur_request->resource_names_unsubscribe(),
+                UnorderedElementsAre("name1", "name2", "name3"));
+  }
+  {
+    // On Reconnection, only "name4", "name5", "name6" are sent.
+    markStreamFresh();
+    auto cur_request = getNextRequestAckless();
+    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+    EXPECT_TRUE(cur_request->initial_resource_versions().empty());
+  }
+  // The xDS server's first response includes removed items name1 and 2, and a
+  // completely unrelated resource "bluhbluh".
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources =
+        populateRepeatedResource({{"name1", "version1A"},
+                                  {"bluhbluh", "bluh"},
+                                  {"name6", "version6A"},
+                                  {"name2", "version2A"}});
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
+    EXPECT_EQ("nonce1", ack.nonce_);
+    EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
+  }
+  { // Simulate a stream reconnection, just to see the current resource_state_.
+    markStreamFresh();
+    auto cur_request = getNextRequestAckless();
+    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
+    ASSERT_EQ(cur_request->initial_resource_versions().size(), 4);
+    EXPECT_EQ(cur_request->initial_resource_versions().at("name1"), "version1A");
+    EXPECT_EQ(cur_request->initial_resource_versions().at("bluhbluh"), "bluh");
+    EXPECT_EQ(cur_request->initial_resource_versions().at("name6"), "version6A");
+    EXPECT_EQ(cur_request->initial_resource_versions().at("name2"), "version2A");
+  }
 }
 
 // initial_resource_versions should not be present on messages after the first in a stream.

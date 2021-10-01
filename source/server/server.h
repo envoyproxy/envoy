@@ -182,6 +182,7 @@ public:
   }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
+  Stats::Scope& serverScope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
   Admin& admin() override { return server_.admin(); }
