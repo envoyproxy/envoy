@@ -869,6 +869,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
