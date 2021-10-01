@@ -40,7 +40,7 @@ public:
   }
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   Stats::Store& stats() override { return stats_; }
   Init::Manager& initManager() override {
     ASSERT(init_manager_ != nullptr);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -69,7 +70,7 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministic() { deterministic_ = true; }
+  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -253,8 +254,10 @@ public:
    *
    * @param port the port to connect to.
    * @param raw_http the data to send.
-   * @param response the response data will be sent here
-   * @param if the connection should be terminated once '\r\n\r\n' has been read.
+   * @param response the response data will be sent here.
+   * @param disconnect_after_headers_complete if the connection should be terminated once "\r\n\r\n"
+   *        has been read.
+   * @param transport_socket the transport socket of the created client connection.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false,
@@ -415,8 +418,9 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
+  // If this member is not empty, the test will use a fixed RNG value specified
+  // by it.
+  absl::optional<uint64_t> deterministic_value_{};
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

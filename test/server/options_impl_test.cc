@@ -292,8 +292,8 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 5. hot restart version - print the hot restart version and exit.
   const uint32_t options_not_in_proto = 5;
 
-  // There are two deprecated options: "max_stats" and "max_obj_name_len".
-  const uint32_t deprecated_options = 2;
+  // There are no deprecated options currently, add here as needed.
+  const uint32_t deprecated_options = 0;
 
   EXPECT_EQ(options->count() - options_not_in_proto,
             command_line_options->GetDescriptor()->field_count() - deprecated_options);
@@ -604,14 +604,14 @@ TEST(DisableExtensions, DEPRECATED_FEATURE_TEST(IsDisabled)) {
                       OptionsImpl::disableExtensions({"no/such.factory"}));
 
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
   EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactoryByType("google.protobuf.StringValue"),
             nullptr);
 
   EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
-  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
 
   OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
 

@@ -34,7 +34,6 @@ absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
 #undef QUIC_FLAG
   // Disable IETF draft 29 implementation. Envoy only supports RFC-v1.
   FLAGS_quic_reloadable_flag_quic_disable_version_draft_29->setValue(true);
-  FLAGS_quic_reloadable_flag_quic_decline_server_push_stream->setValue(true);
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"

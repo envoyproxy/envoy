@@ -174,7 +174,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -182,6 +182,7 @@ public:
   }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
+  Stats::Scope& serverScope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
   Admin& admin() override { return server_.admin(); }

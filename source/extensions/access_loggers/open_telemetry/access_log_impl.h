@@ -36,8 +36,7 @@ public:
   AccessLog(::Envoy::AccessLog::FilterPtr&& filter,
             envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig
                 config,
-            ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-            Stats::Scope& scope);
+            ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:
   /**
@@ -55,7 +54,6 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  Stats::Scope& scope_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::unique_ptr<Formatter::StructFormatter> body_formatter_;
