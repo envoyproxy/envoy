@@ -15,6 +15,8 @@ import os
 import sys
 import argparse
 
+import pytz
+
 import github
 
 import exports
@@ -39,11 +41,7 @@ class DependencyUpdateError(Exception):
 
 # Format a datetime object as UTC YYYY-MM-DD.
 def format_utc_date(date):
-    # We only handle naive datetime objects right now, which is what PyGithub
-    # appears to be handing us.
-    if date.tzinfo is not None:
-        raise ReleaseDateVersionError(
-            "Expected UTC date without timezone information. Received timezone information")
+    date = date.replace(tzinfo=pytz.UTC)
     return date.date().isoformat()
 
 
