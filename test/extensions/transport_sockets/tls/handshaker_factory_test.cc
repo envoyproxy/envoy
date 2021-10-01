@@ -26,6 +26,11 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
+using ::testing::_;
+using ::testing::MockFunction;
+using ::testing::Return;
+using ::testing::ReturnRef;
+
 // Test-only custom process object which accepts an `SslCtxCb` for in-test SSL_CTX
 // manipulation.
 class CustomProcessObjectForTest : public ProcessObject {
@@ -48,7 +53,10 @@ private:
 // case, using a process context to modify the SSL_CTX.
 class HandshakerFactoryImplForTest
     : public Extensions::TransportSockets::Tls::HandshakerFactoryImpl {
-  std::string name() const override { return "envoy.testonly_handshaker"; }
+public:
+  static constexpr char kFactoryName[] = "envoy.testonly_handshaker";
+
+  std::string name() const override { return kFactoryName; }
 
   Ssl::SslCtxCb sslctxCb(Ssl::HandshakerFactoryContext& handshaker_factory_context) const override {
     // Get process object, cast to custom process object, and return custom
@@ -65,9 +73,9 @@ protected:
             std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(time_system_)),
         registered_factory_(handshaker_factory_) {
     // UpstreamTlsContext proto expects to use the newly-registered handshaker.
-    envoy::config::core::v3::TypedExtensionConfig* custom_handshaker_ =
+    envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
-    custom_handshaker_->set_name("envoy.testonly_handshaker");
+    custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
   }
 
   // Helper for downcasting a socket to a test socket so we can examine its
@@ -87,7 +95,7 @@ protected:
 };
 
 TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
-  testing::MockFunction<void(SSL_CTX*)> cb;
+  MockFunction<void(SSL_CTX*)> cb;
   EXPECT_CALL(cb, Call);
 
   CustomProcessObjectForTest custom_process_object_for_test(cb.AsStdFunction());
@@ -96,8 +104,7 @@ TEST_F(HandshakerFactoryTest, SetMockFunctionCb) {
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.api_, processContext())
-      .WillRepeatedly(
-          testing::Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+      .WillRepeatedly(Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
@@ -123,7 +130,7 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
   EXPECT_CALL(mock_factory_ctx.api_, processContext())
       .WillRepeatedly(
-          testing::Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
+          Return(std::reference_wrapper<Envoy::ProcessContext>(*process_context_impl)));
 
   Extensions::TransportSockets::Tls::ClientSslSocketFactory socket_factory(
       /*config=*/
