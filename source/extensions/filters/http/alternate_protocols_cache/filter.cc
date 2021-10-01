@@ -24,17 +24,18 @@ FilterConfig::FilterConfig(
     : alternate_protocol_cache_manager_(alternate_protocol_cache_manager_factory.get()),
       proto_config_(proto_config), time_source_(time_source) {}
 
-Http::AlternateProtocolsCacheSharedPtr FilterConfig::getAlternateProtocolCache() {
+Http::AlternateProtocolsCacheSharedPtr
+FilterConfig::getAlternateProtocolCache(Event::Dispatcher& dispatcher) {
   return proto_config_.has_alternate_protocols_cache_options()
              ? alternate_protocol_cache_manager_->getCache(
-                   proto_config_.alternate_protocols_cache_options())
+                   proto_config_.alternate_protocols_cache_options(), dispatcher)
              : nullptr;
 }
 
 void Filter::onDestroy() {}
 
-Filter::Filter(const FilterConfigSharedPtr& config)
-    : cache_(config->getAlternateProtocolCache()), time_source_(config->timeSource()) {}
+Filter::Filter(const FilterConfigSharedPtr& config, Event::Dispatcher& dispatcher)
+    : cache_(config->getAlternateProtocolCache(dispatcher)), time_source_(config->timeSource()) {}
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (!cache_) {

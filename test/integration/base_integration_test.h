@@ -254,8 +254,10 @@ public:
    *
    * @param port the port to connect to.
    * @param raw_http the data to send.
-   * @param response the response data will be sent here
-   * @param if the connection should be terminated once '\r\n\r\n' has been read.
+   * @param response the response data will be sent here.
+   * @param disconnect_after_headers_complete if the connection should be terminated once "\r\n\r\n"
+   *        has been read.
+   * @param transport_socket the transport socket of the created client connection.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false,
