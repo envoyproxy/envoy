@@ -27,6 +27,11 @@ public:
                               size_t max_entries);
   ~AlternateProtocolsCacheImpl() override;
 
+  // Converts an Origin to a string which can be parsed by stringToOrigin.
+  static std::string originToString(const AlternateProtocolsCache::Origin& origin);
+  // Converts a string from originToString back to structured format.
+  static absl::optional<AlternateProtocolsCache::Origin> stringToOrigin(const std::string& str);
+
   // Convert an AlternateProtocol vector to a string to cache to the key value
   // store. Note that in order to determine the lifetime of entries, this
   // function will serialize ma= as absolute time from the epoch rather than
@@ -50,6 +55,7 @@ public:
   size_t size() const override;
 
 private:
+  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 

@@ -683,9 +683,11 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
-                                        bool use_alternate_protocols_cache) {
-  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+void ConfigHelper::configureUpstreamTls(
+    bool use_alpn, bool http3,
+    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+        alternate_protocol_cache_config) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -716,10 +718,13 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
       }
-      if (use_alternate_protocols_cache) {
+      if (alternate_protocol_cache_config.has_value()) {
         new_protocol_options.mutable_auto_config()
             ->mutable_alternate_protocols_cache_options()
             ->set_name("default_alternate_protocols_cache");
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->CopyFrom(alternate_protocol_cache_config.value());
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
