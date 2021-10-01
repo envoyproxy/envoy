@@ -45,7 +45,10 @@ swift_library(
     ]) + ["@envoy_mobile_extra_swift_sources//:extra_swift_srcs"],
     features = ["swift.enable_library_evolution"],
     module_name = "Envoy",
-    private_deps = ["//library/objective-c:envoy_engine_objc_lib"],
+    private_deps = [
+        "//library/objective-c:envoy_engine_objc_lib",
+        "@envoy_mobile_extra_swift_sources//:extra_private_dep",
+    ],
     visibility = ["//visibility:public"],
 )
 
