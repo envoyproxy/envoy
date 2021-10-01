@@ -9,6 +9,7 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
@@ -17,6 +18,7 @@
 #include "source/common/config/xds_resource.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
 
@@ -84,15 +86,29 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
     ScopedRoutesConfigProviderManager& config_provider_manager,
     envoy::config::core::v3::ConfigSource rds_config_source,
     envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
-        scope_key_builder)
+        scope_key_builder,
+    const OptionalHttpFilters& optional_http_filters)
     : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
                                                  ConfigProviderInstanceType::Inline,
                                                  ConfigProvider::ApiType::Delta),
       name_(std::move(name)),
       config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
-      config_protos_(std::make_move_iterator(config_protos.begin()),
-                     std::make_move_iterator(config_protos.end())),
-      rds_config_source_(std::move(rds_config_source)) {}
+      rds_config_source_(std::move(rds_config_source)) {
+  for (size_t i = 0; i < config_protos.size(); ++i) {
+    std::unique_ptr<const Protobuf::Message> config_proto = std::move(config_protos[i]);
+    auto scoped_route_config =
+        MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
+            *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
+    RouteConfigProviderPtr route_config_provider =
+        config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
+            scoped_route_config.route_configuration(), optional_http_filters, factory_context,
+            factory_context.messageValidationContext().staticValidationVisitor());
+    scopes_.push_back(std::make_shared<const ScopedRouteInfo>(scoped_route_config,
+                                                              route_config_provider->config()));
+  }
+  const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config_.get()))
+      ->addOrUpdateRoutingScopes(scopes_);
+}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
@@ -576,7 +592,7 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createXdsConfigProvider(
                 typed_optarg.scoped_routes_name_, typed_optarg.scope_key_builder_, factory_context,
                 stat_prefix, typed_optarg.rds_config_source_,
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager)
-                    .routeConfigProviderPanager(),
+                    .routeConfigProviderManager(),
                 static_cast<ScopedRoutesConfigProviderManager&>(config_provider_manager));
           });
 
@@ -590,7 +606,8 @@ ConfigProviderPtr ScopedRoutesConfigProviderManager::createStaticConfigProvider(
   const auto& typed_optarg = static_cast<const ScopedRoutesConfigProviderManagerOptArg&>(optarg);
   return std::make_unique<InlineScopedRoutesConfigProvider>(
       std::move(config_protos), typed_optarg.scoped_routes_name_, factory_context, *this,
-      typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_);
+      typed_optarg.rds_config_source_, typed_optarg.scope_key_builder_,
+      typed_optarg.optional_http_filters_);
 }
 
 } // namespace Router

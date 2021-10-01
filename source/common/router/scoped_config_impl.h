@@ -81,8 +81,8 @@ private:
 // ScopedRouteConfiguration and corresponding RouteConfigProvider.
 class ScopedRouteInfo {
 public:
-  ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration&& config_proto,
-                  ConfigConstSharedPtr&& route_config);
+  ScopedRouteInfo(envoy::config::route::v3::ScopedRouteConfiguration config_proto,
+                  ConfigConstSharedPtr route_config);
 
   const ConfigConstSharedPtr& routeConfig() const { return route_config_; }
   const ScopeKey& scopeKey() const { return scope_key_; }

@@ -113,6 +113,143 @@ protected:
   NiceMock<Event::MockDispatcher> event_dispatcher_;
 };
 
+using InlineScopedRoutesTest = ScopedRoutesTestBase;
+
+TEST_F(InlineScopedRoutesTest, InlineRouteConfigurations) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  const std::string hcm_config = R"EOF(
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: http_dynamo_filter
+    typed_config:
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key }
+      - name: foo2-scope
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key-2 }
+)EOF";
+  Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  ASSERT_THAT(provider->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key"}})
+                ->name(),
+            "foo");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key-2"}})
+                ->name(),
+            "foo2");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key,foo-key-2"}})
+                ->name(),
+            "foo");
+}
+
+TEST_F(InlineScopedRoutesTest, ConfigLoadAndDump) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+
+  const std::string hcm_config = R"EOF(
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: http_dynamo_filter
+    typed_config:
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: Addr
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.10" }
+      - name: foo2
+        route_configuration_name: foo-route-config2
+        key:
+          fragments: { string_key: "172.10.10.20" }
+)EOF";
+  Envoy::Config::ConfigProviderPtr inline_config_provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  UniversalStringMatcher universal_matcher;
+  ProtobufTypes::MessagePtr message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+
+  envoy::admin::v3::ScopedRoutesConfigDump expected_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo
+         virtual_hosts:
+           - name: bar
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration_name: foo-route-config2
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+}
+
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup(const OptionalHttpFilters optional_http_filters = OptionalHttpFilters()) {
@@ -986,7 +1123,6 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump6));
 }
 
-// Tests that SRDS only allows creation of delta static config providers.
 TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
   // Use match all regex due to lack of distinctive matchable output for
   // coverage test.
