@@ -1666,7 +1666,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
     Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
+                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
