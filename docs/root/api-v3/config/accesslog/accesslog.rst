@@ -9,4 +9,5 @@ Access loggers
 
   v3/*
   ../../extensions/access_loggers/*/v3/*
+  ../../extensions/access_loggers/*/v3alpha/*
   ../../extensions/access_loggers/filters/*/v3/*
