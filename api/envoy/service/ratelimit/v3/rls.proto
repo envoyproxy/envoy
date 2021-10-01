@@ -146,7 +146,7 @@ message RateLimitResponse {
 
     // Quota is available for a request if its descriptor set has cached quota available for all
     // descriptors.
-    // This is for each individual descriptor in the descriptor set. It is used for future matches when RLS server provides the quota for each individual descriptor.
+    // This is for each individual descriptor in the descriptor set. The client will perform matches for each individual descriptor against available per-descriptor quotas.
     //
     // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
     // all matching descriptors.
