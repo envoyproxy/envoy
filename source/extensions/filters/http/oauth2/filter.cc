@@ -151,13 +151,14 @@ FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope&
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [](absl::string_view key) -> bool {
-    return key == "OauthExpires" || key == "BearerToken" || key == "OauthHMAC" || key == "IdToken" || key == "RefreshToken";
+    return key == "OauthExpires" || key == "BearerToken" || key == "OauthHMAC" ||
+           key == "IdToken" || key == "RefreshToken";
   });
 
   expires_ = findValue(cookies, "OauthExpires");
   token_ = findValue(cookies, "BearerToken");
   id_token_ = findValue(cookies, "IdToken");
-  refresh_token_ = findValue(cookies, "RefreshToken");  
+  refresh_token_ = findValue(cookies, "RefreshToken");
   hmac_ = findValue(cookies, "OauthHMAC");
   host_ = headers.Host()->value().getStringView();
 
@@ -408,7 +409,7 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutCookieValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutBearerTokenValue);
   response_headers->addReference(Http::Headers::get().SetCookie, SignoutIdTokenValue);
-  response_headers->addReference(Http::Headers::get().SetCookie, SignoutRefreshTokenValue);  
+  response_headers->addReference(Http::Headers::get().SetCookie, SignoutRefreshTokenValue);
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -483,13 +484,13 @@ void OAuth2Filter::finishFlow() {
   if (config_->forwardBearerToken()) {
     response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
-    if(id_token_ != EMPTY_STRING)
+    if (id_token_ != EMPTY_STRING)
       response_headers->addReferenceKey(Http::Headers::get().SetCookie,
-                                      absl::StrCat("IdToken=", id_token_, cookie_tail));
+                                        absl::StrCat("IdToken=", id_token_, cookie_tail));
 
-    if(refresh_token_ != EMPTY_STRING)
+    if (refresh_token_ != EMPTY_STRING)
       response_headers->addReferenceKey(Http::Headers::get().SetCookie,
-                                      absl::StrCat("RefreshToken=", refresh_token_, cookie_tail));
+                                        absl::StrCat("RefreshToken=", refresh_token_, cookie_tail));
   }
 
   response_headers->setLocation(state_);

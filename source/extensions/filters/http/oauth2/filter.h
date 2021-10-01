@@ -197,8 +197,7 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
 
   // FilterCallbacks
-  void onGetAccessTokenSuccess(const std::string& access_code,
-                               const std::string& id_token,
+  void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
