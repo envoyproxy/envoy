@@ -419,16 +419,11 @@ public:
           "message '{}' is marked as work-in-progress. {}", message.GetTypeName(), WipWarning));
     }
 
-    if (message.GetDescriptor()
-            ->file()
-            ->options()
-            .GetExtension(udpa::annotations::file_status)
-            .work_in_progress() ||
-        message.GetDescriptor()
-            ->file()
-            ->options()
-            .GetExtension(xds::annotations::v3::file_status)
-            .work_in_progress()) {
+    const auto& udpa_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+    const auto& xds_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+    if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
       validation_visitor_.onWorkInProgress(
           fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
                       message.GetTypeName(), message.GetDescriptor()->file()->name(), WipWarning));

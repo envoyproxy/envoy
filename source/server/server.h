@@ -136,10 +136,13 @@ public:
    * Load a bootstrap config and perform validation.
    * @param bootstrap supplies the bootstrap to fill.
    * @param options supplies the server options.
+   * @param validation_visitor message validation visitor instance.
    * @param api reference to the Api object
    */
   static void loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                  const Options& options, Api::Api& api);
+                                  const Options& options,
+                                  ProtobufMessage::ValidationVisitor& validation_visitor,
+                                  Api::Api& api);
 };
 
 /**
@@ -281,7 +284,7 @@ public:
     return server_contexts_;
   }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
-    return *validation_context_;
+    return validation_context_;
   }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
@@ -328,7 +331,7 @@ private:
   std::atomic<bool> live_;
   bool shutdown_;
   const Options& options_;
-  std::unique_ptr<ProtobufMessage::ProdValidationContextImpl> validation_context_;
+  ProtobufMessage::ProdValidationContextImpl validation_context_;
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.

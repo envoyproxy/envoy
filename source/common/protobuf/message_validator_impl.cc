@@ -23,14 +23,30 @@ void onDeprecatedFieldCommon(absl::string_view description, bool soft_deprecatio
     throw DeprecatedProtoFieldException(absl::StrCat(description, deprecation_error));
   }
 }
+} // namespace
 
-void onWorkInProgressCommon(absl::string_view description, Stats::Counter* counter) {
+void WipCounterBase::setWipCounter(Stats::Counter& wip_counter) {
+  ASSERT(wip_counter_ == nullptr);
+  wip_counter_ = &wip_counter;
+  wip_counter.add(prestats_wip_count_);
+}
+
+void WipCounterBase::onWorkInProgressCommon(absl::string_view description) {
   ENVOY_LOG_MISC(warn, "{}", description);
-  if (counter != nullptr) {
-    counter->inc();
+  if (wip_counter_ != nullptr) {
+    wip_counter_->inc();
+  } else {
+    prestats_wip_count_++;
   }
 }
-} // namespace
+
+void WarningValidationVisitorImpl::setCounters(Stats::Counter& unknown_counter,
+                                               Stats::Counter& wip_counter) {
+  setWipCounter(wip_counter);
+  ASSERT(unknown_counter_ == nullptr);
+  unknown_counter_ = &unknown_counter;
+  unknown_counter.add(prestats_unknown_count_);
+}
 
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   const uint64_t hash = HashUtil::xxHash64(description);
@@ -42,7 +58,11 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 
   // It's a new field, log and bump stat.
   ENVOY_LOG(warn, "Unknown field: {}", description);
-  unknown_counter_.inc();
+  if (unknown_counter_ == nullptr) {
+    ++prestats_unknown_count_;
+  } else {
+    unknown_counter_->inc();
+  }
 }
 
 void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
@@ -51,7 +71,7 @@ void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view descripti
 }
 
 void WarningValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
-  onWorkInProgressCommon(description, &wip_counter_);
+  onWorkInProgressCommon(description);
 }
 
 void StrictValidationVisitorImpl::onUnknownField(absl::string_view description) {
@@ -65,7 +85,7 @@ void StrictValidationVisitorImpl::onDeprecatedField(absl::string_view descriptio
 }
 
 void StrictValidationVisitorImpl::onWorkInProgress(absl::string_view description) {
-  onWorkInProgressCommon(description, wip_counter_);
+  onWorkInProgressCommon(description);
 }
 
 ValidationVisitor& getNullValidationVisitor() {

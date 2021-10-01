@@ -1595,6 +1595,10 @@ TEST(DurationUtilTest, OutOfRange) {
 }
 
 TEST_F(ProtobufUtilityTest, MessageInWipFile) {
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::StrictValidationVisitorImpl validation_visitor;
+
   utility_test::file_wip::Foo foo;
   EXPECT_LOG_CONTAINS(
       "warning",
@@ -1603,7 +1607,11 @@ TEST_F(ProtobufUtilityTest, MessageInWipFile) {
       "marked as work-in-progress are not considered stable, are not covered by the threat model, "
       "are not supported by the security team, and are subject to breaking changes. Do not use "
       "this feature without understanding each of the previous points.",
-      MessageUtil::checkForUnexpectedFields(foo, ProtobufMessage::getStrictValidationVisitor()));
+      MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
 
   utility_test::file_wip_2::Foo foo2;
   EXPECT_LOG_CONTAINS(
@@ -1613,14 +1621,16 @@ TEST_F(ProtobufUtilityTest, MessageInWipFile) {
       "features marked as work-in-progress are not considered stable, are not covered by the "
       "threat model, are not supported by the security team, and are subject to breaking changes. "
       "Do not use this feature without understanding each of the previous points.",
-      MessageUtil::checkForUnexpectedFields(foo2, ProtobufMessage::getStrictValidationVisitor()));
+      MessageUtil::checkForUnexpectedFields(foo2, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
 }
 
 TEST_F(ProtobufUtilityTest, MessageWip) {
   Stats::TestUtil::TestStore stats;
   Stats::Counter& unknown_counter = stats.counter("unknown_counter");
   Stats::Counter& wip_counter = stats.counter("wip_counter");
-  ProtobufMessage::WarningValidationVisitorImpl validation_visitor(unknown_counter, wip_counter);
+  ProtobufMessage::WarningValidationVisitorImpl validation_visitor;
 
   utility_test::message_field_wip::Foo foo;
   EXPECT_LOG_CONTAINS(
@@ -1630,6 +1640,10 @@ TEST_F(ProtobufUtilityTest, MessageWip) {
       "are not supported by the security team, and are subject to breaking changes. Do not use "
       "this feature without understanding each of the previous points.",
       MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(unknown_counter, wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
 
   utility_test::message_field_wip::Bar bar;
   EXPECT_NO_LOGS(MessageUtil::checkForUnexpectedFields(bar, validation_visitor));

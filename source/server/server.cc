@@ -68,9 +68,12 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), time_source_(time_system), restarter_(restarter),
-      start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
-      thread_local_(tls), random_generator_(std::move(random_generator)),
+      options_(options), validation_context_(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
+      time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
+      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
+      random_generator_(std::move(random_generator)),
       api_(new Api::Impl(
           thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
@@ -331,7 +334,9 @@ void registerCustomInlineHeadersFromBootstrap(
 } // namespace
 
 void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                       const Options& options, Api::Api& api) {
+                                       const Options& options,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
   const envoy::config::bootstrap::v3::Bootstrap& config_proto = options.configProto();
@@ -343,21 +348,18 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, ProtobufMessage::getNullValidationVisitor(),
-                              api);
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    MessageUtil::loadFromYaml(config_yaml, bootstrap_override,
-                              ProtobufMessage::getNullValidationVisitor());
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
   if (config_proto.ByteSize() != 0) {
     bootstrap.MergeFrom(config_proto);
   }
-  // fixfix
-  MessageUtil::validate(bootstrap, ProtobufMessage::getNullValidationVisitor());
+  MessageUtil::validate(bootstrap, validation_visitor);
 }
 
 void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
@@ -371,7 +373,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options_, *api_);
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
+                                    messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
@@ -409,17 +412,9 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
-  validation_context_ = std::make_unique<ProtobufMessage::ProdValidationContextImpl>(
-      options_.allowUnknownStaticFields(), !options_.rejectUnknownDynamicFields(),
-      options_.ignoreUnknownDynamicFields(), server_stats_->static_unknown_fields_,
-      server_stats_->dynamic_unknown_fields_, server_stats_->wip_protos_);
-
-  // Now that starts up and we have a validation context, we can perform proper non-PGV validation
-  // on bootstrap.
-  envoy::config::bootstrap::v3::Bootstrap test;
-  MessageUtil::loadFromFile(options_.configPath(), test,
-                            validation_context_->staticValidationVisitor(), *api_);
-  MessageUtil::checkForUnexpectedFields(bootstrap_, validation_context_->staticValidationVisitor());
+  validation_context_.setCounters(server_stats_->static_unknown_fields_,
+                                  server_stats_->dynamic_unknown_fields_,
+                                  server_stats_->wip_protos_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
