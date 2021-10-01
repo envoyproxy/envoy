@@ -67,8 +67,9 @@ public:
 };
 
 // TODO(mattklein123): There are various places where the default strict validator is being used.
-// This does not increment the WIP stat. We should remover this as a public function and make sure
-// that all code is either using the server validation context or the null validator.
+// This does not increment the WIP stat because nothing calls setCounters() on the stock/static
+// version. We should remove this as a public function as well as the stock/static version and
+// make sure that all code is either using the server validation context or the null validator.
 ValidationVisitor& getStrictValidationVisitor();
 
 class ValidationContextImpl : public ValidationContext {

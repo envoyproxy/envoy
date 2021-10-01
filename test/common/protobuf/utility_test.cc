@@ -1594,6 +1594,8 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
+// Verify WIP accounting of the file based annotations. This test uses the strict validator to test
+// that code path.
 TEST_F(ProtobufUtilityTest, MessageInWipFile) {
   Stats::TestUtil::TestStore stats;
   Stats::Counter& wip_counter = stats.counter("wip_counter");
@@ -1626,6 +1628,8 @@ TEST_F(ProtobufUtilityTest, MessageInWipFile) {
   EXPECT_EQ(2, wip_counter.value());
 }
 
+// Verify WIP accounting for message and field annotations. This test uses the warning validator
+// to test that code path.
 TEST_F(ProtobufUtilityTest, MessageWip) {
   Stats::TestUtil::TestStore stats;
   Stats::Counter& unknown_counter = stats.counter("unknown_counter");
