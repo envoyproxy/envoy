@@ -199,7 +199,7 @@ message RateLimitResponse {
   google.protobuf.Struct dynamic_metadata = 6;
 
   // Quota is available for a request if its whole descriptor set has cached quota available.
-  // This is a union of all descriptors in the descriptor set. It is used for future matches when RLS server just provides the quota for the entire descriptor set rather than individual descriptor.
+  // This is a union of all descriptors in the descriptor set. Clients can use the quota for future matches if and only if the descriptor set matches what was sent in the request that originated this response.
   //
   // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
   // all matching descriptor sets.
