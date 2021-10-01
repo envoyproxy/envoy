@@ -398,12 +398,12 @@ bool CacheFilter::isSuccessfulValidation(const Http::ResponseHeaderMap& response
   ASSERT(filter_state_ == FilterState::ValidatingCachedResponse,
          "isSuccessfulValidation precondition unsatisfied: the "
          "CacheFilter is not validating a cache lookup result");
-  // Should only update for 304 responses
+  // If the response has changed then the cache entry is not valid
   if (!isResponseNotModified(response_headers)) {
     return false;
   }
 
-  // Delete the entry instead of updating if
+  // The cached entry is not valid if
   // (1) the vary header has changed
   // (2) the vary allow list changed to disallow the varied field. Note this is a rare case
   //     because the vary allow list change must happen between the initial look up and validation

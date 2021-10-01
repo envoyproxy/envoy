@@ -161,7 +161,7 @@ void SimpleHttpCache::updateHeaders(const LookupContext& lookup_context,
     ASSERT(iter->second.response_headers_ || !iter->second.response_headers_);
   }
 
-  // the iterator should point to the correct entry now
+  // the iterator now points to the correct entry
   Entry& entry = iter->second;
 
   // Assumptions:
