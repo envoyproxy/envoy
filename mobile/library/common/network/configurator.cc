@@ -83,9 +83,10 @@ void Configurator::refreshDns(envoy_network_t network) {
   // Note this does NOT completely prevent parallel refreshes from being triggered in multiple
   // flip-flop scenarios.
   if (network != preferred_network_.load()) {
+    ENVOY_LOG_EVENT(debug, "network_configuration_dns_flipflop", std::to_string(network));
     return;
   }
-  // TODO(goaway): track event here or are there existing signals we can use?
+
   if (auto dns_cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache)) {
     ENVOY_LOG_EVENT(debug, "network_configuration_refresh_dns", std::to_string(network));
     dns_cache->forceRefreshHosts();
