@@ -5,8 +5,8 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/config/old_delta_subscription_state.h"
 #include "source/common/config/new_delta_subscription_state.h"
+#include "source/common/config/old_delta_subscription_state.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/types/variant.h"
@@ -14,7 +14,8 @@
 namespace Envoy {
 namespace Config {
 
-using DeltaSubscriptionStateVariant = absl::variant<OldDeltaSubscriptionState, NewDeltaSubscriptionState>;
+using DeltaSubscriptionStateVariant =
+    absl::variant<OldDeltaSubscriptionState, NewDeltaSubscriptionState>;
 
 class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:

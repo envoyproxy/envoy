@@ -1,4 +1,4 @@
-#include "source/common/config/delta_subscription_state.h"
+#include "source/common/config/new_delta_subscription_state.h"
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"

@@ -103,8 +103,8 @@ private:
 
   const std::string type_url_;
   // Is the subscription is for a wildcard request.
-  bool wildcard_set_ {};
-  bool wildcard_ {};
+  bool wildcard_set_{};
+  bool wildcard_{};
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
