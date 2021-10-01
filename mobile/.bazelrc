@@ -7,8 +7,7 @@ build --define=hot_restart=disabled
 build --define=tcmalloc=disabled
 build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
-# Remove once https://github.com/bazelbuild/rules_swift/pull/427 is merged
-build --swiftcopt=-Xfrontend --swiftcopt=-no-serialize-debugging-options
+build --features=swift.debug_prefix_map
 build --host_force_python=PY3
 build --ios_minimum_os=11.0
 build --ios_simulator_device="iPhone 12"
