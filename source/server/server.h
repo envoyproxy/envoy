@@ -329,7 +329,7 @@ private:
   std::atomic<bool> live_;
   bool shutdown_;
   const Options& options_;
-  ProtobufMessage::ProdValidationContextImpl validation_context_;
+  std::unique_ptr<ProtobufMessage::ProdValidationContextImpl> validation_context_;
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.

@@ -68,12 +68,9 @@ InstanceImpl::InstanceImpl(
     Filesystem::Instance& file_system, std::unique_ptr<ProcessContext> process_context,
     Buffer::WatermarkFactorySharedPtr watermark_factory)
     : init_manager_(init_manager), workers_started_(false), live_(false), shutdown_(false),
-      options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             options.ignoreUnknownDynamicFields()),
-      time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      random_generator_(std::move(random_generator)),
+      options_(options), time_source_(time_system), restarter_(restarter),
+      start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
+      thread_local_(tls), random_generator_(std::move(random_generator)),
       api_(new Api::Impl(
           thread_factory, store, time_system, file_system, *random_generator_, bootstrap_,
           process_context ? ProcessContextOptRef(std::ref(*process_context)) : absl::nullopt,
@@ -413,6 +410,9 @@ void InstanceImpl::initialize(const Options& options,
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
+  validation_context_ = std::make_unique<>(options_.allowUnknownStaticFields(),
+                                             !options.rejectUnknownDynamicFields(),
+                                             options.ignoreUnknownDynamicFields()),
   validation_context_.staticWarningValidationVisitor().setUnknownCounter(
       server_stats_->static_unknown_fields_);
   validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(

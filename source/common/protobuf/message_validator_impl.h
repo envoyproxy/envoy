@@ -25,7 +25,8 @@ ValidationVisitor& getNullValidationVisitor();
 class WarningValidationVisitorImpl : public ValidationVisitor,
                                      public Logger::Loggable<Logger::Id::config> {
 public:
-  void setUnknownCounter(Stats::Counter& counter);
+  WarningValidationVisitorImpl(Stats::Counter& unknown_counter, Stats::Counter& wip_counter)
+      : unknown_counter_(unknown_counter), wip_counter_(wip_counter) {}
 
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
@@ -37,60 +38,58 @@ private:
   // Track hashes of descriptions we've seen, to avoid log spam. A hash is used here to avoid
   // wasting memory with unused strings.
   absl::flat_hash_set<uint64_t> descriptions_;
-  // This can be late initialized via setUnknownCounter(), enabling the server bootstrap loading
-  // which occurs prior to the initialization of the stats subsystem.
-  Stats::Counter* unknown_counter_{};
-  uint64_t prestats_unknown_count_{};
+  Stats::Counter& unknown_counter_;
+  Stats::Counter& wip_counter_;
 };
 
 class StrictValidationVisitorImpl : public ValidationVisitor {
 public:
+  StrictValidationVisitorImpl() = default;
+  StrictValidationVisitorImpl(Stats::Counter& wip_counter) : wip_counter_(&wip_counter) {}
+
   // Envoy::ProtobufMessage::ValidationVisitor
   void onUnknownField(absl::string_view description) override;
   bool skipValidation() override { return false; }
   void onDeprecatedField(absl::string_view description, bool soft_deprecation) override;
   void onWorkInProgress(absl::string_view description) override;
+
+private:
+  Stats::Counter* wip_counter_{};
 };
 
+// fixfix todo
 ValidationVisitor& getStrictValidationVisitor();
 
-class ValidationContextImpl : public ValidationContext {
-public:
-  ValidationContextImpl(ValidationVisitor& static_validation_visitor,
-                        ValidationVisitor& dynamic_validation_visitor)
-      : static_validation_visitor_(static_validation_visitor),
-        dynamic_validation_visitor_(dynamic_validation_visitor) {}
-
-  // Envoy::ProtobufMessage::ValidationContext
-  ValidationVisitor& staticValidationVisitor() override { return static_validation_visitor_; }
-  ValidationVisitor& dynamicValidationVisitor() override { return dynamic_validation_visitor_; }
-
-private:
-  ValidationVisitor& static_validation_visitor_;
-  ValidationVisitor& dynamic_validation_visitor_;
-};
-
-class ProdValidationContextImpl : public ValidationContextImpl {
+class ProdValidationContextImpl : public ValidationContext {
 public:
   ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
-                            bool ignore_unknown_dynamic_fields)
-      : ValidationContextImpl(allow_unknown_static_fields ? static_warning_validation_visitor_
-                                                          : getStrictValidationVisitor(),
-                              allow_unknown_dynamic_fields
-                                  ? (ignore_unknown_dynamic_fields
-                                         ? ProtobufMessage::getNullValidationVisitor()
-                                         : dynamic_warning_validation_visitor_)
-                                  : ProtobufMessage::getStrictValidationVisitor()) {}
+                            bool ignore_unknown_dynamic_fields,
+                            Stats::Counter& static_unknown_counter,
+                            Stats::Counter& dynamic_unknown_counter, Stats::Counter& wip_counter)
+      : allow_unknown_static_fields_(allow_unknown_static_fields),
+        allow_unknown_dynamic_fields_(allow_unknown_dynamic_fields),
+        ignore_unknown_dynamic_fields_(ignore_unknown_dynamic_fields),
+        strict_validation_visitor_(wip_counter),
+        static_warning_validation_visitor_(static_unknown_counter, wip_counter),
+        dynamic_warning_validation_visitor_(dynamic_unknown_counter, wip_counter) {}
 
-  ProtobufMessage::WarningValidationVisitorImpl& staticWarningValidationVisitor() {
-    return static_warning_validation_visitor_;
+  // Envoy::ProtobufMessage::ValidationContext
+  ValidationVisitor& staticValidationVisitor() override {
+    return allow_unknown_static_fields_ ? static_warning_validation_visitor_
+                                        : strict_validation_visitor_;
   }
-
-  ProtobufMessage::WarningValidationVisitorImpl& dynamicWarningValidationVisitor() {
-    return dynamic_warning_validation_visitor_;
+  ValidationVisitor& dynamicValidationVisitor() override {
+    return allow_unknown_dynamic_fields_
+               ? (ignore_unknown_dynamic_fields_ ? ProtobufMessage::getNullValidationVisitor()
+                                                 : dynamic_warning_validation_visitor_)
+               : strict_validation_visitor_;
   }
 
 private:
+  const bool allow_unknown_static_fields_;
+  const bool allow_unknown_dynamic_fields_;
+  const bool ignore_unknown_dynamic_fields_;
+  StrictValidationVisitorImpl strict_validation_visitor_;
   ProtobufMessage::WarningValidationVisitorImpl static_warning_validation_visitor_;
   ProtobufMessage::WarningValidationVisitorImpl dynamic_warning_validation_visitor_;
 };

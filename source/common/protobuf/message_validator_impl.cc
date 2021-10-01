@@ -29,12 +29,6 @@ void onWorkInProgressCommon(absl::string_view description) {
 }
 } // namespace
 
-void WarningValidationVisitorImpl::setUnknownCounter(Stats::Counter& counter) {
-  ASSERT(unknown_counter_ == nullptr);
-  unknown_counter_ = &counter;
-  counter.add(prestats_unknown_count_);
-}
-
 void WarningValidationVisitorImpl::onUnknownField(absl::string_view description) {
   const uint64_t hash = HashUtil::xxHash64(description);
   auto it = descriptions_.insert(hash);
@@ -45,11 +39,7 @@ void WarningValidationVisitorImpl::onUnknownField(absl::string_view description)
 
   // It's a new field, log and bump stat.
   ENVOY_LOG(warn, "Unknown field: {}", description);
-  if (unknown_counter_ == nullptr) {
-    ++prestats_unknown_count_;
-  } else {
-    unknown_counter_->inc();
-  }
+  unknown_counter_.inc();
 }
 
 void WarningValidationVisitorImpl::onDeprecatedField(absl::string_view description,
