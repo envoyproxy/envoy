@@ -687,6 +687,7 @@ public:
   }
 
   // Http::FilterChainFactoryCallbacks
+  Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void addStreamDecoderFilter(StreamDecoderFilterSharedPtr filter) override {
     addStreamDecoderFilterWorker(filter, nullptr, false);
     filters_.push_back(filter.get());
