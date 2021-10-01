@@ -18,15 +18,35 @@ filegroup(
     name = "extra_swift_srcs",
     srcs = ["empty.swift"],
     visibility = ["//visibility:public"],
+)
+
+objc_library(
+    name = "extra_private_dep",
+    module_name = "FakeDep",
+    visibility = ["//visibility:public"],
 )""")
 
 _default_extra_swift_sources = repository_rule(
     implementation = _default_extra_swift_sources_impl,
 )
 
+def _default_extra_jni_deps_impl(ctx):
+    ctx.file("WORKSPACE", "")
+    ctx.file("BUILD.bazel", """
+cc_library(
+    name = "extra_jni_dep",
+    visibility = ["//visibility:public"],
+)""")
+
+_default_extra_jni_deps = repository_rule(
+    implementation = _default_extra_jni_deps_impl,
+)
+
 def envoy_mobile_dependencies():
     if not native.existing_rule("envoy_mobile_extra_swift_sources"):
         _default_extra_swift_sources(name = "envoy_mobile_extra_swift_sources")
+    if not native.existing_rule("envoy_mobile_extra_jni_deps"):
+        _default_extra_jni_deps(name = "envoy_mobile_extra_jni_deps")
 
     swift_dependencies()
     kotlin_dependencies()

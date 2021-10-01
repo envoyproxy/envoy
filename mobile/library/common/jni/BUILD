@@ -25,9 +25,8 @@ envoy_cc_library(
     ],
 )
 
-# Main dynamic library for the Envoy Mobile aar
-cc_binary(
-    name = "libenvoy_jni.so",
+cc_library(
+    name = "envoy_jni_lib",
     srcs = [
         "android_jni_interface.cc",
         "jni_interface.cc",
@@ -40,12 +39,31 @@ cc_binary(
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": ["-Wl,-s"],
     }),
-    linkshared = True,
     deps = [
         ":jni_utility_lib",
         ":ndk_jni_support",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+    ],
+    # We need this to ensure that we link this into the .so even though there are no code references.
+    alwayslink = True,
+)
+
+# Main dynamic library for the Envoy Mobile aar
+cc_binary(
+    name = "libenvoy_jni.so",
+    copts = ["-std=c++17"],
+    linkopts = [
+        "-lm",
+        "-llog",
+    ] + select({
+        "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
+        "//conditions:default": ["-Wl,-s"],
+    }),
+    linkshared = True,
+    deps = [
+        ":envoy_jni_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
     ],
 )
 
@@ -92,7 +110,10 @@ cc_binary(
         "-lm",
     ],
     linkshared = True,
-    deps = ["base_java_jni_lib"],
+    deps = [
+        "base_java_jni_lib",
+        "@envoy_mobile_extra_jni_deps//:extra_jni_dep",
+    ],
 )
 
 cc_library(
