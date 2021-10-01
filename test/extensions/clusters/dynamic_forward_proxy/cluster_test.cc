@@ -173,6 +173,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // Verify no host LB cases.
   EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(setHostAndReturnContext("foo")));
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
@@ -267,9 +268,9 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
-  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(connection, ssl()).WillOnce(Return(ssl_info));
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
@@ -300,9 +301,9 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h3"));
-  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(connection, ssl()).WillOnce(Return(ssl_info));
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
@@ -333,6 +334,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   // Drain the connection then no verify that no connection is subsequently selected.
@@ -363,6 +366,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
 
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
@@ -389,9 +394,9 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   ASSERT_TRUE(lifetime_callbacks.has_value());
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
-  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
-  EXPECT_CALL(connection, ssl()).WillOnce(Return(ssl_info));
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   std::vector<std::string> dns_sans = {"www.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
@@ -419,6 +424,8 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   ASSERT_TRUE(lifetime_callbacks.has_value());
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   hash_key[0]++;
@@ -446,11 +453,73 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   ASSERT_TRUE(lifetime_callbacks.has_value());
   EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
-  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+
+  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+      lb_->selectPool(&lb_context_, host, hash_key);
+
+  ASSERT_FALSE(selection.has_value());
+}
+
+TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
+  initialize(coalesce_connection_config_, false);
+
+  const std::string hostname = "mail.example.org";
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+
+  Envoy::Http::ConnectionPool::MockInstance pool;
+  Envoy::Network::MockConnection connection;
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
+      lb_->lifetimeCallbacks();
+  ASSERT_TRUE(lifetime_callbacks.has_value());
+  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
+  auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
+  std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
+  EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
+
+  const std::string empty_hostname = "";
+  Upstream::MockHost empty_host;
+  EXPECT_CALL(empty_host, hostname()).WillRepeatedly(testing::ReturnRef(empty_hostname));
+
+  absl::optional<Upstream::SelectedPoolAndConnection> selection =
+      lb_->selectPool(&lb_context_, empty_host, hash_key);
+
+  ASSERT_FALSE(selection.has_value());
+}
+
+TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
+  initialize(coalesce_connection_config_, false);
+
+  const std::string hostname = "mail.example.org";
+  Upstream::MockHost host;
+  EXPECT_CALL(host, hostname()).WillRepeatedly(testing::ReturnRef(hostname));
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://10.0.0.4:50000");
+  EXPECT_CALL(host, address()).WillRepeatedly(testing::Return(address));
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+
+  Envoy::Http::ConnectionPool::MockInstance pool;
+  Envoy::Network::MockConnection connection;
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
+      lb_->lifetimeCallbacks();
+  ASSERT_TRUE(lifetime_callbacks.has_value());
+  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
+  auto ssl_info = nullptr;
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
+  lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
       lb_->selectPool(&lb_context_, host, hash_key);

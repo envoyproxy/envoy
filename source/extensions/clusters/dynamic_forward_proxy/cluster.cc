@@ -191,9 +191,7 @@ Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* /*context*/,
 
   for (auto& info : it->second) {
     Envoy::Ssl::ConnectionInfoConstSharedPtr ssl = info.connection_->ssl();
-    if (!ssl) {
-      continue;
-    }
+    ASSERT(ssl);
     for (const std::string& san : ssl->dnsSansPeerCertificate()) {
       if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname, san)) {
         return Upstream::SelectedPoolAndConnection{*info.pool_, *info.connection_};
@@ -215,10 +213,14 @@ Cluster::LoadBalancer::lifetimeCallbacks() {
 void Cluster::LoadBalancer::onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool,
                                              std::vector<uint8_t>& hash_key,
                                              const Network::Connection& connection) {
+  // Only coalesce connections that are over TLS.
+  if (!connection.ssl()) {
+    return;
+  }
   const std::string alpn = connection.nextProtocol();
   if (alpn != Http::Utility::AlpnNames::get().Http2 &&
       alpn != Http::Utility::AlpnNames::get().Http3) {
-    // Only enable coalesced connections for HTTP/2 and HTTP/3.
+    // Only coalesce connections for HTTP/2 and HTTP/3.
     return;
   }
   const LookupKey key = {hash_key, *connection.connectionInfoProvider().remoteAddress()};
