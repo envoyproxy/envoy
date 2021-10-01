@@ -46,9 +46,9 @@ class CacheFilterTest : public ::testing::Test {
 protected:
   // The filter has to be created as a shared_ptr to enable shared_from_this() which is used in the
   // cache callbacks.
-  CacheFilterSharedPtr makeFilter(HttpCache& cache, bool extraAllowedVaryHeaders = false) {
+  CacheFilterSharedPtr makeFilter(HttpCache& cache, bool extra_allowed_vary_headers = false) {
     auto filter =
-        std::make_shared<CacheFilter>(getConfig(extraAllowedVaryHeaders), /*stats_prefix=*/"",
+        std::make_shared<CacheFilter>(getConfig(extra_allowed_vary_headers), /*stats_prefix=*/"",
                                       context_.scope(), context_.timeSource(), cache);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     filter->setEncoderFilterCallbacks(encoder_callbacks_);
