@@ -146,7 +146,7 @@ message RateLimitResponse {
 
     // Quota is available for a request if its descriptor set has cached quota available for all
     // descriptors.
-    // This is for each individual descriptor in the descriptor set. The client will perform matches for each individual descriptor against available per-descriptor quotas.
+    // This is for each individual descriptor in the descriptor set. The client will perform matches for each individual descriptor against available per-descriptor quota.
     //
     // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
     // all matching descriptors.
@@ -201,8 +201,7 @@ message RateLimitResponse {
   // Quota is available for a request if its whole descriptor set has cached quota available.
   // This is a union of all descriptors in the descriptor set. Clients can use the quota for future matches if and only if the descriptor set matches what was sent in the request that originated this response.
   //
-  // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
-  // all matching descriptor sets.
+  // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for all matching descriptor sets.
   //
   // If there is not sufficient quota, there are three cases:
   // 1. A cached entry exists for a RLS descriptor set that is out-of-quota, but not expired.
