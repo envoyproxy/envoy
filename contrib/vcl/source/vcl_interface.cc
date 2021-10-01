@@ -21,15 +21,17 @@ const int MaxNumEpollEvents = 128;
  * Envoy worker epoll session handles by VCL worker index, i.e., `vppcom_worker_index()`. Each
  * worker uses its respective handle to retrieve session events from VCL via `vppcom_epoll_wait()`.
  */
-std::vector<uint32_t> epoll_handles;
+std::vector<uint32_t>& epollHandles() { MUTABLE_CONSTRUCT_ON_FIRST_USE(std::vector<uint32_t>); }
 
 /**
  * Mutex only used during VCL worker registration
  */
 ABSL_CONST_INIT absl::Mutex wrk_lock(absl::kConstInit);
 
+/**
+ * Map of VCL workers to message queue eventfd file events
+ */
 using MqFileEventsMap = absl::flat_hash_map<int, Envoy::Event::FileEventPtr>;
-
 MqFileEventsMap& mqFileEventsMap() { MUTABLE_CONSTRUCT_ON_FIRST_USE(MqFileEventsMap); }
 
 void onMqSocketEvents(uint32_t flags) {
@@ -38,9 +40,10 @@ void onMqSocketEvents(uint32_t flags) {
   VCL_LOG("events on worker {}", wrk_index);
   struct epoll_event events[MaxNumEpollEvents];
   int max_events = MaxNumEpollEvents;
+  uint32_t epoll_fd = vclEpollHandle(wrk_index);
 
   while (max_events > 0) {
-    int n_events = vppcom_epoll_wait(epoll_handles[wrk_index], events, max_events, 0);
+    int n_events = vppcom_epoll_wait(epoll_fd, events, max_events, 0);
     if (n_events <= 0) {
       break;
     }
@@ -78,7 +81,10 @@ void onMqSocketEvents(uint32_t flags) {
 
 } // namespace
 
-uint32_t vclEpollHandle(uint32_t wrk_index) { return epoll_handles[wrk_index]; }
+uint32_t vclEpollHandle(uint32_t wrk_index) {
+  std::vector<uint32_t>& epoll_handles = epollHandles();
+  return epoll_handles[wrk_index];
+}
 
 void vclInterfaceWorkerRegister() {
   {
@@ -87,6 +93,7 @@ void vclInterfaceWorkerRegister() {
   }
   const int wrk_index = vppcom_worker_index();
   int epoll_handle = vppcom_epoll_create();
+  std::vector<uint32_t>& epoll_handles = epollHandles();
   epoll_handles[wrk_index] = epoll_handle;
   VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", wrk_index, epoll_handle,
           vppcom_mq_epoll_fd());
@@ -108,6 +115,7 @@ void vclInterfaceInit(Event::Dispatcher& dispatcher, uint32_t concurrency) {
   MqFileEventsMap& mq_fevts_map = mqFileEventsMap();
   vppcom_app_create("envoy");
   const int wrk_index = vppcom_worker_index();
+  std::vector<uint32_t>& epoll_handles = epollHandles();
   // Assume we may have additional threads that request network access
   epoll_handles.reserve(concurrency * 2);
   epoll_handles[wrk_index] = vppcom_epoll_create();
