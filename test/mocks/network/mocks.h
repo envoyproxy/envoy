@@ -67,8 +67,8 @@ public:
 
 class MockDnsResolverFactory : public DnsResolverFactory {
 public:
-  MockDnsResolverFactory() {}
-  ~MockDnsResolverFactory() override {}
+  MockDnsResolverFactory() = default;
+  ~MockDnsResolverFactory() override = default;
 
   MOCK_METHOD(DnsResolverSharedPtr, createDnsResolverImpl,
               (Event::Dispatcher & dispatcher, Api::Api& api,
