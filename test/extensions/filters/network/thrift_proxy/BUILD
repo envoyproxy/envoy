@@ -353,6 +353,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/thrift_proxy/driver:generate_fixture",
     ],
     extension_names = ["envoy.filters.network.thrift_proxy"],
+    shard_count = 4,
     deps = [
         ":integration_lib",
         ":utility_lib",

@@ -70,6 +70,7 @@ Minor Behavior Changes
   information.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
 * quic: enables IETF connection migration. This feature requires a stable UDP packet routine in the L4 load balancer with the same first-4-bytes in connection id. It can be turned off by setting runtime guard ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_connection_migration_use_new_cid_v2`` to false.
+* thrift_proxy: allow Framed and Header transport combinations to perform :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
 
 Bug Fixes
 ---------

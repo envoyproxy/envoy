@@ -210,6 +210,16 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   return complete_;
 }
 
+FilterStatus ConnectionManager::ResponseDecoder::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
+  // If passing through data, ensure that first reply field is false as if handling a
+  // fieldBegin. Otherwise all requests will be marked as a success, as if void response,
+  // in messageEnd. Therefore later will only increment reply and not the inferred subtype
+  // success/error which requires reading the field id of the first field, see fieldBegin.
+  first_reply_field_ = false;
+  return ProtocolConverter::passthroughData(data);
+}
+
 FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   metadata_->setSequenceId(parent_.original_sequence_id_);
@@ -275,14 +285,22 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   cm.read_callbacks_->connection().write(buffer, false);
 
   cm.stats_.response_.inc();
+  if (passthrough_) {
+    cm.stats_.response_passthrough_.inc();
+  }
 
   switch (metadata_->messageType()) {
   case MessageType::Reply:
     cm.stats_.response_reply_.inc();
-    if (success_.value_or(false)) {
-      cm.stats_.response_success_.inc();
-    } else {
-      cm.stats_.response_error_.inc();
+    // success_ is set by inspecting the payload, which wont
+    // occur when passthrough is enabled as parsing the payload
+    // is skipped entirely.
+    if (success_) {
+      if (success_.value()) {
+        cm.stats_.response_success_.inc();
+      } else {
+        cm.stats_.response_error_.inc();
+      }
     }
 
     break;
@@ -419,6 +437,10 @@ void ConnectionManager::ActiveRpc::finalizeRequest() {
     parent_.stats_.downstream_cx_max_requests_.inc();
   }
 
+  if (passthrough_) {
+    parent_.stats_.request_passthrough_.inc();
+  }
+
   bool destroy_rpc = false;
   switch (original_msg_type_) {
   case MessageType::Call:
@@ -458,6 +480,7 @@ bool ConnectionManager::ActiveRpc::passthroughSupported() const {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::passthroughData(Buffer::Instance& data) {
+  passthrough_ = true;
   filter_context_ = &data;
   filter_action_ = [this](DecoderEventHandler* filter) -> FilterStatus {
     Buffer::Instance* data = absl::any_cast<Buffer::Instance*>(filter_context_);
