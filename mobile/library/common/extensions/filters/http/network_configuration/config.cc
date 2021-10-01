@@ -12,7 +12,7 @@ Http::FilterFactoryCb NetworkConfigurationFilterFactory::createFilterFactoryFrom
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
 
-  auto network_configurator = Network::ConfiguratorHandle{context}.get();
+  auto network_configurator = Network::ConfiguratorFactory{context}.get();
   bool enable_interface_binding = proto_config.enable_interface_binding();
 
   return [network_configurator,
