@@ -43,7 +43,7 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
           config, context.messageValidationVisitor());
 
   return std::make_shared<AccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                     getAccessLoggerCacheSingleton(context), context.scope());
+                                     getAccessLoggerCacheSingleton(context));
 }
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {

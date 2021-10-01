@@ -214,6 +214,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  pmb.SetQueryParamUnescapePlus(proto_config.query_param_unescape_plus());
 
   path_matcher_ = pmb.Build();
 
