@@ -193,7 +193,7 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
-  // Override the CA cert with test/config/integration/certs/ca.pem
+  // Override the CA cert with cert copied from test/config/integration/certs/cacert.pem.
   root_ca_cert_ = R"(-----BEGIN CERTIFICATE-----
 MIID3TCCAsWgAwIBAgIUdCu/mLip3X/We37vh3BA9u/nxakwDQYJKoZIhvcNAQEL
 BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
@@ -221,8 +221,9 @@ ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
-  // This is a cert same as test/config/integration/certs/servercert.pem but with extKeyUsage:
-  // clientAuth.
+  // This is a cert generated with the test/config/integration/certs/certs.sh. And the config that
+  // used to generate this cert is same as test/config/integration/certs/servercert.cfg but with
+  // 'extKeyUsage: clientAuth'.
   const std::string certs{R"(-----BEGIN CERTIFICATE-----
 MIIEYjCCA0qgAwIBAgIUWzmfQSTX8xfzUzdByjCjCJN8E/wwDQYJKoZIhvcNAQEL
 BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
