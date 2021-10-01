@@ -123,7 +123,11 @@ message RateLimitResponse {
     }
 
     // The unique id that is associated with each Quota either at individual descriptor level or whole descriptor set level.
-    // This can be used to share the same quota among multiple descriptors or descriptor sets.
+    //
+    // For the matching policy with disjunction, for example, match: "request.headers['environment'] == 'staging' || request.headers['environment'] == 'dev'"),
+    // the request_headers action produces a distinct list of descriptors for each possible value of the ‘environment’ header even though the granted quota is same.
+    //
+    // The client will use this id information (returned from RLS server) to correctly correlate the multiple descriptors/descriptor sets that have been granted with same quota (i.e., share the same quota among multiple descriptors or descriptor sets.)
     string id = 3;
   }
 
