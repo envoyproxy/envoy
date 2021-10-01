@@ -131,8 +131,8 @@ void EnvoyQuicClientSession::setHttp3Options(
   QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
   if (http3_options_->has_quic_protocol_options()) {
     static_cast<EnvoyQuicClientConnection*>(connection())
-        ->setMigratePortOnPathDegrading(
-            http3_options.quic_protocol_options().migrate_port_on_path_degrading());
+        ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+            http3_options.quic_protocol_options(), migrate_port_on_path_degrading, false));
   }
 }
 

@@ -57,7 +57,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
   // If true, quic client connection will try migrating to a different port when network path is degrading. This has no effect on server sessions.
-  bool migrate_port_on_path_degrading = 4;
+  google.protobuf.BoolValue migrate_port_on_path_degrading = 4;
 }
 
 message UpstreamHttpProtocolOptions {
