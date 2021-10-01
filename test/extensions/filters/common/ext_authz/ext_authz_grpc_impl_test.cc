@@ -321,6 +321,57 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+TEST_F(ExtAuthzGrpcClientTest, DEPRECATED_FEATURE_TEST(AuthorizationOkWithAppendAndAllAtributes)) {
+  initialize();
+
+  const std::string empty_body{};
+
+  HeaderValueOptionVector expected_headers{};
+  // No `append` field set
+  envoy::config::core::v3::HeaderValueOption header_value_option1;
+  auto* mutable_header1 = header_value_option1.mutable_header();
+  mutable_header1->set_key("foo1");
+  mutable_header1->set_value("bar1");
+  expected_headers.push_back(header_value_option1);
+  // `append` field set = true
+  envoy::config::core::v3::HeaderValueOption header_value_option2;
+  auto* mutable_header2 = header_value_option2.mutable_header();
+  mutable_header2->set_key("foo2");
+  mutable_header2->set_value("bar2");
+  header_value_option2.mutable_append()->set_value(true);
+  expected_headers.push_back(header_value_option2);
+  // `append` field set = false
+  envoy::config::core::v3::HeaderValueOption header_value_option3;
+  auto* mutable_header3 = header_value_option3.mutable_header();
+  mutable_header3->set_key("foo2");
+  mutable_header3->set_value("bar2");
+  header_value_option3.mutable_append()->set_value(true);
+  expected_headers.push_back(header_value_option3);
+
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption(
+      {{"authorized-by", "TestAuthService",
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
+       {"cookie", "authtoken=1234",
+        envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD}});
+  auto check_response =
+      TestCommon::makeCheckResponse(Grpc::Status::WellKnownGrpcStatus::Ok, envoy::type::v3::OK,
+                                    empty_body, expected_headers, expected_downstream_headers);
+  auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::OK, Http::Code::OK, empty_body, expected_headers, expected_downstream_headers);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

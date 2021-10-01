@@ -112,9 +112,9 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
 
-  // Compare response_headers_to_append.
-  if (!TestCommon::compareHeaderVector(response.response_headers_to_append,
-                                       arg->response_headers_to_append)) {
+  // Compare response_headers_to_add.
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_add,
+                                       arg->response_headers_to_add)) {
     return false;
   }
 

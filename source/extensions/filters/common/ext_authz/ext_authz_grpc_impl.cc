@@ -68,7 +68,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
                 Http::LowerCaseString(header.header().key()), header.header().value());
             break;
           case envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD:
-            authz_response->response_headers_to_append.emplace_back(
+            authz_response->response_headers_to_add.emplace_back(
                 Http::LowerCaseString(header.header().key()), header.header().value());
             break;
           case envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:

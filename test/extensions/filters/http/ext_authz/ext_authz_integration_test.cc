@@ -275,7 +275,7 @@ public:
                             const Http::TestRequestHeaderMapImpl& new_headers_from_upstream,
                             const Http::TestRequestHeaderMapImpl& headers_to_append_multiple,
                             const Headers& response_headers_to_add_if_absent,
-                            const Headers& response_headers_to_append,
+                            const Headers& response_headers_to_add,
                             const Headers& response_headers_to_set = {}) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
@@ -346,14 +346,13 @@ public:
       const auto value = std::string(response_header_to_add.second);
 
       entry->set_append_action(envoy::config::core::v3::HeaderValueOption::ADD_IF_ABSENT);
-      entry->clear_append();
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add_if_absent {}={}", key,
                      value);
     }
 
-    for (const auto& response_header_to_add : response_headers_to_append) {
+    for (const auto& response_header_to_add : response_headers_to_add) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
       const auto key = std::string(response_header_to_add.first);
       const auto value = std::string(response_header_to_add.second);

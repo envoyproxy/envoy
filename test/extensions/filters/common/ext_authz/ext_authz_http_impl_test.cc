@@ -355,7 +355,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   const auto expected_headers = TestCommon::makeHeaderValueOption(
       {{":status", "200", envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
        {"x-downstream-ok", "1",
-        envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD},
+        envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD},
        {"x-upstream-ok", "1",
         envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD}});
   const auto authz_response = TestCommon::makeAuthzResponse(

@@ -162,7 +162,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   ENVOY_STREAM_LOG(trace,
                    "ext_authz filter has {} response header(s) to append, {} response header(s) "
                    "to add, {} response header(s) to set to the encoded response:",
-                   *encoder_callbacks_, response_headers_to_append_.size(),
+                   *encoder_callbacks_, response_headers_to_add_.size(),
                    response_headers_to_add_if_absent_.size(), response_headers_to_set_.size());
   // Headers to be added only if they are absent.
   if (!response_headers_to_add_if_absent_.empty()) {
@@ -177,10 +177,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     }
   }
   // Headers to be appended. New values will be appended to any existing values.
-  if (!response_headers_to_append_.empty()) {
+  if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter appended header(s) to the encoded response:", *encoder_callbacks_);
-    for (const auto& header : response_headers_to_append_) {
+    for (const auto& header : response_headers_to_add_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
       headers.addCopy(header.first, header.second);
     }
@@ -266,14 +266,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     for (const auto& header : response->headers_to_append) {
       const auto header_to_modify = request_headers_->get(header.first);
-      // TODO(dio): Add a flag to allow appending non-existent headers, without setting it first
-      // (via `headers_to_add`). For example, given:
-      // 1. Original headers {"original": "true"}
-      // 2. Response headers from the authorization servers {{"append": "1"}, {"append": "2"}}
-      //
-      // Currently it is not possible to add {{"append": "1"}, {"append": "2"}} (the intended
-      // combined headers: {{"original": "true"}, {"append": "1"}, {"append": "2"}}) to the request
-      // to upstream server by only sets `headers_to_append`.
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *decoder_callbacks_, header.first.get(), header.second);
       if (!header_to_modify.empty()) {
         // The current behavior of appending is by combining entries with the same key, into one
@@ -304,10 +296,10 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       response_headers_to_add_if_absent_ = std::move(response->response_headers_to_add_if_absent);
     }
 
-    if (!response->response_headers_to_append.empty()) {
+    if (!response->response_headers_to_add.empty()) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to append to the response:",
-                       *decoder_callbacks_, response->response_headers_to_append.size());
-      response_headers_to_append_ = std::move(response->response_headers_to_append);
+                       *decoder_callbacks_, response->response_headers_to_add.size());
+      response_headers_to_add_ = std::move(response->response_headers_to_add);
     }
 
     if (!response->response_headers_to_set.empty()) {
