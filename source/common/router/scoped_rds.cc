@@ -9,7 +9,6 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/assert.h"
-#include "envoy/config/core/v3/config_source.pb.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
