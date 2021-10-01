@@ -193,93 +193,11 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   EXPECT_EQ(1, downstreamTxResetCounterValue());
 }
 
-void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
-                                                       uint32_t request2_bytes,
-                                                       uint32_t response1_bytes,
-                                                       uint32_t response2_bytes) {
-  FakeStreamPtr upstream_request1;
-  FakeStreamPtr upstream_request2;
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Start request 1
-  auto encoder_decoder1 =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
-  auto response1 = std::move(encoder_decoder1.second);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
-
-  // Start request 2
-  auto encoder_decoder2 =
-      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                                                 {":path", "/test/long/url"},
-                                                                 {":scheme", "http"},
-                                                                 {":authority", "host"}});
-  Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
-  auto response2 = std::move(encoder_decoder2.second);
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
-
-  // Finish request 1
-  codec_client_->sendData(*encoder1, request1_bytes, true);
-  ASSERT_TRUE(upstream_request1->waitForEndStream(*dispatcher_));
-
-  // Finish request 2
-  codec_client_->sendData(*encoder2, request2_bytes, true);
-  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
-
-  // Respond to request 2
-  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request2->encodeData(response2_bytes, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-  EXPECT_TRUE(upstream_request2->complete());
-  EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
-  EXPECT_TRUE(response2->complete());
-  EXPECT_EQ("200", response2->headers().getStatusValue());
-  EXPECT_EQ(response2_bytes, response2->body().size());
-
-  // Respond to request 1
-  upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request1->encodeData(response1_bytes, true);
-  ASSERT_TRUE(response1->waitForEndStream());
-  EXPECT_TRUE(upstream_request1->complete());
-  EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
-  EXPECT_TRUE(response1->complete());
-  EXPECT_EQ("200", response1->headers().getStatusValue());
-  EXPECT_EQ(response1_bytes, response1->body().size());
-}
-
 TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
   simultaneousRequest(1024, 512, 1023, 513);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
-  config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
-  simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequestAlpn) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
-    // protocols cache, but currently there is no easy way to initialize the test with this state.
-    return;
-  }
-
-  use_alpn_ = true;
-  simultaneousRequest(1024, 512, 1023, 513);
-}
-
-TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimitsAlpn) {
-  if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    // TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
-    // protocols cache, but currently there is no easy way to initialize the test with this state.
-    return;
-  }
-
-  use_alpn_ = true;
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
@@ -650,52 +568,5 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
   fake_upstream_connection2.reset();
   cleanupUpstreamAndDownstream();
 }
-
-#ifdef ENVOY_ENABLE_QUIC
-
-class MixedUpstreamIntegrationTest : public Http2UpstreamIntegrationTest {
-protected:
-  void initialize() override {
-    use_alpn_ = true;
-    Http2UpstreamIntegrationTest::initialize();
-  }
-  void createUpstreams() override {
-    ASSERT_EQ(upstreamProtocol(), Http::CodecType::HTTP3);
-    ASSERT_EQ(fake_upstreams_count_, 1);
-    ASSERT_FALSE(autonomous_upstream_);
-
-    if (use_http2_) {
-      auto config = configWithType(Http::CodecType::HTTP2);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP2);
-    } else {
-      auto config = configWithType(Http::CodecType::HTTP3);
-      Network::TransportSocketFactoryPtr factory = createUpstreamTlsContext(config);
-      addFakeUpstream(std::move(factory), Http::CodecType::HTTP3);
-    }
-  }
-
-  bool use_http2_{false};
-};
-
-// TODO(alyssawilk) In order to use HTTP/3, and alt-svc entry must exist in the alternate
-// protocols cache, but currently there is no easy way to initialize the test with this state.
-TEST_P(MixedUpstreamIntegrationTest, DISABLED_SimultaneousRequestAutoWithHttp3) {
-  use_alternate_protocols_cache_ = true;
-  testRouterRequestAndResponseWithBody(0, 0, false);
-}
-
-TEST_P(MixedUpstreamIntegrationTest, DISABLED_SimultaneousRequestAutoWithHttp2) {
-  use_alternate_protocols_cache_ = true;
-  use_http2_ = true;
-  testRouterRequestAndResponseWithBody(0, 0, false);
-}
-
-INSTANTIATE_TEST_SUITE_P(Protocols, MixedUpstreamIntegrationTest,
-                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP3})),
-                         HttpProtocolIntegrationTest::protocolTestParamsToString);
-
-#endif
 
 } // namespace Envoy

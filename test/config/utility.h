@@ -296,7 +296,8 @@ public:
 
   // Configure Envoy to do TLS to upstream.
   void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
-                            bool use_alternate_protocols_cache = false);
+                            absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+                                alternate_protocol_cache_config = {});
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.

@@ -516,6 +516,7 @@ public:
               (Http::StreamFilterSharedPtr filter,
                Matcher::MatchTreeSharedPtr<HttpMatchingData> match_tree));
   MOCK_METHOD(void, addAccessLogHandler, (AccessLog::InstanceSharedPtr handler));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 
 class MockDownstreamWatermarkCallbacks : public DownstreamWatermarkCallbacks {
