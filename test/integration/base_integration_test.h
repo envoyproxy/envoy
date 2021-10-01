@@ -205,29 +205,41 @@ public:
     stream->sendGrpcMessage(response);
   }
 
+  // Sends a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  void sendExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed) {
+    xds_stream_->sendGrpcMessage(
+        createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated, removed));
+  }
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed);
+
   template <class T>
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases) {
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(type_url);
+    std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
-      auto* resource = response.add_resources();
+      envoy::service::discovery::v3::Resource resource;
       ProtobufWkt::Any temp_any;
       temp_any.PackFrom(message);
-      resource->mutable_resource()->PackFrom(message);
-      resource->set_name(intResourceName(message));
-      resource->set_version(version);
+      resource.mutable_resource()->PackFrom(message);
+      resource.set_name(intResourceName(message));
+      resource.set_version(version);
       for (const auto& alias : aliases) {
-        resource->add_aliases(alias);
+        resource.add_aliases(alias);
       }
+      resources.emplace_back(resource);
     }
-    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    static int next_nonce_counter = 0;
-    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    return response;
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
   }
 
 private:

@@ -34,6 +34,12 @@ public:
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildTlsClusterLoadAssignment(const std::string& name);
 
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name, const std::string& collection_name);
+
+  envoy::service::discovery::v3::Resource
+  buildLbEndpointResource(const std::string& lb_endpoint_resource_name, const std::string& version);
+
   envoy::config::listener::v3::Listener buildListener(const std::string& name,
                                                       const std::string& route_config,
                                                       const std::string& stat_prefix = "ads_test");
