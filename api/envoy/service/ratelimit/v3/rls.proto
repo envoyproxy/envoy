@@ -107,7 +107,7 @@ message RateLimitResponse {
   // Quota can be granted at different levels: either for each individual descriptor or for the whole descriptor set.
   // This is a certain number of requests over a period of time.
   // The client may cache this result and apply the effective RateLimitResponse to future matching
-  // requests containing a matching without querying rate limit service.
+  // requests without querying rate limit service.
   //
   // When quota expires due to timeout, a new RLS request will also be made.
   // The implementation may choose to preemptively query the rate limit server for more quota on or
@@ -123,6 +123,7 @@ message RateLimitResponse {
     }
 
     // The unique id that is associated with each Quota either at individual descriptor level or whole descriptor set level.
+    // This can be used to share the same quota among multiple descriptors or descriptor sets.
     string id = 3;
   }
 
