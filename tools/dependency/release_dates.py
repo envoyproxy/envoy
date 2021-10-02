@@ -117,6 +117,7 @@ def issues_exist(title, git):
         raise
     return issues.totalCount > 0
 
+
 # search for issue by title and delete old issue if new package version is available
 def search_old_version_open_issue_exist(title, git, package_repo, latest_release):
     # search for only "Newer release available `{dep}`:" as will be common in dep issue
@@ -136,9 +137,9 @@ def search_old_version_open_issue_exist(title, git, package_repo, latest_release
 def get_package_version_from_issue(issue_title):
     # issue title create by github action has two form
     if "(" in issue_title:
-        return issue_title[issue_title.index(":") + 1 : issue_title.index("(") - 1 ]
+        return issue_title[issue_title.index(":") + 1:issue_title.index("(") - 1 ]
     else:
-        return issue_title[issue_title.index(":") + 1 : len(issue_title)]
+        return issue_title[issue_title.index(":") + 1:len(issue_title)]
 
 
 def close_old_issue(git, issue_number, latest_release, package_repo):
