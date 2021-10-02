@@ -156,7 +156,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
   // Note that the local info node() method is mocked, so the node is not really configurable.
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   identifier:

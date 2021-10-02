@@ -417,6 +417,7 @@ envoy_cc_library(
     hdrs = ["eds.h"],
     deps = [
         ":cluster_factory_lib",
+        ":leds_lib",
         ":upstream_includes",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_factory_interface",

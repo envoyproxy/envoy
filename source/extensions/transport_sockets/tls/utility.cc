@@ -331,6 +331,15 @@ absl::string_view Utility::getErrorDescription(int err) {
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
 }
 
+std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
+  const int n = X509_STORE_CTX_get_error(ctx);
+  const int depth = X509_STORE_CTX_get_error_depth(ctx);
+  std::string error_details =
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
+                   X509_verify_cert_error_string(n));
+  return error_details;
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

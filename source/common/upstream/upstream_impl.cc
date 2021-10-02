@@ -676,8 +676,9 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
-        local_info_(c.localInfo()), dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
+      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+        cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
+        dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
         options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
@@ -687,6 +688,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
+  Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
@@ -719,6 +721,7 @@ public:
 
 private:
   Server::Admin& admin_;
+  Stats::Scope& server_scope_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
