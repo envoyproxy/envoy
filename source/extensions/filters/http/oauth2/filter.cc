@@ -484,13 +484,15 @@ void OAuth2Filter::finishFlow() {
   if (config_->forwardBearerToken()) {
     response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                       absl::StrCat("BearerToken=", access_token_, cookie_tail));
-    if (id_token_ != EMPTY_STRING)
+    if (id_token_ != EMPTY_STRING) {
       response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                         absl::StrCat("IdToken=", id_token_, cookie_tail));
+    }
 
-    if (refresh_token_ != EMPTY_STRING)
+    if (refresh_token_ != EMPTY_STRING) {
       response_headers->addReferenceKey(Http::Headers::get().SetCookie,
                                         absl::StrCat("RefreshToken=", refresh_token_, cookie_tail));
+    }
   }
 
   response_headers->setLocation(state_);
