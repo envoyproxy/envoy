@@ -19,7 +19,6 @@ import github
 
 import exports
 import utils
-from pprint import pprint
 from colorama import Fore, Style
 from packaging import version
 
