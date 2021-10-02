@@ -35,7 +35,7 @@ public:
     std::shared_ptr<const Config> initial_config;
     if (config_update_info_->configInfo().has_value()) {
       initial_config =
-          config_factory.createConfig(subscription->routeConfigUpdate()->protobufConfiguration());
+          config_factory.createConfig(subscription_->routeConfigUpdate()->protobufConfiguration());
     } else {
       initial_config = config_factory.createConfig();
     }

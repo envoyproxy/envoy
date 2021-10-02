@@ -4,6 +4,8 @@
 
 #include "envoy/common/time.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Router {
 namespace Rds {

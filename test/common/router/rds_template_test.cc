@@ -15,10 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::Eq;
-using testing::InSequence;
-using testing::Invoke;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -43,7 +39,7 @@ public:
 
 class Config {
 public:
-  Config() {}
+  Config() = default;
   Config(const envoy::config::route::v3::RouteConfiguration& rc) : rc_(rc) {}
   const std::string* route(const std::string& name) const {
     for (const auto& virtual_host_config : rc_.virtual_hosts()) {
@@ -62,10 +58,12 @@ class ConfigFactory
     : public Rds::ConfigFactory<envoy::config::route::v3::RouteConfiguration, Config> {
 public:
   std::shared_ptr<const Config>
-  createConfig(const envoy::config::route::v3::RouteConfiguration& rc) const {
+  createConfig(const envoy::config::route::v3::RouteConfiguration& rc) const override {
     return std::make_shared<const Config>(rc);
   }
-  std::shared_ptr<const Config> createConfig() const { return std::make_shared<const Config>(); }
+  std::shared_ptr<const Config> createConfig() const override {
+    return std::make_shared<const Config>();
+  }
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<
