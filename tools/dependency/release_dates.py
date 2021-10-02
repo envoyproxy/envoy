@@ -137,7 +137,7 @@ def search_old_version_open_issue_exist(title, git, package_repo, latest_release
 def get_package_version_from_issue(issue_title):
     # issue title create by github action has two form
     if "(" in issue_title:
-        return issue_title[issue_title.index(":") + 1:issue_title.index("(") - 1 ]
+        return issue_title[issue_title.index(":") + 1:issue_title.index("(") - 1]
     else:
         return issue_title[issue_title.index(":") + 1:len(issue_title)]
 
