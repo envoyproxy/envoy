@@ -19,7 +19,7 @@ import github
 
 import exports
 import utils
-
+from pprint import pprint
 from colorama import Fore, Style
 from packaging import version
 
@@ -98,6 +98,7 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
         return
+    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
     print('Creating issues...')
     try:
         repo.create_issue(title, body=body, labels=LABELS)
@@ -115,6 +116,50 @@ def issues_exist(title, git):
         print(f'There is a problem looking for issue title: {title}, received {e}')
         raise
     return issues.totalCount > 0
+
+# search for issue by title and delete old issue if new package version is available
+def search_old_version_open_issue_exist(title, git, package_repo, latest_release):
+    # search for only "Newer release available `{dep}`:" as will be common in dep issue
+    title_search = title[0:title.index(":")]
+    query = f'repo:envoyproxy/envoy {title_search} in:title is:open'
+    # there might be more than one issue
+    # if current package version == issue package version no need to do anything, right issue is open
+    # if current package version != issue_title_version means a newer updated version is available
+    # and close old issue
+    issues = git.search_issues(query)
+    for issue in issues:
+        issue_version = get_package_version_from_issue(issue.title)
+        if issue_version != latest_release.tag_name:
+            close_old_issue(git, issue.number, latest_release, package_repo)
+
+
+def get_package_version_from_issue(issue_title):
+    # issue title create by github action has two form
+    if "(" in issue_title:
+        return issue_title[issue_title.index(":") + 1 : issue_title.index("(") - 1 ]
+    else:
+        return issue_title[issue_title.index(":") + 1 : len(issue_title)]
+
+
+def close_old_issue(git, issue_number, latest_release, package_repo):
+    closing_comment = f'''\
+                        New version is available for this package
+                        Details :-
+                        New Version: {latest_release.tag_name}@{latest_release.created_at}
+                        Upstream Link: https://github.com/{package_repo.full_name}\
+                        '''
+    repo = git.get_repo('envoyproxy/envoy')
+    try:
+        issue = repo.get_issue(number=issue_number)
+        print(f'Publishing closing comment... ')
+        publish_comment = issue.create_comment(closing_comment)
+        print(f'Closing this issue as new package is available')
+        if publish_comment.completed:
+            issue.edit(state='closed')
+    except github.GithubException as e:
+        print(f'There was a problem in publishing comment or closing this issue')
+        raise
+    return
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
