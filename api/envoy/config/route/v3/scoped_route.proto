@@ -4,6 +4,7 @@ package envoy.config.route.v3;
 
 import "envoy/config/route/v3/route.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -116,17 +117,15 @@ message ScopedRouteConfiguration {
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  oneof route_config {
-    option (validate.required) = true;
+  // The resource name to use for a :ref:`envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest` to an
+  // RDS server to fetch the :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated
+  // with this scope.
+  string route_configuration_name = 2
+    [(udpa.annotations.field_migrate).oneof_promotion = "route_config"];
 
-    // The resource name to use for a :ref:`envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest` to an
-    // RDS server to fetch the :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated
-    // with this scope.
-    string route_configuration_name = 2 [(validate.rules).string = {min_len: 1}];
-
-    // The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated with the scope.
-    RouteConfiguration route_configuration = 5;
-  }
+  // The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated with the scope.
+  RouteConfiguration route_configuration = 5
+      [(udpa.annotations.field_migrate).oneof_promotion = "route_config"];
 
   // The key to match against.
   Key key = 3 [(validate.rules).message = {required: true}];
