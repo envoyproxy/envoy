@@ -574,6 +574,21 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   return AssertionFailure() << "Timeout waiting for port availability";
 }
 
+envoy::service::discovery::v3::DeltaDiscoveryResponse
+BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
+    const std::string& type_url,
+    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+    const std::vector<std::string>& removed) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info("system_version_info_this_is_a_test");
+  response.set_type_url(type_url);
+  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
+  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+  static int next_nonce_counter = 0;
+  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+  return response;
+}
+
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,

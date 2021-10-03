@@ -31,6 +31,7 @@ public:
   std::unique_ptr<Http::AlternateProtocolsCacheManagerFactoryImpl> factory_;
   Http::AlternateProtocolsCacheManagerSharedPtr manager_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions options_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
@@ -42,7 +43,7 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   options_.mutable_key_value_store_config()->set_name("envoy.common.key_value");
   options_.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
   initialize();
-  manager_->getCache(options_);
+  manager_->getCache(options_, dispatcher_);
 }
 
 } // namespace

@@ -55,6 +55,7 @@ TypeUrlToV3ServiceMap* buildTypeUrlToServiceMap() {
            "envoy.service.secret.v3.SecretDiscoveryService",
            "envoy.service.cluster.v3.ClusterDiscoveryService",
            "envoy.service.endpoint.v3.EndpointDiscoveryService",
+           "envoy.service.endpoint.v3.LocalityEndpointDiscoveryService",
            "envoy.service.listener.v3.ListenerDiscoveryService",
            "envoy.service.runtime.v3.RuntimeDiscoveryService",
            "envoy.service.extension.v3.ExtensionConfigDiscoveryService",

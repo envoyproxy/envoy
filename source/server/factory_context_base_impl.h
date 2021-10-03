@@ -30,6 +30,7 @@ public:
     return validation_visitor_;
   };
   Stats::Scope& scope() override { return scope_; };
+  Stats::Scope& serverScope() override { return scope_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return thread_local_; };
 
 private:

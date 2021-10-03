@@ -14,6 +14,7 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
@@ -28,7 +29,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class DefaultCertValidator : public CertValidator {
+class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                        SslStats& stats, TimeSource& time_source);

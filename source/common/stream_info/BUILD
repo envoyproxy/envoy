@@ -49,3 +49,11 @@ envoy_cc_library(
         "//envoy/stream_info:uint32_accessor_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "upstream_address_lib",
+    hdrs = ["upstream_address.h"],
+    deps = [
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)
