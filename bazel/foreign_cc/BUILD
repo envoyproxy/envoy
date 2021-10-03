@@ -113,7 +113,6 @@ envoy_cmake(
         "SXG_WITH_CERT_CHAIN": "off",
         "RUN_TEST": "off",
         "CMAKE_INSTALL_LIBDIR": "lib",
-        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
     },
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
