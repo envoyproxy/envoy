@@ -42,6 +42,14 @@ Minor Behavior Changes
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
+* config: use of work-in-progress API files, messages, or fields will now generate an explicit
+  warning. Please read the text about ``(xds.annotations.v3.file_status).work_in_progress``,
+  ``(xds.annotations.v3.message_status).work_in_progress``, and
+  ``(xds.annotations.v3.field_status).work_in_progress``
+  `here <https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md>`_ for more information. Some
+  APIs that are known to be implicitly not work-in-progress have been force migrated and are
+  individually indicated elsewhere in the release notes. A server-wide ``wip_protos`` counter has
+  also been added in :ref:`server statistics <server_statistics>` to track this.
 * grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
