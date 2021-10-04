@@ -139,6 +139,18 @@ protected:
     EXPECT_GT(socket->connectionInfoProvider().localAddress()->ip()->port(), 0U);
     EXPECT_EQ(Type, socket->socketType());
   }
+
+  // Verify that a listen sockets that do not bind to port can be duplicated and closed.
+  void testNotBindToPort() {
+    auto local_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
+                                                            : Utility::getIpv4AnyAddress();
+    UdpListenSocket socket(local_address, nullptr, /*bind_to_port=*/false);
+    auto dup_socket = socket.duplicate();
+    EXPECT_FALSE(socket.isOpen());
+    EXPECT_FALSE(dup_socket->isOpen());
+    socket.close();
+    dup_socket->close();
+  }
 };
 
 using ListenSocketImplTestTcp = ListenSocketImplTest<Network::Socket::Type::Stream>;
@@ -227,6 +239,10 @@ TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
 
 TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
+
+TEST_P(ListenSocketImplTestTcp, NotBindToPortAccess) { testNotBindToPort(); }
+
+TEST_P(ListenSocketImplTestUdp, NotBindToPortAccess) { testNotBindToPort(); }
 
 } // namespace
 } // namespace Network

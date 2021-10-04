@@ -10,6 +10,7 @@
 namespace Envoy {
 
 // The FakeOriginalDstListenerFilter restore desired local address without the dependency of OS.
+// Ipv6 and Ipv4 addresses are restored to the corresponding loopback ip address and port 80.
 class FakeOriginalDstListenerFilter : public Network::ListenerFilter {
 public:
   // Network::ListenerFilter
@@ -22,7 +23,6 @@ public:
       socket.connectionInfoProvider().restoreLocalAddress(
           std::make_shared<Network::Address::Ipv6Instance>("::1", 80));
     } else {
-
       socket.connectionInfoProvider().restoreLocalAddress(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
     }
