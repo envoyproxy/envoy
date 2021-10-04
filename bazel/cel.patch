@@ -7,7 +7,7 @@ index 7bca2ca..3bed9d3 100644
    }
  
 -#if defined(__clang_major_version__) && __clang_major_version__ >= 8 && !defined(__APPLE__)
-+#if 1
++#if !defined(__GNUC__) || defined(__clang__)
    template <int arg_index>
    inline absl::Status RunWrap(absl::Span<const CelValue> arguments,
                                std::tuple<::google::protobuf::Arena*, Arguments...> input,
@@ -16,7 +16,7 @@ index 7bca2ca..3bed9d3 100644
      }
  
 -#if defined(__clang_major_version__) && __clang_major_version__ >= 8 && !defined(__APPLE__)
-+#if 1
++#if !defined(__GNUC__) || defined(__clang__)
      std::tuple<::google::protobuf::Arena*, Arguments...> input;
      std::get<0>(input) = arena;
      return RunWrap<0>(arguments, input, result, arena);
