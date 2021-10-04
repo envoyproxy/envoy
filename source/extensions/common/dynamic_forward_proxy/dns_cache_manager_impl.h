@@ -32,8 +32,7 @@ private:
     DnsCacheSharedPtr cache_;
   };
 
-  Server::Configuration::FactoryContextBase& context_;
-
+  Server::FactoryContextBaseImpl context_;
   absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
 
