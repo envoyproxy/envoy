@@ -18,14 +18,10 @@ bool CELAccessLogExtensionFilter::evaluate(
     const StreamInfo::StreamInfo& stream_info, const Http::RequestHeaderMap& request_headers,
     const Http::ResponseHeaderMap& response_headers,
     const Http::ResponseTrailerMap& response_trailers) const {
-  if (compiled_expr_ == nullptr) {
-    return false;
-  }
-
   Protobuf::Arena arena;
   auto eval_status = Expr::evaluate(*compiled_expr_, arena, stream_info, &request_headers,
                                     &response_headers, &response_trailers);
-  if (!eval_status.has_value()) {
+  if (!eval_status.has_value() || eval_status.value().IsError()) {
     return false;
   }
   auto result = eval_status.value();

@@ -15,6 +15,11 @@ namespace CEL {
 Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
     Random::RandomGenerator&) {
+
+#if !defined(USE_CEL_PARSER)
+  throw EnvoyException("Not able to create filter - CEL parser not enabled.");
+#endif
+
   auto factory_config = Config::Utility::translateToFactoryConfig(
       config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
 
@@ -27,6 +32,7 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     throw EnvoyException("Not able to parse filter expression: " +
                          parse_status.status().ToString());
   }
+
   return std::make_unique<CELAccessLogExtensionFilter>(getOrCreateBuilder(),
                                                        parse_status.value().expr());
 }

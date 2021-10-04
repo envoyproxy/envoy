@@ -11,6 +11,12 @@ envoy_package()
 envoy_cc_test(
     name = "access_log_impl_test",
     srcs = ["access_log_impl_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
     deps = [
         "//source/common/access_log:access_log_lib",
         "//source/common/stream_info:utility_lib",
