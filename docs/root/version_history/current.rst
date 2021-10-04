@@ -90,6 +90,7 @@ Bug Fixes
 * listener: fixed an issue on Windows where connections are not handled by all worker threads.
 * lua: fix ``BodyBuffer`` setting a Lua string and printing Lua string containing hex characters. Previously, ``BodyBuffer`` setting a Lua string or printing strings with hex characters will be truncated.
 * xray: fix the AWS X-Ray tracer bug where span's error, fault and throttle information was not reported properly as per the `AWS X-Ray documentation <https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html>`_. Before this fix, server error was reported under the 'annotations' section of the segment data.
+* listener: fixed the crash when updating listeners that do not bind to port.
 
 Removed Config or Runtime
 -------------------------
