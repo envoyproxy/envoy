@@ -181,7 +181,7 @@ coloredlogs==15.0.1 \
     # via
     #   -r requirements.in
     #   envoy.base.runner
-coverage==5.5 \
+coverage[toml]==5.5 \
     --hash=sha256:004d1880bed2d97151facef49f08e255a20ceb6f9432df75f4eef018fdd5a78c \
     --hash=sha256:01d84219b5cdbfc8122223b39a954820929497a1cb1422824bb86b07b74594b6 \
     --hash=sha256:040af6c32813fa3eae5305d53f18875bedd079960822ef8ec067a66dd8afcd45 \
@@ -581,9 +581,9 @@ pytest-asyncio==0.15.1 \
     --hash=sha256:2564ceb9612bbd560d19ca4b41347b54e7835c2f792c504f698e05395ed63f6f \
     --hash=sha256:3042bcdf1c5d978f6b74d96a151c4cfb9dcece65006198389ccd7e6c60eb1eea
     # via -r requirements.in
-pytest-cov==2.12.1 \
-    --hash=sha256:261bb9e47e65bd099c89c3edf92972865210c36813f80ede5277dceb77a4a62a \
-    --hash=sha256:261ceeb8c227b726249b376b8526b600f38667ee314f910353fa318caa01f4d7
+pytest-cov==3.0.0 \
+    --hash=sha256:578d5d15ac4a25e5f961c938b85a05b09fdaae9deef3bb6de9a6e766622ca7a6 \
+    --hash=sha256:e7f0f5b1617d2210a2cabc266dfe2f4c75a8d32fb89eafb7ad9d06f6d076d470
     # via -r requirements.in
 pytest-patches==0.0.3 \
     --hash=sha256:6f8cdc8641c708c4812f58ae48d410f373a6fd16cd6cc4dc4d3fb8951df9c92a
@@ -725,8 +725,8 @@ toml==0.10.2 \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
     # via
+    #   coverage
     #   pytest
-    #   pytest-cov
 trycast==0.3.0 \
     --hash=sha256:1b7b4c0d4b0d674770a53f34a762e52a6cd6879eb251ab21625602699920080d \
     --hash=sha256:687185b812e8d1c45f2ba841e8de7bdcdee0695dcf3464f206800505d4c65f26
