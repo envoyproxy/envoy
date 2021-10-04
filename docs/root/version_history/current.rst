@@ -42,6 +42,14 @@ Minor Behavior Changes
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
+* config: use of work-in-progress API files, messages, or fields will now generate an explicit
+  warning. Please read the text about ``(xds.annotations.v3.file_status).work_in_progress``,
+  ``(xds.annotations.v3.message_status).work_in_progress``, and
+  ``(xds.annotations.v3.field_status).work_in_progress``
+  `here <https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md>`_ for more information. Some
+  APIs that are known to be implicitly not work-in-progress have been force migrated and are
+  individually indicated elsewhere in the release notes. A server-wide ``wip_protos`` counter has
+  also been added in :ref:`server statistics <server_statistics>` to track this.
 * grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
@@ -70,6 +78,7 @@ Minor Behavior Changes
   information.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
 * quic: enables IETF connection migration. This feature requires a stable UDP packet routine in the L4 load balancer with the same first-4-bytes in connection id. It can be turned off by setting runtime guard ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_connection_migration_use_new_cid_v2`` to false.
+* thrift_proxy: allow Framed and Header transport combinations to perform :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
 
 Bug Fixes
 ---------
