@@ -21,7 +21,6 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
-
 using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
