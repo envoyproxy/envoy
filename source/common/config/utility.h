@@ -191,7 +191,7 @@ public:
    */
   template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
-    ASSERT(Thread::MainThread::isMainThread());
+    ASSERT(Thread::MainThread::isMainOrTestThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
