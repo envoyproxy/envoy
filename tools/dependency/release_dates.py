@@ -23,7 +23,7 @@ from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
-github_repo_location = "ME-ON1/envoy"
+github_repo_location = "envoyproxy/envoy"
 
 
 # Thrown on errors related to release date or version.
