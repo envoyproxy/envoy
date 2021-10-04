@@ -473,8 +473,6 @@ TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
-        const std::string access_log_name =
-            TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
         const std::string yaml_string = R"EOF(
 name: router

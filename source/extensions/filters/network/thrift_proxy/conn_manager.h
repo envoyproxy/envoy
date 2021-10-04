@@ -74,13 +74,14 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          complete_(false), first_reply_field_(false) {
+          complete_(false), first_reply_field_(false), passthrough_{false} {
       initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
+    FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus messageEnd() override;
     FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
@@ -102,6 +103,7 @@ private:
     absl::optional<bool> success_;
     bool complete_ : 1;
     bool first_reply_field_ : 1;
+    bool passthrough_ : 1;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -155,7 +157,7 @@ private:
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
                        parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
-          local_response_sent_{false}, pending_transport_end_{false} {
+          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false} {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -245,6 +247,7 @@ private:
     absl::any filter_context_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
+    bool passthrough_ : 1;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;
