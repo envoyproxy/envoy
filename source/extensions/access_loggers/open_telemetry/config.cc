@@ -1,7 +1,7 @@
 #include "source/extensions/access_loggers/open_telemetry/config.h"
 
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.validate.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/server/filter_config.h"
@@ -37,10 +37,9 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                           Server::Configuration::CommonFactoryContext& context) {
   validateProtoDescriptors();
 
-  const auto& proto_config =
-      MessageUtil::downcastAndValidate<const envoy::extensions::access_loggers::open_telemetry::
-                                           v3alpha::OpenTelemetryAccessLogConfig&>(
-          config, context.messageValidationVisitor());
+  const auto& proto_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&>(
+      config, context.messageValidationVisitor());
 
   return std::make_shared<AccessLog>(std::move(filter), proto_config, context.threadLocal(),
                                      getAccessLoggerCacheSingleton(context));
@@ -48,7 +47,7 @@ AccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
 ProtobufTypes::MessagePtr AccessLogFactory::createEmptyConfigProto() {
   return std::make_unique<
-      envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig>();
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig>();
 }
 
 std::string AccessLogFactory::name() const { return "envoy.access_loggers.open_telemetry"; }

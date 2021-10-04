@@ -26,12 +26,14 @@ aio.stream==0.0.2 \
     # via envoy.github.release
 aio.subprocess==0.0.4 \
     --hash=sha256:fd504a7c02423c40fde19ad87b62932b9eaa091f5a22d26b89b452059a728750
-    # via envoy.code-format.python-check
+    # via
+    #   -r requirements.in
+    #   envoy.code-format.python-check
 aio.tasks==0.0.4 \
     --hash=sha256:9abd4b0881edb292c4f91a2f63b1dea7a9829a4bd4e8440225a1a412a90461fc
     # via
+    #   -r requirements.in
     #   envoy.code-format.python-check
-    # via -r tools/base/requirements.in
     #   envoy.github.abstract
     #   envoy.github.release
 aiodocker==0.21.0 \
@@ -274,6 +276,7 @@ envoy.abstract.command==0.0.3 \
 envoy.base.checker==0.0.2 \
     --hash=sha256:2ac81efa20fd01fff644ff7dc7fadeac1c3e4dbb6210881ac7a7919ec0e048d8
     # via
+    #   -r requirements.in
     #   envoy.code-format.python-check
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
@@ -281,7 +284,7 @@ envoy.base.checker==0.0.2 \
 envoy.base.runner==0.0.4 \
     --hash=sha256:4eeb2b661f1f0c402df4425852be554a8a83ef5d338bfae69ddcb9b90755379e
     # via
-    #   -r tools/base/requirements.in
+    #   -r requirements.in
     #   envoy.base.checker
     #   envoy.distribution.release
     #   envoy.docs.sphinx-runner
@@ -333,10 +336,6 @@ envoy.gpg.identity==0.0.2 \
 envoy.gpg.sign==0.0.3 \
     --hash=sha256:31667931f5d7ff05fd809b89748f277511486311c777652af4cb8889bd641049
     # via -r requirements.in
-flake8-polyfill==1.0.2 \
-    --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
-    --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
-    # via pep8-naming
 flake8==3.9.2 \
     --hash=sha256:07528381786f2a6237b061f6e96610a4167b226cb926e2aa2b6b1d78057c576b \
     --hash=sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907
@@ -345,6 +344,10 @@ flake8==3.9.2 \
     #   envoy.code-format.python-check
     #   flake8-polyfill
     #   pep8-naming
+flake8-polyfill==1.0.2 \
+    --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
+    --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
+    # via pep8-naming
 frozendict==2.0.6 \
     --hash=sha256:3f00de72805cf4c9e81b334f3f04809278b967d2fed84552313a0fcce511beb1 \
     --hash=sha256:5d3f75832c35d4df041f0e19c268964cbef29c1eb34cd3517cf883f1c2d089b9
@@ -361,9 +364,9 @@ gitdb==4.0.7 \
     --hash=sha256:6c4cc71933456991da20917998acbe6cf4fb41eeaab7d6d67fbc05ecd4c865b0 \
     --hash=sha256:96bf5c08b157a666fec41129e6d327235284cca4c81e92109260f353ba138005
     # via gitpython
-gitpython==3.1.18 \
-    --hash=sha256:b838a895977b45ab6f0cc926a9045c8d1c44e2b653c1fcc39fe91f42c6e8f05b \
-    --hash=sha256:fce760879cd2aebd2991b3542876dc5c4a909b30c9d69dfc488e504a8db37ee8
+gitpython==3.1.24 \
+    --hash=sha256:dc0a7f2f697657acc8d7f89033e8b1ea94dd90356b2983bca89dc8d2ab3cc647 \
+    --hash=sha256:df83fdf5e684fef7c6ee2c02fc68a5ceb7e7e759d08b694088d0cacb4eba59e5
     # via -r requirements.in
 humanfriendly==9.2 \
     --hash=sha256:332da98c24cc150efcc91b5508b19115209272bfdf4b0764a56795932f854271 \
@@ -566,6 +569,14 @@ pyparsing==2.4.7 \
 pyreadline==2.1 \
     --hash=sha256:4530592fc2e85b25b1a9f79664433da09237c1a270e4d78ea5aa3a2c7229e2d1
     # via -r requirements.in
+pytest==6.2.5 \
+    --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89 \
+    --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134
+    # via
+    #   -r requirements.in
+    #   pytest-asyncio
+    #   pytest-cov
+    #   pytest-patches
 pytest-asyncio==0.15.1 \
     --hash=sha256:2564ceb9612bbd560d19ca4b41347b54e7835c2f792c504f698e05395ed63f6f \
     --hash=sha256:3042bcdf1c5d978f6b74d96a151c4cfb9dcece65006198389ccd7e6c60eb1eea
@@ -577,14 +588,6 @@ pytest-cov==2.12.1 \
 pytest-patches==0.0.3 \
     --hash=sha256:6f8cdc8641c708c4812f58ae48d410f373a6fd16cd6cc4dc4d3fb8951df9c92a
     # via -r requirements.in
-pytest==6.2.5 \
-    --hash=sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89 \
-    --hash=sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134
-    # via
-    #   -r requirements.in
-    #   pytest-asyncio
-    #   pytest-cov
-    #   pytest-patches
 python-gnupg==0.4.7 \
     --hash=sha256:2061f56b1942c29b92727bf9aecbd3cea3893acc9cccbdc7eb4604285efe4ac7 \
     --hash=sha256:3ff5b1bf5e397de6e1fe41a7c0f403dad4e242ac92b345f440eaecfb72a7ebae
@@ -641,7 +644,7 @@ six==1.16.0 \
 slackclient==2.9.3 \
     --hash=sha256:07ec8fa76f6aa64852210ae235ff9e637ba78124e06c0b07a7eeea4abb955965 \
     --hash=sha256:2d68d668c02f4038299897e5c4723ab85dd40a3548354924b24f333a435856f8
-    # via -r tools/base/requirements.in
+    # via -r requirements.in
 smmap==4.0.0 \
     --hash=sha256:7e65386bd122d45405ddf795637b7f7d2b532e7e401d46bbe3fb49b9986d5182 \
     --hash=sha256:a9a7479e4c572e2e775c404dcd3080c8dc49f39918c2cf74913d30c4c478e3c2
@@ -655,6 +658,7 @@ sphinx==4.2.0 \
     --hash=sha256:98a535c62a4fcfcc362528592f69b26f7caec587d32cd55688db580be0287ae0
     # via
     #   -r requirements.in
+    #   envoy.docs.sphinx-runner
     #   sphinx-copybutton
     #   sphinx-rtd-theme
     #   sphinx-tabs
@@ -663,15 +667,21 @@ sphinx==4.2.0 \
 sphinx-copybutton==0.4.0 \
     --hash=sha256:4340d33c169dac6dd82dce2c83333412aa786a42dd01a81a8decac3b130dc8b0 \
     --hash=sha256:8daed13a87afd5013c3a9af3575cc4d5bec052075ccd3db243f895c07a689386
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   envoy.docs.sphinx-runner
 sphinx-rtd-theme==1.0.0 \
     --hash=sha256:4d35a56f4508cfee4c4fb604373ede6feae2a306731d533f409ef5c3496fdbd8 \
     --hash=sha256:eec6d497e4c2195fa0e8b2016b337532b8a699a68bcb22a512870e16925c6a5c
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   envoy.docs.sphinx-runner
 sphinx-tabs==3.2.0 \
     --hash=sha256:1e1b1846c80137bd81a78e4a69b02664b98b1e1da361beb30600b939dfc75065 \
     --hash=sha256:33137914ed9b276e6a686d7a337310ee77b1dae316fdcbce60476913a152e0a4
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   envoy.docs.sphinx-runner
 sphinxcontrib-applehelp==1.0.2 \
     --hash=sha256:806111e5e962be97c29ec4c1e7fe277bfd19e9652fb1a4392105b43e01af885a \
     --hash=sha256:a072735ec80e7675e3f432fcae8610ecf509c5f1869d17e2eecff44389cdbc58
@@ -684,9 +694,9 @@ sphinxcontrib-htmlhelp==2.0.0 \
     --hash=sha256:d412243dfb797ae3ec2b59eca0e52dac12e75a241bf0e4eb861e450d06c6ed07 \
     --hash=sha256:f5f8bb2d0d629f398bf47d0d69c07bc13b65f75a81ad9e2f71a63d4b7a2f6db2
     # via sphinx
-sphinxcontrib-httpdomain==1.7.0 \
-    --hash=sha256:1fb5375007d70bf180cdd1c79e741082be7aa2d37ba99efe561e1c2e3f38191e \
-    --hash=sha256:ac40b4fba58c76b073b03931c7b8ead611066a6aebccafb34dc19694f4eb6335
+sphinxcontrib-httpdomain==1.8.0 \
+    --hash=sha256:2059cfabd0cca8fcc3455cc8ffad92f0915a7d3bb03bfddba078a6a0f35beec5 \
+    --hash=sha256:a3396d6350728d574f52458b400f0ac848f8b6913bd41fed95d391d3ffbbade3
     # via
     #   -r requirements.in
     #   envoy.docs.sphinx-runner
@@ -728,6 +738,7 @@ typing-extensions==3.10.0.2 \
     # via
     #   aiodocker
     #   aiohttp
+    #   gitpython
 uritemplate==3.0.1 \
     --hash=sha256:07620c3f3f8eed1f12600845892b0e036a2420acf513c53f7de0abd911a5894f \
     --hash=sha256:5af8ad10cec94f215e3f48112de2022e1d5a37ed427fbd88652fa908f2ab7cae
@@ -794,9 +805,9 @@ yarl==1.6.3 \
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==58.0.4 \
-    --hash=sha256:69cc739bc2662098a68a9bc575cd974a57969e70c1d58ade89d104ab73d79770 \
-    --hash=sha256:f10059f0152e0b7fb6b2edd77bcb1ecd4c9ed7048a826eb2d79f72fd2e6e237b
+setuptools==58.1.0 \
+    --hash=sha256:5de67252090e08d25f240f07d80310f778a5a46cdcf9ea9855662630ac8547b2 \
+    --hash=sha256:7324fd4b66efa05cdfc9c89174573a4410acc7848f318cc0565c7fb659dfdc81
     # via
     #   -r requirements.in
     #   sphinx
