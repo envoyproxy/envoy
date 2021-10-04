@@ -360,7 +360,8 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionUnsu
       EnvoyException, "Unknown xdstp:// transport API type in api_type: GRPC");
 }
 
-TEST_F(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionUnsupportedConfigSpecifierType) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux,
+       GrpcCollectionSubscriptionUnsupportedConfigSpecifierType) {
   envoy::config::core::v3::ConfigSource config;
   config.set_path("/path/foo/bar");
   EXPECT_THROW_WITH_REGEX(
@@ -372,7 +373,7 @@ TEST_F(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionSubscriptionUnsu
       "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
 }
 
-TEST_F(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscription) {
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
