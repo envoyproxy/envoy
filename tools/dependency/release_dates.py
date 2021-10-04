@@ -14,7 +14,7 @@
 import os
 import sys
 import argparse
-
+import string
 import github
 
 import exports
@@ -24,6 +24,7 @@ from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
+github_repo_location = "ME-ON1/envoy"
 
 
 # Thrown on errors related to release date or version.
@@ -65,6 +66,16 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date, c
             create_issues(dep, repo, metadata_version, release_date, latest_release)
 
 
+def is_sha(text):
+    if len(text) != 40:
+        return False
+    try:
+        int(text, 16)
+    except ValueError:
+        return False
+    return True
+
+
 # create issue for stale dependency
 def create_issues(dep, package_repo, metadata_version, release_date, latest_release):
     """Create issues in GitHub.
@@ -78,7 +89,7 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
     """
     access_token = os.getenv('GITHUB_TOKEN')
     git = github.Github(access_token)
-    repo = git.get_repo('envoyproxy/envoy')
+    repo = git.get_repo(github_repo_location)
     # Find GitHub label objects for LABELS.
     labels = []
     for label in repo.get_labels():
@@ -86,21 +97,26 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
             labels.append(label.name)
     if len(labels) != len(LABELS):
         raise DependencyUpdateError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
-    body = f'''\
-            Package Name: {dep}
-            Current Version: {metadata_version}@{release_date}
-            Available Version: {latest_release.tag_name}@{latest_release.created_at}
-            Upstream link: https://github.com/{package_repo.full_name}\
-            '''
+    # trunctate metadata_version to 7 char if its sha_hash
+    if is_sha(metadata_version):
+        metadata_version = metadata_version[0:7]
+        # dedent for making multiline string works in github specailly link
+    body = f"""\
+Package Name: {dep}
+Current Version: {metadata_version}@${release_date}
+Available Version: {latest_release.tag_name}@{latest_release.created_at}
+Upstream link: https://github.com/{package_repo.full_name}
+\
+            """
     title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
+    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
         return
-    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
     print('Creating issues...')
     try:
-        repo.create_issue(title, body=body, labels=LABELS)
+       repo.create_issue(title, body=body , labels=LABELS)
     except github.GithubException as e:
         print(f'Unable to create issue, received error: {e}')
         raise
@@ -108,7 +124,9 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
 
 # checks if issue exist
 def issues_exist(title, git):
-    query = f'repo:envoyproxy/envoy {title} in:title'
+    # search for common title
+    title_search = title[0:title.index("(") - 1]
+    query = f'repo:{github_repo_location} {title_search} in:title'
     try:
         issues = git.search_issues(query)
     except github.GithubException as e:
@@ -119,9 +137,9 @@ def issues_exist(title, git):
 
 # search for issue by title and delete old issue if new package version is available
 def search_old_version_open_issue_exist(title, git, package_repo, latest_release):
-    # search for only "Newer release available `{dep}`:" as will be common in dep issue
+    # search for only "Newer release available {dep}:" as will be common in dep issue
     title_search = title[0:title.index(":")]
-    query = f'repo:envoyproxy/envoy {title_search} in:title is:open'
+    query = f'repo:{github_repo_location} {title_search} in:title is:open'
     # there might be more than one issue
     # if current package version == issue package version no need to do anything, right issue is open
     # if current package version != issue_title_version means a newer updated version is available
@@ -136,28 +154,28 @@ def search_old_version_open_issue_exist(title, git, package_repo, latest_release
 def get_package_version_from_issue(issue_title):
     # issue title create by github action has two form
     if "(" in issue_title:
-        return issue_title[issue_title.index(":") + 1:issue_title.index("(") - 1]
+        return issue_title[issue_title.index(":") + 2:issue_title.index("(") - 1]
     else:
-        return issue_title[issue_title.index(":") + 1:len(issue_title)]
+        return issue_title[issue_title.index(":") + 2:len(issue_title)]
 
 
 def close_old_issue(git, issue_number, latest_release, package_repo):
-    closing_comment = f'''\
-                        New version is available for this package
-                        Details :-
-                        New Version: {latest_release.tag_name}@{latest_release.created_at}
-                        Upstream Link: https://github.com/{package_repo.full_name}\
-                        '''
-    repo = git.get_repo('envoyproxy/envoy')
+    closing_comment = f"""\
+New version is available for this package
+Details :-
+New Version: {latest_release.tag_name}@{latest_release.created_at}
+Upstream Link: https://github.com/{package_repo.full_name}
+\
+                        """
+    repo = git.get_repo(github_repo_location)
     try:
         issue = repo.get_issue(number=issue_number)
         print(f'Publishing closing comment... ')
         publish_comment = issue.create_comment(closing_comment)
         print(f'Closing this issue as new package is available')
-        if publish_comment.completed:
-            issue.edit(state='closed')
+        issue.edit(state='closed')
     except github.GithubException as e:
-        print(f'There was a problem in publishing comment or closing this issue')
+        print(f'There was a problem in publishing comment or closing this issue {e}')
         raise
     return
 
