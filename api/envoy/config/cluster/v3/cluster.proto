@@ -1113,9 +1113,9 @@ message Cluster {
   //
   // Built-in load balancers will have their corresponding configuration messages in
   // typed_config, e.g. :ref:`RoundRobinLbConfig` for round robin. Custom load balancers
-  // can support arbitrary configuration data in the value field with the type_url set to
-  // a unique value in the "envoy_custom_lb" namespace. E.g.: 
-  // "envoy_custom_lb.my_load_balancer". The client is responsible for being able to
+  // will have a TypedStruct with arbitrary Struct configuration data in the value field
+  // with the type_url set to a unique value in the "envoy_custom_lb" namespace.
+  // E.g.: "envoy_custom_lb.my_load_balancer". The client is responsible for being able to
   // look up the custom load balancer implementation with this value and for understanding
   // the configuration data in the Struct.
   //
