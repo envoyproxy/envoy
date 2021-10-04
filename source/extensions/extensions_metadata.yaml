@@ -273,6 +273,11 @@ envoy.filters.http.wasm:
   - envoy.filters.http
   security_posture: unknown
   status: alpha
+envoy.filters.http.stateful_session:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
 envoy.filters.listener.http_inspector:
   categories:
   - envoy.filters.listener
@@ -703,4 +708,9 @@ envoy.key_value.file_based:
   categories:
   - envoy.common.key_value
   security_posture: data_plane_agnostic
+  status: alpha
+envoy.http.stateful_session.cookie:
+  categories:
+  - envoy.http.stateful_session
+  security_posture: unknown
   status: alpha

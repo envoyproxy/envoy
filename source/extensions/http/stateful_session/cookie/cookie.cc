@@ -13,8 +13,8 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
   absl::string_view host_address = host.address()->asStringView();
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     std::string encoded_address = Envoy::Base64::encode(host_address.data(), host_address.length());
-    headers.addReference(Envoy::Http::Headers::get().SetCookie,
-                         factory_.makeSetCookie(encoded_address));
+    headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
+                            factory_.makeSetCookie(encoded_address));
   }
 }
 

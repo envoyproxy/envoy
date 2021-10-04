@@ -597,19 +597,5 @@ public:
   NiceMock<MockUpstreamToDownstream> upstream_to_downstream_;
 };
 
-class MockSessionState : public Http::SessionState {
-public:
-  MOCK_METHOD(absl::optional<absl::string_view>, upstreamAddress, (), (const));
-  MOCK_METHOD(void, onUpdate,
-              (const Upstream::HostDescription& host, Http::ResponseHeaderMap& headers));
-};
-
-class MockSessionStateFactory : public Http::SessionStateFactory {
-public:
-  MockSessionStateFactory();
-
-  MOCK_METHOD(Http::SessionStatePtr, create, (const Http::RequestHeaderMap& headers), (const));
-};
-
 } // namespace Router
 } // namespace Envoy

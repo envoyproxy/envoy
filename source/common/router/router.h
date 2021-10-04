@@ -179,15 +179,6 @@ public:
 };
 
 /**
- * Simple struct wrapper for the stateful session sticky.
- */
-struct SessionStateConfig {
-  bool enabled_{false};
-  Upstream::LoadBalancerContext::OverrideHostStatus host_statuses_;
-  Envoy::Http::SessionStateFactorySharedPtr factory_;
-};
-
-/**
  * Configuration for the router filter.
  */
 class FilterConfig {
@@ -229,23 +220,6 @@ public:
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
-
-    if (config.has_stateful_session_sticky()) {
-      session_state_config_.enabled_ = true;
-      std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
-      for (int i = 0; i < config.stateful_session_sticky().host_statuses_size(); i++) {
-        host_statuses.push_back(config.stateful_session_sticky().host_statuses(i));
-      }
-      session_state_config_.host_statuses_ =
-          Upstream::LoadBalancerContextBase::createOverrideHostStatus(host_statuses);
-
-      auto& factory =
-          Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SessionStateFactoryConfig>(
-              config.stateful_session_sticky().session_state().name());
-
-      session_state_config_.factory_ = factory.createSessionStateFactory(
-          config.stateful_session_sticky().session_state().typed_config(), context);
-    }
   }
   using HeaderVector = std::vector<Http::LowerCaseString>;
   using HeaderVectorPtr = std::unique_ptr<HeaderVector>;
@@ -270,9 +244,6 @@ public:
   Http::Context& http_context_;
   Stats::StatName zone_name_;
   Stats::StatName empty_stat_name_;
-
-  // Config for the stateful session sticky.
-  SessionStateConfig session_state_config_;
 
 private:
   ShadowWriterPtr shadow_writer_;
@@ -441,16 +412,11 @@ public:
   }
 
   absl::optional<OverrideHost> overrideHostToSelect() const override {
-    if (session_state_ == nullptr || is_retry_) {
+    if (is_retry_) {
       return {};
     }
 
-    auto address = session_state_->upstreamAddress();
-    if (address.has_value()) {
-      return std::make_pair(std::string(address.value()),
-                            config_.session_state_config_.host_statuses_);
-    }
-    return {};
+    return callbacks_->upstreamOverrideHost();
   }
 
   /**
@@ -618,8 +584,6 @@ private:
 
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::Socket::OptionsSharedPtr upstream_options_;
-
-  mutable Http::SessionStatePtr session_state_;
 };
 
 class ProdFilter : public Filter {

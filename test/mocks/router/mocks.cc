@@ -158,10 +158,5 @@ MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
   ON_CALL(*this, upstreamToDownstream()).WillByDefault(ReturnRef(upstream_to_downstream_));
 }
 
-MockSessionStateFactory::MockSessionStateFactory() {
-  ON_CALL(*this, create(_))
-      .WillByDefault(Return(testing::ByMove(std::make_unique<NiceMock<MockSessionState>>())));
-}
-
 } // namespace Router
 } // namespace Envoy

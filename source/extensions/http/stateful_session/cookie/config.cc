@@ -10,7 +10,7 @@ namespace Cookie {
 
 Envoy::Http::SessionStateFactorySharedPtr
 CookieBasedSessionStateFactoryConfig::createSessionStateFactory(
-    const Protobuf::Message& config, Server::Configuration::FactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& context) {
 
   auto new_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(config), context.messageValidationVisitor(), *this);

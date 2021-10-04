@@ -14,7 +14,7 @@ class CookieBasedSessionStateFactoryConfig : public Envoy::Http::SessionStateFac
 public:
   Envoy::Http::SessionStateFactorySharedPtr
   createSessionStateFactory(const Protobuf::Message& config,
-                            Server::Configuration::FactoryContext& context) override;
+                            Server::Configuration::CommonFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<

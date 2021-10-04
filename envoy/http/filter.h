@@ -16,6 +16,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/scope_tracked_object_stack.h"
@@ -607,6 +608,21 @@ public:
    */
   virtual void
   requestRouteConfigUpdate(RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+
+  /**
+   * Set override host to be used by the upstream load balancing. If the target host exists in the
+   * host list of the routed cluster, and the status of the target host also meets expectations, the
+   * host should be selected first.
+   * @param host The override host address and expected health status.
+   */
+  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host) PURE;
+
+  /**
+   * @return absl::optional<Upstream::LoadBalancerContext::OverrideHost> optional overrride host
+   * for the upstream load balancing.
+   */
+  virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const PURE;
 };
 
 /**

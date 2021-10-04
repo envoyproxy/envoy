@@ -6370,13 +6370,8 @@ TEST_F(RouterTest, RequestResponseSize) { testRequestResponseSize(false); }
 // when there are trailers in both the request/response.
 TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponseSize(true); }
 
-// Test the case that request with session state.
-TEST_F(RouterTest, RequestWithSessionState) {
-  // Setting mock session state factory.
-  auto mock_factory = std::make_shared<NiceMock<MockSessionStateFactory>>();
-  config_.session_state_config_ = {true, 0b111, mock_factory};
-  auto* session_state = new NiceMock<MockSessionState>();
-
+// Test the case that request with upstream override host.
+TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   NiceMock<Http::MockRequestEncoder> encoder_for_first_reqeust;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -6394,17 +6389,16 @@ TEST_F(RouterTest, RequestWithSessionState) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
 
-  // When stateful session sticky is enabled, `create` of session state factory will be called to
-  // create a session state instance when the request header is processed.
-  EXPECT_CALL(*mock_factory, create(_))
-      .WillOnce(Return(testing::ByMove(Http::SessionStatePtr{session_state})));
+  // Simulate the normal first request.
   router_.decodeHeaders(headers, true);
 
   // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
-  // `LoadBalancerContext` is called, `upstreamAddress` of session state will be called to get
-  // address of upstream host that current session stuck on.
-  EXPECT_CALL(*session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
+  // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
+  // called to get address of upstream host that should be selected first.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost())
+      .WillOnce(Return(
+          absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>({"1.2.3.4", 0b111})));
+
   auto override_host = router_.overrideHostToSelect();
   EXPECT_EQ("1.2.3.4", override_host->first);
   EXPECT_EQ(0b111, override_host->second);
@@ -6429,32 +6423,19 @@ TEST_F(RouterTest, RequestWithSessionState) {
           }));
   router_.retry_state_->callback_();
 
-  // Simulate the load balancer to call the `overrideHostToSelect` again. The address in the session
-  // state will be ignored when the request is retried.
-  EXPECT_CALL(*session_state, upstreamAddress()).Times(0);
+  // Simulate the load balancer to call the `overrideHostToSelect` again. The upstream override host
+  // will be ignored when the request is retried.
+  EXPECT_CALL(callbacks_, upstreamOverrideHost()).Times(0);
   EXPECT_EQ(absl::nullopt, router_.overrideHostToSelect());
-
-  // When processing response from upstream, the `onUpdate` of session state will be called to
-  // determine if the session state state needs to be updated.
-  EXPECT_CALL(*session_state, onUpdate(_, _))
-      .WillOnce(
-          Invoke([&](const Upstream::HostDescription& host, Http::ResponseHeaderMap& headers) {
-            EXPECT_EQ(&host, cm_.thread_local_cluster_.conn_pool_.host_.get());
-            headers.addCopy(Http::LowerCaseString("test"), "test_value");
-          }));
 
   // Normal response.
   Http::ResponseHeaderMapPtr response_headers_200(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  auto* raw_headers = response_headers_200.get();
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
   response_decoder->decodeHeaders(std::move(response_headers_200), true);
 
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
-
-  EXPECT_EQ("test_value",
-            raw_headers->get(Http::LowerCaseString("test"))[0]->value().getStringView());
 
   router_.onDestroy();
 }

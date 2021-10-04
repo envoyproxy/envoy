@@ -447,6 +447,11 @@ private:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost>
+  upstreamOverrideHost() const override {
+    return {};
+  }
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {
