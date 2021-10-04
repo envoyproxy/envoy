@@ -9,6 +9,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -362,6 +363,8 @@ protected:
   }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
+
+  Thread::TestThread test_thread_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
