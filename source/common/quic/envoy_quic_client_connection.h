@@ -38,7 +38,8 @@ public:
   public:
     EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
                                    quic::QuicSocketAddress& peer_address,
-                                   std::unique_ptr<EnvoyQuicPacketWriter> writer);
+                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
 
     ~EnvoyQuicPathValidationContext() override;
 
@@ -46,9 +47,11 @@ public:
 
     std::unique_ptr<EnvoyQuicPacketWriter> releaseWriter();
 
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
+
   private:
-    Network::ConnectionSocketPtr socket_;
     std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    Network::ConnectionSocketPtr socket_;
   };
 
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
@@ -123,15 +126,14 @@ private:
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
 
-  void onFileEvent(uint32_t events);
+  void onFileEvent(uint32_t events, Network::ConnectionSocket& connection_socket);
 
   void maybeMigratePort();
 
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
-  Network::ConnectionSocketPtr probing_socket_;
-  Network::ConnectionSocket* probing_socket_raw_ptr_{nullptr};
+  Network::ConnectionSocket* probing_socket_{nullptr};
   bool migrate_port_on_path_degrading_{false};
 };
 
