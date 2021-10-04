@@ -116,7 +116,7 @@ Upstream link: https://github.com/{package_repo.full_name}
         return
     print('Creating issues...')
     try:
-       repo.create_issue(title, body=body , labels=LABELS)
+        repo.create_issue(title, body=body , labels=LABELS)
     except github.GithubException as e:
         print(f'Unable to create issue, received error: {e}')
         raise
