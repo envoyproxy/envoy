@@ -202,6 +202,8 @@ public:
    * TODO(jmarantz): rename to isMainOrTestThread().
    */
   static bool isMainThread();
+
+  static bool hasMainThread();
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
