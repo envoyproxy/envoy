@@ -26,7 +26,6 @@ namespace TransportSockets {
 namespace Tls {
 namespace {
 
-using ::testing::_;
 using ::testing::MockFunction;
 using ::testing::Ref;
 using ::testing::Return;
