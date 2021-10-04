@@ -45,8 +45,7 @@ bool checkUseAppleApiForDnsLookups(
 
 // Overloading the template function for DnsFilterConfig type, which doesn't need to copy anything.
 void handleLegacyDnsResolverData(
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
-        ClientContextConfig&,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ClientContextConfig&,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
   makeDefaultCaresDnsResolverConfig(typed_dns_resolver_config);
 }

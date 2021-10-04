@@ -5,7 +5,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
 #include "envoy/network/dns.h"
@@ -99,8 +99,7 @@ void handleLegacyDnsResolverData(
 
 // Overloading the template function for DnsFilterConfig type, which doesn't need to copy anything.
 void handleLegacyDnsResolverData(
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
-        ClientContextConfig&,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ClientContextConfig&,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Overloading the template function for Cluster config type, which need to copy

@@ -61,7 +61,7 @@ TEST_F(DnsFactoryTest, MakeDefaultDnsResolverTest) {
 
 // Test handleLegacyDnsResolverData() function with DnsFilterConfig type.
 TEST_F(DnsFactoryTest, LegacyDnsResolverDataDnsFilterConfig) {
-  envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::ClientContextConfig
+  envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ClientContextConfig
       dns_filter_config;
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
