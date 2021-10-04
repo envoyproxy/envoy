@@ -13,6 +13,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/stl_helpers.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
@@ -210,7 +211,14 @@ std::list<DnsResponse>& AppleDnsResolverImpl::PendingResolution::finalAddressLis
 
 void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
-                  "dns resolution for {} completed with status {}", dns_name_, pending_cb_.status_);
+                  "dns resolution for {} completed with status={} v4_addresses={} v6_addresses={}",
+                  dns_name_, pending_cb_.status_,
+                  accumulateToString<Network::DnsResponse>(
+                      pending_cb_.v4_responses_,
+                      [](const auto& dns_response) { return dns_response.address_->asString(); }),
+                  accumulateToString<Network::DnsResponse>(
+                      pending_cb_.v4_responses_,
+                      [](const auto& dns_response) { return dns_response.address_->asString(); }));
   callback_(pending_cb_.status_, std::move(finalAddressList()));
 
   if (owned_) {

@@ -10,6 +10,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/stl_helpers.h"
 #include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
@@ -183,9 +184,13 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       // portFromTcpUrl().
       // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
       // exception in fuzz tests.
-      ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
-                      "dns resolution for {} completed with status {}", dns_name_,
-                      resolution_status);
+      ENVOY_LOG_EVENT(
+          debug, "cares_dns_resolution_complete",
+          "dns resolution for {} completed with status={} addresses={}", dns_name_,
+          resolution_status,
+          accumulateToString<Network::DnsResponse>(address_list, [](const auto& dns_response) {
+            return dns_response.address_->asString();
+          }));
 
       TRY_NEEDS_AUDIT { callback_(resolution_status, std::move(address_list)); }
       catch (const EnvoyException& e) {
