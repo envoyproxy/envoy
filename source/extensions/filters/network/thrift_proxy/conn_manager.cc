@@ -220,7 +220,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   metadata_->setSequenceId(parent_.original_sequence_id_);
 
   if (metadata->hasReplyType()) {
-    success_ = (metadata->replyType() == ReplyType::Success);
+    success_ = metadata->replyType() == ReplyType::Success;
   }
   return ProtocolConverter::messageBegin(metadata);
 }
