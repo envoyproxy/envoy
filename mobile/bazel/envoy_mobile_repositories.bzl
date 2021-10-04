@@ -74,9 +74,9 @@ def swift_repos():
 def kotlin_repos():
     http_archive(
         name = "rules_jvm_external",
-        sha256 = "1bbf2e48d07686707dd85357e9a94da775e1dbd7c464272b3664283c9c716d26",
-        strip_prefix = "rules_jvm_external-2.10",
-        url = "https://github.com/bazelbuild/rules_jvm_external/archive/2.10.zip",
+        sha256 = "f36441aa876c4f6427bfb2d1f2d723b48e9d930b62662bf723ddfb8fc80f0140",
+        strip_prefix = "rules_jvm_external-4.1",
+        url = "https://github.com/bazelbuild/rules_jvm_external/archive/4.1.zip",
     )
 
     http_archive(
