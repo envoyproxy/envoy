@@ -19,7 +19,7 @@ namespace Envoy {
 namespace Config {
 
 // Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
-// There can be multiple DeltaSubscriptionStates active. They will always all be
+// There can be multiple OldDeltaSubscriptionStates active. They will always all be
 // blissfully unaware of each other's existence, even when their messages are
 // being multiplexed together by ADS.
 class OldDeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
@@ -30,7 +30,6 @@ public:
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed);
-  void addAliasesToResolve(const absl::flat_hash_set<std::string>& aliases);
   void setMustSendDiscoveryRequest() { must_send_discovery_request_ = true; }
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
@@ -49,8 +48,8 @@ public:
   // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
   envoy::service::discovery::v3::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
 
-  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
-  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
+  OldDeltaSubscriptionState(const OldDeltaSubscriptionState&) = delete;
+  OldDeltaSubscriptionState& operator=(const OldDeltaSubscriptionState&) = delete;
 
 private:
   bool isHeartbeatResponse(const envoy::service::discovery::v3::Resource& resource) const;

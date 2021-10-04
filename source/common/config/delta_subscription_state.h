@@ -24,7 +24,6 @@ public:
 
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed);
-  void addAliasesToResolve(const absl::flat_hash_set<std::string>& aliases);
   void setMustSendDiscoveryRequest();
   bool subscriptionUpdatePending() const;
   void markStreamFresh();
@@ -37,7 +36,7 @@ public:
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
-  absl::variant<OldDeltaSubscriptionState, NewDeltaSubscriptionState> state_;
+  DeltaSubscriptionStateVariant state_;
 };
 
 } // namespace Config

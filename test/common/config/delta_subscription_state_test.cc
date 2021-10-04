@@ -991,19 +991,19 @@ TEST_P(WildcardDeltaSubscriptionStateTest, ResetToLegacyWildcardBehaviorOnStream
 
 // All resources from the server should be tracked.
 TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWildcardXDS) {
-  { // Add "name4", "name5", "name6" and remove "name1", "name2", "name3".
-    updateSubscriptionInterest({"name4", "name5", "name6"}, {"name1", "name2", "name3"});
+  { // Add "name4", "name5", "name6"
+    updateSubscriptionInterest({"name4", "name5", "name6"}, {});
     auto cur_request = getNextRequestAckless();
     EXPECT_THAT(cur_request->resource_names_subscribe(),
                 UnorderedElementsAre("name4", "name5", "name6"));
-    EXPECT_THAT(cur_request->resource_names_unsubscribe(),
-                UnorderedElementsAre("name1", "name2", "name3"));
+    EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
   }
   {
-    // On Reconnection, only "name4", "name5", "name6" are sent.
+    // On Reconnection, only "name4", "name5", "name6" and wildcard resource are sent.
     markStreamFresh();
     auto cur_request = getNextRequestAckless();
-    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
     EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
     EXPECT_TRUE(cur_request->initial_resource_versions().empty());
   }
@@ -1023,7 +1023,8 @@ TEST_P(WildcardDeltaSubscriptionStateTest, AllResourcesFromServerAreTrackedInWil
   { // Simulate a stream reconnection, just to see the current resource_state_.
     markStreamFresh();
     auto cur_request = getNextRequestAckless();
-    EXPECT_TRUE(cur_request->resource_names_subscribe().empty());
+    EXPECT_THAT(cur_request->resource_names_subscribe(),
+                UnorderedElementsAre(WildcardStr, "name4", "name5", "name6"));
     EXPECT_TRUE(cur_request->resource_names_unsubscribe().empty());
     ASSERT_EQ(cur_request->initial_resource_versions().size(), 4);
     EXPECT_EQ(cur_request->initial_resource_versions().at("name1"), "version1A");

@@ -19,11 +19,11 @@ namespace Envoy {
 namespace Config {
 
 // Tracks the xDS protocol state of an individual ongoing delta xDS session, i.e. a single type_url.
-// There can be multiple DeltaSubscriptionStates active. They will always all be
-// blissfully unaware of each other's existence, even when their messages are
-// being multiplexed together by ADS.
+// There can be multiple NewDeltaSubscriptionStates active. They will always all be blissfully
+// unaware of each other's existence, even when their messages are being multiplexed together by
+// ADS.
 //
-// There are two scenarios which affect how DeltaSubscriptionState manages the resources. First
+// There are two scenarios which affect how NewDeltaSubscriptionState manages the resources. First
 // scenario is when we are subscribed to a wildcard resource, and other scenario is when we are not.
 //
 // Delta subscription state also divides the resources it cached into three categories: requested,
@@ -74,15 +74,14 @@ namespace Config {
 // subscribed to wildcard resource or not. Nothing special happens when we transition from "no
 // wildcard subscription" to "wildcard subscription" scenario, but when transitioning in the other
 // direction, we drop all the resources in "wildcard" and "ambiguous" categories.
-class DeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
+class NewDeltaSubscriptionState : public Logger::Loggable<Logger::Id::config> {
 public:
-  DeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
-                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
+  NewDeltaSubscriptionState(std::string type_url, UntypedConfigUpdateCallbacks& watch_map,
+                            const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher);
 
   // Update which resources we're interested in subscribing to.
   void updateSubscriptionInterest(const absl::flat_hash_set<std::string>& cur_added,
                                   const absl::flat_hash_set<std::string>& cur_removed);
-  void addAliasesToResolve(const absl::flat_hash_set<std::string>& aliases);
   void setMustSendDiscoveryRequest() { must_send_discovery_request_ = true; }
 
   // Whether there was a change in our subscription interest we have yet to inform the server of.
@@ -101,8 +100,8 @@ public:
   // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
   envoy::service::discovery::v3::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
 
-  DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
-  DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
+  NewDeltaSubscriptionState(const NewDeltaSubscriptionState&) = delete;
+  NewDeltaSubscriptionState& operator=(const NewDeltaSubscriptionState&) = delete;
 
 private:
   bool isHeartbeatResponse(const envoy::service::discovery::v3::Resource& resource) const;
@@ -164,7 +163,6 @@ private:
   const std::string type_url_;
   UntypedConfigUpdateCallbacks& watch_map_;
   const LocalInfo::LocalInfo& local_info_;
-  Event::Dispatcher& dispatcher_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};

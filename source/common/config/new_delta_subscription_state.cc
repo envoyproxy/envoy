@@ -11,10 +11,10 @@
 namespace Envoy {
 namespace Config {
 
-DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
-                                               UntypedConfigUpdateCallbacks& watch_map,
-                                               const LocalInfo::LocalInfo& local_info,
-                                               Event::Dispatcher& dispatcher)
+NewDeltaSubscriptionState::NewDeltaSubscriptionState(std::string type_url,
+                                                     UntypedConfigUpdateCallbacks& watch_map,
+                                                     const LocalInfo::LocalInfo& local_info,
+                                                     Event::Dispatcher& dispatcher)
     // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
     // empty resources as updates.
     : supports_heartbeats_(type_url != "envoy.config.route.v3.VirtualHost"),
@@ -36,10 +36,9 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
             watch_map_.onConfigUpdate({}, removed_resources, "");
           },
           dispatcher, dispatcher.timeSource()),
-      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info),
-      dispatcher_(dispatcher) {}
+      type_url_(std::move(type_url)), watch_map_(watch_map), local_info_(local_info) {}
 
-void DeltaSubscriptionState::updateSubscriptionInterest(
+void NewDeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
     const absl::flat_hash_set<std::string>& cur_removed) {
   for (const auto& a : cur_added) {
@@ -110,7 +109,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
 
 // Not having sent any requests yet counts as an "update pending" since you're supposed to resend
 // the entirety of your interest at the start of a stream, even if nothing has changed.
-bool DeltaSubscriptionState::subscriptionUpdatePending() const {
+bool NewDeltaSubscriptionState::subscriptionUpdatePending() const {
   if (!names_added_.empty() || !names_removed_.empty()) {
     return true;
   }
@@ -138,7 +137,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   return must_send_discovery_request_;
 }
 
-UpdateAck DeltaSubscriptionState::handleResponse(
+UpdateAck NewDeltaSubscriptionState::handleResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
@@ -151,7 +150,7 @@ UpdateAck DeltaSubscriptionState::handleResponse(
   return ack;
 }
 
-bool DeltaSubscriptionState::isHeartbeatResponse(
+bool NewDeltaSubscriptionState::isHeartbeatResponse(
     const envoy::service::discovery::v3::Resource& resource) const {
   if (!supports_heartbeats_ &&
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_heartbeats")) {
@@ -182,7 +181,7 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
   return false;
 }
 
-void DeltaSubscriptionState::handleGoodResponse(
+void NewDeltaSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) {
   absl::flat_hash_set<std::string> names_added_removed;
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> non_heartbeat_resources;
@@ -256,7 +255,7 @@ void DeltaSubscriptionState::handleGoodResponse(
             message.resources().size(), message.removed_resources().size());
 }
 
-void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
+void NewDeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
   // Note that error_detail being set is what indicates that a DeltaDiscoveryRequest is a NACK.
   ack.error_detail_.set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
   ack.error_detail_.set_message(Config::Utility::truncateGrpcStatusMessage(e.what()));
@@ -264,13 +263,13 @@ void DeltaSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAc
   watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
 }
 
-void DeltaSubscriptionState::handleEstablishmentFailure() {
+void NewDeltaSubscriptionState::handleEstablishmentFailure() {
   watch_map_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                   nullptr);
 }
 
 envoy::service::discovery::v3::DeltaDiscoveryRequest
-DeltaSubscriptionState::getNextRequestAckless() {
+NewDeltaSubscriptionState::getNextRequestAckless() {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   must_send_discovery_request_ = false;
   if (!any_request_sent_yet_in_current_stream_) {
@@ -315,7 +314,7 @@ DeltaSubscriptionState::getNextRequestAckless() {
   return request;
 }
 
-bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
+bool NewDeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   if (in_initial_legacy_wildcard_) {
     requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
     ASSERT(requested_resource_state_.contains(Wildcard));
@@ -349,7 +348,7 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
 }
 
 envoy::service::discovery::v3::DeltaDiscoveryRequest
-DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
+NewDeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request = getNextRequestAckless();
   request.set_response_nonce(ack.nonce_);
   if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
@@ -359,7 +358,7 @@ DeltaSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   return request;
 }
 
-void DeltaSubscriptionState::addResourceStateFromServer(
+void NewDeltaSubscriptionState::addResourceStateFromServer(
     const envoy::service::discovery::v3::Resource& resource) {
   if (resource.has_ttl()) {
     ttl_.add(std::chrono::milliseconds(DurationUtil::durationToMilliseconds(resource.ttl())),
@@ -387,8 +386,8 @@ void DeltaSubscriptionState::addResourceStateFromServer(
   }
 }
 
-OptRef<DeltaSubscriptionState::ResourceState>
-DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
+OptRef<NewDeltaSubscriptionState::ResourceState>
+NewDeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
@@ -396,8 +395,8 @@ DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_nam
   return {itr->second};
 }
 
-OptRef<const DeltaSubscriptionState::ResourceState>
-DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
+OptRef<const NewDeltaSubscriptionState::ResourceState>
+NewDeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
