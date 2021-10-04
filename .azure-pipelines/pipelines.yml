@@ -547,7 +547,7 @@ stages:
         artifactName: windows.clang-cl
       condition: always()
 
-- job: docker
+  - job: docker
     strategy:
       matrix:
         windows2019:
