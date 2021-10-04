@@ -83,6 +83,7 @@ void onMqSocketEvents(uint32_t flags) {
 
 uint32_t vclEpollHandle(uint32_t wrk_index) {
   std::vector<uint32_t>& epoll_handles = epollHandles();
+  RELEASE_ASSERT(wrk_index < epoll_handles.size(), "epoll handles worker index");
   return epoll_handles[wrk_index];
 }
 
@@ -94,6 +95,8 @@ void vclInterfaceWorkerRegister() {
   const int wrk_index = vppcom_worker_index();
   int epoll_handle = vppcom_epoll_create();
   std::vector<uint32_t>& epoll_handles = epollHandles();
+  RELEASE_ASSERT(static_cast<size_t>(wrk_index) < epoll_handles.size(),
+                 "epoll handles worker index");
   epoll_handles[wrk_index] = epoll_handle;
   VCL_LOG("registered worker {} and epoll handle {:x} mq fd {}", wrk_index, epoll_handle,
           vppcom_mq_epoll_fd());
@@ -117,7 +120,7 @@ void vclInterfaceInit(Event::Dispatcher& dispatcher, uint32_t concurrency) {
   const int wrk_index = vppcom_worker_index();
   std::vector<uint32_t>& epoll_handles = epollHandles();
   // Assume we may have additional threads that request network access
-  epoll_handles.reserve(concurrency * 2);
+  epoll_handles.resize(std::max(concurrency, static_cast<uint32_t>(1)) * 2);
   epoll_handles[wrk_index] = vppcom_epoll_create();
   mq_fevts_map[wrk_index] = dispatcher.createFileEvent(
       vppcom_mq_epoll_fd(), [](uint32_t events) -> void { onMqSocketEvents(events); },
