@@ -64,12 +64,8 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override {
-    tls_.runOnAllThreads(
-        [new_config = config_update_info_->parsedConfiguration()](OptRef<ThreadLocalConfig> tls) {
-          printf("XXXX %ld tls\n", syscall(SYS_gettid));
-          tls->config_ = new_config;
-          printf("XXXX tls end\n");
-        });
+    tls_.runOnAllThreads([new_config = config_update_info_->parsedConfiguration()](
+                             OptRef<ThreadLocalConfig> tls) { tls->config_ = new_config; });
   }
   void validateConfig(const RouteConfiguration&) const override {}
 
