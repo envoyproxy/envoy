@@ -5,10 +5,10 @@
 #include "source/common/secret/secret_manager_impl.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/server/options.h"
 
 #include "config_tracker.h"
 #include "gmock/gmock.h"
