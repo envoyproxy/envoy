@@ -5,6 +5,31 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
+* config: due to the switch to using work-in-progress annotations and warnings to indicate APIs
+  subject to change, the following API packages have been force migrated from ``v3alpha`` to ``v3``:
+  ``envoy.extensions.access_loggers.open_telemetry.v3``,
+  ``envoy.extensions.cache.simple_http_cache.v3``,
+  ``envoy.extensions.filters.http.admission_control.v3``,
+  ``envoy.extensions.filters.http.bandwidth_limit.v3``,
+  ``envoy.extensions.filters.http.cache.v3``,
+  ``envoy.extensions.filters.http.cdn_loop.v3``,
+  ``envoy.extensions.filters.http.ext_proc.v3``,
+  ``envoy.extensions.filters.http.oauth2.v3``,
+  ``envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3``,
+  ``envoy.extensions.filters.udp.dns_filter.v3``,
+  ``envoy.extensions.transport_sockets.s2a.v3``,
+  ``envoy.extensions.watchdog.profile_action.v3``,
+  ``envoy.service.ext_proc.v3``, and
+  ``envoy.watchdog.v3``. If your production deployment was using one of these APIs, you will be
+  forced to potentially vendor the old proto file to continue serving old versions of Envoy.
+  The project realizes this is unfortunate because some of these are known to be used in production,
+  however the project does not have the resources to undergo a migration in which we support
+  ``v3alpha`` and ``v3`` at the same time. The switch to using work-in-progress annotations with
+  clear and explicit warnings will avoid any such issue in the future. We apologize again for any
+  difficulty this change causes, though it is for the best. Additionally, some of the above
+  namespaces have had their work-in-progress annotations removed due to known production usage.
+  Thus, they will not warn and are offered full API stability support by the project from this
+  point forward.
 * config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
   bootstrap configurations since 1.18.0.
 * contrib: the :ref:`squash filter <config_http_filters_squash>` has been moved to
@@ -17,11 +42,11 @@ Incompatible Behavior Changes
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`MySQL proxy filter <config_network_filters_mysql_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
-* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
   protobuf fields have been renumbered to restore compatibility with Envoy
   1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
   numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to
-  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
   provided they skip over Envoy 1.19.0 and 1.19.1.
   Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
   vendor the corresponding protobuf definitions to ensure that the
@@ -42,6 +67,14 @@ Minor Behavior Changes
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
+* config: use of work-in-progress API files, messages, or fields will now generate an explicit
+  warning. Please read the text about ``(xds.annotations.v3.file_status).work_in_progress``,
+  ``(xds.annotations.v3.message_status).work_in_progress``, and
+  ``(xds.annotations.v3.field_status).work_in_progress``
+  `here <https://github.com/envoyproxy/envoy/blob/main/api/STYLE.md>`_ for more information. Some
+  APIs that are known to be implicitly not work-in-progress have been force migrated and are
+  individually indicated elsewhere in the release notes. A server-wide ``wip_protos`` counter has
+  also been added in :ref:`server statistics <server_statistics>` to track this.
 * grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
@@ -70,6 +103,7 @@ Minor Behavior Changes
   information.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
 * quic: enables IETF connection migration. This feature requires a stable UDP packet routine in the L4 load balancer with the same first-4-bytes in connection id. It can be turned off by setting runtime guard ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_connection_migration_use_new_cid_v2`` to false.
+* thrift_proxy: allow Framed and Header transport combinations to perform :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
 
 Bug Fixes
 ---------
@@ -113,7 +147,7 @@ New Features
 * grpc reverse bridge: added a new :ref:`option <envoy_v3_api_field_extensions.filters.http.grpc_http1_reverse_bridge.v3.FilterConfig.response_size_header>` to support streaming response bodies when withholding gRPC frames from the upstream.
 * grpc_json_transcoder: added support to unescape '+' in query parameters to space with a new config field :ref:`query_param_unescape_plus <envoy_v3_api_field_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.query_param_unescape_plus>`.
 * http: added cluster_header in :ref:`weighted_clusters <envoy_v3_api_field_config.route.v3.RouteAction.weighted_clusters>` to allow routing to the weighted cluster specified in the request_header.
-* http: added :ref:`alternate_protocols_cache_options <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>` for enabling HTTP/3 connections to servers which advertise HTTP/3 support via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_.
+* http: added :ref:`alternate_protocols_cache_options <envoy_v3_api_msg_config.core.v3.AlternateProtocolsCacheOptions>` for enabling HTTP/3 connections to servers which advertise HTTP/3 support via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`_ and caching the advertisements to disk.
 * http: added :ref:`string_match <envoy_v3_api_field_config.route.v3.HeaderMatcher.string_match>` in the header matcher.
 * http: added :ref:`x-envoy-upstream-stream-duration-ms <config_http_filters_router_x-envoy-upstream-stream-duration-ms>` that allows configuring the max stream duration via a request header.
 * http: added support for :ref:`max_requests_per_connection <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_requests_per_connection>` for both upstream and downstream connections.
@@ -139,6 +173,11 @@ New Features
 * thrift_proxy: added support for :ref:`mirroring requests <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.request_mirror_policies>`.
 * udp: allows updating filter chain in-place through LDS, which is supported by Quic listener. Such listener config will be rejected in other connection-less UDP listener implementations. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
 * udp: disallow L4 filter chain in config which configures connection-less UDP listener. It can be reverted by ``envoy.reloadable_features.udp_listener_updates_filter_chain_in_place``.
+* upstream: added support for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`, which allows to progresively increase traffic for new endpoints.
+* upstream: extended :ref:`Round Robin load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.round_robin_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>` support.
+* upstream: extended :ref:`Least Request load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.least_request_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` support.
+* windows: added a new container image based on Windows Nanoserver 2022.
+* xray: request direction (``ingress`` or ``egress``) is recorded as X-Ray trace segment's annotation by name ``direction``.
 
 Deprecated
 ----------

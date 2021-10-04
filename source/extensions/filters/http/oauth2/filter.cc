@@ -116,7 +116,7 @@ std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
 } // namespace
 
 FilterConfig::FilterConfig(
-    const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config& proto_config,
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
     Upstream::ClusterManager& cluster_manager, std::shared_ptr<SecretReader> secret_reader,
     Stats::Scope& scope, const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),

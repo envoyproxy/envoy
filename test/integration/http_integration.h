@@ -245,6 +245,8 @@ protected:
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
                             bool with_multiple_1xx_headers = false);
+  void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
+                           uint32_t response1_bytes, uint32_t response2_bytes);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
