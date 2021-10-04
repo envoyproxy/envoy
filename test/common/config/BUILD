@@ -76,6 +76,27 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "delta_subscription_state_old_test",
+    srcs = ["delta_subscription_state_old_test.cc"],
+    deps = [
+        "//source/common/config:delta_subscription_state_lib",
+        "//source/common/config:grpc_subscription_lib",
+        "//source/common/config:new_grpc_mux_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "sotw_subscription_state_test",
     srcs = ["sotw_subscription_state_test.cc"],
     deps = [
