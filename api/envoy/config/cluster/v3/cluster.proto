@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 57]
+// [#next-free-field: 58]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -1107,6 +1107,27 @@ message Cluster {
   // If `connection_pool_per_downstream_connection` is true, the cluster will use a separate
   // connection pool for every downstream connection
   bool connection_pool_per_downstream_connection = 51;
+
+  // This field specifies the load balancing policy. A heterogenous mix of built-in
+  // (e.g. round robin) load balancers as well as custom implementations can be included.
+  //
+  // Built-in load balancers will have their corresponding configuration messages in
+  // typed_config, e.g. :ref:`RoundRobinLbConfig` for round robin. Custom load balancers
+  // can support arbitrary configuration data in the value field with the type_url set to
+  // a unique value in the "envoy_custom_lb" namespace. E.g.: 
+  // "envoy_custom_lb.my_load_balancer". The client is responsible for being able to
+  // look up the custom load balancer implementation with this value and for understanding
+  // the configuration data in the Struct.
+  //
+  // Note that this is a newer, parallel mechanism to the :ref:`load_balancing_policy` field
+  // where this same type is used, but only when the :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`
+  // field is set to :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // The lb_policy and load_balancing_policy fields are deprecated but will be continued to be
+  // supported for backward compatibility.
+  //
+  // Clients that have an understanding of this field should use it for their load balancer
+  // configuration even if the older fields are populated.
+  LoadBalancingPolicy load_balancing_policy_config = 57;
 }
 
 // Extensible load balancing policy configuration.
