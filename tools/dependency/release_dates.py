@@ -14,7 +14,6 @@
 import os
 import sys
 import argparse
-import string
 import github
 
 import exports
