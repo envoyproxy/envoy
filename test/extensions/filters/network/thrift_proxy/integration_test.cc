@@ -225,7 +225,20 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
-  counter = test_server_->counter("thrift.thrift_stats.response_success");
+  if (payload_passthrough_ &&
+      (transport_ == TransportType::Framed || transport_ == TransportType::Header) &&
+      protocol_ != ProtocolType::Twitter) {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(1U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_success");
+    EXPECT_EQ(0U, counter->value());
+  } else {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(0U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_success");
+    EXPECT_EQ(1U, counter->value());
+  }
+  counter = test_server_->counter("thrift.thrift_stats.response_reply");
   EXPECT_EQ(1U, counter->value());
 }
 
@@ -252,13 +265,21 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
-  counter = test_server_->counter("thrift.thrift_stats.response_error");
-  if (payload_passthrough_ && transport_ == TransportType::Framed &&
+  if (payload_passthrough_ &&
+      (transport_ == TransportType::Framed || transport_ == TransportType::Header) &&
       protocol_ != ProtocolType::Twitter) {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(1U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_error");
     EXPECT_EQ(0U, counter->value());
   } else {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(0U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_error");
     EXPECT_EQ(1U, counter->value());
   }
+  counter = test_server_->counter("thrift.thrift_stats.response_reply");
+  EXPECT_EQ(1U, counter->value());
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {

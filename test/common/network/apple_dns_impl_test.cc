@@ -76,9 +76,11 @@ public:
           if (expected_results) {
             EXPECT_FALSE(results.empty());
             for (const auto& result : results) {
-              if (lookup_family == DnsLookupFamily::V4Only) {
+              if (lookup_family == DnsLookupFamily::V4Only ||
+                  lookup_family == DnsLookupFamily::V4Preferred) {
                 EXPECT_NE(nullptr, result.address_->ip()->ipv4());
-              } else if (lookup_family == DnsLookupFamily::V6Only) {
+              } else if (lookup_family == DnsLookupFamily::V6Only ||
+                         lookup_family == DnsLookupFamily::Auto) {
                 EXPECT_NE(nullptr, result.address_->ip()->ipv6());
               }
             }
@@ -152,6 +154,10 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -186,6 +192,10 @@ TEST_F(AppleDnsImplTest, DoubleLookupInOneLoop) {
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionInvalid) {
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V4Preferred,
                                              DnsResolver::ResolutionStatus::Failure, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
@@ -318,6 +328,84 @@ public:
                            }));
     dns_callback_executed.WaitForNotification();
     checkErrorStat(error_code);
+  }
+
+  enum AddressType { V4, V6, Both };
+
+  void fallbackWith(DnsLookupFamily dns_lookup_family, AddressType address_type) {
+    const std::string hostname = "foo.com";
+    sockaddr_in addr4;
+    addr4.sin_family = AF_INET;
+    EXPECT_EQ(1, inet_pton(AF_INET, "1.2.3.4", &addr4.sin_addr));
+    addr4.sin_port = htons(6502);
+    Network::Address::Ipv4Instance address(&addr4);
+
+    sockaddr_in6 addr6;
+    addr6.sin6_family = AF_INET6;
+    EXPECT_EQ(1, inet_pton(AF_INET6, "102:304:506:708:90a:b0c:d0e:f00", &addr6.sin6_addr));
+    addr6.sin6_port = 0;
+    Network::Address::Ipv6Instance address_v6(addr6);
+
+    DNSServiceGetAddrInfoReply reply_callback;
+    absl::Notification dns_callback_executed;
+
+    EXPECT_CALL(dns_service_,
+                dnsServiceGetAddrInfo(_, kDNSServiceFlagsTimeout, 0,
+                                      kDNSServiceProtocol_IPv4 | kDNSServiceProtocol_IPv6,
+                                      StrEq(hostname.c_str()), _, _))
+        .WillOnce(DoAll(SaveArg<5>(&reply_callback), Return(kDNSServiceErr_NoError)));
+
+    EXPECT_CALL(dns_service_, dnsServiceRefSockFD(_)).WillOnce(Return(0));
+    EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
+        .WillOnce(Return(new NiceMock<Event::MockFileEvent>));
+
+    auto query = resolver_->resolve(
+        hostname, dns_lookup_family,
+        [&dns_callback_executed, dns_lookup_family, address_type](
+            DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) -> void {
+          EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
+          EXPECT_EQ(1, response.size());
+
+          if (dns_lookup_family == DnsLookupFamily::Auto) {
+            if (address_type == AddressType::V4) {
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+            } else {
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
+            }
+          }
+
+          if (dns_lookup_family == DnsLookupFamily::V4Preferred) {
+            if (address_type == AddressType::V6) {
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
+            } else {
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+            }
+          }
+          dns_callback_executed.Notify();
+        });
+    ASSERT_NE(nullptr, query);
+
+    switch (address_type) {
+    case V4:
+      reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
+                     address.sockAddr(), 30, query);
+      break;
+    case V6:
+      reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
+                     address_v6.sockAddr(), 30, query);
+      break;
+    case Both:
+      reply_callback(nullptr, kDNSServiceFlagsAdd | kDNSServiceFlagsMoreComing, 0,
+                     kDNSServiceErr_NoError, hostname.c_str(), address.sockAddr(), 30, query);
+
+      reply_callback(nullptr, kDNSServiceFlagsAdd, 0, kDNSServiceErr_NoError, hostname.c_str(),
+                     address_v6.sockAddr(), 30, query);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+
+    dns_callback_executed.WaitForNotification();
   }
 
 protected:
@@ -559,6 +647,30 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
                  address2.sockAddr(), 30, query);
 
   dns_callback_executed.WaitForNotification();
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AutoOnlyV6IfBothV6andV4) {
+  fallbackWith(DnsLookupFamily::Auto, AddressType::Both);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AutoV6IfOnlyV6) {
+  fallbackWith(DnsLookupFamily::Auto, AddressType::V6);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AutoV4IfOnlyV4) {
+  fallbackWith(DnsLookupFamily::Auto, AddressType::V4);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, V4PreferredOnlyV4IfBothV6andV4) {
+  fallbackWith(DnsLookupFamily::V4Preferred, AddressType::Both);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, V4PreferredV6IfOnlyV6) {
+  fallbackWith(DnsLookupFamily::V4Preferred, AddressType::V6);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, V4PreferredV4IfOnlyV4) {
+  fallbackWith(DnsLookupFamily::V4Preferred, AddressType::V4);
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {

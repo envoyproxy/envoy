@@ -160,7 +160,8 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderM
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace,
-                   "ext_authz filter has {} response header(s) to add to the encoded response:",
+                   "ext_authz filter has {} response header(s) to add and {} response header(s) to "
+                   "set to the encoded response:",
                    *encoder_callbacks_, response_headers_to_add_.size());
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
@@ -171,6 +172,14 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     }
   }
 
+  if (!response_headers_to_set_.empty()) {
+    ENVOY_STREAM_LOG(
+        trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
+    for (const auto& header : response_headers_to_set_) {
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, header.first.get(), header.second);
+      headers.setCopy(header.first, header.second);
+    }
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -269,6 +278,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to add to the response:",
                        *decoder_callbacks_, response->response_headers_to_add.size());
       response_headers_to_add_ = std::move(response->response_headers_to_add);
+    }
+
+    if (!response->response_headers_to_set.empty()) {
+      ENVOY_STREAM_LOG(trace, "ext_authz filter saving {} header(s) to set to the response:",
+                       *decoder_callbacks_, response->response_headers_to_set.size());
+      response_headers_to_set_ = std::move(response->response_headers_to_set);
     }
 
     if (cluster_) {

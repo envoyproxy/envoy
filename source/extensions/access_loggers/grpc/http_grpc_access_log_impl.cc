@@ -23,29 +23,30 @@ HttpGrpcAccessLog::ThreadLocalLogger::ThreadLocalLogger(
     GrpcCommon::GrpcAccessLoggerSharedPtr logger)
     : logger_(std::move(logger)) {}
 
-HttpGrpcAccessLog::HttpGrpcAccessLog(
-    AccessLog::FilterPtr&& filter,
-    envoy::extensions::access_loggers::grpc::v3::HttpGrpcAccessLogConfig config,
-    ThreadLocal::SlotAllocator& tls, GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    Stats::Scope& scope)
-    : Common::ImplBase(std::move(filter)), scope_(scope), config_(std::move(config)),
+HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
+                                     const HttpGrpcAccessLogConfig config,
+                                     ThreadLocal::SlotAllocator& tls,
+                                     GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache)
+    : Common::ImplBase(std::move(filter)),
+      config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(tls.allocateSlot()), access_logger_cache_(std::move(access_logger_cache)) {
-  for (const auto& header : config_.additional_request_headers_to_log()) {
+  for (const auto& header : config_->additional_request_headers_to_log()) {
     request_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_headers_to_log()) {
+  for (const auto& header : config_->additional_response_headers_to_log()) {
     response_headers_to_log_.emplace_back(header);
   }
 
-  for (const auto& header : config_.additional_response_trailers_to_log()) {
+  for (const auto& header : config_->additional_response_trailers_to_log()) {
     response_trailers_to_log_.emplace_back(header);
   }
-  Envoy::Config::Utility::checkTransportVersion(config_.common_config());
-  tls_slot_->set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
-        config_.common_config(), Common::GrpcAccessLoggerType::HTTP, scope_));
-  });
+  Envoy::Config::Utility::checkTransportVersion(config_->common_config());
+  tls_slot_->set(
+      [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+            config->common_config(), Common::GrpcAccessLoggerType::HTTP));
+      });
 }
 
 void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
@@ -56,7 +57,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   // TODO(mattklein123): Populate sample_rate field.
   envoy::data::accesslog::v3::HTTPAccessLogEntry log_entry;
   GrpcCommon::Utility::extractCommonAccessLogProperties(*log_entry.mutable_common_properties(),
-                                                        stream_info, config_.common_config());
+                                                        stream_info, config_->common_config());
 
   if (stream_info.protocol()) {
     switch (stream_info.protocol().value()) {

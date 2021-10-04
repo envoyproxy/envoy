@@ -16,12 +16,6 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    visibility = [
-        "//source/extensions:__subpackages__",
-        "//test/common/network:__pkg__",
-        "//test/extensions:__subpackages__",
-    ],
     deps = [
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",

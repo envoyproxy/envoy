@@ -486,9 +486,9 @@ envoy_cc_test(
     deps = [
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
+        "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/runtime:runtime_mocks",

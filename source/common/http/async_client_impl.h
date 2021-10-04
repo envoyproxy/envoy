@@ -40,6 +40,7 @@
 #include "source/common/router/router.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/common/upstream/retry_factory.h"
 
 namespace Envoy {
 namespace Http {
@@ -67,6 +68,7 @@ private:
   Router::FilterConfig config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
+  Singleton::Manager& singleton_manager_;
 
   friend class AsyncStreamImpl;
   friend class AsyncRequestImpl;
@@ -124,48 +126,6 @@ private:
         rate_limit_policy_entry_;
   };
 
-  struct NullRetryPolicy : public Router::RetryPolicy {
-    // Router::RetryPolicy
-    std::chrono::milliseconds perTryTimeout() const override {
-      return std::chrono::milliseconds(0);
-    }
-    std::chrono::milliseconds perTryIdleTimeout() const override {
-      return std::chrono::milliseconds(0);
-    }
-    std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
-      return {};
-    }
-    Upstream::RetryPrioritySharedPtr retryPriority() const override { return {}; }
-
-    uint32_t hostSelectionMaxAttempts() const override { return 1; }
-    uint32_t numRetries() const override { return 1; }
-    uint32_t retryOn() const override { return 0; }
-    const std::vector<uint32_t>& retriableStatusCodes() const override {
-      return retriable_status_codes_;
-    }
-    const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
-      return retriable_headers_;
-    }
-    const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
-      return retriable_request_headers_;
-    }
-    absl::optional<std::chrono::milliseconds> baseInterval() const override {
-      return absl::nullopt;
-    }
-    absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
-    const std::vector<Router::ResetHeaderParserSharedPtr>& resetHeaders() const override {
-      return reset_headers_;
-    }
-    std::chrono::milliseconds resetMaxInterval() const override {
-      return std::chrono::milliseconds(300000);
-    }
-
-    const std::vector<uint32_t> retriable_status_codes_{};
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
-    const std::vector<Router::ResetHeaderParserSharedPtr> reset_headers_{};
-  };
-
   struct NullConfig : public Router::Config {
     Router::RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                                       uint64_t) const override {
@@ -211,20 +171,21 @@ private:
 
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(
-        const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+        AsyncClientImpl& parent, const absl::optional<std::chrono::milliseconds>& timeout,
         const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
             hash_policy,
         const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
-        : cluster_name_(cluster_name), timeout_(timeout) {
+        : cluster_name_(parent.cluster_->name()), timeout_(timeout) {
       if (!hash_policy.empty()) {
         hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
       }
       if (retry_policy.has_value()) {
         // ProtobufMessage::getStrictValidationVisitor() ?  how often do we do this?
+        Upstream::RetryExtensionFactoryContextImpl factory_context(parent.singleton_manager_);
         retry_policy_ = std::make_unique<Router::RetryPolicyImpl>(
-            retry_policy.value(), ProtobufMessage::getNullValidationVisitor());
+            retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context);
       } else {
-        retry_policy_ = std::make_unique<NullRetryPolicy>();
+        retry_policy_ = std::make_unique<Router::RetryPolicyImpl>();
       }
     }
 
@@ -330,12 +291,11 @@ private:
   };
 
   struct RouteImpl : public Router::Route {
-    RouteImpl(const std::string& cluster_name,
-              const absl::optional<std::chrono::milliseconds>& timeout,
+    RouteImpl(AsyncClientImpl& parent, const absl::optional<std::chrono::milliseconds>& timeout,
               const Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>&
                   hash_policy,
               const absl::optional<envoy::config::route::v3::RetryPolicy>& retry_policy)
-        : route_entry_(cluster_name, timeout, hash_policy, retry_policy), typed_metadata_({}) {}
+        : route_entry_(parent, timeout, hash_policy, retry_policy), typed_metadata_({}) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }

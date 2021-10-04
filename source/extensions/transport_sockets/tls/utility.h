@@ -101,6 +101,14 @@ absl::optional<std::string> getLastCryptoError();
  */
 absl::string_view getErrorDescription(int err);
 
+/**
+ * Extracts the X509 certificate validation error information.
+ *
+ * @param ctx the store context
+ * @return the error details
+ */
+std::string getX509VerificationErrorInfo(X509_STORE_CTX* ctx);
+
 } // namespace Utility
 } // namespace Tls
 } // namespace TransportSockets
