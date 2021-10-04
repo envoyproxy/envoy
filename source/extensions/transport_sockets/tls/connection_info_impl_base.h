@@ -18,8 +18,6 @@ namespace Tls {
 // An implementation wraps struct SSL in BoringSSL.
 class ConnectionInfoImplBase : public Ssl::ConnectionInfo {
 public:
-  ConnectionInfoImplBase(bssl::UniquePtr<SSL> ssl) : ssl_(std::move(ssl)) {}
-
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
   absl::Span<const std::string> uriSanLocalCertificate() const override;
@@ -41,7 +39,7 @@ public:
   std::string ciphersuiteString() const override;
   const std::string& tlsVersion() const override;
 
-  SSL* ssl() const { return ssl_.get(); }
+  virtual SSL* ssl() const PURE;
 
 protected:
   bssl::UniquePtr<SSL> ssl_;

@@ -25,7 +25,7 @@ Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidat
 
 SslHandshakerImpl::SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                                      Ssl::HandshakeCallbacks* handshake_callbacks)
-    : ConnectionInfoImplBase(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
+    : ConnectionInfoImplBase(), ssl_(std::move(ssl)), handshake_callbacks_(handshake_callbacks),
       state_(Ssl::SocketState::PreHandshake) {
   SSL_set_ex_data(ssl_.get(), ssl_extended_socket_info_index, &(this->extended_socket_info_));
 }

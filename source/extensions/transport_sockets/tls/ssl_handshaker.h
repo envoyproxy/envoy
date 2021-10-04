@@ -45,6 +45,7 @@ public:
 
   // ConnectionInfoImplBase
   bool peerCertificateValidated() const override;
+  SSL* ssl() const override { return ssl_.get(); }
 
   // Ssl::Handshaker
   Network::PostIoAction doHandshake() override;
@@ -52,6 +53,8 @@ public:
   Ssl::SocketState state() const { return state_; }
   void setState(Ssl::SocketState state) { state_ = state; }
   Ssl::HandshakeCallbacks* handshakeCallbacks() { return handshake_callbacks_; }
+
+  bssl::UniquePtr<SSL> ssl_;
 
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
