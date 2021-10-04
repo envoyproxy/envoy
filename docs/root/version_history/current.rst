@@ -5,8 +5,6 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
-  bootstrap configurations since 1.18.0.
 * config: due to the switch to using work-in-progress annotations and warnings to indicate APIs
   subject to change, the following API packages have been force migrated from ``v3alpha`` to ``v3``:
   ``envoy.extensions.access_loggers.open_telemetry.v3``,
@@ -32,6 +30,8 @@ Incompatible Behavior Changes
   namespaces have had their work-in-progress annotations removed due to known production usage.
   Thus, they will not warn and are offered full API stability support by the project from this
   point forward.
+* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
+  bootstrap configurations since 1.18.0.
 * contrib: the :ref:`squash filter <config_http_filters_squash>` has been moved to
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`kafka broker filter <config_network_filters_kafka_broker>` has been moved to
