@@ -58,6 +58,9 @@ message DnsCacheConfig {
   // The DNS refresh rate for unresolved DNS hosts. If not specified defaults to 60s.
   //
   // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
+  //
+  // Once a host has been resolved, the refresh rate will be the DNS TTL, capped
+  // at a minimum of 5s.
   google.protobuf.Duration dns_refresh_rate = 3
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 

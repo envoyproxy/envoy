@@ -357,8 +357,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     if (!from_cache) {
       addCacheEntry(host, new_address, response.front().ttl_);
     }
-    // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
-    dns_ttl = std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().ttl_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
+      // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
+      dns_ttl = std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().ttl_);
+    }
     primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
   }
 

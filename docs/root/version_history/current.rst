@@ -38,6 +38,7 @@ Minor Behavior Changes
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
   seconds.
+* dns: now respecting the returned DNS TTL for resolved  hosts, rather than always relying on the hard-coded ref:`dns_refresh_rate. <envoy_v3_api_field_config.cluster.v3.Cluster.dns_refresh_rate>` This behavior can be temporarily reverted by setting the runtime guard ``envoy.reloadable_features.use_dns_ttl`` to false.
 * grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
