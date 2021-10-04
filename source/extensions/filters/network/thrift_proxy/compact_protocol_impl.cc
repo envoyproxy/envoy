@@ -113,14 +113,9 @@ bool CompactProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& 
 
   if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
     throw EnvoyException(absl::StrCat("invalid compact protocol field id ", id));
-  } else if (id == 0) {
-    // successful response is inside field id 0
-    reply_type = ReplyType::Success;
-  } else {
-    // error (IDL exception) is in field id greater than 0
-    reply_type = ReplyType::Error;
   }
-
+  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
+  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
 }
 

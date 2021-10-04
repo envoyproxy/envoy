@@ -77,6 +77,7 @@ public:
    * Peeks the start of a Thrift protocol reply payload in the buffer and updates the reply
    * type parameter with the reply type of the payload.
    * @param buffer the buffer to peek from
+   * @param reply_type ReplyType to set the payload's reply type to success or error
    * @return true if reply type was successfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid payload
    */

@@ -81,14 +81,9 @@ bool BinaryProtocolImpl::peekReplyPayload(Buffer::Instance& buffer, ReplyType& r
   int16_t id = buffer.peekBEInt<int16_t>(1);
   if (id < 0) {
     throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
-  } else if (id == 0) {
-    // successful response is inside field id 0
-    reply_type = ReplyType::Success;
-  } else {
-    // error (IDL exception) is in field id greater than 0
-    reply_type = ReplyType::Error;
   }
-
+  // successful response struct in field id 0, error (IDL exception) in field id greater than 0
+  reply_type = id == 0 ? ReplyType::Success : ReplyType::Error;
   return true;
 }
 

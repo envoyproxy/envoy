@@ -60,7 +60,7 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     metadata_ = metadata;
     if (metadata_->hasReplyType()) {
-      success_ = (metadata_->replyType() == ReplyType::Success);
+      success_ = metadata_->replyType() == ReplyType::Success;
     }
     return FilterStatus::Continue;
   }
