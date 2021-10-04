@@ -7,6 +7,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -119,6 +120,12 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
             error_details);
 }
 
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidCA) {
+  root_ca_cert_ = "invalid root CA";
+  EXPECT_THROW_WITH_REGEX(configCertVerificationDetails(true), EnvoyException,
+                          "Failed to load trusted CA certificates from");
+}
+
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
   configCertVerificationDetails(true);
   const std::string ocsp_response;
@@ -217,7 +224,7 @@ jxpQSR32nx6oNN/6kVKlgmBjlWrOy7JyDXGim6Z97TzmS6Clctewmw/5gZ9g+M8e
 g0ZdFbFkNUjzSNm44hiDX8nR6yJRn+gLaARaJvp1dnT+MlvofZuER17WYKH4OyMs
 ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
 -----END CERTIFICATE-----)";
-  configCertVerificationDetails(false);
+  configCertVerificationDetails(true);
   const std::string ocsp_response;
   const std::string cert_sct;
   std::string error_details;
