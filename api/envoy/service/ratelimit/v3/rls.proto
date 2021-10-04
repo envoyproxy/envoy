@@ -126,8 +126,9 @@ message RateLimitResponse {
     //
     // For the matching policy with disjunction, for example, match: "request.headers['environment'] == 'staging' || request.headers['environment'] == 'dev'"),
     // the request_headers action produces a distinct list of descriptors for each possible value of the ‘environment’ header even though the granted quota is same.
+    // Thus, the client will use this id information (returned from RLS server) to correctly correlate the multiple descriptors/descriptor sets that have been granted with same quota (i.e., share the same quota among multiple descriptors or descriptor sets.)
     //
-    // The client will use this id information (returned from RLS server) to correctly correlate the multiple descriptors/descriptor sets that have been granted with same quota (i.e., share the same quota among multiple descriptors or descriptor sets.)
+    // If id is empty, this id field will be ignored. If quota for the same id changes (e.g. due to configuration update), the old quota will be overridden by the new one. It will also be reset when quota expires after `valid_until`.
     string id = 3;
   }
 
