@@ -384,6 +384,9 @@ public:
     // ensure thread safety, ownership of per_lua_code_setup_ptr_ must be transferred to the main
     // thread and destroyed when the FilterConfigPerRoute object is not destructed in the main
     // thread.
+    printf("XXXX %p pointer %d thread safe %d\n", this,
+           static_cast<int>(per_lua_code_setup_ptr_ != nullptr),
+           static_cast<int>(main_thread_dispatcher_.isThreadSafe()));
     if (per_lua_code_setup_ptr_ && !main_thread_dispatcher_.isThreadSafe()) {
       auto shared_ptr_wrapper =
           std::make_shared<PerLuaCodeSetupPtr>(std::move(per_lua_code_setup_ptr_));

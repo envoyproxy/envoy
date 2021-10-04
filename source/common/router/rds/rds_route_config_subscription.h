@@ -114,9 +114,13 @@ private:
                                           route_config_name_, route_config.name()));
     }
     if (route_config_provider_opt_.has_value()) {
+      printf("XXXX validateConfig\n");
       route_config_provider_opt_.value()->validateConfig(route_config);
+      printf("XXXX validateConfig end\n");
     }
+    printf("XXXX onRdsUpdate\n");
     if (config_update_info_->onRdsUpdate(route_config, version_info)) {
+      printf("XXXX onRdsUpdate end\n");
       stats_.config_reload_.inc();
       stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
 
