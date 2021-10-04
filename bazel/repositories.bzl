@@ -454,7 +454,11 @@ def _org_brotli():
     )
 
 def _com_google_cel_cpp():
-    external_http_archive("com_google_cel_cpp")
+    external_http_archive(
+        name = "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:cel.patch"],
+    )
     external_http_archive("rules_antlr")
 
     # Parser dependencies
