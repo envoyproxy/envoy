@@ -147,10 +147,8 @@ Network::DnsResolverFactory& createDefaultDnsResolverFactory(
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config);
 
 // Create the DNS resolver factory from the proto config.
-// Retrieve the DNS related configurations in the passed in @param config, and store the
-// data into @param typed_dns_resolver_config. Output: the DNS resolver factory.
-// The passed in @param config may contain invalid typed_dns_resolver_config.
-// In that case, the underline registry lookup may throw an exception.
+// The passed in config parameter may contain invalid typed_dns_resolver_config.
+// In that case, the underline registry lookup will throw an exception.
 // This function has to be called in main thread.
 template <class ConfigType>
 Network::DnsResolverFactory& createDnsResolverFactoryFromProto(
