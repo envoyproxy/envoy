@@ -1,14 +1,13 @@
 syntax = "proto3";
 
-package envoy.extensions.transport_sockets.s2a.v3alpha;
+package envoy.extensions.transport_sockets.s2a.v3;
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.s2a.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.s2a.v3";
 option java_outer_classname = "S2aProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#not-implemented-hide:]
