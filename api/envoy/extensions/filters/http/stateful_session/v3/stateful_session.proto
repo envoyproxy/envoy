@@ -6,7 +6,6 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/health_check.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.stateful_session.v3";
@@ -30,6 +29,8 @@ message StatefulSession {
 
   // Specific implementation of session state. This session state will be used to store and
   // get address of upstream host that session stuck on.
+  //
+  // [#extension-category: envoy.http.stateful_session]
   config.core.v3.TypedExtensionConfig session_state = 2
       [(validate.rules).message = {required: true}];
 }
