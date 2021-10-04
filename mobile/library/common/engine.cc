@@ -302,13 +302,15 @@ void Engine::drainConnections() {
 
 void Engine::logInterfaces() {
   auto v4_vec = network_configurator_->enumerateV4Interfaces();
-  std::string v4_names = std::accumulate(v4_vec.begin(), v4_vec.end(), std::string{},
+  auto v4_vec_unique_end = std::unique(v4_vec.begin(), v4_vec.end());
+  std::string v4_names = std::accumulate(v4_vec.begin(), v4_vec_unique_end, std::string{},
                                          [](std::string acc, std::string next) {
                                            return acc.empty() ? next : std::move(acc) + "," + next;
                                          });
 
   auto v6_vec = network_configurator_->enumerateV6Interfaces();
-  std::string v6_names = std::accumulate(v6_vec.begin(), v6_vec.end(), std::string{},
+  auto v6_vec_unique_end = std::unique(v6_vec.begin(), v6_vec.end());
+  std::string v6_names = std::accumulate(v6_vec.begin(), v6_vec_unique_end, std::string{},
                                          [](std::string acc, std::string next) {
                                            return acc.empty() ? next : std::move(acc) + "," + next;
                                          });
