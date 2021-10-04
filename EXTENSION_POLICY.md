@@ -93,7 +93,7 @@ The extension status may be adjusted by the extension [CODEOWNERS](./CODEOWNERS)
 maintainers based on an assessment of the above criteria. Note that the status of the extension
 reflects the implementation status. It is orthogonal to the API stability, for example, an extension
 API marked with `(xds.annotations.v3.file_status).work_in_progress` might have a `stable` implementation and
-`envoy.foo.v3.Baz` can have a `wip` implementation.
+and an extension with a stable config proto can have a `wip` implementation.
 
 The `security_posture` is one of:
 * `robust_to_untrusted_downstream`: The extension is hardened against untrusted downstream traffic. It
