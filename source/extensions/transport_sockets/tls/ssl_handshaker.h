@@ -43,8 +43,10 @@ public:
   SslHandshakerImpl(bssl::UniquePtr<SSL> ssl, int ssl_extended_socket_info_index,
                     Ssl::HandshakeCallbacks* handshake_callbacks);
 
-  // ConnectionInfoImplBase
+  // Ssl::ConnectionInfo
   bool peerCertificateValidated() const override;
+
+  // ConnectionInfoImplBase
   SSL* ssl() const override { return ssl_.get(); }
 
   // Ssl::Handshaker
