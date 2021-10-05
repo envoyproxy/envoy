@@ -205,7 +205,6 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes,
                                                             uint32_t max_response_bytes,
                                                             uint32_t num_requests) {
-  autonomous_allow_incomplete_streams_ = true;
   TestRandomGenerator rand;
   std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
