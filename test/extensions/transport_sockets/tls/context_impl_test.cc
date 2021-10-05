@@ -1141,7 +1141,7 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
 }
 
 // Validate that P384 ECDSA certs load.
-TEST_F(ClientContextConfigImplTest,P384EcdsaCert) {
+TEST_F(ClientContextConfigImplTest, P384EcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
