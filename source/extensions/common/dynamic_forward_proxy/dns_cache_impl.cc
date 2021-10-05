@@ -9,7 +9,6 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
