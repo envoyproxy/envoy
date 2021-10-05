@@ -35,16 +35,15 @@ TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
 
 template <Network::Socket::Type Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
+  using ListenSocketType = NetworkListenSocket<NetworkSocketTrait<Type>>;
+
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
   const Address::IpVersion version_;
 
   template <typename... Args>
-  std::unique_ptr<ListenSocketImpl> createListenSocketPtr(Args&&... args) {
-    using NetworkSocketTraitType = NetworkSocketTrait<Type>;
-
-    return std::make_unique<NetworkListenSocket<NetworkSocketTraitType>>(
-        std::forward<Args>(args)...);
+  std::unique_ptr<ListenSocketType> createListenSocketPtr(Args&&... args) {
+    return std::make_unique<ListenSocketType>(std::forward<Args>(args)...);
   }
 
   void testBindSpecificPort() {
@@ -76,7 +75,7 @@ protected:
       EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options->emplace_back(std::move(option));
-      std::unique_ptr<ListenSocketImpl> socket1;
+      std::unique_ptr<ListenSocketType> socket1;
       try {
         socket1 = createListenSocketPtr(addr, options, true);
       } catch (SocketBindException& e) {
