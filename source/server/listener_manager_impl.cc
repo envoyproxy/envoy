@@ -190,9 +190,9 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     }
     return std::make_shared<Network::UdsListenSocket>(address);
   } else if (address->type() == Network::Address::Type::EnvoyInternal) {
-     if (socket_type != Network::Socket::Type::Stream) {
-      throw EnvoyException(
-          fmt::format("socket type {} not supported for EnvoyInternalAddress", toString(socket_type)));
+    if (socket_type != Network::Socket::Type::Stream) {
+      throw EnvoyException(fmt::format("socket type {} not supported for EnvoyInternalAddress",
+                                       toString(socket_type)));
     }
     return std::make_shared<Network::InternalListenSocket>(address);
   }

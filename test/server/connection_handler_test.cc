@@ -4,50 +4,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/config/core/v3/address.pb.h"
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/network/listener.h"
-#include "envoy/server/filter_config.h"
-#include "envoy/server/listener_manager.h"
-#include "envoy/stream_info/filter_state.h"
-
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/common/macros.h"
-#include "source/common/config/metadata.h"
-#include "source/common/init/manager_impl.h"
-#include "source/common/network/address_impl.h"
-#include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/utility.h"
-#include "source/common/protobuf/protobuf.h"
-#include "source/server/configuration_impl.h"
-#include "source/server/listener_manager_impl.h"
-
-#include "test/mocks/init/mocks.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/server/drain_manager.h"
-#include "test/mocks/server/guard_dog.h"
-#include "test/mocks/server/instance.h"
-#include "test/mocks/server/listener_component_factory.h"
-#include "test/mocks/server/worker.h"
-#include "test/mocks/server/worker_factory.h"
-#include "test/server/utility.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/network_utility.h"
-#include "test/test_common/test_runtime.h"
-#include "test/test_common/threadsafe_singleton_injector.h"
-#include "test/test_common/utility.h"
-
-#include "absl/strings/escaping.h"
-#include "absl/strings/match.h"
-
-// Above from listener_manager_impl_test.cc
-
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/listener/v3/udp_listener_config.pb.h"
-#include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 

@@ -144,7 +144,14 @@ public:
   SocketPtr duplicate() override {
     return std::make_unique<InternalListenSocket>(connectionInfoProvider().localAddress());
   }
+
+  void close() override { ASSERT(io_handle_ == nullptr); }
+  bool isOpen() const override {
+    ASSERT(io_handle_ == nullptr);
+    return false;
+  }
 };
+
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
