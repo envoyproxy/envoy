@@ -233,7 +233,7 @@ DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrIn
     break;
   case DnsLookupFamily::Auto:
   case DnsLookupFamily::V4Preferred:
-    /* We want to make sure we don't get any address that is not routable.  Passing 0
+    /* We want to make sure we don't get any address that is not routable. Passing 0
      * to apple's `DNSServiceGetAddrInfo` will make a best attempt to filter out IPv6
      * or IPv4 addresses depending on what's routable, per Apple's documentation:
      *
@@ -245,7 +245,7 @@ DNSServiceErrorType AppleDnsResolverImpl::PendingResolution::dnsServiceGetAddrIn
      * any use anyway. Similarly, if this host has no routable IPv4 address, the call will
      * not try to look up IPv4 addresses for "hostname".
      */
-    protocol = 0
+    protocol = 0;
     break;
   }
 
