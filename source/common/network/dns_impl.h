@@ -43,7 +43,8 @@ private:
                       ares_channel channel, const std::string& dns_name,
                       DnsLookupFamily dns_lookup_family)
         : parent_(parent), callback_(callback), dispatcher_(dispatcher), channel_(channel),
-          dns_name_(dns_name), dns_lookup_family_(dns_lookup_family) {}
+          dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
+          pending_response_({ResolutionStatus::Success, {}}) {}
 
     void cancel(CancelReason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -86,14 +87,14 @@ private:
     bool completed_ = false;
     // Was the query cancelled via cancel()?
     bool cancelled_ = false;
-    // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred or
-    // Auto, perform a second resolution if the first one fails. If dns_lookup_family_ is All
+    // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred
+    // or Auto, perform a second resolution if the first one fails. If dns_lookup_family_ is All
     // perform the second resolution whether the first one fails or succeeds.
     bool dual_resolution_ = false;
-    PendingResponse pending_response_;
     const ares_channel channel_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
+    PendingResponse pending_response_;
   };
 
   struct AresOptions {

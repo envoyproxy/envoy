@@ -111,16 +111,16 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
       ASSERT(dns_lookup_family_ == DnsLookupFamily::All && !dual_resolution_);
       // The only way the resolver would have addresses here is if it is configured to resolve All
       // families, and the first resolution was successful. In that case, we might as well return
-      // the addresses that resolved.
+      // the addresses that resolved as a success.
     } else {
       pending_response_.status_ = ResolutionStatus::Failure;
     }
     // Nothing can follow a call to finishResolve due to the deletion of this object upon
     // finishResolve().
     finishResolve();
-
     return;
   }
+
   if (!dual_resolution_) {
     completed_ = true;
 
