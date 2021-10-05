@@ -6,10 +6,10 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-DeltaSubscriptionStateVariant get_state(std::string type_url,
-                                        UntypedConfigUpdateCallbacks& watch_map,
-                                        const LocalInfo::LocalInfo& local_info,
-                                        Event::Dispatcher& dispatcher) {
+DeltaSubscriptionStateVariant getState(std::string type_url,
+                                       UntypedConfigUpdateCallbacks& watch_map,
+                                       const LocalInfo::LocalInfo& local_info,
+                                       Event::Dispatcher& dispatcher) {
   if (Runtime::runtimeFeatureEnabled("envoy.restart_features.explicit_wildcard_resource")) {
     return DeltaSubscriptionStateVariant(absl::in_place_type<NewDeltaSubscriptionState>,
                                          std::move(type_url), watch_map, local_info, dispatcher);
@@ -25,7 +25,7 @@ DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                const LocalInfo::LocalInfo& local_info,
                                                Event::Dispatcher& dispatcher)
-    : state_(get_state(std::move(type_url), watch_map, local_info, dispatcher)) {}
+    : state_(getState(std::move(type_url), watch_map, local_info, dispatcher)) {}
 
 void DeltaSubscriptionState::updateSubscriptionInterest(
     const absl::flat_hash_set<std::string>& cur_added,
