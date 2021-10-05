@@ -124,6 +124,18 @@ The Envoy project provides reference gRPC implementations of EDS and
 in both `Java <https://github.com/envoyproxy/java-control-plane>`_
 and `Go <https://github.com/envoyproxy/go-control-plane>`_.
 
+.. _arch_overview_endpoint_discovery_types_leds:
+
+Locality-Endpoint discovery service (LEDS)
+""""""""""""""""""""""""""""""""""""""""""
+
+The *locality-endpoint discovery service* is a :ref:`xDS management server based on gRPC in incremental
+(delta-xDS) mode <config_overview_management_server>` used by Envoy to fetch per-cluster locality members.
+The cluster members are called "endpoint" in Envoy terminology. For each locality of a cluster, Envoy
+fetches the endpoints from the discovery service. This is useful for deployments where Envoy needs to support
+many endpoints which are updated often. Using LEDS allows the xDS management server to only send the
+updated endpoints, thus decreasing the amount of transferred data.
+
 .. _arch_overview_service_discovery_types_custom:
 
 Custom cluster
