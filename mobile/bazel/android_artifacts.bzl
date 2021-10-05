@@ -1,3 +1,4 @@
+load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
 load("@rules_java//java:defs.bzl", "java_binary")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
@@ -242,6 +243,7 @@ def _create_classes_jar(name, manifest, android_library):
 def _create_sources_javadocs(name, android_library):
     """
     Creates the sources.jar and javadocs.jar for the provided android library.
+
     This rule generates a sources jar first using a proxy java_binary's result and then uses
     kotlin/dokka's CLI tool to generate javadocs from the sources.jar.
 
@@ -259,26 +261,9 @@ def _create_sources_javadocs(name, android_library):
     )
 
     # This takes all the source files from the source jar and creates a javadoc.jar from it
-    native.genrule(
+    sources_javadocs(
         name = _javadocs_name,
-        srcs = [_sources_name + "_deploy-src.jar"],
-        outs = [_javadocs_name + ".jar"],
-        message = "Generating javadocs...",
-        cmd = """
-        original_directory=$$PWD
-        sources_dir=$$(mktemp -d)
-        unzip $(SRCS) -d $$sources_dir > /dev/null
-        tmp_dir=$$(mktemp -d)
-        java -jar $(location @kotlin_dokka//jar) \
-            $$sources_dir \
-            -format javadoc \
-            -noStdlibLink -noJdkLink \
-            -output $$tmp_dir > /dev/null
-        cd $$tmp_dir
-        zip -r $$original_directory/$@ . > /dev/null
-        """,
-        local = True,
-        tools = ["@kotlin_dokka//jar"],
+        sources_jar = _sources_name + "_deploy-src.jar",
     )
 
     return _sources_name, _javadocs_name
