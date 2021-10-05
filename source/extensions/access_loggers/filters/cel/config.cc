@@ -4,7 +4,9 @@
 
 #include "source/extensions/access_loggers/filters/cel/cel.h"
 
+#if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
+#endif
 
 namespace Envoy {
 namespace Extensions {
