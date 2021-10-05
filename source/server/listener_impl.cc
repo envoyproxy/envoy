@@ -391,8 +391,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
-      // listener_init_target_ is not used during in place update because we expect server
-      // started.
+      // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
