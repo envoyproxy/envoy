@@ -33,8 +33,6 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
   }
 }
 
-CidrRange::CidrRange(const CidrRange& other) = default;
-
 CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
 bool CidrRange::operator==(const CidrRange& other) const {
@@ -192,10 +190,11 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 }
 
 IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs) {
+  ip_list_.reserve(cidrs.size());
   for (const envoy::config::core::v3::CidrRange& entry : cidrs) {
     CidrRange list_entry = CidrRange::create(entry);
     if (list_entry.isValid()) {
-      ip_list_.push_back(list_entry);
+      ip_list_.push_back(std::move(list_entry));
     } else {
       throw EnvoyException(
           fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",

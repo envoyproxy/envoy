@@ -1,8 +1,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
@@ -96,7 +96,7 @@ public:
 
   // Set up proto fields with standard config.
   FilterConfigSharedPtr getConfig() {
-    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
     endpoint->set_uri("auth.example.com/_oauth");
@@ -245,7 +245,7 @@ TEST_F(OAuth2Test, InvalidCluster) {
 TEST_F(OAuth2Test, DefaultAuthScope) {
 
   // Set up proto fields with no auth scope set.
-  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
   endpoint->set_uri("auth.example.com/_oauth");

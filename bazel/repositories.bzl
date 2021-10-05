@@ -227,8 +227,16 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
-    external_http_archive("envoy_build_tools")
-    external_http_archive("rules_cc")
+    external_http_archive(
+        name = "envoy_build_tools",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
+    )
+    external_http_archive(
+        "rules_cc",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/external:rules_cc.patch"],
+    )
     external_http_archive("rules_pkg")
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.

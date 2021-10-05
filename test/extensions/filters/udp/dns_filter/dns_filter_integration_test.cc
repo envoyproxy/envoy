@@ -83,7 +83,7 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
@@ -151,7 +151,7 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "external_resolver"
     server_config:
       inline_dns_table:

@@ -1,7 +1,7 @@
 config {
   name: "envoy.filters.http.admission_control"
   typed_config {
-    type_url: "type.googleapis.com/envoy.extensions.filters.http.admission_control.v3alpha.AdmissionControl"
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.admission_control.v3.AdmissionControl"
     value: "\022\000"
   }
 }

@@ -56,7 +56,7 @@
   "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.proto": "envoy/config/filter/http/aws_lambda/v2alpha/aws_lambda.proto",
   "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.proto": "envoy/config/filter/http/aws_request_signing/v2alpha/aws_request_signing.proto",
   "envoy/extensions/filters/http/buffer/v3/buffer.proto": "envoy/config/filter/http/buffer/v2/buffer.proto",
-  "envoy/extensions/filters/http/cache/v3alpha/cache.proto": "envoy/config/filter/http/cache/v2alpha/cache.proto",
+  "envoy/extensions/filters/http/cache/v3/cache.proto": "envoy/config/filter/http/cache/v2alpha/cache.proto",
   "envoy/extensions/filters/http/compressor/v3/compressor.proto": "envoy/config/filter/http/compressor/v2/compressor.proto",
   "envoy/extensions/filters/http/cors/v3/cors.proto": "envoy/config/filter/http/cors/v2/cors.proto",
   "envoy/extensions/filters/http/csrf/v3/csrf.proto": "envoy/config/filter/http/csrf/v2/csrf.proto",

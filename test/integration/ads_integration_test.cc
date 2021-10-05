@@ -1656,4 +1656,364 @@ TEST_P(XdsTpAdsIntegrationTest, Basic) {
   makeSingleRequest();
 }
 
+// Basic CDS/EDS/LEDS update that warms and makes active a single cluster.
+TEST_P(XdsTpAdsIntegrationTest, BasicWithLeds) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  const auto leds_resource_prefix =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/";
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints_name}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints_name, absl::StrCat(leds_resource_prefix, "*"))},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
+  // Receive LEDS request, and send 2 endpoints.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix, "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+  const auto endpoint1_name = absl::StrCat(leds_resource_prefix, "endpoint_0",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name = absl::StrCat(leds_resource_prefix, "endpoint_1",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(
+      Config::TypeUrl::get().LbEndpoint,
+      {buildLbEndpointResource(endpoint1_name, "2"), buildLbEndpointResource(endpoint2_name, "2")},
+      {});
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "2", {}, {}, {}));
+}
+
+// CDS/EDS/LEDS update that warms and makes active a single cluster. While
+// waiting for LEDS a new EDS update arrives.
+TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingEds) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  const auto leds_resource_prefix_foo =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/";
+  const auto leds_resource_prefix_bar =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/bar-endpoints/";
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints_name}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints_name,
+                                          absl::StrCat(leds_resource_prefix_foo, "*"))},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
+  // Receive LEDS request, and send an updated EDS response.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix_foo,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints_name,
+                                          absl::StrCat(leds_resource_prefix_bar, "*"))},
+      {}, "2");
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
+
+  // Send the old LEDS response, and ensure it is rejected.
+  const auto endpoint1_name_foo =
+      absl::StrCat(leds_resource_prefix_foo, "endpoint_0",
+                   "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name_foo =
+      absl::StrCat(leds_resource_prefix_foo, "endpoint_1",
+                   "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(Config::TypeUrl::get().LbEndpoint,
+                                              {buildLbEndpointResource(endpoint1_name_foo, "2"),
+                                               buildLbEndpointResource(endpoint2_name_foo, "2")},
+                                              {});
+
+  // Receive the new LEDS request and EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix_bar,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {absl::StrCat(leds_resource_prefix_foo,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")}));
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {}, {}, {}));
+
+  // Send the new LEDS response
+  const auto endpoint1_name_bar =
+      absl::StrCat(leds_resource_prefix_bar, "endpoint_0",
+                   "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name_bar =
+      absl::StrCat(leds_resource_prefix_bar, "endpoint_1",
+                   "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(Config::TypeUrl::get().LbEndpoint,
+                                              {buildLbEndpointResource(endpoint1_name_bar, "3"),
+                                               buildLbEndpointResource(endpoint2_name_bar, "3")},
+                                              {});
+
+  // The cluster should be warmed up.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "3", {}, {}, {}));
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "2", {}, {}, {}));
+}
+
+// CDS/EDS/LEDS update that warms and makes active a single cluster. While
+// waiting for LEDS a new CDS update arrives.
+TEST_P(XdsTpAdsIntegrationTest, LedsClusterWarmingUpdatingCds) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster1_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                    "cluster1?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster1_resource = buildCluster(cluster1_name);
+  const std::string endpoints1_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/cluster1";
+  cluster1_resource.mutable_eds_cluster_config()->set_service_name(endpoints1_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster1_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  const auto leds_resource_prefix1 =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints1/";
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints1_name}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints1_name,
+                                          absl::StrCat(leds_resource_prefix1, "*"))},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
+  // Receive LEDS request, and send an updated CDS response (removing previous
+  // cluster and adding a new one).
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix1,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+  const std::string cluster2_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                    "cluster2?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster2_resource = buildCluster(cluster2_name);
+  const std::string endpoints2_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/cluster2";
+  cluster2_resource.mutable_eds_cluster_config()->set_service_name(endpoints2_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster2_resource},
+                                                             {cluster1_name}, "2");
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
+
+  // Send the old LEDS response.
+  const auto endpoint1_name_cluster1 = absl::StrCat(
+      leds_resource_prefix1, "endpoint_0", "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name_cluster1 = absl::StrCat(
+      leds_resource_prefix1, "endpoint_1", "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(
+      Config::TypeUrl::get().LbEndpoint,
+      {buildLbEndpointResource(endpoint1_name_cluster1, "2"),
+       buildLbEndpointResource(endpoint2_name_cluster1, "2")},
+      {});
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  const auto leds_resource_prefix2 =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints2/";
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints2_name}, {endpoints1_name}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints2_name,
+                                          absl::StrCat(leds_resource_prefix2, "*"))},
+      {}, "2");
+
+  // The server should remove interest in the old LEDS.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {}, {},
+      {absl::StrCat(leds_resource_prefix1,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")}));
+
+  // Receive CDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}));
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "2", {}, {}, {}));
+
+  // Receive the new LEDS request and EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix2,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {}, {}, {}));
+
+  // Send 2 endpoints using LEDS.
+  const auto endpoint1_name_cluster2 = absl::StrCat(
+      leds_resource_prefix2, "endpoint_0", "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name_cluster2 = absl::StrCat(
+      leds_resource_prefix2, "endpoint_1", "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(
+      Config::TypeUrl::get().LbEndpoint,
+      {buildLbEndpointResource(endpoint1_name_cluster2, "2"),
+       buildLbEndpointResource(endpoint2_name_cluster2, "2")},
+      {});
+
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "2", {}, {}, {}));
+}
+
+// Timeout on LEDS update activates the cluster.
+TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality, that uses LEDS.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {}, {endpoints_name}, {}));
+  const auto leds_resource_prefix =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/";
+
+  auto cla_with_leds =
+      buildClusterLoadAssignmentWithLeds(endpoints_name, absl::StrCat(leds_resource_prefix, "*"));
+  // Set a short timeout for the initial fetch.
+  cla_with_leds.mutable_endpoints(0)
+      ->mutable_leds_cluster_locality_config()
+      ->mutable_leds_config()
+      ->mutable_initial_fetch_timeout()
+      ->set_nanos(100 * 1000 * 1000);
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {}, {cla_with_leds}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  // Receive LEDS request, and wait for the initial fetch timeout.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix, "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+
+  // The cluster should be warming. Wait until initial fetch timeout.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
+
+  test_server_->waitForCounterEq(
+      "cluster.xdstp_//test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+      "baz?xds.node.cluster=cluster_name&xds.node.id=node_name.leds.init_fetch_timeout",
+      1);
+
+  // After timeout the cluster should be active, not warming.
+  test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "1", {}, {}, {}));
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+}
+
 } // namespace Envoy
