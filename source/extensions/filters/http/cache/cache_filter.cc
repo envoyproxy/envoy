@@ -29,9 +29,9 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(
-    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
-    Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
+CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+                         const std::string&, Stats::Scope&, TimeSource& time_source,
+                         HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
       vary_allow_list_(config.allowed_vary_headers()) {}
 

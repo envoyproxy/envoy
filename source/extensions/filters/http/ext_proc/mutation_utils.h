@@ -2,7 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/header_map.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/logger.h"
 
@@ -19,22 +19,21 @@ public:
 
   // Apply mutations that are common to header responses.
   static void
-  applyCommonHeaderResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response,
+  applyCommonHeaderResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
                             Http::HeaderMap& headers);
 
   // Modify header map based on a set of mutations from a protobuf
-  static void
-  applyHeaderMutations(const envoy::service::ext_proc::v3alpha::HeaderMutation& mutation,
-                       Http::HeaderMap& headers, bool replacing_message);
+  static void applyHeaderMutations(const envoy::service::ext_proc::v3::HeaderMutation& mutation,
+                                   Http::HeaderMap& headers, bool replacing_message);
 
   // Apply mutations that are common to body responses.
   // Mutations will be applied to the header map if it is not null.
-  static void applyCommonBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& body,
+  static void applyCommonBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& body,
                                       Http::RequestOrResponseHeaderMap* headers,
                                       Buffer::Instance& buffer);
 
   // Modify a buffer based on a set of mutations from a protobuf
-  static void applyBodyMutations(const envoy::service::ext_proc::v3alpha::BodyMutation& mutation,
+  static void applyBodyMutations(const envoy::service::ext_proc::v3::BodyMutation& mutation,
                                  Buffer::Instance& buffer);
 
   // Determine if a particular HTTP status code is valid.

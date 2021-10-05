@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
@@ -71,7 +71,7 @@ public:
           auto* access_log = hcm.add_access_log();
           access_log->set_name("grpc_accesslog");
 
-          envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig
+          envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
               config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
