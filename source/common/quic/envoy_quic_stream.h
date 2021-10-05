@@ -139,6 +139,7 @@ protected:
     }
     if (received_content_bytes_ > content_length_.value() ||
         (end_stream && received_content_bytes_ != content_length_.value())) {
+      details_ = Http3ResponseCodeDetailValues::inconsistent_content_length;
       // Reset instead of closing the connection to align with nghttp2.
       onStreamError(false);
     }
