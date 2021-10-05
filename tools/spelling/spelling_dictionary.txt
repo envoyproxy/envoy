@@ -128,7 +128,6 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
-disjunction
 guarddog
 GC
 GCC
