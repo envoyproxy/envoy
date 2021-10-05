@@ -17,6 +17,13 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
+std::string getConnectionInfoString(const ConnectionInfoProvider& conn_info) {
+  std::stringstream out;
+  conn_info.dumpState(out, 0);
+  return out.str();
+}
+} // namespace
 
 class ListenSocketImpl : public SocketImpl {
 protected:
@@ -35,32 +42,20 @@ protected:
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
   void close() override {
-    if (io_handle_ != nullptr) {
-      if (io_handle_->isOpen()) {
-        io_handle_->close();
-      }
-    } else {
-      std::stringstream out;
-      connection_info_provider_->dumpState(out, 0);
-      std::string state = out.str();
-      ENVOY_BUG(false, fmt::format("close() is called from ListenSocketImpl but the io handle is "
-                                   "nullptr. Info: {}",
-                                   out.str()));
+    RELEASE_ASSERT(io_handle_ != nullptr,
+                   absl::StrCat(__FUNCTION__,
+                                " is called from the ListenSocket with no io handle. Socket info: ",
+                                getConnectionInfoString(*connection_info_provider_)));
+    if (io_handle_->isOpen()) {
+      io_handle_->close();
     }
   }
   bool isOpen() const override {
-    if (io_handle_ != nullptr) {
-      return io_handle_->isOpen();
-    } else {
-      std::stringstream out;
-      connection_info_provider_->dumpState(out, 0);
-      ENVOY_BUG(false, fmt::format("isOpen() is called from ListenSocketImpl but the io handle is "
-                                   "nullptr. Info: {}",
-                                   out.str()));
-      // Consider listen socket as closed if it does not bind to
-      // port. No fd will leak.
-      return false;
-    }
+    RELEASE_ASSERT(io_handle_ != nullptr,
+                   absl::StrCat(__FUNCTION__,
+                                " is called from the ListenSocket with no io handle. Socket info: ",
+                                getConnectionInfoString(*connection_info_provider_)));
+    return io_handle_->isOpen();
   }
 };
 
