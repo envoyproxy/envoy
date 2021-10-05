@@ -12,6 +12,7 @@ kt_jvm_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "@maven//:io_github_classgraph_classgraph",
         "@maven//:junit_junit",
     ],
 )
