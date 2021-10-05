@@ -83,7 +83,6 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   if (auto* listener = details.listener_->listener(); listener != nullptr) {
     listener->setRejectFraction(listener_reject_fraction_);
   }
-  // TODO: make listenSocketFactory support envoy internal listener.
   listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
 }
 

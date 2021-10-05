@@ -129,10 +129,22 @@ using UdpListenSocketPtr = std::unique_ptr<UdpListenSocket>;
 class UdsListenSocket : public ListenSocketImpl {
 public:
   UdsListenSocket(const Address::InstanceConstSharedPtr& address);
-  UdsListenSocket(IoHandlePtr&& io_handle, const Address::InstanceConstSharedPtr& address);
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 };
 
+// This socket type adapts the ListenerComponentFactory.
+class InternalListenSocket : public ListenSocketImpl {
+public:
+  InternalListenSocket(const Address::InstanceConstSharedPtr& address)
+      : ListenSocketImpl(/* io_handle= */ nullptr, address) {}
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
+
+  // InternalListenSocket cannot be duplicated.
+  SocketPtr duplicate() override {
+    return std::make_unique<InternalListenSocket>(/* io_handle */ nullptr,
+                                                  connectionInfoProvider().localAddress());
+  }
+};
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,

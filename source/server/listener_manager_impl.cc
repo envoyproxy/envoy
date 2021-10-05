@@ -169,8 +169,6 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
-  ASSERT(address->type() == Network::Address::Type::Ip ||
-         address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -191,6 +189,12 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
+  } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+     if (socket_type != Network::Socket::Type::Stream) {
+      throw EnvoyException(
+          fmt::format("socket type {} not supported for EnvoyInternalAddress", toString(socket_type)));
+    }
+    return std::make_shared<Network::InternalListenSocket>(address);
   }
 
   const std::string scheme = (socket_type == Network::Socket::Type::Stream)
