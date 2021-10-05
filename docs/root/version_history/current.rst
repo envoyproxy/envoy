@@ -1,5 +1,5 @@
-1.20.0 (Pending)
-================
+1.20.0 (October 5, 2021)
+========================
 
 Incompatible Behavior Changes
 -----------------------------
@@ -51,7 +51,6 @@ Incompatible Behavior Changes
   Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
   vendor the corresponding protobuf definitions to ensure that the
   renumbered fields have the types expected by those releases.
-* ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 * extensions: deprecated extension names now default to triggering a configuration error.
   The previous warning-only behavior may be temporarily reverted by setting the runtime key
   ``envoy.deprecated_features.allow_deprecated_extension_names`` to true.
@@ -60,9 +59,9 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* client_ssl_auth filter: now sets additional termination details and **UAEX** response flag when the client certificate is not in the allowed-list.
+* client_ssl_auth filter: now sets additional termination details and ``UAEX`` response flag when the client certificate is not in the allowed-list.
 * config: configuration files ending in .yml now load as YAML.
-* config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON file load as JSON.
+* config: configuration file extensions now ignore case when deciding the file type. E.g., .JSON files load as JSON.
 * config: reduced log level for "Unable to establish new stream" xDS logs to debug. The log level
   for "gRPC config stream closed" is now reduced to debug when the status is ``Ok`` or has been
   retriable (``DeadlineExceeded``, ``ResourceExhausted``, or ``Unavailable``) for less than 30
@@ -75,6 +74,7 @@ Minor Behavior Changes
   APIs that are known to be implicitly not work-in-progress have been force migrated and are
   individually indicated elsewhere in the release notes. A server-wide ``wip_protos`` counter has
   also been added in :ref:`server statistics <server_statistics>` to track this.
+* ext_authz: fixed skipping authentication when returning either a direct response or a redirect. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect`` runtime guard to false.
 * grpc: gRPC async client can be cached and shared across filter instances in the same thread, this feature is turned off by default, can be turned on by setting runtime guard ``envoy.reloadable_features.enable_grpc_async_client_cache`` to true.
 * http: correct the use of the ``x-forwarded-proto`` header and the ``:scheme`` header. Where they differ
   (which is rare) ``:scheme`` will now be used for serving redirect URIs and cached content. This behavior
@@ -92,13 +92,13 @@ Minor Behavior Changes
   feature to a non-negative number will override the default value.
 * http: stop processing pending H/2 frames if connection transitioned to a closed state. This behavior can be temporarily reverted by setting the ``envoy.reloadable_features.skip_dispatching_frames_for_closed_connection`` to false.
 * listener: added the :ref:`enable_reuse_port <envoy_v3_api_field_config.listener.v3.Listener.enable_reuse_port>`
-  field and changed the default for reuse_port from false to true, as the feature is now well
+  field and changed the default for ``reuse_port`` from false to true, as the feature is now well
   supported on the majority of production Linux kernels in use. The default change is aware of the hot
   restart, as otherwise, the change would not be backward compatible between restarts. This means
   that hot restarting onto a new binary will retain the default of false until the binary undergoes
   a full restart. To retain the previous behavior, either explicitly set the new configuration
   field to false, or set the runtime feature flag ``envoy.reloadable_features.listener_reuse_port_default_enabled``
-  to false. As part of this change, the use of reuse_port for TCP listeners on both macOS and
+  to false. As part of this change, the use of ``reuse_port`` for TCP listeners on both macOS and
   Windows has been disabled due to suboptimal behavior. See the field documentation for more
   information.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in-place update.
@@ -158,14 +158,11 @@ New Features
 * listener: new listener metric ``downstream_cx_transport_socket_connect_timeout`` to track transport socket timeouts.
 * lua: added ``header:getAtIndex()`` and ``header:getNumValues()`` methods to :ref:`header object <config_http_filters_lua_header_wrapper>` for retrieving the value of a header at certain index and get the total number of values for a given header.
 * matcher: added :ref:`invert <envoy_v3_api_field_type.matcher.v3.MetadataMatcher.invert>` for inverting the match result in the metadata matcher.
-* overload: add a new overload action that resets streams using a lot of memory. To enable the tracking of allocated bytes in buffers that a stream is using we need to configure the minimum threshold for tracking via:ref:`buffer_factory_config <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`. We have an overload action ``Envoy::Server::OverloadActionNameValues::ResetStreams`` that takes advantage of the tracking to reset the most expensive stream first.
+* overload: add a new overload action that resets streams using a lot of memory. To enable the tracking of allocated bytes in buffers that a stream is using we need to configure the minimum threshold for tracking via :ref:`buffer_factory_config <envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`. We have an overload action ``Envoy::Server::OverloadActionNameValues::ResetStreams`` that takes advantage of the tracking to reset the most expensive stream first.
 * rbac: added :ref:`destination_port_range <envoy_v3_api_field_config.rbac.v3.Permission.destination_port_range>` for matching range of destination ports.
 * rbac: added :ref:`matcher<envoy_v3_api_field_config.rbac.v3.Permission.matcher>` along with extension category ``extension_category_envoy.rbac.matchers`` for custom RBAC permission matchers. Added reference implementation for matchers :ref:`envoy.rbac.matchers.upstream_ip_port <extension_envoy.rbac.matchers.upstream_ip_port>`.
 * route config: added :ref:`dynamic_metadata <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>` for routing based on dynamic metadata.
-* router: added retry options predicate extensions configured via
-  :ref:` <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_options_predicates>`. These
-  extensions allow modification of requests between retries at the router level. There are not
-  currently any built-in extensions that implement this extension point.
+* router: added retry options predicate extensions configured via :ref:`retry_options_predicates. <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_options_predicates>` These extensions allow modification of requests between retries at the router level. There are not currently any built-in extensions that implement this extension point.
 * router: added :ref:`per_try_idle_timeout <envoy_v3_api_field_config.route.v3.RetryPolicy.per_try_idle_timeout>` timeout configuration.
 * router: added an optional :ref:`override_auto_sni_header <envoy_v3_api_field_config.core.v3.UpstreamHttpProtocolOptions.override_auto_sni_header>` to support setting SNI value from an arbitrary header other than host/authority.
 * sxg_filter: added filter to transform response to SXG package to :ref:`contrib images <install_contrib>`. This can be enabled by setting :ref:`SXG <envoy_v3_api_msg_extensions.filters.http.sxg.v3alpha.SXG>` configuration.
