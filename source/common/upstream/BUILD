@@ -509,6 +509,7 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
+        "//source/common/common:dns_utils_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
