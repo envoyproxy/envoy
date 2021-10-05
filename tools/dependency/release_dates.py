@@ -25,7 +25,7 @@ from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
-GITHUB_REPO_LOCATION = "ME-ON1/envoy"
+GITHUB_REPO_LOCATION = "envoyproxy/envoy"
 
 BODY_TPL = """
 Package Name: ${dep}
