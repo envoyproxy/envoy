@@ -144,7 +144,8 @@ protected:
   void testNotBindToPort() {
     auto local_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
                                                             : Utility::getIpv4AnyAddress();
-    UdpListenSocket socket(local_address, nullptr, /*bind_to_port=*/false);
+    auto socket = NetworkListenSocket<NetworkSocketTrait<Type>>(local_address, nullptr,
+                                                                /*bind_to_port=*/false);
     auto dup_socket = socket.duplicate();
     EXPECT_FALSE(socket.isOpen());
     EXPECT_FALSE(dup_socket->isOpen());
