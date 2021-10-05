@@ -28,6 +28,11 @@ VERSION=7.0.1
 SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
 PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
 
+if [[ -f /etc/centos-release ]] && [[ $$(cat /etc/centos-release) =~ "CentOS Linux release 7" ]]; then
+  SHA256=609190391ea7be5a0e0b267f1657228ca728c545d6e27a2d8e0b65080eec3001
+  PLATFORM="x86_64-linux-sles11.3"
+fi
+
 curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
   && echo "$$SHA256" clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz | sha256sum --check
 tar xf clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz
@@ -61,14 +66,24 @@ fi
 
 # Ninja 1.9.0
 VERSION=1.9.0
-SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
-PLATFORM="linux"
 
-curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
-  && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
-unzip -o ninja-"$$PLATFORM".zip
-
-export PATH="$$PWD:$$PATH"
+if [[ -f /etc/centos-release ]] && [[ $$(cat /etc/centos-release) =~ "CentOS Linux release 7" ]]; then
+  SHA256=5d7ec75828f8d3fd1a0c2f31b5b0cea780cdfe1031359228c428c1a48bfcd5b9
+  curl -sLo ninja-"$$VERSION".tar.gz https://github.com/ninja-build/ninja/archive/refs/tags/v"$$VERSION".tar.gz \
+    && echo "$$SHA256" ninja-"$$VERSION".tar.gz | sha256sum --check
+  tar xf ninja-"$$VERSION".tar.gz
+  pushd ninja-"$$VERSION"
+  ./configure.py --bootstrap
+  export PATH="$$PWD:$$PATH"
+  popd
+else
+  SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
+  PLATFORM="linux"
+  curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
+    && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
+  unzip -o ninja-"$$PLATFORM".zip
+  export PATH="$$PWD:$$PATH"
+fi
 
 if [[ `ninja --version` != "$$VERSION" ]]; then
   echo "ERROR: Ninja version doesn't match."
