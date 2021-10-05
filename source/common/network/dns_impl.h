@@ -65,6 +65,15 @@ private:
      */
     void getAddrInfo(int family);
 
+    void finishResolve();
+
+    // Small wrapping struct to accumulate addresses from firings of the
+    // onAresGetAddrInfoCallback callback.
+    struct PendingResponse {
+      ResolutionStatus status_;
+      std::list<DnsResponse> address_list_;
+    };
+
     DnsResolverImpl& parent_;
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
@@ -77,9 +86,11 @@ private:
     bool completed_ = false;
     // Was the query cancelled via cancel()?
     bool cancelled_ = false;
-    // If dns_lookup_family is "fallback", fallback to v4 address if v6
-    // resolution failed.
-    bool fallback_if_failed_ = false;
+    // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred or
+    // Auto, perform a second resolution if the first one fails. If dns_lookup_family_ is All
+    // perform the second resolution whether the first one fails or succeeds.
+    bool dual_resolution_ = false;
+    PendingResponse pending_response_;
     const ares_channel channel_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;

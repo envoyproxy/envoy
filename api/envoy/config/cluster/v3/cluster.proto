@@ -129,6 +129,8 @@ message Cluster {
   // If V4_PREFERRED is specified, the DNS resolver will first perform a lookup for addresses in the
   // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
   // target will only get v6 addresses if there were NO v4 addresses to return.
+  // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
+  // and return all resolved addresses.
   // For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
@@ -140,6 +142,7 @@ message Cluster {
     V4_ONLY = 1;
     V6_ONLY = 2;
     V4_PREFERRED = 3;
+    ALL = 4;
   }
 
   enum ClusterProtocolSelection {
