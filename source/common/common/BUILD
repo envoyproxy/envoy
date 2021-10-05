@@ -372,8 +372,8 @@ envoy_cc_library(
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":macros",
         ":non_copyable",
-        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 

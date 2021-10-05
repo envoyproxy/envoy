@@ -1,22 +1,24 @@
 syntax = "proto3";
 
-package envoy.service.ext_proc.v3alpha;
+package envoy.service.ext_proc.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
+import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/struct.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.service.ext_proc.v3alpha";
+option java_package = "io.envoyproxy.envoy.service.ext_proc.v3";
 option java_outer_classname = "ExternalProcessorProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Service]
 
@@ -167,7 +169,7 @@ message ProcessingResponse {
   // for the duration of this particular request/response only. Servers
   // may use this to intelligently control how requests are processed
   // based on the headers and other metadata that they see.
-  envoy.extensions.filters.http.ext_proc.v3alpha.ProcessingMode mode_override = 9;
+  envoy.extensions.filters.http.ext_proc.v3.ProcessingMode mode_override = 9;
 }
 
 // The following are messages that are sent to the server.

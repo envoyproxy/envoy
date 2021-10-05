@@ -29,6 +29,7 @@ envoy_cc_library(
     deps = [
         ":dns_cache_impl",
         "//source/common/protobuf",
+        "//source/server:factory_context_base_impl_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
