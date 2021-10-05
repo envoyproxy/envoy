@@ -174,8 +174,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
   } else {
-    // FIXME: if the failure happens on the second resolution of DnsLookupFamily::All, should this
-    // return the v6 addresses that it has from the first resolution?
     if (!pending_response_.address_list_.empty()) {
       ASSERT(dns_lookup_family_ == DnsLookupFamily::All && !dual_resolution_);
       // The only way the resolver would have addresses here is if it is configured to resolve All
