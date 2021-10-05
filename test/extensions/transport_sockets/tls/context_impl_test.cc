@@ -1068,7 +1068,7 @@ TEST_F(ClientContextConfigImplTest, RSA2048Cert) {
   manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
-// Validate that 1024-bit RSA certificates are rejected.
+// Validate that 1024-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
@@ -1083,17 +1083,7 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-
-  std::string error_msg(
-      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
-#ifdef BORINGSSL_FIPS
-      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-      "with 2048-bit or larger keys are supported"
-#endif
-  );
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
-                          EnvoyException, error_msg);
+  manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
 // Validate that 3072-bit RSA certificates load successfully.
@@ -1150,8 +1140,8 @@ TEST_F(ClientContextConfigImplTest, P256EcdsaCert) {
   manager.createSslClientContext(store, client_context_config, nullptr);
 }
 
-// Validate that non-P256 ECDSA certs are rejected.
-TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
+// Validate that P384 ECDSA certs load.
+TEST_F(ClientContextConfigImplTest,P384EcdsaCert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   const std::string tls_certificate_yaml = R"EOF(
   certificate_chain:
@@ -1165,10 +1155,46 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config, nullptr);
+}
+
+// Validate that P521 ECDSA certs load.
+TEST_F(ClientContextConfigImplTest, P521EcdsaCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p521_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p521_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  manager.createSslClientContext(store, client_context_config, nullptr);
+}
+
+// Validate that non-P256/P384/P521 ECDSA certs are rejected.
+TEST_F(ClientContextConfigImplTest, P224EcdsaCert) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  certificate_chain:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p224_cert.pem"
+  private_key:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p224_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
-                          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
-                          "only P-256 ECDSA certificates are supported");
+                          "Failed to load certificate chain from .*selfsigned_ecdsa_p224_cert.pem, "
+                          "only P-256, P-384, and P-521 ECDSA certificates are supported");
 }
 
 // Multiple TLS certificates are not yet supported.

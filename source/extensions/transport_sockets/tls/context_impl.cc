@@ -230,8 +230,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         ASSERT(ecdsa_public_key != nullptr);
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
         if (ecdsa_group == nullptr ||
-            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
-          throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256 "
+            (EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1 && EC_GROUP_get_curve_name(ecdsa_group) != NID_secp384r1 && EC_GROUP_get_curve_name(ecdsa_group) != NID_secp521r1)) {
+          throw EnvoyException(fmt::format("Failed to load certificate chain from {}, only P-256, P-384, and P-521 "
                                            "ECDSA certificates are supported",
                                            ctx.cert_chain_file_path_));
         }
@@ -252,10 +252,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                           ctx.cert_chain_file_path_));
         }
 #else
-        if (rsa_key_length < 2048 / 8) {
+        if (rsa_key_length < 1024 / 8) {
           throw EnvoyException(
               fmt::format("Failed to load certificate chain from {}, only RSA "
-                          "certificates with 2048-bit or larger keys are supported",
+                          "certificates with 1024-bit or larger keys are supported",
                           ctx.cert_chain_file_path_));
         }
 #endif
@@ -982,7 +982,9 @@ bool ServerContextImpl::isClientEcdsaCapable(const SSL_CLIENT_HELLO* ssl_client_
             CBS_len(&signature_algorithms_ext) != 0) {
           return false;
         }
-        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256)) {
+        if (cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP256R1_SHA256) 
+            || cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP384R1_SHA384)
+            || cbsContainsU16(signature_algorithms, SSL_SIGN_ECDSA_SECP521R1_SHA512)) {
           return true;
         }
       }

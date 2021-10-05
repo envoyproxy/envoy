@@ -210,6 +210,18 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
+# Generate selfsigned_ecdsa_p521_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p521_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p521 secp521r1
+generate_selfsigned_x509_cert selfsigned_ecdsa_p521
+rm -f selfsigned_ecdsa_p521_cert.cfg
+
+# Generate selfsigned_ecdsa_p224_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p224_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p224 secp224r1
+generate_selfsigned_x509_cert selfsigned_ecdsa_p224
+rm -f selfsigned_ecdsa_p224_cert.cfg
+
 # Generate long_validity_cert.pem as a self-signed, with expiry that exceeds 32bit time_t.
 cp -f selfsigned_cert.cfg long_validity_cert.cfg
 generate_rsa_key long_validity
