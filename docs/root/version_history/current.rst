@@ -5,7 +5,6 @@ Incompatible Behavior Changes
 -----------------------------
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
-* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has been able to accept v3
 * config: due to the switch to using work-in-progress annotations and warnings to indicate APIs
   subject to change, the following API packages have been force migrated from ``v3alpha`` to ``v3``:
   ``envoy.extensions.access_loggers.open_telemetry.v3``,
