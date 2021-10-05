@@ -691,6 +691,7 @@ void ConfigHelper::setConnectConfig(
 void ConfigHelper::applyConfigModifiers() {
   for (const auto& config_modifier : config_modifiers_) {
     config_modifier(bootstrap_);
+      ENVOY_LOG_MISC(debug, "lambdai: bootstrap each: {}", bootstrap_.DebugString());
   }
   config_modifiers_.clear();
 }
@@ -790,7 +791,7 @@ void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
-
+  
   applyConfigModifiers();
 
   uint32_t port_idx = 0;

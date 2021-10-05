@@ -166,6 +166,7 @@ void BaseIntegrationTest::createEnvoy() {
       ports.push_back(upstream->localAddress()->ip()->port());
     }
   }
+  ENVOY_LOG_MISC(debug, "lambdai: bootstrap before finalize: {}", config_helper_.bootstrap().DebugString());
 
   if (use_lds_) {
     ENVOY_LOG_MISC(debug, "Setting up file-based LDS");
@@ -185,6 +186,8 @@ void BaseIntegrationTest::createEnvoy() {
   config_helper_.finalize(ports);
 
   envoy::config::bootstrap::v3::Bootstrap bootstrap = config_helper_.bootstrap();
+
+  // lambdai: the listener address is mutated here
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
