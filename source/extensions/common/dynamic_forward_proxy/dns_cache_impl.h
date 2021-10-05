@@ -109,6 +109,13 @@ private:
       absl::ReaderMutexLock lock{&resolve_lock_};
       return address_;
     }
+    std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
+      std::vector<Network::Address::InstanceConstSharedPtr> ret;
+      absl::ReaderMutexLock lock{&resolve_lock_};
+      ret = address_list_;
+      return ret;
+    }
+
     const std::string& resolvedHost() const override { return resolved_host_; }
     bool isIpAddress() const override { return is_ip_address_; }
     void touch() final { last_used_time_ = time_source_.monotonicTime().time_since_epoch(); }
@@ -116,11 +123,14 @@ private:
       stale_at_time_ = resolution_time + ttl;
     }
 
-    void setAddress(Network::Address::InstanceConstSharedPtr address) {
+    void setAddresses(Network::Address::InstanceConstSharedPtr address,
+                      std::vector<Network::Address::InstanceConstSharedPtr>&& list) {
       absl::WriterMutexLock lock{&resolve_lock_};
       first_resolve_complete_ = true;
       address_ = address;
+      address_list_ = std::move(list);
     }
+
     std::chrono::steady_clock::duration lastUsedTime() const { return last_used_time_.load(); }
 
     bool firstResolveComplete() const {
@@ -140,6 +150,8 @@ private:
     const bool is_ip_address_;
     mutable absl::Mutex resolve_lock_;
     Network::Address::InstanceConstSharedPtr address_ ABSL_GUARDED_BY(resolve_lock_);
+    std::vector<Network::Address::InstanceConstSharedPtr>
+        address_list_ ABSL_GUARDED_BY(resolve_lock_);
 
     // Using std::chrono::steady_clock::duration is required for compilation within an atomic vs.
     // using MonotonicTime.
@@ -180,6 +192,13 @@ private:
 
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
+
+  static std::vector<Network::Address::InstanceConstSharedPtr>
+  generateAddressList(const std::list<Network::DnsResponse>& response, uint32_t port);
+
+  bool listChanged(const std::vector<Network::Address::InstanceConstSharedPtr>& list1,
+                   const std::vector<Network::Address::InstanceConstSharedPtr>& list2);
+
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      std::list<Network::DnsResponse>&& response,
                      absl::optional<MonotonicTime> resolution_time = {});

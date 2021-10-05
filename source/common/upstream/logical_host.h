@@ -34,14 +34,17 @@ public:
   // Note that the health check address update requires no lock to be held since it is only
   // used on the main thread, but we do so anyway since it shouldn't be perf critical and will
   // future proof the code.
-  void setNewAddress(const Network::Address::InstanceConstSharedPtr& address,
-                     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
+  void setNewAddresses(const Network::Address::InstanceConstSharedPtr& address,
+                       const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+                       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
     const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
     auto health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
 
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
+    setAddressList(address_list);
+    // TODO(alyssawilk) consider the port magic for setAddressList too?
     setHealthCheckAddress(health_check_address);
   }
 

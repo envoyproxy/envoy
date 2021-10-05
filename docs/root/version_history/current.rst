@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+dns: allowing multiple address resolutions and trying them in serial when communicating upstream. This behavior is defaulted off but can be enabled by flipping runtime guard ``envoy.reloadable_features.allow_multiple_dns_addresses`` to true.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*

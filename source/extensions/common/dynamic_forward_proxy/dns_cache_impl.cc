@@ -344,6 +344,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
                                                                       primary_host_info->port_)
                                : nullptr;
+  auto address_list = DnsUtils::generateAddressList(response, primary_host_info->port_);
 
   // Only the change the address if:
   // 1) The new address is valid &&
@@ -354,9 +355,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // resolution failure.
   bool address_changed = false;
   auto current_address = primary_host_info->host_info_->address();
-  if (new_address != nullptr && (current_address == nullptr || *current_address != *new_address)) {
+  if (new_address != nullptr &&
+      (current_address == nullptr || *current_address != *new_address ||
+       DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList()))) {
     ENVOY_LOG(debug, "host '{}' address has changed", host);
-    primary_host_info->host_info_->setAddress(new_address);
+    primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
+
     runAddUpdateCallbacks(host, primary_host_info->host_info_);
     address_changed = true;
     stats_.host_address_changed_.inc();

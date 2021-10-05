@@ -78,7 +78,8 @@ void Cluster::addOrUpdateHost(
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_it->second.logical_host_->setNewAddress(host_info->address(), dummy_lb_endpoint_);
+      host_map_it->second.logical_host_->setNewAddresses(
+          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
       return;
     }
 
