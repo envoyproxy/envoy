@@ -174,8 +174,22 @@ class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
       : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+
+  TestListenSocket(Address::IpVersion ip_version)
+      : ListenSocketImpl(/*io_handle=*/nullptr, ip_version == Address::IpVersion::v4
+                                                    ? Utility::getIpv4AnyAddress()
+                                                    : Utility::getIpv6AnyAddress()) {}
   Socket::Type socketType() const override { return Socket::Type::Stream; }
+
+  bool isOpen() const override { return ListenSocketImpl::isOpen(); }
+  void close() override { ListenSocketImpl::close(); }
 };
+
+TEST_P(ListenSocketImplTestTcp, NonIoHandleListenSocket) {
+  TestListenSocket sock(version_);
+  EXPECT_FALSE(sock.isOpen());
+  sock.close();
+}
 
 TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
   std::string address_str = "10.1.2.3";

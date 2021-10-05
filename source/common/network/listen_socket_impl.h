@@ -17,13 +17,6 @@
 
 namespace Envoy {
 namespace Network {
-namespace {
-std::string getConnectionInfoString(const ConnectionInfoProvider& conn_info) {
-  std::stringstream out;
-  conn_info.dumpState(out, 0);
-  return out.str();
-}
-} // namespace
 
 class ListenSocketImpl : public SocketImpl {
 protected:
@@ -42,21 +35,11 @@ protected:
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
   void close() override {
-    RELEASE_ASSERT(io_handle_ != nullptr,
-                   absl::StrCat(__FUNCTION__,
-                                " is called from the ListenSocket with no io handle. Socket info: ",
-                                getConnectionInfoString(*connection_info_provider_)));
-    if (io_handle_->isOpen()) {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
       io_handle_->close();
     }
   }
-  bool isOpen() const override {
-    RELEASE_ASSERT(io_handle_ != nullptr,
-                   absl::StrCat(__FUNCTION__,
-                                " is called from the ListenSocket with no io handle. Socket info: ",
-                                getConnectionInfoString(*connection_info_provider_)));
-    return io_handle_->isOpen();
-  }
+  bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
 /**
