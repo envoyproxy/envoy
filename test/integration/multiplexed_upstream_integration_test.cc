@@ -202,7 +202,8 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
-void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
+void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t max_response_bytes,
+                                                            uint32_t num_requests) {
   TestRandomGenerator rand;
   const uint32_t num_requests = 50;
   std::vector<Http::RequestEncoder*> encoders;
@@ -213,7 +214,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
-    response_bytes.push_back(rand.random() % (1024 * 2));
+    response_bytes.push_back(rand.random() % (max_response_bytes));
     auto headers = Http::TestRequestHeaderMapImpl{
         {":method", "POST"},
         {":path", "/test/long/url"},
@@ -247,7 +248,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
-  manySimultaneousRequests(1024, 1024);
+  manySimultaneousRequests(1024, 1024, 200);
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
