@@ -172,7 +172,7 @@ def get_package_version_from_issue(issue_title):
 
 def close_old_issue(git, issue_number, latest_release, package_repo):
     repo = git.get_repo(GITHUB_REPO_LOCATION)
-    closing_comment = string.Template(CLOSING_CMT)
+    closing_comment = string.Template(CLOSING_TPL)
     try:
         issue = repo.get_issue(number=issue_number)
         print(f'Publishing closing comment... ')
