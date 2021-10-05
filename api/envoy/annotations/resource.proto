@@ -11,10 +11,6 @@ extend google.protobuf.ServiceOptions {
   ResourceAnnotation resource = 265073217;
 }
 
-extend google.protobuf.MessageOptions {
-  ResourceAnnotation resource_alias = 265073217;
-}
-
 message ResourceAnnotation {
   // Annotation for xDS services that indicates the fully-qualified Protobuf type for the resource
   // type.

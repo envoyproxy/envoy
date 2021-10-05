@@ -59,6 +59,7 @@ TypeUrlToV3ServiceMap* buildTypeUrlToServiceMap() {
            "envoy.service.listener.v3.ListenerDiscoveryService",
            "envoy.service.runtime.v3.RuntimeDiscoveryService",
            "envoy.service.extension.v3.ExtensionConfigDiscoveryService",
+           "envoy.extensions.filters.network.thrift_proxy.v3.RouteDiscoveryService",
        }) {
     const TypeUrl resource_type_url = getResourceTypeUrl(name);
     V3Service& service = (*type_url_to_versioned_service_map)[resource_type_url];
@@ -91,45 +92,22 @@ TypeUrlToV3ServiceMap& typeUrlToV3ServiceMap() {
   return *type_url_to_versioned_service_map;
 }
 
-TypeUrlToV3ServiceMap::iterator findV3Service(const std::string& type_url) {
-  const auto it = typeUrlToV3ServiceMap().find(type_url);
-  if (it != typeUrlToV3ServiceMap().cend()) {
-    return it;
-  }
-  std::string message_name = type_url;
-  const std::string& typeUrlPrefix = Grpc::Common::typeUrlPrefix();
-  if (message_name.compare(0, typeUrlPrefix.length(), typeUrlPrefix) == 0) {
-    if (message_name[typeUrlPrefix.length()] == '/') {
-      message_name.erase(0, typeUrlPrefix.length() + 1);
-    }
-  }
-  const auto* message_desc =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(message_name);
-  if (message_desc != nullptr &&
-      message_desc->options().HasExtension(envoy::annotations::resource_alias)) {
-    const std::string& resource =
-        message_desc->options().GetExtension(envoy::annotations::resource_alias).type();
-    return typeUrlToV3ServiceMap().find(Grpc::Common::typeUrl(resource));
-  }
-  return typeUrlToV3ServiceMap().end();
-}
-
 } // namespace
 
 const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
-  const auto it = findV3Service(static_cast<TypeUrl>(type_url));
+  const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.delta_grpc_);
 }
 
 const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
-  const auto it = findV3Service(static_cast<TypeUrl>(type_url));
+  const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.sotw_grpc_);
 }
 
 const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
-  const auto it = findV3Service(static_cast<TypeUrl>(type_url));
+  const auto it = typeUrlToV3ServiceMap().find(static_cast<TypeUrl>(type_url));
   ASSERT(it != typeUrlToV3ServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.rest_);
 }
