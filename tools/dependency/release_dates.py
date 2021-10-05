@@ -23,7 +23,7 @@ from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
-github_repo_location = "envoyproxy/envoy"
+GITHUB_REPO_LOCATION = "envoyproxy/envoy"
 
 
 # Thrown on errors related to release date or version.
@@ -88,7 +88,7 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
     """
     access_token = os.getenv('GITHUB_TOKEN')
     git = github.Github(access_token)
-    repo = git.get_repo(github_repo_location)
+    repo = git.get_repo(GITHUB_REPO_LOCATION)
     # Find GitHub label objects for LABELS.
     labels = []
     for label in repo.get_labels():
@@ -125,7 +125,7 @@ Upstream link: https://github.com/{package_repo.full_name}
 def issues_exist(title, git):
     # search for common title
     title_search = title[0:title.index("(") - 1]
-    query = f'repo:{github_repo_location} {title_search} in:title'
+    query = f'repo:{GITHUB_REPO_LOCATION} {title_search} in:title'
     try:
         issues = git.search_issues(query)
     except github.GithubException as e:
@@ -138,7 +138,7 @@ def issues_exist(title, git):
 def search_old_version_open_issue_exist(title, git, package_repo, latest_release):
     # search for only "Newer release available {dep}:" as will be common in dep issue
     title_search = title[0:title.index(":")]
-    query = f'repo:{github_repo_location} {title_search} in:title is:open'
+    query = f'repo:{GITHUB_REPO_LOCATION} {title_search} in:title is:open'
     # there might be more than one issue
     # if current package version == issue package version no need to do anything, right issue is open
     # if current package version != issue_title_version means a newer updated version is available
@@ -166,7 +166,7 @@ New Version: {latest_release.tag_name}@{latest_release.created_at}
 Upstream Link: https://github.com/{package_repo.full_name}
 \
                         """
-    repo = git.get_repo(github_repo_location)
+    repo = git.get_repo(GITHUB_REPO_LOCATION)
     try:
         issue = repo.get_issue(number=issue_number)
         print(f'Publishing closing comment... ')
