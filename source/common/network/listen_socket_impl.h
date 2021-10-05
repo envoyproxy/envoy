@@ -34,7 +34,6 @@ protected:
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
 
-public:
   void close() override {
     if (io_handle_ != nullptr) {
       if (io_handle_->isOpen()) {
