@@ -17,6 +17,8 @@ Removed Config or Runtime
 -------------------------
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
+* compression: removed ``envoy.reloadable_features.enable_compression_without_content_length_header`` runtime guard and legacy code paths.
+
 New Features
 ------------
 
