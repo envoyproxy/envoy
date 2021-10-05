@@ -14,6 +14,8 @@
 import os
 import sys
 import argparse
+import string
+
 import github
 
 import exports
@@ -23,7 +25,20 @@ from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
-GITHUB_REPO_LOCATION = "envoyproxy/envoy"
+GITHUB_REPO_LOCATION = "ME-ON1/envoy"
+
+BODY_TPL = """
+Package Name: ${dep}
+Current Version: ${metadata_version}@${release_date}
+Available Version: ${tag_name}@${created_at}
+Upstream link: https://github.com/${package_name}
+"""
+
+CLOSING_CMT = """
+New version is available for this package
+New Version: ${tag_name}@${created_at}
+Upstream Link: https://github.com/${full_name}
+"""
 
 
 # Thrown on errors related to release date or version.
@@ -99,16 +114,11 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
     # trunctate metadata_version to 7 char if its sha_hash
     if is_sha(metadata_version):
         metadata_version = metadata_version[0:7]
-        # dedent for making multiline string works in github specailly link
-    body = f"""\
-Package Name: {dep}
-Current Version: {metadata_version}@${release_date}
-Available Version: {latest_release.tag_name}@{latest_release.created_at}
-Upstream link: https://github.com/{package_repo.full_name}
-\
-            """
     title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
+    # search for old package opened issue and close them
     search_old_version_open_issue_exist(title, git, package_repo, latest_release)
+    body = string.Template(BODY_TPL).substitute(dep=dep, metadata_version=metadata_version, release_date=release_date,
+    tag_name=latest_release.tag_name, created_at=latest_release.created_at, package_name=package_repo.full_name)
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
@@ -152,25 +162,16 @@ def search_old_version_open_issue_exist(title, git, package_repo, latest_release
 
 def get_package_version_from_issue(issue_title):
     # issue title create by github action has two form
-    if "(" in issue_title:
-        return issue_title[issue_title.index(":") + 2:issue_title.index("(") - 1]
-    else:
-        return issue_title[issue_title.index(":") + 2:len(issue_title)]
+    return issue_title.split(":")[1].split("(")[0].strip()
 
 
 def close_old_issue(git, issue_number, latest_release, package_repo):
-    closing_comment = f"""\
-New version is available for this package
-Details :-
-New Version: {latest_release.tag_name}@{latest_release.created_at}
-Upstream Link: https://github.com/{package_repo.full_name}
-\
-                        """
     repo = git.get_repo(GITHUB_REPO_LOCATION)
+    closing_comment = string.Template(CLOSING_CMT)
     try:
         issue = repo.get_issue(number=issue_number)
         print(f'Publishing closing comment... ')
-        publish_comment = issue.create_comment(closing_comment)
+        issue.create_comment(closing_comment.substitute(tag_name=latest_release.tag_name, created_at=latest_release.created_at        , full_name=package_repo.full_name))
         print(f'Closing this issue as new package is available')
         issue.edit(state='closed')
     except github.GithubException as e:
