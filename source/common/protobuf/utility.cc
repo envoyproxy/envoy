@@ -17,6 +17,8 @@
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
+#include "udpa/annotations/status.pb.h"
+#include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
@@ -345,6 +347,11 @@ void checkForDeprecatedNonRepeatedEnumValue(
       message, validation_visitor);
 }
 
+constexpr absl::string_view WipWarning =
+    "API features marked as work-in-progress are not considered stable, are not covered by the "
+    "threat model, are not supported by the security team, and are subject to breaking changes. Do "
+    "not use this feature without understanding each of the previous points.";
+
 class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   UnexpectedFieldProtoVisitor(ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -365,6 +372,12 @@ public:
     if ((field.is_repeated() && reflection->FieldSize(message, &field) == 0) ||
         (!field.is_repeated() && !reflection->HasField(message, &field))) {
       return nullptr;
+    }
+
+    const auto& field_status = field.options().GetExtension(xds::annotations::v3::field_status);
+    if (field_status.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "field '{}' is marked as work-in-progress. {}", field.full_name(), WipWarning));
     }
 
     // If this field is deprecated, warn or throw an error.
@@ -398,6 +411,24 @@ public:
   }
 
   void onMessage(const Protobuf::Message& message, const void*) override {
+    if (message.GetDescriptor()
+            ->options()
+            .GetExtension(xds::annotations::v3::message_status)
+            .work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "message '{}' is marked as work-in-progress. {}", message.GetTypeName(), WipWarning));
+    }
+
+    const auto& udpa_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+    const auto& xds_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+    if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(
+          fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
+                      message.GetTypeName(), message.GetDescriptor()->file()->name(), WipWarning));
+    }
+
     // Reject unknown fields.
     const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
     if (!unknown_fields.empty()) {
@@ -405,9 +436,6 @@ public:
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
         error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
-      // We use the validation visitor but have hard coded behavior below for deprecated fields.
-      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
       if (!error_msg.empty()) {
         validation_visitor_.onUnknownField("type " + message.GetTypeName() +
                                            " with unknown field set {" + error_msg + "}");
@@ -651,7 +679,25 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
-      if (field_descriptor->is_repeated()) {
+      if (field_descriptor->is_map()) {
+        // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
+        // keys.
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          Protobuf::Message* map_pair =
+              reflection->MutableRepeatedMessage(message, field_descriptor, i);
+          auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
+          if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+                            value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
+            map_pair->GetReflection()->SetString(map_pair, value_field_desc, "[redacted]");
+          } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+            redact(map_pair->GetReflection()->MutableMessage(map_pair, value_field_desc),
+                   sensitive);
+          } else if (sensitive) {
+            map_pair->GetReflection()->ClearField(map_pair, value_field_desc);
+          }
+        }
+      } else if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
           redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);

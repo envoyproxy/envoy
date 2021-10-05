@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.validate.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.validate.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_constants.h"
@@ -68,7 +68,7 @@ public:
   }
 
   void setup(const std::string& yaml) {
-    envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig config;
+    envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig config;
     TestUtility::loadFromYamlAndValidate(yaml, config);
     auto store = stats_store_.createScope("dns_scope");
     ON_CALL(listener_factory_, scope()).WillByDefault(ReturnRef(*store));

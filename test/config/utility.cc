@@ -508,6 +508,39 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
   return cluster_load_assignment;
 }
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                 const std::string& leds_collection_name) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+        leds_cluster_locality_config:
+          leds_config:
+            resource_api_version: V3
+            ads: {{}}
+          leds_collection_name: {}
+    )EOF",
+                                        name, leds_collection_name),
+                            cluster_load_assignment);
+  return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::LbEndpoint ConfigHelper::buildLbEndpoint(const std::string& address,
+                                                                      uint32_t port) {
+  API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      endpoint:
+        address:
+          socket_address:
+            address: {}
+            port_value: {}
+    )EOF",
+                                        address, port),
+                            lb_endpoint);
+  return lb_endpoint;
+}
+
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
@@ -683,9 +716,11 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
-                                        bool use_alternate_protocols_cache) {
-  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+void ConfigHelper::configureUpstreamTls(
+    bool use_alpn, bool http3,
+    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+        alternate_protocol_cache_config) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -716,10 +751,13 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
       }
-      if (use_alternate_protocols_cache) {
+      if (alternate_protocol_cache_config.has_value()) {
         new_protocol_options.mutable_auto_config()
             ->mutable_alternate_protocols_cache_options()
             ->set_name("default_alternate_protocols_cache");
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->CopyFrom(alternate_protocol_cache_config.value());
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]

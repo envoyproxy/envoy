@@ -14,7 +14,7 @@ namespace {
 constexpr uint64_t DefaultWaitDurationMs = 5000;
 } // end namespace
 
-AbortAction::AbortAction(envoy::watchdog::v3alpha::AbortActionConfig& config,
+AbortAction::AbortAction(envoy::watchdog::v3::AbortActionConfig& config,
                          Server::Configuration::GuardDogActionFactoryContext& /*context*/)
     : wait_duration_(absl::Milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, wait_duration, DefaultWaitDurationMs))) {}

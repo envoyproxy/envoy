@@ -66,7 +66,7 @@ public:
   void OnCanWrite() override;
   void OnHttp3GoAway(uint64_t stream_id) override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
