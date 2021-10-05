@@ -264,7 +264,8 @@ public:
   static HeaderValidationResult
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
-                        bool& should_close_connection);
+                        bool& should_close_connection,
+                        size_t& content_length_output);
 };
 
 } // namespace Http

@@ -211,6 +211,11 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
     if (fin_read_and_no_trailers) {
       end_stream_decoded_ = true;
     }
+    updateReceivedContentBytes(buffer->length(), fin_read_and_no_trailers);
+    if (!details_.empty()) {
+      // A stream error has occurred, stop processing.
+      return;
+    }
     request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
@@ -248,6 +253,11 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    updateReceivedContentBytes(0, true);
+    if (!details_.empty()) {
+      // A stream error has occurred, stop processing.
+      return;
+    }
     quic::QuicRstStreamErrorCode rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,
