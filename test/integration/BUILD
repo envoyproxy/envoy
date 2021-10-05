@@ -765,6 +765,7 @@ envoy_cc_test_library(
         ":fake_upstream_lib",
         ":integration_tcp_client_lib",
         ":utility_lib",
+        "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",

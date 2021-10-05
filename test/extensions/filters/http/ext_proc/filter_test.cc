@@ -1,4 +1,4 @@
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
@@ -25,15 +25,15 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ExtProcPerRoute;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::HttpBody;
-using envoy::service::ext_proc::v3alpha::HttpHeaders;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeadersResponse;
+using envoy::service::ext_proc::v3::HttpBody;
+using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
@@ -77,7 +77,7 @@ protected:
           return timer;
         }));
 
-    envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
+    envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
