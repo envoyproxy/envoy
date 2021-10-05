@@ -18,13 +18,10 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
     Random::RandomGenerator&) {
 
-#if !defined(USE_CEL_PARSER)
-  throw EnvoyException("Not able to create filter - CEL parser not enabled.");
-#endif
-
   auto factory_config = Config::Utility::translateToFactoryConfig(
       config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
 
+#if defined(USE_CEL_PARSER)
   envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter cel_config =
       *dynamic_cast<const envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter*>(
           factory_config.get());
@@ -37,6 +34,9 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
 
   return std::make_unique<CELAccessLogExtensionFilter>(getOrCreateBuilder(),
                                                        parse_status.value().expr());
+#elif
+  return nullptr;
+#endif
 }
 
 ProtobufTypes::MessagePtr CELAccessLogExtensionFilterFactory::createEmptyConfigProto() {
