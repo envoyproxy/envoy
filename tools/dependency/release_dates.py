@@ -34,7 +34,7 @@ Available Version: ${tag_name}@${created_at}
 Upstream link: https://github.com/${package_name}
 """
 
-CLOSING_CMT = """
+CLOSING_TPL = """
 New version is available for this package
 New Version: ${tag_name}@${created_at}
 Upstream Link: https://github.com/${full_name}
