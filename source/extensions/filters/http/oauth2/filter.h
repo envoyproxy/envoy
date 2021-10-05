@@ -7,7 +7,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/stats_macros.h"
@@ -100,7 +100,7 @@ struct FilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config& proto_config,
+  FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
                Upstream::ClusterManager& cluster_manager,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);

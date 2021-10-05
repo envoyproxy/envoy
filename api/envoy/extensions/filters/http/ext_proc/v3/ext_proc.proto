@@ -1,20 +1,22 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.ext_proc.v3alpha;
+package envoy.extensions.filters.http.ext_proc.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.proto";
+import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 
 import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3";
 option java_outer_classname = "ExtProcProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: External Processing Filter]
 // External Processing Filter
@@ -88,9 +90,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The protocol itself is based on a bidirectional gRPC stream. Envoy will send the
 // server
-// :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingRequest>`
+// :ref:`ProcessingRequest <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`
 // messages, and the server must reply with
-// :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3alpha.ProcessingResponse>`.
+// :ref:`ProcessingResponse <envoy_v3_api_msg_service.ext_proc.v3.ProcessingResponse>`.
 
 // [#next-free-field: 9]
 message ExternalProcessor {
