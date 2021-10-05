@@ -78,8 +78,8 @@ Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
-  return dns_resolver_factory.createDnsResolverImpl(main_thread_dispatcher, context.api(),
-                                                    typed_dns_resolver_config);
+  return dns_resolver_factory.createDnsResolver(main_thread_dispatcher, context.api(),
+                                                typed_dns_resolver_config);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {

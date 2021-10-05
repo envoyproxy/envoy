@@ -598,7 +598,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   Network::DnsResolverFactory& dns_resolver_factory =
       Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
   dns_resolver_ =
-      dns_resolver_factory.createDnsResolverImpl(dispatcher(), api(), typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,

@@ -379,7 +379,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
@@ -438,7 +438,7 @@ TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -519,7 +519,7 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   Network::DnsResolverFactory& dns_resolver_factory =
       createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
   auto resolver =
-      dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -546,8 +546,8 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
       {
         Network::DnsResolverFactory& dns_resolver_factory =
             createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-        auto resolver = dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_,
-                                                                   typed_dns_resolver_config);
+        auto resolver =
+            dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
       },
       EnvoyException, "DNS resolver 'foo' is not an IP address");
 }
@@ -602,7 +602,7 @@ public:
     Network::DnsResolverFactory& dns_resolver_factory =
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
-        dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

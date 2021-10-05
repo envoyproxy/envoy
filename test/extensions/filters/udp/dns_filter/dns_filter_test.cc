@@ -81,7 +81,7 @@ public:
     NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
     Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_(
         dns_resolver_factory_);
-    ON_CALL(dns_resolver_factory_, createDnsResolverImpl(_, _, _))
+    ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
         .WillByDefault(DoAll(SaveArg<2>(&typed_dns_resolver_config_), Return(resolver_)));
 
     config_ = std::make_shared<DnsFilterEnvoyConfig>(listener_factory_, config);

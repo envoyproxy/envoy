@@ -366,8 +366,8 @@ public:
         new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
   }
   DnsResolverSharedPtr
-  createDnsResolverImpl(Event::Dispatcher& dispatcher, Api::Api& api,
-                        const envoy::config::core::v3::TypedExtensionConfig&) const override {
+  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
+                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
     ASSERT(dispatcher.isThreadSafe());
     return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
   }

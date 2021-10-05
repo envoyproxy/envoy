@@ -70,7 +70,7 @@ public:
   MockDnsResolverFactory() = default;
   ~MockDnsResolverFactory() override = default;
 
-  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolverImpl,
+  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolver,
               (Event::Dispatcher & dispatcher, Api::Api& api,
                const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
               (const, override));

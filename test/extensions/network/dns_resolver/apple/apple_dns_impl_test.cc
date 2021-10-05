@@ -74,7 +74,7 @@ public:
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
     resolver_ =
-        dns_resolver_factory.createDnsResolverImpl(*dispatcher_, *api_, typed_dns_resolver_config);
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,

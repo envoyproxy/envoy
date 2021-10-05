@@ -128,7 +128,7 @@ void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for dynamic forward proxy.
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
-  ON_CALL(dns_resolver_factory, createDnsResolverImpl(_, _, _))
+  ON_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.

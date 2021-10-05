@@ -98,8 +98,8 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromProto(cluster, typed_dns_resolver_config);
-    return dns_resolver_factory.createDnsResolverImpl(context.mainThreadDispatcher(), context.api(),
-                                                      typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(context.mainThreadDispatcher(), context.api(),
+                                                  typed_dns_resolver_config);
   }
 
   return context.dnsResolver();

@@ -1445,7 +1445,7 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
-  EXPECT_CALL(dns_resolver_factory, createDnsResolverImpl(_, _, _))
+  EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
       .WillRepeatedly(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;

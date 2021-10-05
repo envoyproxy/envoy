@@ -25,7 +25,7 @@ public:
                     const Network::DnsResolverFactory& dns_resolver_factory, Api::Api& api)
       : timeout_(timeout), dispatcher_(dispatcher),
         resolver_(
-            dns_resolver_factory.createDnsResolverImpl(dispatcher, api, typed_dns_resolver_config)),
+            dns_resolver_factory.createDnsResolver(dispatcher, api, typed_dns_resolver_config)),
         callback_(callback), max_pending_lookups_(max_pending_lookups) {}
   /**
    * @brief entry point to resolve the name in a DnsQueryRecord

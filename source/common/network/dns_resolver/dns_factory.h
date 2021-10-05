@@ -28,7 +28,7 @@ public:
    * @param api: API interface to interact with system resources
    * @param typed_dns_resolver_config: the typed DNS resolver config
    */
-  virtual DnsResolverSharedPtr createDnsResolverImpl(
+  virtual DnsResolverSharedPtr createDnsResolver(
       Event::Dispatcher& dispatcher, Api::Api& api,
       const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
 
