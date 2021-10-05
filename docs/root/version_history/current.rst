@@ -6,6 +6,32 @@ Incompatible Behavior Changes
 *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 
 * config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has been able to accept v3
+* config: due to the switch to using work-in-progress annotations and warnings to indicate APIs
+  subject to change, the following API packages have been force migrated from ``v3alpha`` to ``v3``:
+  ``envoy.extensions.access_loggers.open_telemetry.v3``,
+  ``envoy.extensions.cache.simple_http_cache.v3``,
+  ``envoy.extensions.filters.http.admission_control.v3``,
+  ``envoy.extensions.filters.http.bandwidth_limit.v3``,
+  ``envoy.extensions.filters.http.cache.v3``,
+  ``envoy.extensions.filters.http.cdn_loop.v3``,
+  ``envoy.extensions.filters.http.ext_proc.v3``,
+  ``envoy.extensions.filters.http.oauth2.v3``,
+  ``envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3``,
+  ``envoy.extensions.filters.udp.dns_filter.v3``,
+  ``envoy.extensions.transport_sockets.s2a.v3``,
+  ``envoy.extensions.watchdog.profile_action.v3``,
+  ``envoy.service.ext_proc.v3``, and
+  ``envoy.watchdog.v3``. If your production deployment was using one of these APIs, you will be
+  forced to potentially vendor the old proto file to continue serving old versions of Envoy.
+  The project realizes this is unfortunate because some of these are known to be used in production,
+  however the project does not have the resources to undergo a migration in which we support
+  ``v3alpha`` and ``v3`` at the same time. The switch to using work-in-progress annotations with
+  clear and explicit warnings will avoid any such issue in the future. We apologize again for any
+  difficulty this change causes, though it is for the best. Additionally, some of the above
+  namespaces have had their work-in-progress annotations removed due to known production usage.
+  Thus, they will not warn and are offered full API stability support by the project from this
+  point forward.
+* config: the ``--bootstrap-version`` CLI flag has been removed, Envoy has only been able to accept v3
   bootstrap configurations since 1.18.0.
 * contrib: the :ref:`squash filter <config_http_filters_squash>` has been moved to
   :ref:`contrib images <install_contrib>`.
@@ -17,11 +43,11 @@ Incompatible Behavior Changes
   :ref:`contrib images <install_contrib>`.
 * contrib: the :ref:`MySQL proxy filter <config_network_filters_mysql_proxy>` has been moved to
   :ref:`contrib images <install_contrib>`.
-* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>`
+* dns_filter: :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3.DnsFilterConfig>`
   protobuf fields have been renumbered to restore compatibility with Envoy
   1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
   numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to
-  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+  :ref:`dns_resolution_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
   provided they skip over Envoy 1.19.0 and 1.19.1.
   Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
   vendor the corresponding protobuf definitions to ensure that the
@@ -147,6 +173,7 @@ New Features
 * upstream: added support for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`, which allows to progresively increase traffic for new endpoints.
 * upstream: extended :ref:`Round Robin load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.round_robin_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.RoundRobinLbConfig.slow_start_config>` support.
 * upstream: extended :ref:`Least Request load balancer configuration <envoy_v3_api_field_config.cluster.v3.Cluster.least_request_lb_config>` with :ref:`slow start <envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.slow_start_config>` support.
+* windows: added a new container image based on Windows Nanoserver 2022.
 * xray: request direction (``ingress`` or ``egress``) is recorded as X-Ray trace segment's annotation by name ``direction``.
 
 Deprecated
