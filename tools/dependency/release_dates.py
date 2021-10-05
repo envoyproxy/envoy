@@ -117,8 +117,13 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
     title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
     # search for old package opened issue and close them
     search_old_version_open_issue_exist(title, git, package_repo, latest_release)
-    body = string.Template(BODY_TPL).substitute(dep=dep, metadata_version=metadata_version, release_date=release_date,
-    tag_name=latest_release.tag_name, created_at=latest_release.created_at, package_name=package_repo.full_name)
+    body = string.Template(BODY_TPL).substitute(
+        dep=dep,
+        metadata_version=metadata_version,
+        release_date=release_date,
+        tag_name=latest_release.tag_name,
+        created_at=latest_release.created_at,
+        package_name=package_repo.full_name)
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
@@ -171,7 +176,11 @@ def close_old_issue(git, issue_number, latest_release, package_repo):
     try:
         issue = repo.get_issue(number=issue_number)
         print(f'Publishing closing comment... ')
-        issue.create_comment(closing_comment.substitute(tag_name=latest_release.tag_name, created_at=latest_release.created_at        , full_name=package_repo.full_name))
+        issue.create_comment(
+            closing_comment.substitute(
+                tag_name=latest_release.tag_name,
+                created_at=latest_release.created_at,
+                full_name=package_repo.full_name))
         print(f'Closing this issue as new package is available')
         issue.edit(state='closed')
     except github.GithubException as e:
