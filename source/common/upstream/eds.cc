@@ -205,11 +205,15 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     return cla_leds_configs.find(leds_config) == cla_leds_configs.end();
   });
 
-  // Optimize for no-copy, if possible.
+  // In case LEDS is used, store the cluster load assignment as a field
+  // (optimize for no-copy).
+  envoy::config::endpoint::v3::ClusterLoadAssignment* used_load_assignment;
   if (cla_leds_configs.empty()) {
     cluster_load_assignment_ = absl::nullopt;
+    used_load_assignment = &cluster_load_assignment;
   } else {
     cluster_load_assignment_ = std::move(cluster_load_assignment);
+    used_load_assignment = &cluster_load_assignment_.value();
   }
 
   // Add all the LEDS localities that are new.
@@ -220,10 +224,11 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
 
       // Create a new LEDS subscription and add it to the subscriptions map.
       LedsSubscriptionPtr leds_locality_subscription = std::make_unique<LedsSubscription>(
-          leds_config, cluster_name_, factory_context_, info_->statsScope(), [&]() {
+          leds_config, cluster_name_, factory_context_, info_->statsScope(),
+          [&, used_load_assignment]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
-              BatchUpdateHelper helper(*this, cluster_load_assignment_.value());
+              BatchUpdateHelper helper(*this, *used_load_assignment);
               priority_set_.batchHostUpdate(helper);
             }
           });
@@ -237,9 +242,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     return;
   }
 
-  BatchUpdateHelper helper(*this, cluster_load_assignment_.has_value()
-                                      ? cluster_load_assignment_.value()
-                                      : cluster_load_assignment);
+  BatchUpdateHelper helper(*this, *used_load_assignment);
   priority_set_.batchHostUpdate(helper);
 }
 
