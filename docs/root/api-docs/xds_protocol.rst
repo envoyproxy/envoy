@@ -142,6 +142,9 @@ variants. Here are the RPC services and methods for each resource type:
 -  ClusterLoadAssignment: Endpoint Discovery Service (EDS)
    -  SotW: EndpointDiscoveryService.StreamEndpoints
    -  Incremental: EndpointDiscoveryService.DeltaEndpoints
+-  LbEndpoint: Locality Endpoint Discovery Service (LEDS)
+   -  SotW: N/A
+   -  Incremental: LocalityEndpointDiscoveryService.DeltaLocalityEndpoints
 -  Secret: Secret Discovery Service (SDS)
    -  SotW: SecretDiscoveryService.StreamSecrets
    -  Incremental: SecretDiscoveryService.DeltaSecrets

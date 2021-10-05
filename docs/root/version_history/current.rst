@@ -155,6 +155,7 @@ New Features
 * jwt_authn: added support for :ref:`Jwt Cache <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.jwt_cache_config>` and its size can be specified by :ref:`jwt_cache_size <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtCacheConfig.jwt_cache_size>`.
 * jwt_authn: added support for extracting JWTs from request cookies using :ref:`from_cookies <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.from_cookies>`.
 * jwt_authn: added support for setting the extracted headers from a successfully verified JWT using :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>` to dynamic metadata.
+* leds: added support for :ref:`Locality-Endpoints Discovery Service (LEDS)<arch_overview_dynamic_config_leds>` that enables per-locality dynamic configuration of endpoints, when using EDS.
 * listener: new listener metric ``downstream_cx_transport_socket_connect_timeout`` to track transport socket timeouts.
 * lua: added ``header:getAtIndex()`` and ``header:getNumValues()`` methods to :ref:`header object <config_http_filters_lua_header_wrapper>` for retrieving the value of a header at certain index and get the total number of values for a given header.
 * matcher: added :ref:`invert <envoy_v3_api_field_type.matcher.v3.MetadataMatcher.invert>` for inverting the match result in the metadata matcher.

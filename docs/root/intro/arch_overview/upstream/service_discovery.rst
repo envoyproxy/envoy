@@ -114,6 +114,11 @@ preferred service discovery mechanism for a few reasons:
   load balancing weight, canary status, zone, etc. These additional attributes are used globally
   by the Envoy mesh during load balancing, statistic gathering, etc.
 
+EDS can also be used with the :ref:`Locality Endpoint Discovery Service (LEDS)
+<arch_overview_dynamic_config_leds>`. In this case EDS will be used to fetch the cluster's
+locality-level configuration (e.g., load-balancing policy), and per-locality dynamic endpoint-level
+configuration (e.g., endpoint address, endpoint metadata) will be served via LEDS.
+
 The Envoy project provides reference gRPC implementations of EDS and
 :ref:`other discovery services <arch_overview_dynamic_config>`
 in both `Java <https://github.com/envoyproxy/java-control-plane>`_

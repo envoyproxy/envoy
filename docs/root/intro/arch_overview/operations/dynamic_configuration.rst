@@ -39,6 +39,16 @@ of a static configuration, EDS allows an Envoy deployment to circumvent the limi
 (maximum records in a response, etc.) as well as consume more information used in load balancing and
 routing (e.g., canary status, zone, etc.).
 
+.. _arch_overview_dynamic_config_leds:
+
+LEDS
+----
+
+The :ref:`Locality Endpoint Discovery Service (LEDS) API <arch_overview_endpoint_discovery_types_leds>`
+provides a fine-grained mechanism to discover the members (endpoints) of a specific upstream locality when
+using the incremental xDS mode. This allows deployments with large numbers of endpoints to only send
+updates about the modified or removed endpoints.
+
 .. _arch_overview_dynamic_config_cds:
 
 CDS
