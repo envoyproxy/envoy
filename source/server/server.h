@@ -71,6 +71,7 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(wip_protos)                                                                              \
   COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
@@ -303,7 +304,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();

@@ -8,7 +8,6 @@
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/non_copyable.h"
-#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -169,35 +168,40 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
-struct MainThread {
-  using MainThreadSingleton = InjectableSingleton<MainThread>;
-  bool inMainThread() const { return main_thread_id_ == std::this_thread::get_id(); }
-  bool inTestThread() const {
-    return test_thread_id_.has_value() && (test_thread_id_.value() == std::this_thread::get_id());
-  }
-  void registerTestThread() { test_thread_id_ = std::this_thread::get_id(); }
-  void registerMainThread() { main_thread_id_ = std::this_thread::get_id(); }
-  static bool initialized() { return MainThreadSingleton::getExisting() != nullptr; }
-  /*
-   * Register the main thread id, should be called in main thread before threading is on. Currently
-   * called in ThreadLocal::InstanceImpl().
-   */
-  static void initMainThread();
-  /*
-   * Register the test thread id, should be called in test thread before threading is on. Allow
-   * some main thread only code to be executed on test thread.
-   */
-  static void initTestThread();
-  /*
-   * Delete the main thread singleton, should be called in main thread after threading
-   * has been shut down. Currently called in ~ThreadLocal::InstanceImpl().
-   */
-  static void clear();
-  static bool isMainThread();
+// RAII object to declare the TestThread. This should be declared in main() or
+// equivalent for any test binaries.
+//
+// Generally we expect TestThread to be instantiated only once on main() for
+// each test binary, though nested instantiations are allowed as long as the
+// thread ID does not change.
+class TestThread {
+public:
+  TestThread();
+  ~TestThread();
+};
 
-private:
-  std::thread::id main_thread_id_;
-  absl::optional<std::thread::id> test_thread_id_;
+// RAII object to declare the MainThread. This should be declared in the thread
+// function or equivalent.
+//
+// Generally we expect MainThread to be instantiated only once or twice. It has
+// to be instantiated prior to OptionsImpl being created, so it needs to be in
+// instantiated from main_common(). In addition, it is instantiated by
+// ThreadLocal implementation to get the correct behavior for tests that do not
+// instantiate main.
+//
+// In general, nested instantiations are allowed as long as the thread ID does
+// not change.
+class MainThread {
+public:
+  MainThread();
+  ~MainThread();
+
+  /**
+   * Returns whether the current thread is the main thread or test thread.
+   *
+   * TODO(jmarantz): rename to isMainOrTestThread().
+   */
+  static bool isMainThread();
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
