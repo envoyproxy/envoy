@@ -875,7 +875,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2021-10-04",
+        release_date = "2021-10-05",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
