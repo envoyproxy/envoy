@@ -26,7 +26,7 @@ service RateLimitService {
   rpc ShouldRateLimit(RateLimitRequest) returns (RateLimitResponse) {
   }
 
-  // Determine whether rate limiting should take place (Stream RPC version).
+  // Determine whether rate limiting should take place (Bidi-Stream RPC version).
   // [#not-implemented-hide:]
   rpc ShouldRateLimitStream(stream RateLimitRequest) returns (stream RateLimitResponse) {
   }

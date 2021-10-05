@@ -33,7 +33,7 @@ message RateLimitServiceConfig {
   // version of messages used on the wire.
   core.v3.ApiVersion transport_api_version = 4 [(validate.rules).enum = {defined_only: true}];
 
-  // Specifies whether the RPC communication with RLS server should be unary or streaming RPC.
+  // Specifies whether the RPC communication with RLS server should be unary or streaming RPC. The default value is false.
   // [#not-implemented-hide:]
   bool use_stream_api = 5;
 }
