@@ -22,7 +22,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:basic_resource_limit_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
-        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 

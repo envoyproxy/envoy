@@ -23,7 +23,7 @@ public:
       TimeSource& time_source);
 
   // Returns the alternate protocols cache for the current thread.
-  Http::AlternateProtocolsCacheSharedPtr getAlternateProtocolCache();
+  Http::AlternateProtocolsCacheSharedPtr getAlternateProtocolCache(Event::Dispatcher& dispatcher);
 
   TimeSource& timeSource() { return time_source_; }
 
@@ -42,7 +42,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class Filter : public Http::PassThroughEncoderFilter,
                Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
-  explicit Filter(const FilterConfigSharedPtr& config);
+  Filter(const FilterConfigSharedPtr& config, Event::Dispatcher& thread_local_dispatcher);
 
   // Http::PassThroughEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& header,

@@ -53,10 +53,10 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, Stats::Scope& scope) {
+    Event::Dispatcher& dispatcher) {
   return std::make_shared<GrpcAccessLoggerImpl>(client, config.log_name(),
                                                 buffer_flush_interval_msec, max_buffer_size_bytes,
-                                                dispatcher, local_info_, scope);
+                                                dispatcher, local_info_, scope_);
 }
 
 } // namespace GrpcCommon

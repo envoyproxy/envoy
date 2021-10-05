@@ -13,14 +13,15 @@ class MockClient : public ExternalProcessorClient {
 public:
   MockClient();
   ~MockClient() override;
-  MOCK_METHOD(ExternalProcessorStreamPtr, start, (ExternalProcessorCallbacks&));
+  MOCK_METHOD(ExternalProcessorStreamPtr, start,
+              (ExternalProcessorCallbacks&, const StreamInfo::StreamInfo& stream_info));
 };
 
 class MockStream : public ExternalProcessorStream {
 public:
   MockStream();
   ~MockStream() override;
-  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3alpha::ProcessingRequest&&, bool));
+  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool));
   MOCK_METHOD(bool, close, ());
 };
 

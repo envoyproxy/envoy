@@ -39,6 +39,7 @@ public:
   const std::string name2_ = "name2";
   const int max_entries1_ = 10;
   const int max_entries2_ = 20;
+  Event::MockDispatcher dispatcher_;
 
   envoy::config::core::v3::AlternateProtocolsCacheOptions options1_;
   envoy::config::core::v3::AlternateProtocolsCacheOptions options2_;
@@ -53,33 +54,33 @@ TEST_F(AlternateProtocolsCacheManagerTest, FactoryGet) {
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_);
+  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
   EXPECT_NE(nullptr, cache);
-  EXPECT_EQ(cache, manager_->getCache(options1_));
+  EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 }
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
   options1_.mutable_key_value_store_config();
   initialize();
-  EXPECT_THROW_WITH_REGEX(manager_->getCache(options1_), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(manager_->getCache(options1_, dispatcher_), EnvoyException,
                           "options has key value store but Envoy has concurrency = 5");
 }
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForDifferentOptions) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
-  AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_);
+  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
+  AlternateProtocolsCacheSharedPtr cache2 = manager_->getCache(options2_, dispatcher_);
   EXPECT_NE(nullptr, cache2);
   EXPECT_NE(cache1, cache2);
 }
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheForConflictingOptions) {
   initialize();
-  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_);
+  AlternateProtocolsCacheSharedPtr cache1 = manager_->getCache(options1_, dispatcher_);
   options2_.set_name(options1_.name());
   EXPECT_THROW_WITH_REGEX(
-      manager_->getCache(options2_), EnvoyException,
+      manager_->getCache(options2_, dispatcher_), EnvoyException,
       "options specified alternate protocols cache 'name1' with different settings.*");
 }
 
