@@ -2,8 +2,8 @@
 
 set -e
 
-# BoringSSL build as described in the Security Policy for BoringCrypto module (2020-07-02):
-# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf
+# BoringSSL build as described in the Security Policy for BoringCrypto module (2021-05-03):
+# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp4028.pdf
 
 # This works only on Linux-x86_64.
 if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
