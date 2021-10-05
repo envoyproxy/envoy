@@ -141,6 +141,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
       factory.createListenSocket(local_address_, socket_type, options_, bind_type_, worker_index);
 
   // Binding is done by now.
+  ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
+            local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
     const bool ok = Network::Socket::applyOptions(
         options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);

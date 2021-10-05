@@ -636,7 +636,7 @@ public:
               repeats);
   }
 
-  // The stats
+  // The stats prefix that shared by ipv6 and ipv4 listener.
   std::string target_listener_prefix_{"balanced_listener"};
 };
 
