@@ -703,11 +703,11 @@ void testUtilV2(const TestUtilOptionsV2& options) {
                               ? options.transportSocketOptions()->serverNameOverride().value()
                               : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
-        Network::TransportSocketPtr transport_socket = server_ssl_socket_factory.createTransportSocket(nullptr);
+        Network::TransportSocketPtr transport_socket =
+            server_ssl_socket_factory.createTransportSocket(nullptr);
         EXPECT_FALSE(transport_socket->startSecureTransport());
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), std::move(transport_socket),
-            stream_info);
+            std::move(socket), std::move(transport_socket), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
