@@ -46,7 +46,7 @@ void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
   absl::flat_hash_set<std::string> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb);
-  for (const auto& locality_lb_endpoint : parent_.cluster_load_assignment_.endpoints()) {
+  for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
     parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
 
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
@@ -81,9 +81,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   HostMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
-  const uint32_t overprovisioning_factor =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(parent_.cluster_load_assignment_.policy(),
-                                      overprovisioning_factor, kDefaultOverProvisioningFactor);
+  const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
   LocalityWeightsMap empty_locality_map;
 
@@ -206,6 +205,13 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     return cla_leds_configs.find(leds_config) == cla_leds_configs.end();
   });
 
+  // Optimize for no-copy, if possible.
+  if (cla_leds_configs.empty()) {
+    cluster_load_assignment_ = absl::nullopt;
+  } else {
+    cluster_load_assignment_ = std::move(cluster_load_assignment);
+  }
+
   // Add all the LEDS localities that are new.
   for (const auto& leds_config : cla_leds_configs) {
     if (leds_localities_.find(leds_config) == leds_localities_.end()) {
@@ -217,7 +223,7 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
           leds_config, cluster_name_, factory_context_, info_->statsScope(), [&]() {
             // Called upon an update to the locality.
             if (validateAllLedsUpdated()) {
-              BatchUpdateHelper helper(*this);
+              BatchUpdateHelper helper(*this, cluster_load_assignment_.value());
               priority_set_.batchHostUpdate(helper);
             }
           });
@@ -225,16 +231,15 @@ void EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef
     }
   }
 
-  // TODO(adisuissa): optimize for no-copy, if possible.
-  cluster_load_assignment_ = cluster_load_assignment;
-
   // If all the LEDS localities are updated, the EDS update can occur. If not, then when the last
   // LEDS locality will be updated, it will trigger the EDS update helper.
   if (!validateAllLedsUpdated()) {
     return;
   }
 
-  BatchUpdateHelper helper(*this);
+  BatchUpdateHelper helper(*this, cluster_load_assignment_.has_value()
+                                      ? cluster_load_assignment_.value()
+                                      : cluster_load_assignment);
   priority_set_.batchHostUpdate(helper);
 }
 
