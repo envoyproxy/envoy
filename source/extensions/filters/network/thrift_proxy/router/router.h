@@ -357,7 +357,8 @@ protected:
     }
 
     const auto passthrough_supported =
-        transport == TransportType::Framed && final_transport == TransportType::Framed &&
+        (transport == TransportType::Framed || transport == TransportType::Header) &&
+        (final_transport == TransportType::Framed || final_transport == TransportType::Header) &&
         protocol == final_protocol && final_protocol != ProtocolType::Twitter;
     UpstreamRequestInfo result = {passthrough_supported, final_transport, final_protocol,
                                   conn_pool_data};

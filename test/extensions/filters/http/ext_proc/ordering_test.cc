@@ -22,10 +22,10 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Event::MockTimer;
 using Http::FilterDataStatus;

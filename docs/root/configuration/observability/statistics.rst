@@ -33,6 +33,7 @@ Server related statistics are rooted at *server.* with following statistics:
   envoy_bug_failures, Counter, Number of envoy bug failures detected in a release build. File or report the issue if this increments as this may be serious.
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
+  wip_protos, Counter, Number of messages and fields marked as work-in-progress being used
 
 .. _server_compilation_settings_statistics:
 
