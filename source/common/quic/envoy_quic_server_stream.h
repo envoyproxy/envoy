@@ -80,8 +80,9 @@ protected:
   void onPendingFlushTimer() override;
   bool hasPendingData() override;
 
-  void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
+  void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();

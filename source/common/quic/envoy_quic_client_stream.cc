@@ -260,7 +260,7 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
-     updateReceivedContentBytes(0, true);
+    updateReceivedContentBytes(0, true);
     if (!details_.empty()) {
       // A stream error has occurred, stop processing.
       return;

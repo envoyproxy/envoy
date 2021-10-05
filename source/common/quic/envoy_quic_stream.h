@@ -108,12 +108,12 @@ public:
     }
     if (header_name == "content-length") {
       size_t content_length = 0;
-      Http::HeaderUtility::HeaderValidationResult result = Http::HeaderUtility::validateContentLength(
-          header_value, override_stream_error_on_invalid_http_message,
-          close_connection_upon_invalid_header_, content_length);
+      Http::HeaderUtility::HeaderValidationResult result =
+          Http::HeaderUtility::validateContentLength(
+              header_value, override_stream_error_on_invalid_http_message,
+              close_connection_upon_invalid_header_, content_length);
       content_length_ = content_length;
       return result;
-
     }
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
@@ -128,16 +128,18 @@ protected:
   virtual Network::Connection* connection() PURE;
   // Either reset the stream or close the connection according to
   // should_close_connection and configured http3 options.
-  virtual void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
+  virtual void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
 
   void updateReceivedContentBytes(size_t payload_length, bool end_stream) {
     received_content_bytes_ += payload_length;
     if (!content_length_.has_value()) {
       return;
     }
-    if (received_content_bytes_ > content_length_.value() || (end_stream && received_content_bytes_ != content_length_.value())) {
-      // Reset intead of closing the connection to align with nghttp2.
+    if (received_content_bytes_ > content_length_.value() ||
+        (end_stream && received_content_bytes_ != content_length_.value())) {
+      // Reset instead of closing the connection to align with nghttp2.
       onStreamError(false);
     }
   }
