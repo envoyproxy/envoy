@@ -44,7 +44,7 @@ else
     && useradd -o --uid $(id -u) --gid $(id -g) --no-create-home --home-dir /build envoybuild \
     && usermod -a -G pcap envoybuild \
     && chown envoybuild:envoygroup /build \
-    && sudo -EHs -u envoybuild bash -c 'cd /source && $*'")
+    && sudo -EHs -u envoybuild PATH=\$PATH bash -c 'cd /source && $*'")
 fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
