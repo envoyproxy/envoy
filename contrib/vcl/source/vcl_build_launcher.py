@@ -26,5 +26,6 @@ def main():
     # build vcl
     subprocess.run([vcl_build, vpp_path, dst_path])
 
+
 if __name__ == "__main__":
     main()
