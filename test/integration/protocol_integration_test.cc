@@ -535,6 +535,27 @@ TEST_P(ProtocolIntegrationTest, 304HeadResponseWithoutContentLengthLegacy) {
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
 }
 
+// Tests that the response to a HEAD request can have content-length header but empty body.
+TEST_P(ProtocolIntegrationTest, 200HeadResponseWithContentLength) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"if-none-match", "\"1234567890\""}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "123"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "123",
+      response->headers().get(Http::LowerCaseString("content-length"))[0]->value().getStringView());
+}
+
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
