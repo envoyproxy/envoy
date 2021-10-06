@@ -158,9 +158,8 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 
   auto probing_socket = envoy_context->releaseSocket();
   if (MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
-                  envoy_context->releaseWriter().release(), true)) {
+                  envoy_context->releaseWriter(), true)) {
     setConnectionSocket(std::move(probing_socket));
-    std::cout << "switched socket" << std::endl;
   } else {
     probing_socket.reset();
   }
@@ -228,9 +227,8 @@ quic::QuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContex
   return writer_.get();
 }
 
-std::unique_ptr<EnvoyQuicPacketWriter>
-EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseWriter() {
-  return std::move(writer_);
+EnvoyQuicPacketWriter* EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseWriter() {
+  return writer_.release();
 }
 
 std::unique_ptr<Network::ConnectionSocket>

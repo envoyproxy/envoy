@@ -45,7 +45,7 @@ public:
 
     quic::QuicPacketWriter* WriterToUse() override;
 
-    std::unique_ptr<EnvoyQuicPacketWriter> releaseWriter();
+    EnvoyQuicPacketWriter* releaseWriter();
 
     Network::ConnectionSocket& probingSocket();
 
