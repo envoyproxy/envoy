@@ -377,8 +377,7 @@ bool HeaderUtility::isRemovableHeader(absl::string_view header) {
 
 bool HeaderUtility::isModifiableHeader(absl::string_view header) {
   return (header.empty() || header[0] != ':') &&
-         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
-          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
 }
 
 HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
