@@ -75,13 +75,37 @@ public:
           EXPECT_EQ(expected_status, status);
           if (expected_results) {
             EXPECT_FALSE(results.empty());
+            absl::optional<bool> is_v4{};
             for (const auto& result : results) {
-              if (lookup_family == DnsLookupFamily::V4Only ||
-                  lookup_family == DnsLookupFamily::V4Preferred) {
+              switch (lookup_family)
+              {
+              case DnsLookupFamily::V4Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv4());
-              } else if (lookup_family == DnsLookupFamily::V6Only ||
-                         lookup_family == DnsLookupFamily::Auto) {
+                break;
+              case DnsLookupFamily::V6Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv6());
+                break;
+              // In CI these modes could return either V4 or V6 with the non-mocked API calls. But
+              // regardless of the family all returned addresses need to be one _or_ the other.
+              case DnsLookupFamily::V4Preferred:
+              case DnsLookupFamily::Auto:
+                // Set the expectation for subsequent responses based on the first one.
+                if (!is_v4.has_value()) {
+                  if (result.address_->ip()->ipv4()) {
+                    is_v4 = true;
+                  } else {
+                    is_v4 = false;
+                  }
+                }
+
+                if (is_v4.value()) {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv4());
+                } else {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv6());
+                }
+                break;
+              default:
+                NOT_REACHED_GCOVR_EXCL_LINE;
               }
             }
           }
@@ -228,7 +252,10 @@ TEST_F(AppleDnsImplTest, CallbackExceptionLocalResolution) {
 // Validate working of cancellation provided by ActiveDnsQuery return.
 TEST_F(AppleDnsImplTest, Cancel) {
   ActiveDnsQuery* query =
-      resolveWithUnreferencedParameters("google.com", DnsLookupFamily::Auto, false);
+      resolveWithUnreferencedParameters("some.domain", DnsLookupFamily::Auto, false);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::Auto,
+                                             DnsResolver::ResolutionStatus::Success, true));
 
   ASSERT_NE(nullptr, query);
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
