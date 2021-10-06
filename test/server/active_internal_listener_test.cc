@@ -88,7 +88,6 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   // FIX-ME: replace by mock socket
   Network::Address::InstanceConstSharedPtr original_dst_address(
       new Network::Address::Ipv4Instance("127.0.0.2", 8080));
-
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
@@ -107,6 +106,33 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
   EXPECT_CALL(*generic_listener_, onDestroy());
+}
+
+TEST_F(ActiveInternalListenerTest, DestroyListenerClosesActiveSocket) {
+  addListener();
+  expectFilterChainFactory();
+  Network::MockListenerFilter* test_listener_filter = new Network::MockListenerFilter();
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(*accepted_socket, ioHandle()).WillOnce(ReturnRef(io_handle));
+  EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
+
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+        manager.addAcceptFilter(listener_filter_matcher_,
+                                Network::ListenerFilterPtr{test_listener_filter});
+        return true;
+      }));
+  EXPECT_CALL(*test_listener_filter, onAccept(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+        return Network::FilterStatus::StopIteration;
+      }));
+
+  internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  EXPECT_CALL(*test_listener_filter, destroy_());
+  EXPECT_CALL(*generic_listener_, onDestroy());
+  internal_listener_.reset();
 }
 
 TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {

@@ -339,7 +339,6 @@ public:
 
   IoHandlePtr io_handle_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
-  bool is_closed_;
 };
 
 class MockListenerFilterCallbacks : public ListenerFilterCallbacks {
