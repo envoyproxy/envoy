@@ -21,17 +21,7 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
                                                  ConstSupportedBuckets& supported_buckets)
     : supported_buckets_(supported_buckets),
       computed_quantiles_(HistogramStatisticsImpl::supportedQuantiles().size(), 0.0) {
-  hist_approx_quantile(histogram_ptr, supportedQuantiles().data(),
-                       HistogramStatisticsImpl::supportedQuantiles().size(),
-                       computed_quantiles_.data());
-
-  sample_count_ = hist_sample_count(histogram_ptr);
-  sample_sum_ = hist_approx_sum(histogram_ptr);
-
-  computed_buckets_.reserve(supported_buckets_.size());
-  for (const auto bucket : supported_buckets_) {
-    computed_buckets_.emplace_back(hist_approx_count_below(histogram_ptr, bucket));
-  }
+  refresh(histogram_ptr);
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
@@ -72,7 +62,6 @@ void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
   sample_count_ = hist_sample_count(new_histogram_ptr);
   sample_sum_ = hist_approx_sum(new_histogram_ptr);
 
-  ASSERT(supportedBuckets().size() == computed_buckets_.size());
   computed_buckets_.clear();
   ConstSupportedBuckets& supported_buckets = supportedBuckets();
   computed_buckets_.reserve(supported_buckets.size());
