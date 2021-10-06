@@ -154,6 +154,8 @@ TEST_P(ThriftTranslationIntegrationTest, Translates) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_rq_call");
+  EXPECT_EQ(1U, counter->value());
   if (passthrough_ &&
       (downstream_transport_ == TransportType::Framed ||
        downstream_transport_ == TransportType::Header) &&
@@ -164,17 +166,19 @@ TEST_P(ThriftTranslationIntegrationTest, Translates) {
     EXPECT_EQ(1U, counter->value());
     counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
     EXPECT_EQ(1U, counter->value());
-    counter = test_server_->counter("thrift.thrift_stats.response_success");
-    EXPECT_EQ(0U, counter->value());
   } else {
     counter = test_server_->counter("thrift.thrift_stats.request_passthrough");
     EXPECT_EQ(0U, counter->value());
     counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
     EXPECT_EQ(0U, counter->value());
-    counter = test_server_->counter("thrift.thrift_stats.response_success");
-    EXPECT_EQ(1U, counter->value());
   }
   counter = test_server_->counter("thrift.thrift_stats.response_reply");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("thrift.thrift_stats.response_success");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_resp_reply");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_resp_success");
   EXPECT_EQ(1U, counter->value());
 }
 
