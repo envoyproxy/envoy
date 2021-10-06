@@ -138,7 +138,8 @@ protected:
       return;
     }
     if (received_content_bytes_ > content_length_.value() ||
-        (end_stream && received_content_bytes_ != content_length_.value())) {
+        (end_stream && received_content_bytes_ != content_length_.value() &&
+         !(is_304_response_ && received_content_bytes_ == 0))) {
       details_ = Http3ResponseCodeDetailValues::inconsistent_content_length;
       // Reset instead of closing the connection to align with nghttp2.
       onStreamError(false);
@@ -163,6 +164,7 @@ protected:
   // TODO(kbaichoo): bind the account to the QUIC buffers to enable tracking of
   // memory allocated within QUIC buffers.
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_ = nullptr;
+  bool is_304_response_{false};
 
 private:
   // Keeps track of bytes buffered in the stream send buffer in QUICHE and reacts

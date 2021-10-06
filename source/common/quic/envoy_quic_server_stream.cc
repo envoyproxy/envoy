@@ -212,7 +212,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       end_stream_decoded_ = true;
     }
     updateReceivedContentBytes(buffer->length(), fin_read_and_no_trailers);
-    if (!details_.empty()) {
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
       // A stream error has occurred, stop processing.
       return;
     }
@@ -254,7 +254,7 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
     updateReceivedContentBytes(0, true);
-    if (!details_.empty()) {
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
       // A stream error has occurred, stop processing.
       return;
     }
