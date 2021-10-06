@@ -60,18 +60,20 @@ public:
                                               bool skip_cluster_check) override;
 
 private:
+  using RawAsyncClientLRUMap = SimpleLRUCache<envoy::config::core::v3::GrpcService,
+                                              RawAsyncClientSharedPtr, MessageUtil, MessageUtil>;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
+    ~RawAsyncClientCache() { lru_cache_.clear(); }
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) const;
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
   private:
     absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
                         MessageUtil>
         cache_;
-      SimpleLRUCache<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
-                        MessageUtil> lru_cache_{500};  
+    RawAsyncClientLRUMap lru_cache_{500};
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;

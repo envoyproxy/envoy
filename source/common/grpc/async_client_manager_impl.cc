@@ -149,17 +149,17 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
 }
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
-    const envoy::config::core::v3::GrpcService& config) const {
-  auto it = cache_.find(config);
-  if (it == cache_.end()) {
-    return nullptr;
+    const envoy::config::core::v3::GrpcService& config) {
+  RawAsyncClientLRUMap::ScopedLookup lookup(&lru_cache_, config);
+  if (lookup.found()) {
+    return *(lookup.value());
   }
-  return it->second;
+  return nullptr;
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  cache_[config] = client;
+  lru_cache_.insert(config, new RawAsyncClientSharedPtr{client}, 1);
 }
 
 } // namespace Grpc
