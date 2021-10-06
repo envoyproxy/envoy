@@ -50,6 +50,7 @@ envoy_cc_library(
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
     ] + envoy_select_google_grpc([":google_async_client_lib"]),
+    external_deps = ["simple_lru_cache_lib"],
 )
 
 envoy_cc_library(

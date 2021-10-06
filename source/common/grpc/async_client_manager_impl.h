@@ -10,6 +10,10 @@
 
 #include "source/common/grpc/stat_names.h"
 
+#include "simple_lru_cache/simple_lru_cache_inl.h"
+
+using ::google::simple_lru_cache::SimpleLRUCache;
+
 namespace Envoy {
 namespace Grpc {
 
@@ -66,6 +70,8 @@ private:
     absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
                         MessageUtil>
         cache_;
+      SimpleLRUCache<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
+                        MessageUtil> lru_cache_{500};  
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
