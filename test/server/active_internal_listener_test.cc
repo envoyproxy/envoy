@@ -183,12 +183,21 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
   auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
 
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
-
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
-  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
+  EXPECT_CALL(*filter_chain_, transportSocketFactory)
+      .WillOnce(testing::ReturnRef(*transport_socket_factory));
+  EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_()).WillOnce(Return(connection));
+  EXPECT_CALL(conn_handler_, incNumConnections());
+  EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+
+  EXPECT_CALL(conn_handler_, decNumConnections());
+  internal_listener_.reset();
 }
 } // namespace
 } // namespace Server
