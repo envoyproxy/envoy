@@ -211,7 +211,7 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   });
 }
 
-http2::adapter::HeaderRep GetRep(const HeaderString& str) {
+http2::adapter::HeaderRep getRep(const HeaderString& str) {
   if (str.isReference()) {
     return str.getStringView();
   } else {
@@ -224,7 +224,7 @@ ConnectionImpl::StreamImpl::buildHeaders(const HeaderMap& headers) {
   std::vector<http2::adapter::Header> out;
   out.reserve(headers.size());
   headers.iterate([&out](const HeaderEntry& header) -> HeaderMap::Iterate {
-    out.push_back({GetRep(header.key()), GetRep(header.value())});
+    out.push_back({getRep(header.key()), getRep(header.value())});
     return HeaderMap::Iterate::Continue;
   });
   return out;

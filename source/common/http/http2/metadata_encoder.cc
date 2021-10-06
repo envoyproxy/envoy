@@ -169,7 +169,7 @@ NewMetadataEncoder::createSource(const MetadataMap& metadata_map) {
   for (const auto& header : metadata_map) {
     r.push_back({header.first, header.second});
   }
-  QUICHE_CHECK_EQ(r.size(), metadata_map.size());
+  ASSERT(r.size() == metadata_map.size());
   Buffer::OwnedImpl payload;
   auto progressive_encoder = deflater_.EncodeRepresentations(r);
   while (progressive_encoder->HasNext()) {
