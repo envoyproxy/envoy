@@ -70,9 +70,6 @@ private:
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
   private:
-    absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
-                        MessageUtil>
-        cache_;
     RawAsyncClientLRUMap lru_cache_{500};
   };
   Upstream::ClusterManager& cm_;
