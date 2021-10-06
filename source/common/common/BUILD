@@ -84,6 +84,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dns_utils_lib",
+    srcs = ["dns_utils.cc"],
+    hdrs = ["dns_utils.h"],
+    deps = [
+        ":assert_lib",
+        "//envoy/network:dns_interface",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "documentation_url_lib",
     hdrs = ["documentation_url.h"],
 )

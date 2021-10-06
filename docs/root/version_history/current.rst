@@ -18,6 +18,7 @@ Removed Config or Runtime
 *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 * http: removed ``envoy.reloadable_features.dont_add_content_length_for_bodiless_requests deprecation`` and legacy code paths.
+* http: removed ``envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure`` and legacy code paths.
 
 New Features
 ------------
