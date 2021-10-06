@@ -194,15 +194,15 @@ bool SnapshotImpl::getBoolean(absl::string_view key, bool default_value) const {
 }
 
 const std::vector<Snapshot::OverrideLayerConstPtr>& SnapshotImpl::getLayers() const {
-  return layers_;
+  return *layers_;
 }
 
 const Snapshot::EntryMap& SnapshotImpl::values() const { return values_; }
 
 SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
-                           std::vector<OverrideLayerConstPtr>&& layers)
-    : layers_{std::move(layers)}, generator_{generator}, stats_{stats} {
-  for (const auto& layer : layers_) {
+                           std::shared_ptr<std::vector<OverrideLayerConstPtr>> layers)
+    : layers_{layers}, generator_{generator}, stats_{stats} {
+  for (const auto& layer : *layers_) {
     for (const auto& kv : layer->values()) {
       values_.erase(kv.first);
       values_.emplace(kv.first, kv.second);
@@ -531,7 +531,7 @@ void RtdsSubscription::onConfigRemoved(
 void LoaderImpl::loadNewSnapshot() {
   std::shared_ptr<SnapshotImpl> ptr = createNewSnapshot();
   tls_->set([ptr](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::static_pointer_cast<ThreadLocal::ThreadLocalObject>(ptr);
+    return std::make_shared<SnapshotImpl>(ptr.get());
   });
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -635,7 +635,9 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
   } else {
     stats_.override_dir_not_exists_.inc();
   }
-  return std::make_unique<SnapshotImpl>(generator_, stats_, std::move(layers));
+  return std::make_unique<SnapshotImpl>(
+      generator_, stats_,
+      std::make_shared<std::vector<Snapshot::OverrideLayerConstPtr>>(std::move(layers)));
 }
 
 } // namespace Runtime

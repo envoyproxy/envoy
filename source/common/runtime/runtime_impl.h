@@ -64,7 +64,8 @@ struct RuntimeStats {
 class SnapshotImpl : public Snapshot, Logger::Loggable<Logger::Id::runtime> {
 public:
   SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& stats,
-               std::vector<OverrideLayerConstPtr>&& layers);
+               std::shared_ptr<std::vector<OverrideLayerConstPtr>> layers);
+  SnapshotImpl(SnapshotImpl* src) : SnapshotImpl(src->generator_, src->stats_, src->layers_){};
 
   // Runtime::Snapshot
   bool deprecatedFeatureEnabled(absl::string_view key, bool default_value) const override;
@@ -112,7 +113,7 @@ private:
   static bool parseEntryDoubleValue(Entry& entry);
   static void parseEntryFractionalPercentValue(Entry& entry);
 
-  const std::vector<OverrideLayerConstPtr> layers_;
+  const std::shared_ptr<std::vector<OverrideLayerConstPtr>> layers_;
   EntryMap values_;
   Random::RandomGenerator& generator_;
   RuntimeStats& stats_;
