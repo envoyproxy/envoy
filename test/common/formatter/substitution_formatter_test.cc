@@ -362,12 +362,12 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer{
-        std::make_shared<StreamInfo::BytesMeterer>()};
-    upstream_bytes_meterer->addWireBytesReceived(1);
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesReceived(1);
     StreamInfoFormatter wire_bytes_received_format("UPSTREAM_WIRE_BYTES_RECEIVED");
-    EXPECT_CALL(stream_info, getUpstreamBytesMeterer())
-        .WillRepeatedly(ReturnRef(upstream_bytes_meterer));
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
     EXPECT_EQ("1", wire_bytes_received_format.format(request_headers, response_headers,
                                                      response_trailers, stream_info, body));
     EXPECT_THAT(wire_bytes_received_format.formatValue(request_headers, response_headers,
@@ -465,12 +465,12 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer{
-        std::make_shared<StreamInfo::BytesMeterer>()};
-    upstream_bytes_meterer->addWireBytesSent(1);
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesSent(1);
     StreamInfoFormatter wire_bytes_sent_format("UPSTREAM_WIRE_BYTES_SENT");
-    EXPECT_CALL(stream_info, getUpstreamBytesMeterer())
-        .WillRepeatedly(ReturnRef(upstream_bytes_meterer));
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
     EXPECT_EQ("1", wire_bytes_sent_format.format(request_headers, response_headers,
                                                  response_trailers, stream_info, body));
     EXPECT_THAT(wire_bytes_sent_format.formatValue(request_headers, response_headers,

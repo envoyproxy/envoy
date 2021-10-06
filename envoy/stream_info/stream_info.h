@@ -238,7 +238,8 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
-struct BytesMeterer {
+// Measure the number of bytes sent and received for an http stream.
+struct BytesMeter {
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
@@ -255,7 +256,7 @@ private:
   uint64_t wire_bytes_received_{};
 };
 
-using BytesMetererSharedPtr = std::shared_ptr<BytesMeterer>;
+using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
 /**
  * Additional information about a completed request for logging.
@@ -625,19 +626,30 @@ public:
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
 
-  virtual const BytesMetererSharedPtr& getUpstreamBytesMeterer() const PURE;
+  /**
+   * @return the bytes meter for upstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getUpstreamBytesMeter() const PURE;
 
-  virtual const BytesMetererSharedPtr& getDownstreamBytesMeterer() const PURE;
+  /**
+   * @return the bytes meter for downstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getDownstreamBytesMeter() const PURE;
 
-  virtual void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) PURE;
+  /**
+   * @param upstream_bytes_meter, the bytes meter for upstream http stream.
+   */
+  virtual void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) PURE;
 
-  virtual void
-  setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) PURE;
+  /**
+   * @param downstream_bytes_meter, the bytes meter for downstream http stream.
+   */
+  virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
 
-  static void syncUpstreamAndDownstreamBytesMeterer(StreamInfo& downstream_info,
-                                                    StreamInfo& upstream_info) {
-    downstream_info.setUpstreamBytesMeterer(upstream_info.getUpstreamBytesMeterer());
-    upstream_info.setDownstreamBytesMeterer(downstream_info.getDownstreamBytesMeterer());
+  static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
+                                                  StreamInfo& upstream_info) {
+    downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
+    upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
 };
 

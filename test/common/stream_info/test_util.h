@@ -219,22 +219,22 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  const Envoy::StreamInfo::BytesMetererSharedPtr& getUpstreamBytesMeterer() const override {
-    return upstream_bytes_meterer_;
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
   }
 
-  const Envoy::StreamInfo::BytesMetererSharedPtr& getDownstreamBytesMeterer() const override {
-    return downstream_bytes_meterer_;
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
   }
 
-  void setUpstreamBytesMeterer(
-      const Envoy::StreamInfo::BytesMetererSharedPtr& upstream_bytes_meterer) override {
-    upstream_bytes_meterer_ = upstream_bytes_meterer;
+  void setUpstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& upstream_bytes_meter) override {
+    upstream_bytes_meter_ = upstream_bytes_meter;
   }
 
-  void setDownstreamBytesMeterer(
-      const Envoy::StreamInfo::BytesMetererSharedPtr& downstream_bytes_meterer) override {
-    downstream_bytes_meterer_ = downstream_bytes_meterer;
+  void setDownstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& downstream_bytes_meter) override {
+    downstream_bytes_meter_ = downstream_bytes_meter;
   }
 
   Random::RandomGeneratorImpl random_;
@@ -280,10 +280,10 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  Envoy::StreamInfo::BytesMetererSharedPtr upstream_bytes_meterer_{
-      std::make_shared<Envoy::StreamInfo::BytesMeterer>()};
-  Envoy::StreamInfo::BytesMetererSharedPtr downstream_bytes_meterer_{
-      std::make_shared<Envoy::StreamInfo::BytesMeterer>()};
+  Envoy::StreamInfo::BytesMeterSharedPtr upstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
+  Envoy::StreamInfo::BytesMeterSharedPtr downstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
 };
 
 } // namespace Envoy

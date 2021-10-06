@@ -884,10 +884,10 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   // Track bytes sent and received.
   if (frame->hd.type != METADATA_FRAME_TYPE) {
-    stream->bytes_meterer_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
   if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-    stream->bytes_meterer_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {
@@ -960,10 +960,10 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (stream != nullptr) {
     if (frame->hd.type != METADATA_FRAME_TYPE) {
-      stream->bytes_meterer_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+      stream->bytes_meter_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
     if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
-      stream->bytes_meterer_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+      stream->bytes_meter_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
     }
   }
   switch (frame->hd.type) {

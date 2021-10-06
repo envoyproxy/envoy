@@ -130,16 +130,15 @@ MockStreamInfo::MockStreamInfo()
     attempt_count_ = attempt_count;
   }));
   ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() { return attempt_count_; }));
-  ON_CALL(*this, getUpstreamBytesMeterer()).WillByDefault(ReturnPointee(&upstream_bytes_meterer_));
-  ON_CALL(*this, getDownstreamBytesMeterer())
-      .WillByDefault(ReturnPointee(&downstream_bytes_meterer_));
-  ON_CALL(*this, setUpstreamBytesMeterer(_))
-      .WillByDefault(Invoke([this](const BytesMetererSharedPtr& upstream_bytes_meterer) {
-        upstream_bytes_meterer_ = upstream_bytes_meterer;
+  ON_CALL(*this, getUpstreamBytesMeter()).WillByDefault(ReturnPointee(&upstream_bytes_meter_));
+  ON_CALL(*this, getDownstreamBytesMeter()).WillByDefault(ReturnPointee(&downstream_bytes_meter_));
+  ON_CALL(*this, setUpstreamBytesMeter(_))
+      .WillByDefault(Invoke([this](const BytesMeterSharedPtr& upstream_bytes_meter) {
+        upstream_bytes_meter_ = upstream_bytes_meter;
       }));
-  ON_CALL(*this, setDownstreamBytesMeterer(_))
-      .WillByDefault(Invoke([this](const BytesMetererSharedPtr& downstream_bytes_meterer) {
-        downstream_bytes_meterer_ = downstream_bytes_meterer;
+  ON_CALL(*this, setDownstreamBytesMeter(_))
+      .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
+        downstream_bytes_meter_ = downstream_bytes_meter;
       }));
 }
 

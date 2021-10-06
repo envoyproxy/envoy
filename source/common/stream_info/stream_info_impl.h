@@ -283,30 +283,30 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
-  const BytesMetererSharedPtr& getUpstreamBytesMeterer() const override {
-    return upstream_bytes_meterer_;
+  const BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
   }
 
-  const BytesMetererSharedPtr& getDownstreamBytesMeterer() const override {
-    return downstream_bytes_meterer_;
+  const BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
   }
 
-  void setUpstreamBytesMeterer(const BytesMetererSharedPtr& upstream_bytes_meterer) override {
+  void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) override {
     // Accumulate the byte measurement from previous upstream request during a retry.
-    upstream_bytes_meterer->addWireBytesSent(upstream_bytes_meterer_->wireBytesSent());
-    upstream_bytes_meterer->addWireBytesReceived(upstream_bytes_meterer_->wireBytesReceived());
-    upstream_bytes_meterer->addHeaderBytesSent(upstream_bytes_meterer_->headerBytesSent());
-    upstream_bytes_meterer->addHeaderBytesReceived(upstream_bytes_meterer_->headerBytesReceived());
+    upstream_bytes_meter->addWireBytesSent(upstream_bytes_meter_->wireBytesSent());
+    upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
+    upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
+    upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
 
-    upstream_bytes_meterer_ = upstream_bytes_meterer;
+    upstream_bytes_meter_ = upstream_bytes_meter;
   }
 
-  void setDownstreamBytesMeterer(const BytesMetererSharedPtr& downstream_bytes_meterer) override {
+  void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) override {
     // Downstream bytes counter don't reset during a retry.
-    if (downstream_bytes_meterer_ == nullptr) {
-      downstream_bytes_meterer_ = downstream_bytes_meterer;
+    if (downstream_bytes_meter_ == nullptr) {
+      downstream_bytes_meter_ = downstream_bytes_meter;
     }
-    ASSERT(downstream_bytes_meterer_.get() == downstream_bytes_meterer.get());
+    ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
   }
 
   TimeSource& time_source_;
@@ -366,8 +366,8 @@ private:
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
   // Default construct the object because upstream stream is not constructed in some cases.
-  BytesMetererSharedPtr upstream_bytes_meterer_{std::make_shared<BytesMeterer>()};
-  BytesMetererSharedPtr downstream_bytes_meterer_;
+  BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
+  BytesMeterSharedPtr downstream_bytes_meter_;
 };
 
 } // namespace StreamInfo

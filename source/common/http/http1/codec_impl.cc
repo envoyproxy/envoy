@@ -101,13 +101,13 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
                                      uint32_t value_size) {
 
   ASSERT(key_size > 0);
-  uint64_t old_buffer_length = connection_.buffer().length();
+  const uint64_t old_buffer_length = connection_.buffer().length();
   connection_.copyToBuffer(key, key_size);
   connection_.addCharToBuffer(':');
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(value, value_size);
   connection_.addToBuffer(CRLF);
-  bytes_meterer_->addHeaderBytesSent(connection_.buffer().length() - old_buffer_length);
+  bytes_meter_->addHeaderBytesSent(connection_.buffer().length() - old_buffer_length);
 }
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
@@ -263,7 +263,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 
 void StreamEncoderImpl::flushOutput(bool end_encode) {
   auto encoded_bytes = connection_.flushOutput(end_encode);
-  bytes_meterer_->addWireBytesSent(encoded_bytes);
+  bytes_meter_->addWireBytesSent(encoded_bytes);
 }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -341,7 +341,7 @@ uint64_t ConnectionImpl::flushOutput(bool end_encode) {
     // protection
     maybeAddSentinelBufferFragment(*output_buffer_);
   }
-  uint64_t bytes_encoded = output_buffer_->length();
+  const uint64_t bytes_encoded = output_buffer_->length();
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
   return bytes_encoded;
@@ -509,11 +509,9 @@ Status ConnectionImpl::completeLastHeader() {
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
   auto& headers_or_trailers = headersOrTrailers();
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-  if (bytes_meterer) {
-    // Account for ":" and "\r\n" bytes between the header key value pair.
-    bytes_meterer->addHeaderBytesReceived(CRLF_SIZE + 1);
-  }
+
+  // Account for ":" and "\r\n" bytes between the header key value pair.
+  getBytesMeter().addHeaderBytesReceived(CRLF_SIZE + 1);
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
@@ -580,14 +578,7 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
 }
 
 void ConnectionImpl::onDispatch(const Buffer::Instance& data) {
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-  if (bytes_meterer) {
-    bytes_meterer->addWireBytesReceived(data.length());
-  } else {
-    // Bytes dispatched before we create active request.
-    // Should never happen for pending response.
-    dispatched_bytes_before_stream_ += data.length();
-  }
+  getBytesMeter().addWireBytesReceived(data.length());
 }
 
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
@@ -683,10 +674,9 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
 
 Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
   ASSERT(dispatching_);
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-  if (bytes_meterer) {
-    bytes_meterer->addHeaderBytesReceived(length);
-  }
+
+  getBytesMeter().addHeaderBytesReceived(length);
+
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
@@ -709,10 +699,9 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
 
 Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(dispatching_);
-  StreamInfo::BytesMeterer* bytes_meterer = getBytesMeterer();
-  if (bytes_meterer) {
-    bytes_meterer->addHeaderBytesReceived(length);
-  }
+
+  getBytesMeter().addHeaderBytesReceived(length);
+
   if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
     return okStatus();
@@ -1154,7 +1143,8 @@ Status ServerConnectionImpl::onMessageBeginBase() {
     ASSERT(!active_request_.has_value());
     active_request_.emplace(*this);
     auto& active_request = active_request_.value();
-    getBytesMeterer()->addWireBytesReceived(dispatched_bytes_before_stream_);
+    getBytesMeter().addWireBytesReceived(bytes_meter_before_stream_.wireBytesReceived());
+    getBytesMeter().addHeaderBytesReceived(bytes_meter_before_stream_.headerBytesReceived());
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
     }
@@ -1313,7 +1303,6 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   ASSERT(pending_response_done_);
   pending_response_.emplace(*this, &response_decoder);
   pending_response_done_ = false;
-  ASSERT(dispatched_bytes_before_stream_ == 0);
   return pending_response_.value().encoder_;
 }
 

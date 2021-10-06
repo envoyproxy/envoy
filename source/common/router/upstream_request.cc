@@ -450,9 +450,9 @@ void UpstreamRequest::onPoolReady(
         info.downstreamAddressProvider().connectionID().value());
   }
 
-  stream_info_.setUpstreamBytesMeterer(upstream_->bytesMeterer());
-  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeterer(parent_.callbacks()->streamInfo(),
-                                                                stream_info_);
+  stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
+                                                              stream_info_);
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
