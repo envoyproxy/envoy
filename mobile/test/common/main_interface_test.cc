@@ -551,81 +551,86 @@ TEST(EngineTest, EventTrackerRegistersDefaultAPI) {
   ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
 }
 
-// FIXME(goaway): temporarily comment out test until it can be made resilient to API usage.
-// TEST(EngineTest, EventTrackerRegistersAPI) {
-//  engine_test_context test_context{};
-//  envoy_engine_callbacks engine_cbs{NULL /*on_engine_running*/,
-//                                    [](void* context) -> void {
-//                                      auto* test_context =
-//                                          static_cast<engine_test_context*>(context);
-//                                      test_context->on_exit.Notify();
-//                                    } /*on_exit*/,
-//                                    &test_context /*context*/};
-//
-//  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-//                                      const auto new_map = toMap(map);
-//                                      EXPECT_EQ("bar", new_map.at("foo"));
-//                                      auto* test_context = static_cast<engine_test_context*>(
-//                                          const_cast<void*>(context));
-//                                      test_context->on_event.Notify();
-//                                    } /*track*/,
-//                                    &test_context /*context*/};
-//
-//  init_engine(engine_cbs, {}, event_tracker);
-//  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
-//
-//  const auto registered_event_tracker =
-//      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
-//  EXPECT_TRUE(registered_event_tracker != nullptr);
-//  EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
-//  EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
-//
-//  event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
-//                      registered_event_tracker->context);
-//
-//  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
-//  terminate_engine(0);
-//  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
-//}
+TEST(EngineTest, EventTrackerRegistersAPI) {
+  engine_test_context test_context{};
+  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_engine_running.Notify();
+                                    } /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &test_context /*context*/};
+  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
+                                      const auto new_map = toMap(map);
+                                      if (new_map.count("foo") && new_map.at("foo") == "bar") {
+                                        auto* test_context = static_cast<engine_test_context*>(
+                                            const_cast<void*>(context));
+                                        test_context->on_event.Notify();
+                                      }
+                                    } /*track*/,
+                                    &test_context /*context*/};
 
-// TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
-//  engine_test_context test_context{};
-//  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
-//                                      auto* test_context =
-//                                          static_cast<engine_test_context*>(context);
-//                                      test_context->on_engine_running.Notify();
-//                                    } /*on_engine_running*/,
-//                                    [](void* context) -> void {
-//                                      auto* test_context =
-//                                          static_cast<engine_test_context*>(context);
-//                                      test_context->on_exit.Notify();
-//                                    } /*on_exit*/,
-//                                    &test_context /*context*/};
-//
-//  envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
-//                                      const auto new_map = toMap(map);
-//                                      EXPECT_EQ(new_map.at("name"), "assertion");
-//                                      EXPECT_EQ(new_map.at("location"), "foo_location");
-//                                      auto* test_context = static_cast<engine_test_context*>(
-//                                          const_cast<void*>(context));
-//                                      test_context->on_event.Notify();
-//                                    } /*track*/,
-//                                    &test_context /*context*/};
-//
-//  init_engine(engine_cbs, {}, event_tracker);
-//  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
-//
-//  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
-//  // Simulate a failed assertion by invoking a debug assertion failure
-//  // record action.
-//  // Verify that an envoy event is emitted when an event tracker is passed
-//  // at engine's initialization time.
-//  Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
-//
-//  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
-//  terminate_engine(0);
-//  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
-//}
+  init_engine(engine_cbs, {}, event_tracker);
+  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
+
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  const auto registered_event_tracker =
+      static_cast<envoy_event_tracker*>(Api::External::retrieveApi(envoy_event_tracker_api_name));
+  EXPECT_TRUE(registered_event_tracker != nullptr);
+  EXPECT_EQ(event_tracker.track, registered_event_tracker->track);
+  EXPECT_EQ(event_tracker.context, registered_event_tracker->context);
+
+  event_tracker.track(Bridge::Utility::makeEnvoyMap({{"foo", "bar"}}),
+                      registered_event_tracker->context);
+
+  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  terminate_engine(0);
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+}
+
+TEST(EngineTest, EventTrackerRegistersAssertionFailureRecordAction) {
+  engine_test_context test_context{};
+  envoy_engine_callbacks engine_cbs{[](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_engine_running.Notify();
+                                    } /*on_engine_running*/,
+                                    [](void* context) -> void {
+                                      auto* test_context =
+                                          static_cast<engine_test_context*>(context);
+                                      test_context->on_exit.Notify();
+                                    } /*on_exit*/,
+                                    &test_context /*context*/};
+
+  envoy_event_tracker event_tracker{
+      [](envoy_map map, const void* context) -> void {
+        const auto new_map = toMap(map);
+        if (new_map.count("name") && new_map.at("name") == "assertion") {
+          EXPECT_EQ(new_map.at("location"), "foo_location");
+          auto* test_context = static_cast<engine_test_context*>(const_cast<void*>(context));
+          test_context->on_event.Notify();
+        }
+      } /*track*/,
+      &test_context /*context*/};
+
+  init_engine(engine_cbs, {}, event_tracker);
+  run_engine(0, MINIMAL_TEST_CONFIG.c_str(), LEVEL_DEBUG.c_str());
+
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  // Simulate a failed assertion by invoking a debug assertion failure
+  // record action.
+  // Verify that an envoy event is emitted when an event tracker is passed
+  // at engine's initialization time.
+  Assert::invokeDebugAssertionFailureRecordActionForAssertMacroUseOnly("foo_location");
+
+  ASSERT_TRUE(test_context.on_event.WaitForNotificationWithTimeout(absl::Seconds(3)));
+  terminate_engine(0);
+  ASSERT_TRUE(test_context.on_exit.WaitForNotificationWithTimeout(absl::Seconds(3)));
+}
 
 TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   engine_test_context test_context{};
@@ -644,7 +649,6 @@ TEST(EngineTest, EventTrackerRegistersEnvoyBugRecordAction) {
   envoy_event_tracker event_tracker{[](envoy_map map, const void* context) -> void {
                                       const auto new_map = toMap(map);
                                       if (new_map.count("name") && new_map.at("name") == "bug") {
-                                        EXPECT_EQ(new_map.at("name"), "bug");
                                         EXPECT_EQ(new_map.at("location"), "foo_location");
                                         auto* test_context = static_cast<engine_test_context*>(
                                             const_cast<void*>(context));
