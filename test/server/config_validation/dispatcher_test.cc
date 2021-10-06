@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "source/common/common/thread.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/libevent.h"
@@ -24,7 +26,7 @@ public:
   ConfigValidation() {
     validation_ = std::make_unique<Api::ValidationImpl>(
         Thread::threadFactoryForTest(), stats_store_, test_time_.timeSystem(),
-        Filesystem::fileSystemForTest(), random_generator_);
+        Filesystem::fileSystemForTest(), random_generator_, bootstrap_);
     dispatcher_ = validation_->allocateDispatcher("test_thread");
   }
 
@@ -32,6 +34,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
 
 private:
   // Using config validation API.

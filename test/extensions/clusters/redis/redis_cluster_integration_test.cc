@@ -149,7 +149,7 @@ public:
 
   void initialize() override {
     setUpstreamCount(num_upstreams_);
-    setDeterministic();
+    setDeterministicValue();
     config_helper_.renameListener("redis_proxy");
 
     // Change the port for each of the discovery host in cluster_0.

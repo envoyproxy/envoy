@@ -102,8 +102,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
-        *filter_config, context.api().randomGenerator(), context.dispatcher().timeSource()));
+    filter_manager.addReadFilter(
+        std::make_shared<ConnectionManager>(*filter_config, context.api().randomGenerator(),
+                                            context.mainThreadDispatcher().timeSource()));
   };
 }
 
@@ -158,11 +159,7 @@ void ConfigImpl::processFilter(
   ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessageOrError(
-                proto_config.has_typed_config()
-                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
-                    : static_cast<const Protobuf::Message&>(
-                          proto_config.hidden_envoy_deprecated_config()),
-                true));
+                static_cast<const Protobuf::Message&>(proto_config.typed_config()), true));
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
           proto_config);

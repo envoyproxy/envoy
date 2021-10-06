@@ -9,6 +9,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -21,10 +22,10 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Event::MockTimer;
 using Http::FilterDataStatus;
@@ -32,6 +33,7 @@ using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::AnyNumber;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
@@ -54,9 +56,12 @@ protected:
 
   void initialize(absl::optional<std::function<void(ExternalProcessor&)>> cb) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &OrderingTest::doStart));
+    route_ = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &OrderingTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
     ExternalProcessor proto_config;
     proto_config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("ext_proc_server");
@@ -72,7 +77,8 @@ protected:
   void TearDown() override { filter_->onDestroy(); }
 
   // Called by the "start" method on the stream by the filter
-  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
+  virtual ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
+                                             const StreamInfo::StreamInfo&) {
     stream_callbacks_ = &callbacks;
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, send(_, _)).WillRepeatedly(Invoke(this, &OrderingTest::doSend));
@@ -199,8 +205,10 @@ protected:
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Router::RouteConstSharedPtr route_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
@@ -211,7 +219,8 @@ protected:
 
 class FastFailOrderingTest : public OrderingTest {
   // All tests using this class have gRPC streams that will fail while being opened.
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) override {
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks,
+                                     const StreamInfo::StreamInfo&) override {
     auto stream = std::make_unique<MockStream>();
     EXPECT_CALL(*stream, close());
     callbacks.onGrpcError(Grpc::Status::Internal);
@@ -535,9 +544,14 @@ TEST_F(OrderingTest, AddRequestTrailers) {
 TEST_F(OrderingTest, ImmediateResponseOnRequest) {
   initialize(absl::nullopt);
 
+  // MockTimer constructor sets up expectations in the Dispatcher class to wire it up
+  MockTimer* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*request_timer, disableTimer());
   sendImmediateResponse500();
   // The rest of the filter isn't necessarily called after this.
 }
@@ -546,14 +560,22 @@ TEST_F(OrderingTest, ImmediateResponseOnRequest) {
 TEST_F(OrderingTest, ImmediateResponseOnResponse) {
   initialize(absl::nullopt);
 
+  MockTimer* request_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*request_timer, enabled()).Times(AnyNumber());
+  EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(*request_timer, disableTimer());
   sendRequestHeadersReply();
 
+  MockTimer* response_timer = new MockTimer(&dispatcher_);
+  EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
+  EXPECT_CALL(*response_timer, enabled()).Times(AnyNumber());
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendResponseHeaders(true);
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(*response_timer, disableTimer());
   sendImmediateResponse500();
   Buffer::OwnedImpl resp_body("Hello!");
   EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_body, true));

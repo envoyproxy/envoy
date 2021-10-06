@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace Cache {
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+    const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string type{TypeUtil::typeUrlToDescriptorFullName(config.typed_config().type_url())};
   HttpCacheFactory* const http_cache_factory =

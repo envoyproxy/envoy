@@ -320,6 +320,15 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "inline_cookie_test",
+    srcs = ["inline_cookie_test.cc"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "header_utility_test",
     srcs = ["header_utility_test.cc"],
     deps = [
@@ -437,6 +446,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",
@@ -472,6 +482,7 @@ envoy_cc_test(
         "//source/common/http:alternate_protocols_cache",
         "//source/common/singleton:manager_impl_lib",
         "//test/mocks:common_lib",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
     ],

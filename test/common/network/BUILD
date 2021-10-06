@@ -181,7 +181,6 @@ envoy_cc_test(
         "//source/common/tcp_proxy",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/filters/network/ratelimit:ratelimit_lib",
         "//test/common/upstream:utility_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_mocks",
         "//test/mocks/buffer:buffer_mocks",
@@ -193,7 +192,6 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -322,7 +320,7 @@ envoy_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
-        "@com_googlesource_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
+        "@com_github_google_quiche//:quic_test_tools_mock_syscall_wrapper_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

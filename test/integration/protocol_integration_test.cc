@@ -53,12 +53,6 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-// TODO(#2557) fix all the failures.
-#define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
-    return;                                                                                        \
-  }
-
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -170,55 +164,12 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ComputedHealthCheck) {
-  config_helper_.addFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ModifyBuffer) {
-  config_helper_.addFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
-  // filters are prepended, so add them in reverse order
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: add-body-filter
   )EOF");
   initialize();
@@ -238,11 +189,10 @@ TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
 }
 
 TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
-  // filters are prepended, so add them in reverse order
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: add-body-filter
   )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: wait-for-whole-request-and-response-filter
   )EOF");
   initialize();
@@ -260,7 +210,7 @@ TEST_P(ProtocolIntegrationTest, AddBodyToResponseAndWaitForIt) {
 }
 
 TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: continue-headers-only-inject-body-filter
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
@@ -287,33 +237,8 @@ TEST_P(ProtocolIntegrationTest, ContinueHeadersOnlyInjectBodyFilter) {
   EXPECT_EQ(response->body(), "body");
 }
 
-// Tests a filter that returns a FilterHeadersStatus::Continue after a local reply. In debug mode,
-// this fails on ENVOY_BUG. In opt mode, the status is corrected and the failure is logged.
-TEST_P(DownstreamProtocolIntegrationTest, ContinueAfterLocalReply) {
-  config_helper_.addFilter(R"EOF(
-  name: continue-after-local-reply-filter
-  typed_config:
-    "@type": type.googleapis.com/google.protobuf.Empty
-  )EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Send a headers only request.
-  IntegrationStreamDecoderPtr response;
-  EXPECT_ENVOY_BUG(
-      {
-        response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-        ASSERT_TRUE(response->waitForEndStream());
-        EXPECT_TRUE(response->complete());
-        EXPECT_EQ("200", response->headers().getStatusValue());
-      },
-      "envoy bug failure: !continue_iteration || !state_.local_complete_. "
-      "Details: Filter did not return StopAll or StopIteration after sending a local reply.");
-}
-
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: add-trailers-filter
 typed_config:
   "@type": type.googleapis.com/google.protobuf.Empty
@@ -577,8 +502,8 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
     autonomous_upstream_ = true;
   }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -608,8 +533,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
-  // TODO(danzh) re-enable after adding http3 option "allow_connect".
-  EXCLUDE_DOWNSTREAM_HTTP3;
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     // For QUIC, even through the headers are not sent upstream, the stream will
     // be created. Use the autonomous upstream and allow incomplete streams.
@@ -619,18 +542,13 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    // Clone the whole listener.
-    auto static_resources = bootstrap.mutable_static_resources();
-    auto* old_listener = static_resources->mutable_listeners(0);
-    auto* cloned_listener = static_resources->add_listeners();
-    cloned_listener->CopyFrom(*old_listener);
-    old_listener->set_name("http_forward");
-  });
+              hcm) -> void {
+        ConfigHelper::setConnectConfig(hcm, false, false,
+                                       downstreamProtocol() == Http::CodecType::HTTP3);
+      });
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -638,9 +556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
 
-  auto response = (downstream_protocol_ == Http::CodecType::HTTP1)
-                      ? std::move((codec_client_->startRequest(headers)).second)
-                      : codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = std::move((codec_client_->startRequest(headers)).second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -650,8 +566,8 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -671,8 +587,8 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -1205,8 +1121,8 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
 // connection manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1248,8 +1164,8 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
       });
 
   useAccessLog();
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -1325,14 +1241,149 @@ TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(ProtocolIntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
-TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) { testMaxStreamDuration(); }
+TEST_P(ProtocolIntegrationTest, BasicMaxStreamDuration) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+  } else {
+    ASSERT_TRUE(response->waitForEndStream());
+    codec_client_->close();
+  }
+}
+
+TEST_P(ProtocolIntegrationTest, BasicDynamicMaxStreamDuration) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setEnvoyUpstreamStreamDurationMs(500);
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+  } else {
+    ASSERT_TRUE(response->waitForEndStream());
+    codec_client_->close();
+  }
+}
 
 TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicy) {
-  testMaxStreamDurationWithRetry(false);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(retriable_header);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+
+  response->waitForHeaders();
+  codec_client_->close();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(ProtocolIntegrationTest, MaxStreamDurationWithRetryPolicyWhenRetryUpstreamDisconnection) {
-  testMaxStreamDurationWithRetry(true);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
+        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
+      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder = codec_client_->startRequest(retriable_header);
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    ASSERT_TRUE(response->complete());
+  } else {
+    ASSERT_TRUE(response->waitForEndStream());
+    codec_client_->close();
+  }
+
+  EXPECT_EQ("408", response->headers().getStatusValue());
 }
 
 // Verify that headers with underscores in their names are dropped from client requests
@@ -1753,7 +1804,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyDuringEncoding) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: local-reply-during-encode
 )EOF");
   initialize();
@@ -1777,7 +1828,7 @@ name: local-reply-during-encode
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyDuringEncodingData) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: local-reply-during-encode-data
 )EOF");
   initialize();
@@ -2015,13 +2066,13 @@ TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAll) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: call-decodedata-once-filter
 )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: passthrough-filter
 )EOF");
 
@@ -2066,10 +2117,10 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-watermark-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(DownstreamProtocolIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: passthrough-filter
 )EOF");
 
@@ -2124,13 +2175,13 @@ name: passthrough-filter
 
 // Test two filters that return StopAllIterationAndBuffer back-to-back.
 TEST_P(DownstreamProtocolIntegrationTest, TestTwoFiltersDecodeHeadersReturnsStopAll) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: passthrough-filter
 )EOF");
 
@@ -2172,7 +2223,7 @@ name: passthrough-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndBuffer.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAll) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addConfigModifier(
@@ -2206,7 +2257,7 @@ name: encode-headers-return-stop-all-filter
 
 // Tests encodeHeaders() returns StopAllIterationAndWatermark.
 TEST_P(DownstreamProtocolIntegrationTest, TestEncodeHeadersReturnsStopAllWatermark) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
 name: encode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addConfigModifier(
@@ -2276,8 +2327,8 @@ TEST_P(ProtocolIntegrationTest, MultipleCookiesAndSetCookies) {
 
 // Test that delay closed connections are eventually force closed when the timeout triggers.
 TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  config_helper_.addFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
-                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.prependFilter("{ name: encoder-decoder-buffer-filter, typed_config: { \"@type\": "
+                               "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -2558,8 +2609,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
-  // TODO(danzh) add "allow_connect" to http3 options.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
@@ -2576,8 +2625,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host"}});
 
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(codec_client_->disconnected());
@@ -2620,7 +2669,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HeaderNormalizationRejection) {
 // Tests a filter that returns a FilterHeadersStatus::Continue after a local reply without
 // processing new metadata generated in decodeHeader
 TEST_P(DownstreamProtocolIntegrationTest, LocalReplyWithMetadata) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: local-reply-with-metadata-filter
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Empty
@@ -2697,7 +2746,7 @@ typed_config:
 )EOF";
 
 TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilter) {
-  config_helper_.addFilter(remove_response_headers_filter);
+  config_helper_.prependFilter(remove_response_headers_filter);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -2714,7 +2763,7 @@ TEST_P(ProtocolIntegrationTest, HeadersOnlyRequestWithRemoveResponseHeadersFilte
 }
 
 TEST_P(ProtocolIntegrationTest, RemoveResponseHeadersFilter) {
-  config_helper_.addFilter(remove_response_headers_filter);
+  config_helper_.prependFilter(remove_response_headers_filter);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -2752,6 +2801,293 @@ TEST_P(ProtocolIntegrationTest, ReqRespSizeStats) {
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rs_headers_size");
 }
 
+// Verify that when a filter encodeHeaders callback overflows response buffer in filter manager the
+// filter chain is aborted and 500 is sent to the client.
+TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeHeaders) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: ENCODE_HEADERS
+      body_size: 70000
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_encode_headers: false
+      crash_in_encode_data: false
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, response_headers, 10,
+                                                0, TestUtility::DefaultTimeout);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that when a filter encodeData callback overflows response buffer in filter manager the
+// filter chain is aborted and 500 is sent to the client in case where upstream response headers
+// have not yet been sent.
+TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeDataWithResponseHeadersUnsent) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  // Buffer filter will stop iteration from encodeHeaders preventing response headers from being
+  // sent downstream.
+  config_helper_.prependFilter(R"EOF(
+  name: encoder-decoder-buffer-filter
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_encode_headers: true
+      crash_in_encode_data: true
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  // This much data should overflow the 64Kb response buffer.
+  upstream_request_->encodeData(16 * 1024, false);
+  upstream_request_->encodeData(64 * 1024, false);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+}
+
+// Verify that when a filter encodeData callback overflows response buffer in filter manager the
+// filter chain is aborted and stream is reset in case where upstream response headers have already
+// been sent.
+TEST_P(ProtocolIntegrationTest, OverflowEncoderBufferFromEncodeData) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  // Make the add-body-filter stop iteration from encodeData. Headers should be sent to the client.
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: ENCODE_DATA
+      where_to_stop_and_buffer: ENCODE_DATA
+      body_size: 16384
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_encode_headers: false
+      crash_in_encode_data: true
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  // This much data should cause the add-body-filter to overflow response buffer
+  upstream_request_->encodeData(16 * 1024, false);
+  upstream_request_->encodeData(64 * 1024, false);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_FALSE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Verify that when a filter decodeHeaders callback overflows request buffer in filter manager the
+// filter chain is aborted and 413 is sent to the client.
+TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeHeaders) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_decode_headers: true
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DECODE_HEADERS
+      body_size: 70000
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
+// Verify that when a filter decodeData callback overflows request buffer in filter manager the
+// filter chain is aborted and 413 is sent to the client.
+TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeData) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_decode_headers: true
+      crash_in_decode_data: true
+  )EOF");
+  // Buffer filter causes filter manager to buffer data
+  config_helper_.prependFilter(R"EOF(
+  name: encoder-decoder-buffer-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // This much data should overflow request buffer in filter manager
+  codec_client_->sendData(*request_encoder, 16 * 1024, false);
+  codec_client_->sendData(*request_encoder, 64 * 1024, false);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
+// Verify that when a filter decodeData callback overflows request buffer in filter manager the
+// filter chain is aborted and 413 is sent to the client. In this test the overflow occurs after
+// filter chain iteration was restarted. It is very similar to the test case above but some filter
+// manager's internal state is slightly different.
+TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeDataContinueIteration) {
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_decode_headers: false
+      crash_in_decode_data: true
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DECODE_DATA
+      body_size: 70000
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: encoder-decoder-buffer-filter
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // This should cause some data to be buffered without overflowing request buffer.
+  codec_client_->sendData(*request_encoder, 16 * 1024, false);
+  // The buffer filter will resume filter chain iteration and the next add-body-filter filter
+  // will overflow the request buffer.
+  codec_client_->sendData(*request_encoder, 16 * 1024, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
+// Adding data in decodeTrailers without any data in the filter manager's request buffer should work
+// as it will overflow the pending_recv_data_ which will cause downstream window updates to stop.
+TEST_P(DownstreamProtocolIntegrationTest,
+       OverflowDecoderBufferFromDecodeTrailersWithContinuedIteration) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DECODE_TRAILERS
+      body_size: 70000
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder, 1024, false);
+  codec_client_->sendData(*request_encoder, 1024, false);
+
+  codec_client_->sendTrailers(*request_encoder,
+                              Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Adding data in decodeTrailers with some data in the filter manager's request buffer should case
+// 413 as it will overflow the request buffer in filter manager.
+TEST_P(DownstreamProtocolIntegrationTest, OverflowDecoderBufferFromDecodeTrailers) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
+  config_helper_.prependFilter(R"EOF(
+  name: crash-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.CrashFilterConfig
+      crash_in_decode_headers: false
+      crash_in_decode_data: true
+      crash_in_decode_trailers: true
+  )EOF");
+  config_helper_.prependFilter(R"EOF(
+  name: add-body-filter
+  typed_config:
+      "@type": type.googleapis.com/test.integration.filters.AddBodyFilterConfig
+      where_to_add_body: DECODE_TRAILERS
+      where_to_stop_and_buffer: DECODE_DATA
+      body_size: 70000
+  )EOF");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":scheme", "http"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":authority", "host"}});
+  auto request_encoder = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder, 1024, false);
+  codec_client_->sendData(*request_encoder, 1024, false);
+
+  codec_client_->sendTrailers(*request_encoder,
+                              Http::TestRequestTrailerMapImpl{{"some", "trailer"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("413", response->headers().getStatusValue());
+}
+
 TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
@@ -2786,6 +3122,40 @@ TEST_P(ProtocolIntegrationTest, ResetLargeResponseUponReceivingHeaders) {
   // Reset stream while the quic server stream might have FIN buffered in its send buffer.
   codec_client_->sendReset(encoder);
   codec_client_->close();
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, PathWithFragmentRejectedByDefault) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/some/path#fragment"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.com"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(request_headers, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+}
+
+TEST_P(ProtocolIntegrationTest, FragmentStrippedFromPathWithOverride) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
+                                    "false");
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/some/path?p1=v1#fragment"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.com"}};
+  Http::TestRequestHeaderMapImpl expected_request_headers{request_headers};
+  expected_request_headers.setPath("/some/path?p1=v1");
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  auto response = sendRequestAndWaitForResponse(expected_request_headers, 0, response_headers, 0, 0,
+                                                TestUtility::DefaultTimeout);
+  EXPECT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 } // namespace Envoy

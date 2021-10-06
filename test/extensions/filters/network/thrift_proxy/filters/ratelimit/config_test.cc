@@ -19,9 +19,9 @@ namespace RateLimitFilter {
 namespace {
 
 envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
-parseRateLimitFromV3Yaml(const std::string& yaml, bool avoid_boosting = true) {
+parseRateLimitFromV3Yaml(const std::string& yaml) {
   envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit rate_limit;
-  TestUtility::loadFromYaml(yaml, rate_limit, false, avoid_boosting);
+  TestUtility::loadFromYaml(yaml, rate_limit);
   return rate_limit;
 }
 

@@ -17,10 +17,7 @@ namespace Envoy {
 
 class AdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public HttpIntegrationTest {
 public:
-  AdsIntegrationTest(envoy::config::core::v3::ApiVersion resource_api_version,
-                     envoy::config::core::v3::ApiVersion transport_api_version =
-                         envoy::config::core::v3::ApiVersion::AUTO);
-  AdsIntegrationTest() : AdsIntegrationTest(envoy::config::core::v3::ApiVersion::V3) {}
+  AdsIntegrationTest();
 
   void TearDown() override;
 
@@ -36,6 +33,12 @@ public:
 
   envoy::config::endpoint::v3::ClusterLoadAssignment
   buildTlsClusterLoadAssignment(const std::string& name);
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name, const std::string& collection_name);
+
+  envoy::service::discovery::v3::Resource
+  buildLbEndpointResource(const std::string& lb_endpoint_resource_name, const std::string& version);
 
   envoy::config::listener::v3::Listener buildListener(const std::string& name,
                                                       const std::string& route_config,
@@ -57,11 +60,6 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
-
-  // If API version is v2, fatal-by-default is disabled unless fatal_by_default_v2_override_ is set.
-  envoy::config::core::v3::ApiVersion api_version_;
-  // Set to force fatal-by-default v2 even if API version is v2.
-  bool fatal_by_default_v2_override_{false};
 };
 
 } // namespace Envoy

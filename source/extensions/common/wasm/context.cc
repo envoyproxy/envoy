@@ -910,21 +910,6 @@ void Context::onUpstreamConnectionClose(CloseType close_type) {
   }
 }
 
-uint32_t Context::nextHttpCallToken() {
-  uint32_t token = next_http_call_token_++;
-  // Handle rollover.
-  for (;;) {
-    if (token == 0) {
-      token = next_http_call_token_++;
-    }
-    if (!http_request_.count(token)) {
-      break;
-    }
-    token = next_http_call_token_++;
-  }
-  return token;
-}
-
 // Async call via HTTP
 WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_headers,
                              std::string_view request_body, const Pairs& request_trailers,
@@ -961,7 +946,7 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
     timeout = std::chrono::milliseconds(timeout_milliseconds);
   }
 
-  uint32_t token = nextHttpCallToken();
+  uint32_t token = wasm()->nextHttpCallId();
   auto& handler = http_request_[token];
   handler.context_ = this;
   handler.token_ = token;
@@ -981,22 +966,6 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   handler.request_ = http_request;
   *token_ptr = token;
   return WasmResult::Ok;
-}
-
-uint32_t Context::nextGrpcCallToken() {
-  uint32_t token = next_grpc_token_++;
-  if (isGrpcStreamToken(token)) {
-    token = next_grpc_token_++;
-  }
-  // Handle rollover. Note: token is always odd.
-  for (;;) {
-    if (!grpc_call_request_.count(token)) {
-      break;
-    }
-    next_grpc_token_++; // Skip stream token.
-    token = next_grpc_token_++;
-  }
-  return token;
 }
 
 WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view service_name,
@@ -1019,7 +988,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
       return WasmResult::ParseFailure;
     }
   }
-  uint32_t token = nextGrpcCallToken();
+  uint32_t token = wasm()->nextGrpcCallId();
   auto& handler = grpc_call_request_[token];
   handler.context_ = this;
   handler.token_ = token;
@@ -1049,26 +1018,6 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   return WasmResult::Ok;
 }
 
-uint32_t Context::nextGrpcStreamToken() {
-  uint32_t token = next_grpc_token_++;
-  if (isGrpcCallToken(token)) {
-    token = next_grpc_token_++;
-  }
-  // Handle rollover. Note: token is always even.
-  for (;;) {
-    if (token == 0) {
-      next_grpc_token_++; // Skip call token.
-      token = next_grpc_token_++;
-    }
-    if (!grpc_stream_.count(token)) {
-      break;
-    }
-    next_grpc_token_++; // Skip call token.
-    token = next_grpc_token_++;
-  }
-  return token;
-}
-
 WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view service_name,
                                std::string_view method_name, const Pairs& initial_metadata,
                                uint32_t* token_ptr) {
@@ -1088,7 +1037,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
       return WasmResult::ParseFailure;
     }
   }
-  uint32_t token = nextGrpcStreamToken();
+  uint32_t token = wasm()->nextGrpcStreamId();
   auto& handler = grpc_stream_[token];
   handler.context_ = this;
   handler.token_ = token;
@@ -1288,23 +1237,30 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
   Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
+  // We prefix the given name with custom_stat_name_ so that these user-defined
+  // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
-    auto c = &wasm()->scope_->counterFromStatName(stat_name);
+    Stats::Counter* c = &Stats::Utility::counterFromElements(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name});
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
-    auto g = &wasm()->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+        Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
-  auto h = &wasm()->scope_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
+      *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+      Stats::Histogram::Unit::Unspecified);
   wasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;
@@ -1879,7 +1835,7 @@ void Context::onGrpcReceiveWrapper(uint32_t token, ::Envoy::Buffer::InstancePtr 
     ContextBase::onGrpcReceive(token, response_size);
     grpc_receive_buffer_.reset();
   }
-  if (isGrpcCallToken(token)) {
+  if (wasm()->isGrpcCallId(token)) {
     grpc_call_request_.erase(token);
   }
 }
@@ -1899,9 +1855,9 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
     onGrpcClose(token, status_code_);
     status_message_ = "";
   }
-  if (isGrpcCallToken(token)) {
+  if (wasm()->isGrpcCallId(token)) {
     grpc_call_request_.erase(token);
-  } else {
+  } else if (wasm()->isGrpcStreamId(token)) {
     auto it = grpc_stream_.find(token);
     if (it != grpc_stream_.end()) {
       if (it->second.local_closed_) {
@@ -1912,7 +1868,7 @@ void Context::onGrpcCloseWrapper(uint32_t token, const Grpc::Status::GrpcStatus&
 }
 
 WasmResult Context::grpcSend(uint32_t token, std::string_view message, bool end_stream) {
-  if (isGrpcCallToken(token)) {
+  if (!wasm()->isGrpcStreamId(token)) {
     return WasmResult::BadArgument;
   }
   auto it = grpc_stream_.find(token);
@@ -1928,7 +1884,7 @@ WasmResult Context::grpcSend(uint32_t token, std::string_view message, bool end_
 }
 
 WasmResult Context::grpcClose(uint32_t token) {
-  if (isGrpcCallToken(token)) {
+  if (wasm()->isGrpcCallId(token)) {
     auto it = grpc_call_request_.find(token);
     if (it == grpc_call_request_.end()) {
       return WasmResult::NotFound;
@@ -1937,7 +1893,8 @@ WasmResult Context::grpcClose(uint32_t token) {
       it->second.request_->cancel();
     }
     grpc_call_request_.erase(token);
-  } else {
+    return WasmResult::Ok;
+  } else if (wasm()->isGrpcStreamId(token)) {
     auto it = grpc_stream_.find(token);
     if (it == grpc_stream_.end()) {
       return WasmResult::NotFound;
@@ -1950,12 +1907,13 @@ WasmResult Context::grpcClose(uint32_t token) {
     } else {
       it->second.local_closed_ = true;
     }
+    return WasmResult::Ok;
   }
-  return WasmResult::Ok;
+  return WasmResult::BadArgument;
 }
 
 WasmResult Context::grpcCancel(uint32_t token) {
-  if (isGrpcCallToken(token)) {
+  if (wasm()->isGrpcCallId(token)) {
     auto it = grpc_call_request_.find(token);
     if (it == grpc_call_request_.end()) {
       return WasmResult::NotFound;
@@ -1964,7 +1922,8 @@ WasmResult Context::grpcCancel(uint32_t token) {
       it->second.request_->cancel();
     }
     grpc_call_request_.erase(token);
-  } else {
+    return WasmResult::Ok;
+  } else if (wasm()->isGrpcStreamId(token)) {
     auto it = grpc_stream_.find(token);
     if (it == grpc_stream_.end()) {
       return WasmResult::NotFound;
@@ -1973,8 +1932,9 @@ WasmResult Context::grpcCancel(uint32_t token) {
       it->second.stream_->resetStream();
     }
     grpc_stream_.erase(token);
+    return WasmResult::Ok;
   }
-  return WasmResult::Ok;
+  return WasmResult::BadArgument;
 }
 
 } // namespace Wasm

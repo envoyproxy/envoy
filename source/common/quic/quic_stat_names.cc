@@ -45,15 +45,16 @@ void QuicStatNames::chargeQuicConnectionCloseStats(Stats::Scope& scope,
 }
 
 void QuicStatNames::chargeQuicResetStreamErrorStats(Stats::Scope& scope,
-                                                    quic::QuicRstStreamErrorCode error_code,
+                                                    quic::QuicResetStreamError error_code,
                                                     bool from_self, bool is_upstream) {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
-  if (error_code > quic::QUIC_STREAM_LAST_ERROR) {
-    error_code = quic::QUIC_STREAM_LAST_ERROR;
+  auto internal_code = error_code.internal_code();
+  if (internal_code > quic::QUIC_STREAM_LAST_ERROR) {
+    internal_code = quic::QUIC_STREAM_LAST_ERROR;
   }
 
-  const Stats::StatName stream_error = resetStreamErrorStatName(error_code);
+  const Stats::StatName stream_error = resetStreamErrorStatName(internal_code);
   incCounter(scope, {http3_prefix_, (is_upstream ? upstream_ : downstream_),
                      (from_self ? from_self_ : from_peer_), stream_error});
 }

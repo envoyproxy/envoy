@@ -57,7 +57,6 @@ envoy_cc_test_library(
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/squash/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
 )

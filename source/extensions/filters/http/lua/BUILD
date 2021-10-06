@@ -44,7 +44,6 @@ envoy_cc_library(
         "//source/common/crypto:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
     ],

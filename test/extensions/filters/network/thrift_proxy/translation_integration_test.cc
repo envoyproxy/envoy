@@ -20,7 +20,7 @@ namespace ThriftProxy {
 
 class ThriftTranslationIntegrationTest
     : public testing::TestWithParam<
-          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>,
+          std::tuple<TransportType, ProtocolType, TransportType, ProtocolType, bool>>,
       public BaseThriftIntegrationTest {
 public:
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
@@ -42,13 +42,11 @@ public:
   }
 
   void initialize() override {
-    TransportType downstream_transport, upstream_transport;
-    ProtocolType downstream_protocol, upstream_protocol;
-    std::tie(downstream_transport, downstream_protocol, upstream_transport, upstream_protocol) =
-        GetParam();
+    std::tie(downstream_transport_, downstream_protocol_, upstream_transport_, upstream_protocol_,
+             passthrough_) = GetParam();
 
-    auto upstream_transport_proto = transportTypeToProto(upstream_transport);
-    auto upstream_protocol_proto = protocolTypeToProto(upstream_protocol);
+    auto upstream_transport_proto = transportTypeToProto(upstream_transport_);
+    auto upstream_protocol_proto = protocolTypeToProto(upstream_protocol_);
 
     envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions proto_opts;
     proto_opts.set_transport(upstream_transport_proto);
@@ -61,27 +59,43 @@ public:
       (*opts)[NetworkFilterNames::get().ThriftProxy].PackFrom(proto_opts);
     });
 
+    if (passthrough_) {
+      config_helper_.addFilterConfigModifier<
+          envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy>(
+          "thrift", [](Protobuf::Message& filter) {
+            auto& conn_manager =
+                dynamic_cast<envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy&>(
+                    filter);
+            conn_manager.set_payload_passthrough(true);
+          });
+    }
+
     // Invent some varying, but deterministic, values to add. We use the add method instead of
     // execute because the default execute params contains a set and the ordering can vary across
     // generated payloads.
     std::vector<std::string> args({
-        fmt::format("{}", (static_cast<int>(downstream_transport) << 8) +
-                              static_cast<int>(downstream_protocol)),
-        fmt::format("{}", (static_cast<int>(upstream_transport) << 8) +
-                              static_cast<int>(upstream_protocol)),
+        fmt::format("{}", (static_cast<int>(downstream_transport_) << 8) +
+                              static_cast<int>(downstream_protocol_)),
+        fmt::format("{}", (static_cast<int>(upstream_transport_) << 8) +
+                              static_cast<int>(upstream_protocol_)),
     });
 
-    PayloadOptions downstream_opts(downstream_transport, downstream_protocol, DriverMode::Success,
+    PayloadOptions downstream_opts(downstream_transport_, downstream_protocol_, DriverMode::Success,
                                    {}, "add", args);
     preparePayloads(downstream_opts, downstream_request_bytes_, downstream_response_bytes_);
 
-    PayloadOptions upstream_opts(upstream_transport, upstream_protocol, DriverMode::Success, {},
+    PayloadOptions upstream_opts(upstream_transport_, upstream_protocol_, DriverMode::Success, {},
                                  "add", args);
     preparePayloads(upstream_opts, upstream_request_bytes_, upstream_response_bytes_);
 
     BaseThriftIntegrationTest::initialize();
   }
 
+  TransportType downstream_transport_;
+  ProtocolType downstream_protocol_;
+  TransportType upstream_transport_;
+  ProtocolType upstream_protocol_;
+  bool passthrough_;
   Buffer::OwnedImpl downstream_request_bytes_;
   Buffer::OwnedImpl downstream_response_bytes_;
   Buffer::OwnedImpl upstream_request_bytes_;
@@ -89,17 +103,22 @@ public:
 };
 
 static std::string paramToString(
-    const TestParamInfo<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>>&
+    const TestParamInfo<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType, bool>>&
         params) {
   TransportType downstream_transport, upstream_transport;
   ProtocolType downstream_protocol, upstream_protocol;
-  std::tie(downstream_transport, downstream_protocol, upstream_transport, upstream_protocol) =
-      params.param;
+  bool passthrough;
+  std::tie(downstream_transport, downstream_protocol, upstream_transport, upstream_protocol,
+           passthrough) = params.param;
 
-  return fmt::format("From{}{}To{}{}", transportNameForTest(downstream_transport),
-                     protocolNameForTest(downstream_protocol),
-                     transportNameForTest(upstream_transport),
-                     protocolNameForTest(upstream_protocol));
+  auto result =
+      fmt::format("From{}{}To{}{}", transportNameForTest(downstream_transport),
+                  protocolNameForTest(downstream_protocol),
+                  transportNameForTest(upstream_transport), protocolNameForTest(upstream_protocol));
+  if (passthrough) {
+    result = fmt::format("{}Passthrough", result);
+  }
+  return result;
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -107,7 +126,7 @@ INSTANTIATE_TEST_SUITE_P(
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact),
             Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
-            Values(ProtocolType::Binary, ProtocolType::Compact)),
+            Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
     paramToString);
 
 // Tests that the proxy will translate between different downstream and upstream transports and
@@ -135,7 +154,31 @@ TEST_P(ThriftTranslationIntegrationTest, Translates) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_rq_call");
+  EXPECT_EQ(1U, counter->value());
+  if (passthrough_ &&
+      (downstream_transport_ == TransportType::Framed ||
+       downstream_transport_ == TransportType::Header) &&
+      (upstream_transport_ == TransportType::Framed ||
+       upstream_transport_ == TransportType::Header) &&
+      downstream_protocol_ == upstream_protocol_ && downstream_protocol_ != ProtocolType::Twitter) {
+    counter = test_server_->counter("thrift.thrift_stats.request_passthrough");
+    EXPECT_EQ(1U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(1U, counter->value());
+  } else {
+    counter = test_server_->counter("thrift.thrift_stats.request_passthrough");
+    EXPECT_EQ(0U, counter->value());
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(0U, counter->value());
+  }
+  counter = test_server_->counter("thrift.thrift_stats.response_reply");
+  EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_success");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_resp_reply");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("cluster.cluster_0.thrift.upstream_resp_success");
   EXPECT_EQ(1U, counter->value());
 }
 

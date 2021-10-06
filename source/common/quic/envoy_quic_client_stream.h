@@ -27,9 +27,6 @@ public:
   EnvoyQuicClientStream(quic::QuicStreamId id, quic::QuicSpdyClientSession* client_session,
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
-  EnvoyQuicClientStream(quic::PendingStream* pending, quic::QuicSpdyClientSession* client_session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
   void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
@@ -52,7 +49,7 @@ public:
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::Stream
@@ -72,6 +69,9 @@ protected:
                                 const quic::QuicHeaderList& header_list) override;
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
+
+  // Http::MultiplexedStreamImplBase
+  bool hasPendingData() override;
 
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();

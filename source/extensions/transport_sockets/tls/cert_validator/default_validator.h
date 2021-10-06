@@ -14,6 +14,7 @@
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
@@ -28,7 +29,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-class DefaultCertValidator : public CertValidator {
+class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                        SslStats& stats, TimeSource& time_source);
@@ -52,9 +53,10 @@ public:
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 
   // Utility functions.
-  Envoy::Ssl::ClientValidationStatus
-  verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
-                    const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);
+  Envoy::Ssl::ClientValidationStatus verifyCertificate(
+      X509* cert, const std::vector<std::string>& verify_san_list,
+      const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+          subject_alt_name_matchers);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -101,9 +103,10 @@ public:
    * @param subject_alt_name_matchers the configured matchers to match
    * @return true if the verification succeeds
    */
-  static bool
-  matchSubjectAltName(X509* cert,
-                      const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);
+  static bool matchSubjectAltName(
+      X509* cert,
+      const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
+          subject_alt_name_matchers);
 
 private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
@@ -113,7 +116,8 @@ private:
   bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
-  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers_;
+  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
+      subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
   bool verify_trusted_ca_{false};

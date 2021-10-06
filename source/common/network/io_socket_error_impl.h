@@ -18,6 +18,7 @@ public:
 
   Api::IoError::IoErrorCode getErrorCode() const override;
   std::string getErrorDetails() const override;
+  int getSystemErrorCode() const override { return errno_; }
 
   // IoErrorCode::Again is used frequently. Define it to be a singleton to avoid frequent memory
   // allocation of such instance. If this is used, IoHandleCallResult has to be instantiated with

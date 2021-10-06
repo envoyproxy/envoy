@@ -22,9 +22,7 @@
 # original_src common extension
 extensions/filters/common/original_src @snowp @klarose
 # dubbo_proxy extension
-/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan
-# rocketmq_proxy extension
-/*/extensions/filters/network/rocketmq_proxy @aaron-ai @lizhanhui @lizan
+/*/extensions/filters/network/dubbo_proxy @zyfjeff @lizan @wbpcode
 # thrift_proxy extension
 /*/extensions/filters/network/thrift_proxy @zuercher @rgs1
 # cdn_loop extension
@@ -62,10 +60,6 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/tracers/xray @abaptiste @lavignes @mattklein123
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @dio @lizan @Shikugawa
-# mysql_proxy extension
-/*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
-# postgres_proxy extension
-/*/extensions/filters/network/postgres_proxy @fabriziomello @cpakulski @dio
 # quic extension
 /*/extensions/quic/ @alyssawilk @danzh2010 @mattklein123 @mpwarres @wu-bin @ggreenway
 # zookeeper_proxy extension
@@ -107,19 +101,16 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/wasm_runtime/ @PiotrSikora @mathetake @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
-# common crypto extension
-/*/extensions/common/crypto @lizan @bdecoste @asraa
 /*/extensions/common/proxy_protocol @alyssawilk @wez470
-/*/extensions/common/sqlutils @cpakulski @dio
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose
 /*/extensions/filters/http/gzip @gsagula @dio
 /*/extensions/filters/http/fault @rshriram @alyssawilk
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
+/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
-/*/extensions/filters/http/squash @yuval-k @alyssawilk
 /*/extensions/filters/common/original_src @klarose @snowp
 /*/extensions/filters/listener/tls_inspector @ggreenway @asraa
 /*/extensions/grpc_credentials/example @wozz @htuch
@@ -199,5 +190,17 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/formatter/req_without_query @dio @tsaarni
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
-# Kafka
-/*/extensions/filters/network/kafka @mattklein123 @adamkotwasinski
+# Key Value store
+/*/extensions/key_value @alyssawilk @ryantheoptimist
+
+# Contrib
+/contrib/exe/ @mattklein123 @lizan
+/contrib/common/sqlutils/ @cpakulski @dio
+/contrib/squash/ @yuval-k @alyssawilk
+/contrib/kafka/ @mattklein123 @adamkotwasinski
+/contrib/rocketmq_proxy/ @aaron-ai @lizhanhui @lizan
+/contrib/mysql_proxy/ @rshriram @venilnoronha
+/contrib/postgres_proxy/ @fabriziomello @cpakulski @dio
+/contrib/sxg/ @cpapazian @rgs1 @alyssawilk
+/contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
+/contrib/cryptomb/ @rojkov @ipuustin

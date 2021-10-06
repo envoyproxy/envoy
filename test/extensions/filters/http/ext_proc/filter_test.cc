@@ -1,4 +1,4 @@
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
@@ -10,6 +10,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
@@ -24,20 +25,22 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::HttpBody;
-using envoy::service::ext_proc::v3alpha::HttpHeaders;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeadersResponse;
+using envoy::service::ext_proc::v3::HttpBody;
+using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Http::FilterDataStatus;
 using Http::FilterHeadersStatus;
 using Http::FilterTrailersStatus;
 using Http::LowerCaseString;
 
+using testing::AnyNumber;
 using testing::Eq;
 using testing::Invoke;
 using testing::ReturnRef;
@@ -54,11 +57,27 @@ class HttpFilterTest : public testing::Test {
 protected:
   void initialize(std::string&& yaml) {
     client_ = std::make_unique<MockClient>();
-    EXPECT_CALL(*client_, start(_)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
+    route_ = std::make_shared<NiceMock<Router::MockRoute>>();
+    EXPECT_CALL(*client_, start(_, _)).WillOnce(Invoke(this, &HttpFilterTest::doStart));
     EXPECT_CALL(encoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
     EXPECT_CALL(decoder_callbacks_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route_));
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .Times(AnyNumber())
+        .WillRepeatedly(Invoke([this](Unused) {
+          // Create a mock timer that we can check at destruction time to see if
+          // all timers were disabled no matter what. MockTimer has default
+          // actions that we just have to enable properly here.
+          auto* timer = new Event::MockTimer();
+          EXPECT_CALL(*timer, enableTimer(_, _)).Times(AnyNumber());
+          EXPECT_CALL(*timer, disableTimer()).Times(AnyNumber());
+          EXPECT_CALL(*timer, enabled()).Times(AnyNumber());
+          timers_.push_back(timer);
+          return timer;
+        }));
 
-    envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config{};
+    envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config{};
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
@@ -72,7 +91,16 @@ protected:
     request_headers_.setMethod("POST");
   }
 
-  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks) {
+  void TearDown() override {
+    for (auto* t : timers_) {
+      // This will fail if, at the end of the test, we left any timers enabled.
+      // (This particular test suite does not actually let timers expire,
+      // although other test suites do.)
+      EXPECT_FALSE(t->enabled_);
+    }
+  }
+
+  ExternalProcessorStreamPtr doStart(ExternalProcessorCallbacks& callbacks, testing::Unused) {
     stream_callbacks_ = &callbacks;
 
     auto stream = std::make_unique<MockStream>();
@@ -214,13 +242,16 @@ protected:
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   FilterConfigSharedPtr config_;
   std::unique_ptr<Filter> filter_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
+  Router::RouteConstSharedPtr route_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Http::TestRequestHeaderMapImpl request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestRequestTrailerMapImpl request_trailers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
+  std::vector<Event::MockTimer*> timers_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -1991,6 +2022,70 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// When merging two configurations, ensure that the second processing mode
+// overrides the first.
+TEST(OverrideTest, OverrideProcessingMode) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::STREAMED);
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_response_body_mode(
+      ProcessingMode::BUFFERED);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_FALSE(route1.disabled());
+  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
+  EXPECT_EQ(route1.processingMode()->request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(route1.processingMode()->response_body_mode(), ProcessingMode::BUFFERED);
+}
+
+// When merging two configurations, if the first processing mode is set, and
+// the second is disabled, then the filter should be disabled.
+TEST(OverrideTest, DisableOverridesFirstMode) {
+  ExtProcPerRoute cfg1;
+  cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  ExtProcPerRoute cfg2;
+  cfg2.set_disabled(true);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_TRUE(route1.disabled());
+  EXPECT_FALSE(route1.processingMode());
+}
+
+// When merging two configurations, if the first override is disabled, and
+// the second has a new mode, then the filter should use the new mode.
+TEST(OverrideTest, ModeOverridesFirstDisable) {
+  ExtProcPerRoute cfg1;
+  cfg1.set_disabled(true);
+  ExtProcPerRoute cfg2;
+  cfg2.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+      ProcessingMode::SKIP);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_FALSE(route1.disabled());
+  EXPECT_EQ(route1.processingMode()->request_header_mode(), ProcessingMode::SKIP);
+}
+
+// When merging two configurations, if both are disabled, then it's still
+// disabled.
+TEST(OverrideTest, DisabledThingsAreDisabled) {
+  ExtProcPerRoute cfg1;
+  cfg1.set_disabled(true);
+  ExtProcPerRoute cfg2;
+  cfg2.set_disabled(true);
+  FilterConfigPerRoute route1(cfg1);
+  FilterConfigPerRoute route2(cfg2);
+  route1.merge(route2);
+  EXPECT_TRUE(route1.disabled());
+  EXPECT_FALSE(route1.processingMode());
 }
 
 } // namespace

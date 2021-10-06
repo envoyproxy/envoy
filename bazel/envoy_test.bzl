@@ -156,7 +156,8 @@ def envoy_cc_test(
         coverage = True,
         local = False,
         size = "medium",
-        flaky = False):
+        flaky = False,
+        env = {}):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
 
     cc_test(
@@ -180,6 +181,7 @@ def envoy_cc_test(
         shard_count = shard_count,
         size = size,
         flaky = flaky,
+        env = env,
     )
 
 # Envoy C++ test related libraries (that want gtest, gmock) should be specified

@@ -1,8 +1,8 @@
 #include "source/extensions/filters/http/admission_control/config.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/enum_to_int.h"
@@ -18,7 +18,7 @@ namespace AdmissionControl {
 static constexpr std::chrono::seconds defaultSamplingWindow{30};
 
 Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
+    const envoy::extensions::filters::http::admission_control::v3::AdmissionControl& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   if (config.has_sr_threshold() && config.sr_threshold().default_value().value() < 1.0) {

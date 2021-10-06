@@ -20,7 +20,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/filter/http/filter_config_discovery_impl.h"
+#include "source/common/filter/config_discovery_impl.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -151,8 +151,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(
+                context.mainThreadDispatcher(), context.threadLocal());
           });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
@@ -176,10 +176,10 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
                 context.getServerFactoryContext(), context.messageValidationVisitor()));
       });
 
-  std::shared_ptr<Filter::Http::FilterConfigProviderManager> filter_config_provider_manager =
-      context.singletonManager().getTyped<Filter::Http::FilterConfigProviderManager>(
+  std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =
+      context.singletonManager().getTyped<FilterConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(filter_config_provider_manager),
-          [] { return std::make_shared<Filter::Http::FilterConfigProviderManagerImpl>(); });
+          [] { return std::make_shared<Filter::HttpFilterConfigProviderManagerImpl>(); });
 
   return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager,
           http_tracer_manager, filter_config_provider_manager};
@@ -192,7 +192,7 @@ std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager) {
+    FilterConfigProviderManager& filter_config_provider_manager) {
   return std::make_shared<HttpConnectionManagerConfig>(
       proto_config, context, date_provider, route_config_provider_manager,
       scoped_routes_config_provider_manager, http_tracer_manager, filter_config_provider_manager);
@@ -227,7 +227,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -263,7 +263,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager,
     Tracing::HttpTracerManager& http_tracer_manager,
-    Filter::Http::FilterConfigProviderManager& filter_config_provider_manager)
+    FilterConfigProviderManager& filter_config_provider_manager)
     : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
@@ -373,6 +373,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     auto* extension = ip_detection_extensions.Add();
     extension->set_name("envoy.http.original_ip_detection.xff");
     extension->mutable_typed_config()->PackFrom(xff_config);
+  } else {
+    if (use_remote_address_) {
+      throw EnvoyException(
+          "Original IP detection extensions and use_remote_address may not be mixed");
+    }
+
+    if (xff_num_trusted_hops_ > 0) {
+      throw EnvoyException(
+          "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+    }
   }
 
   original_ip_detection_extensions_.reserve(ip_detection_extensions.size());
@@ -816,7 +826,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

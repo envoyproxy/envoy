@@ -114,7 +114,7 @@ void UpstreamRequest::handleUpgradeResponse(Buffer::Instance& data) {
 }
 
 ThriftFilters::ResponseStatus
-UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& owner,
+UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
                                        UpstreamResponseCallbacks& callbacks) {
   ENVOY_LOG(trace, "reading response: {} bytes", data.length());
 
@@ -123,36 +123,36 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
     response_started_ = true;
   }
 
-  const auto& cluster = owner.cluster();
+  const auto& cluster = parent_.cluster();
 
   const auto status = callbacks.upstreamData(data);
   if (status == ThriftFilters::ResponseStatus::Complete) {
     ENVOY_LOG(debug, "response complete");
 
-    owner.recordUpstreamResponseSize(cluster, response_size_);
+    parent_.recordUpstreamResponseSize(cluster, response_size_);
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
-      owner.incResponseReply(cluster);
+      parent_.incResponseReply(cluster);
       if (callbacks.responseSuccess()) {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestSuccess);
-        owner.incResponseReplySuccess(cluster);
+        parent_.incResponseReplySuccess(cluster);
       } else {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestFailed);
-        owner.incResponseReplyError(cluster);
+        parent_.incResponseReplyError(cluster);
       }
       break;
 
     case MessageType::Exception:
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      owner.incResponseException(cluster);
+      parent_.incResponseException(cluster);
       break;
 
     default:
-      owner.incResponseInvalidType(cluster);
+      parent_.incResponseInvalidType(cluster);
       break;
     }
     onResponseComplete();
@@ -167,7 +167,6 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data, RequestOwner& own
 }
 
 bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream,
-                                         RequestOwner& owner,
                                          UpstreamResponseCallbacks& callbacks) {
   ASSERT(!response_complete_);
 
@@ -176,7 +175,7 @@ bool UpstreamRequest::handleUpstreamData(Buffer::Instance& data, bool end_stream
   if (upgrade_response_ != nullptr) {
     handleUpgradeResponse(data);
   } else {
-    const auto status = handleRegularResponse(data, owner, callbacks);
+    const auto status = handleRegularResponse(data, callbacks);
     if (status != ThriftFilters::ResponseStatus::MoreData) {
       return true;
     }

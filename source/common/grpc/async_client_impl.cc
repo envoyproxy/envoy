@@ -21,6 +21,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
           Router::HeaderParser::configure(config.initial_metadata(), /*append=*/false)) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
+  ASSERT(isThreadSafe());
   while (!active_streams_.empty()) {
     active_streams_.front()->resetStream();
   }
@@ -31,6 +32,7 @@ AsyncRequest* AsyncClientImpl::sendRaw(absl::string_view service_full_name,
                                        RawAsyncRequestCallbacks& callbacks,
                                        Tracing::Span& parent_span,
                                        const Http::AsyncClient::RequestOptions& options) {
+  ASSERT(isThreadSafe());
   auto* const async_request = new AsyncRequestImpl(
       *this, service_full_name, method_name, std::move(request), callbacks, parent_span, options);
   AsyncStreamImplPtr grpc_stream{async_request};
@@ -48,6 +50,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
                                           absl::string_view method_name,
                                           RawAsyncStreamCallbacks& callbacks,
                                           const Http::AsyncClient::StreamOptions& options) {
+  ASSERT(isThreadSafe());
   auto grpc_stream =
       std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name, callbacks, options);
 

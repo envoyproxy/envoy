@@ -208,11 +208,11 @@ TEST_F(CdsApiImplTest, DeltaConfigUpdate) {
     {
       envoy::config::cluster::v3::Cluster cluster;
       cluster.set_name("cluster_3");
-      expectAdd("cluster_3", "v2");
+      expectAdd("cluster_3", "v3");
       auto* resource = resources.Add();
       resource->mutable_resource()->PackFrom(cluster);
       resource->set_name("cluster_3");
-      resource->set_version("v2");
+      resource->set_version("v3");
     }
     Protobuf::RepeatedPtrField<std::string> removed;
     *removed.Add() = "cluster_1";

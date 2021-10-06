@@ -41,8 +41,10 @@ envoy_cc_test(
     deps = [
         ":test_cluster_manager",
         "//source/common/router:context_lib",
+        "//source/common/upstream:load_balancer_factory_base_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
+        "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/upstream:cds_api_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
@@ -84,9 +86,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "wrsq_scheduler_test",
+    srcs = ["wrsq_scheduler_test.cc"],
+    deps = [
+        "//source/common/upstream:scheduler_lib",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "edf_scheduler_test",
     srcs = ["edf_scheduler_test.cc"],
-    deps = ["//source/common/upstream:edf_scheduler_lib"],
+    deps = ["//source/common/upstream:scheduler_lib"],
 )
 
 envoy_cc_test(
@@ -100,6 +111,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
+        "//test/integration/load_balancers:custom_lb_policy",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
@@ -151,6 +163,28 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "eds_speed_test_benchmark_test",
     benchmark_binary = "eds_speed_test",
+)
+
+envoy_cc_test(
+    name = "leds_test",
+    srcs = ["leds_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/upstream:leds_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/common/stats:stat_test_utility_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:admin_mocks",
+        "//test/mocks/server:instance_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_test_library(
@@ -243,6 +277,7 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
@@ -293,7 +328,7 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "random_load_balancer_fuzz_test",
     srcs = ["random_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:random_load_balancer_corpus",
+    corpus = "random_load_balancer_corpus",
     deps = [
         ":load_balancer_fuzz_lib",
         ":load_balancer_fuzz_proto_cc_proto",
@@ -486,7 +521,9 @@ envoy_cc_test(
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -501,7 +538,9 @@ envoy_cc_test(
         "//source/common/upstream:maglev_lb_lib",
         "//test/mocks:common_lib",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -565,6 +604,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
+        "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:load_balancer_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -787,13 +827,14 @@ envoy_proto_library(
     srcs = ["round_robin_load_balancer_fuzz.proto"],
     deps = [
         "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
     ],
 )
 
 envoy_cc_fuzz_test(
     name = "round_robin_load_balancer_fuzz_test",
     srcs = ["round_robin_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:round_robin_load_balancer_corpus",
+    corpus = "round_robin_load_balancer_corpus",
     deps = [
         ":round_robin_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
@@ -814,10 +855,22 @@ envoy_proto_library(
 envoy_cc_fuzz_test(
     name = "least_request_load_balancer_fuzz_test",
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
-    corpus = "//test/common/upstream:least_request_load_balancer_corpus",
+    corpus = "least_request_load_balancer_corpus",
     deps = [
         ":least_request_load_balancer_fuzz_proto_cc_proto",
         ":utility_lib",
         ":zone_aware_load_balancer_fuzz_lib",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "scheduler_benchmark",
+    srcs = ["scheduler_benchmark.cc"],
+    external_deps = [
+        "benchmark",
+    ],
+    deps = [
+        "//source/common/common:random_generator_lib",
+        "//source/common/upstream:scheduler_lib",
     ],
 )

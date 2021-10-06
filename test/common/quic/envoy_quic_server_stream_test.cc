@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
 
+#include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
@@ -83,6 +84,11 @@ public:
   void SetUp() override {
     quic_session_.Initialize();
     setQuicConfigWithDefaultValues(quic_session_.config());
+    quic_connection_.SetEncrypter(
+        quic::ENCRYPTION_FORWARD_SECURE,
+        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+    quic_connection_.SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+
     quic_session_.OnConfigNegotiated();
     spdy_request_headers_[":authority"] = host_;
     spdy_request_headers_[":method"] = "POST";
@@ -92,7 +98,9 @@ public:
   void TearDown() override {
     if (quic_connection_.connected()) {
       EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(testing::AtMost(1u));
-      EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, quic::QUIC_STREAM_NO_ERROR))
+      EXPECT_CALL(quic_session_,
+                  MaybeSendStopSendingFrame(
+                      _, quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR)))
           .Times(testing::AtMost(1u));
       EXPECT_CALL(quic_connection_,
                   SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed by application"));
@@ -215,6 +223,23 @@ TEST_F(EnvoyQuicServerStreamTest, ResetStreamByHCM) {
               onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
   quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
   EXPECT_TRUE(quic_stream_->rst_sent());
+}
+
+TEST_F(EnvoyQuicServerStreamTest, ReceiveStopSending) {
+  size_t payload_offset = receiveRequest(request_body_, false, request_body_.size() * 2);
+  // Receiving STOP_SENDING alone should trigger upstream reset.
+  EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
+  quic_stream_->OnStopSending(quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_NO_ERROR));
+  EXPECT_FALSE(quic_stream_->read_side_closed());
+
+  // Following FIN should be discarded and the stream should be closed.
+  std::string second_part_request = bodyToHttp3StreamPayload("aaaa");
+  EXPECT_CALL(stream_decoder_, decodeData(_, _)).Times(0u);
+  quic::QuicStreamFrame frame(stream_id_, true, payload_offset, second_part_request);
+  quic_stream_->OnStreamFrame(frame);
+  EXPECT_TRUE(quic_stream_->read_side_closed());
+  EXPECT_TRUE(quic_stream_->write_side_closed());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, EarlyResponseWithStopSending) {

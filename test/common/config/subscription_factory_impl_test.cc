@@ -206,7 +206,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscriptionNonExistentFile) {
   envoy::config::core::v3::ConfigSource config;
   config.set_path("/blahblah");
   EXPECT_THROW_WITH_MESSAGE(subscriptionFromConfigSource(config)->start({"foo"}), EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist")
 }
 
@@ -224,7 +224,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
 TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscriptionNonExistentFile) {
   EXPECT_THROW_WITH_MESSAGE(collectionSubscriptionFromUrl("file:///blahblah", {})->start({}),
                             EnvoyException,
-                            "envoy::api::v2::Path must refer to an existing path in the system: "
+                            "paths must refer to an existing path in the system: "
                             "'/blahblah' does not exist");
 }
 
@@ -339,6 +339,18 @@ TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedApiType) {
           "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
           ->start({}),
       EnvoyException, "Unknown xdstp:// transport API type in api_type: GRPC");
+}
+
+TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedConfigSpecifierType) {
+  envoy::config::core::v3::ConfigSource config;
+  config.set_path("/path/foo/bar");
+  EXPECT_THROW_WITH_REGEX(
+      collectionSubscriptionFromUrl(
+          "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
+          ->start({}),
+      EnvoyException,
+      "Missing or not supported config source specifier in envoy::config::core::v3::ConfigSource "
+      "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcCollectionAggregatedSubscription) {

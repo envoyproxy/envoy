@@ -20,6 +20,7 @@ void validateProtoDescriptors() {
       "envoy.service.endpoint.v3.EndpointDiscoveryService.FetchEndpoints",
       "envoy.service.endpoint.v3.EndpointDiscoveryService.StreamEndpoints",
       "envoy.service.endpoint.v3.EndpointDiscoveryService.DeltaEndpoints",
+      "envoy.service.endpoint.v3.LocalityEndpointDiscoveryService.DeltaLocalityEndpoints",
       "envoy.service.health.v3.HealthDiscoveryService.FetchHealthCheck",
       "envoy.service.health.v3.HealthDiscoveryService.StreamHealthCheck",
       "envoy.service.listener.v3.ListenerDiscoveryService.FetchListeners",
@@ -39,14 +40,16 @@ void validateProtoDescriptors() {
   }
 
   const auto types = {
-      "envoy.api.v2.Cluster",           "envoy.api.v2.ClusterLoadAssignment",
-      "envoy.api.v2.Listener",          "envoy.api.v2.RouteConfiguration",
-      "envoy.api.v2.route.VirtualHost", "envoy.api.v2.auth.Secret",
+      "envoy.config.cluster.v3.Cluster",     "envoy.config.endpoint.v3.ClusterLoadAssignment",
+      "envoy.config.listener.v3.Listener",   "envoy.config.route.v3.RouteConfiguration",
+      "envoy.config.route.v3.VirtualHost",   "envoy.extensions.transport_sockets.tls.v3.Secret",
+      "envoy.config.endpoint.v3.LbEndpoint",
   };
 
   for (const auto& type : types) {
-    RELEASE_ASSERT(
-        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) != nullptr, "");
+    RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type) !=
+                       nullptr,
+                   absl::StrCat("Unable to find message type for ", type));
   }
 }
 

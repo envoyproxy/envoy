@@ -61,14 +61,13 @@ public:
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override { drainConnectionsImpl(); }
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+  }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
-  bool maybePreconnect(float ratio) override {
-    return Envoy::ConnectionPool::ConnPoolImplBase::maybePreconnect(ratio);
-  }
+  bool maybePreconnect(float ratio) override { return maybePreconnectImpl(ratio); }
   bool hasActiveConnections() const override;
 
   // Creates a new PendingStream and enqueues it into the queue.

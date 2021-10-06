@@ -148,6 +148,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
+    fake_stream_->startGrpcStream(false);
     fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl(*reply_headers), false);
   }
 

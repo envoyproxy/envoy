@@ -257,6 +257,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   } else {
     cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
         http2_options.value(), quic::kStreamReceiveWindowLimit);
+    cluster->http3_options_.set_allow_extended_connect(true);
 #endif
   }
   cluster->http2_options_ = http2_options.value();
@@ -381,8 +382,8 @@ ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrail
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
-    const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_size,
-    int upstream_index, std::chrono::milliseconds timeout) {
+    const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
+    const std::vector<uint64_t>& upstream_indices, std::chrono::milliseconds timeout) {
   ASSERT(codec_client_ != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
@@ -391,16 +392,25 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
   } else {
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
-  waitForNextUpstreamRequest(upstream_index, timeout);
+  waitForNextUpstreamRequest(upstream_indices, timeout);
   // Send response headers, and end_stream if there is no response body.
-  upstream_request_->encodeHeaders(response_headers, response_size == 0);
+  upstream_request_->encodeHeaders(response_headers, response_body_size == 0);
   // Send any response data, with end_stream true.
-  if (response_size) {
-    upstream_request_->encodeData(response_size, true);
+  if (response_body_size) {
+    upstream_request_->encodeData(response_body_size, true);
   }
   // Wait for the response to be read by the codec client.
   RELEASE_ASSERT(response->waitForEndStream(timeout), "unexpected timeout");
   return response;
+}
+
+IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
+    const Http::TestRequestHeaderMapImpl& request_headers, uint32_t request_body_size,
+    const Http::TestResponseHeaderMapImpl& response_headers, uint32_t response_body_size,
+    uint64_t upstream_index, std::chrono::milliseconds timeout) {
+  return sendRequestAndWaitForResponse(request_headers, request_body_size, response_headers,
+                                       response_body_size, std::vector<uint64_t>{upstream_index},
+                                       timeout);
 }
 
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
@@ -1000,7 +1010,7 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
                                                bool with_multiple_1xx_headers) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
-    config_helper_.addFilter("name: passthrough-filter");
+    config_helper_.prependFilter("name: passthrough-filter");
   }
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1071,7 +1081,7 @@ void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // created while the socket appears to be in the high watermark state, and regression tests that
   // flow control will be corrected as the socket "becomes unblocked"
   if (network_backup) {
-    config_helper_.addFilter(
+    config_helper_.prependFilter(
         fmt::format(R"EOF(
   name: pause-filter{}
   typed_config:
@@ -1404,91 +1414,61 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
   }
 }
 
-void HttpIntegrationTest::testMaxStreamDuration() {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
-    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(200));
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
-
+void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
+                                              uint32_t response1_bytes, uint32_t response2_bytes) {
+  FakeStreamPtr upstream_request1;
+  FakeStreamPtr upstream_request2;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
+  // Start request 1
+  auto encoder_decoder1 =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  Http::RequestEncoder* encoder1 = &encoder_decoder1.first;
+  auto response1 = std::move(encoder_decoder1.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
 
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
+  // Start request 2
+  auto encoder_decoder2 =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  Http::RequestEncoder* encoder2 = &encoder_decoder2.first;
+  auto response2 = std::move(encoder_decoder2.second);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
-  if (downstream_protocol_ == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(codec_client_->waitForDisconnect());
-  } else {
-    ASSERT_TRUE(response->waitForEndStream());
-    codec_client_->close();
-  }
-}
+  // Finish request 1
+  codec_client_->sendData(*encoder1, request1_bytes, true);
+  ASSERT_TRUE(upstream_request1->waitForEndStream(*dispatcher_));
 
-void HttpIntegrationTest::testMaxStreamDurationWithRetry(bool invoke_retry_upstream_disconnect) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    ConfigHelper::HttpProtocolOptions protocol_options;
-    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
-    http_protocol_options->mutable_max_stream_duration()->MergeFrom(
-        ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
-    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                     protocol_options);
-  });
+  // Finish request 2
+  codec_client_->sendData(*encoder2, request2_bytes, true);
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
-  Http::TestRequestHeaderMapImpl retriable_header = Http::TestRequestHeaderMapImpl{
-      {":method", "POST"},    {":path", "/test/long/url"},     {":scheme", "http"},
-      {":authority", "host"}, {"x-forwarded-for", "10.0.0.1"}, {"x-envoy-retry-on", "5xx"}};
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Respond to request 2
+  upstream_request2->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request2->encodeData(response2_bytes, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(upstream_request2->complete());
+  EXPECT_EQ(request2_bytes, upstream_request2->bodyLength());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ(response2_bytes, response2->body().size());
 
-  auto encoder_decoder = codec_client_->startRequest(retriable_header);
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-
-  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  } else {
-    ASSERT_TRUE(upstream_request_->waitForReset());
-  }
-
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 1);
-
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  if (invoke_retry_upstream_disconnect) {
-    test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_max_duration_reached", 2);
-    if (downstream_protocol_ == Http::CodecType::HTTP1) {
-      ASSERT_TRUE(codec_client_->waitForDisconnect());
-    } else {
-      ASSERT_TRUE(response->waitForEndStream());
-      codec_client_->close();
-    }
-
-    EXPECT_EQ("408", response->headers().getStatusValue());
-  } else {
-    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-    upstream_request_->encodeHeaders(response_headers, true);
-
-    response->waitForHeaders();
-    codec_client_->close();
-
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-  }
+  // Respond to request 1
+  upstream_request1->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request1->encodeData(response1_bytes, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_TRUE(upstream_request1->complete());
+  EXPECT_EQ(request1_bytes, upstream_request1->bodyLength());
+  EXPECT_TRUE(response1->complete());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ(response1_bytes, response1->body().size());
 }
 
 std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {

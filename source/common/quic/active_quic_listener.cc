@@ -21,6 +21,8 @@
 namespace Envoy {
 namespace Quic {
 
+bool ActiveQuicListenerFactory::disable_kernel_bpf_packet_routing_for_test_ = false;
+
 ActiveQuicListener::ActiveQuicListener(
     uint32_t worker_index, uint32_t concurrency, Event::Dispatcher& dispatcher,
     Network::UdpConnectionHandler& parent, Network::ListenerConfig& listener_config,
@@ -219,6 +221,24 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
   return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
 }
 
+void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
+  config_ = &config;
+  dynamic_cast<EnvoyQuicProofSource*>(crypto_config_->proof_source())
+      ->updateFilterChainManager(config.filterChainManager());
+  quic_dispatcher_->updateListenerConfig(config);
+}
+
+void ActiveQuicListener::onFilterChainDraining(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  for (auto* filter_chain : draining_filter_chains) {
+    closeConnectionsWithFilterChain(filter_chain);
+  }
+}
+
+void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
+  quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names)
@@ -300,8 +320,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
   // SPELLCHECKER(on)
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.prefer_quic_kernel_bpf_packet_routing")) {
+  if (!disable_kernel_bpf_packet_routing_for_test_) {
     if (concurrency_ > 1) {
       // Note that this option refers to the BPF program data above, which must live until the
       // option is used. The program is kept as a member variable for this purpose.

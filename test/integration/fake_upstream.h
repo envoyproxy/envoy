@@ -147,9 +147,11 @@ public:
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
-  void startGrpcStream();
+  void startGrpcStream(bool send_headers = true);
   void finishGrpcStream(Grpc::Status::GrpcStatus status);
   template <class T> void sendGrpcMessage(const T& message) {
+    ASSERT(grpc_stream_started_,
+           "start gRPC stream by calling startGrpcStream before sending a message");
     auto serialized_response = Grpc::Common::serializeToGrpcFrame(message);
     encodeData(*serialized_response, false);
     ENVOY_LOG(debug, "Sent gRPC message: {}", message.DebugString());
@@ -249,6 +251,7 @@ private:
   absl::node_hash_map<std::string, uint64_t> duplicated_metadata_key_count_;
   std::unique_ptr<StreamInfo::StreamInfo> stream_info_;
   bool received_data_{false};
+  bool grpc_stream_started_{false};
 };
 
 using FakeStreamPtr = std::unique_ptr<FakeStream>;
@@ -567,6 +570,7 @@ struct FakeUpstreamConfig {
     // Legacy options which are always set.
     http2_options_.set_allow_connect(true);
     http2_options_.set_allow_metadata(true);
+    http3_options_.set_allow_extended_connect(true);
   }
 
   Event::TestTimeSystem& time_system_;
@@ -617,7 +621,7 @@ public:
   waitForRawConnection(FakeRawConnectionPtr& connection,
                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   Network::Address::InstanceConstSharedPtr localAddress() const {
-    return socket_->addressProvider().localAddress();
+    return socket_->connectionInfoProvider().localAddress();
   }
 
   virtual std::unique_ptr<FakeRawConnection>
@@ -702,7 +706,7 @@ private:
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->addressProvider().localAddress();
+      return socket_->connectionInfoProvider().localAddress();
     }
     Network::SocketSharedPtr getListenSocket(uint32_t) override { return socket_; }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }

@@ -15,7 +15,8 @@ class HttpSubsetLbIntegrationTest
     : public testing::TestWithParam<envoy::config::cluster::v3::Cluster::LbPolicy>,
       public HttpIntegrationTest {
 public:
-  // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
+  // Returns all load balancer types except ORIGINAL_DST_LB, CLUSTER_PROVIDED
+  // and LOAD_BALANCING_POLICY_CONFIG.
   static std::vector<envoy::config::cluster::v3::Cluster::LbPolicy> getSubsetLbTestParams() {
     int first = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MIN);
     int last = static_cast<int>(envoy::config::cluster::v3::Cluster::LbPolicy_MAX);
@@ -29,8 +30,7 @@ public:
 
       auto policy = static_cast<envoy::config::cluster::v3::Cluster::LbPolicy>(i);
 
-      if (policy == envoy::config::cluster::v3::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB ||
-          policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
+      if (policy == envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED ||
           policy == envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
         continue;
       }

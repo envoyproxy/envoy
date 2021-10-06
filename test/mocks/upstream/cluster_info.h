@@ -105,6 +105,9 @@ public:
               (const));
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
               (const));
+  MOCK_METHOD(const envoy::config::cluster::v3::LoadBalancingPolicy_Policy&, loadBalancingPolicy,
+              (), (const));
+  MOCK_METHOD(TypedLoadBalancerFactory*, loadBalancerFactory, (), (const));
   MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
   MOCK_METHOD(LoadBalancerType, lbType, (), (const));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
@@ -114,6 +117,8 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
               lbMaglevConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&,
+              lbRoundRobinConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
@@ -191,6 +196,7 @@ public:
       upstream_http_protocol_options_;
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;

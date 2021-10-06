@@ -6,6 +6,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -254,6 +255,23 @@ std::string stripQueryString(const HeaderString& path);
  * @return std::string the parsed cookie value, or "" if none exists
  **/
 std::string parseCookieValue(const HeaderMap& headers, const std::string& key);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @param key_filter predicate that returns true for every cookie key to be included.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string>
+parseCookies(const RequestHeaderMap& headers,
+             const std::function<bool(absl::string_view)>& key_filter);
+
+/**
+ * Parse cookies from header into a map.
+ * @param headers supplies the headers to get cookies from.
+ * @return absl::flat_hash_map cookie map.
+ **/
+absl::flat_hash_map<std::string, std::string> parseCookies(const RequestHeaderMap& headers);
 
 /**
  * Parse a particular value out of a set-cookie
@@ -571,6 +589,16 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
+
+/**
+ * It returns RetryPolicy defined in core api to route api.
+ * @param retry_policy core retry policy
+ * @param retry_on this specifies when retry should be invoked.
+ * @return route retry policy
+ */
+envoy::config::route::v3::RetryPolicy
+convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
+                              const std::string& retry_on);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

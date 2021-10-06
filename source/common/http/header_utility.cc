@@ -69,7 +69,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
+    string_match_ =
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -336,6 +338,18 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       // Host header must be present for CONNECT request.
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect")) {
+      if (headers.Path() && !headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+      }
+      if (!headers.Path() && headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+      }
     }
   } else {
     if (!headers.Path()) {
