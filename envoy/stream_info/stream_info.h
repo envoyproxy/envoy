@@ -238,7 +238,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
-// Measure the number of bytes sent and received for an http stream.
+// Measure the number of bytes sent and received for a stream.
 struct BytesMeter {
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
