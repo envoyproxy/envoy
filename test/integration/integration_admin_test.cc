@@ -34,48 +34,6 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(IntegrationAdminTest, HealthCheck) {
-  initialize();
-
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "POST", "/healthcheck", response));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
-  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
-}
-
-TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
-  envoy::config::metrics::v3::StatsMatcher stats_matcher;
-  stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
-  initialize(stats_matcher);
-
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "POST", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
-  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-}
-
-TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
-  config_helper_.prependFilter(ConfigHelper::defaultBufferFilter());
-  initialize();
-
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
-}
-
 TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
 
