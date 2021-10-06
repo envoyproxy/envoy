@@ -17,11 +17,6 @@ Http::LocalErrorStatus LocalErrorFilter::onLocalReply(const LocalReplyData& repl
   // ASSERT(reply.details_ == info.responseCodeDetails().value());
   info.setResponseCode(static_cast<uint32_t>(reply.code_));
 
-  // Charge failures to the upstream cluster to allow for passive healthchecking.
-  if (auto upstream = info.upstreamHost()) {
-    ENVOY_LOG(trace, "LocalErrorFilter::onLocalReply charging failure to upstream host");
-    upstream->outlierDetector().putHttpResponseCode(static_cast<uint64_t>(reply.code_));
-  }
   return Http::LocalErrorStatus::ContinueAndResetStream;
 }
 
