@@ -132,6 +132,7 @@ protected:
   onStreamError(absl::optional<bool> should_close_connection,
                 quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) PURE;
 
+  // TODO(danzh) remove this once QUICHE enforces content-length consistency.
   void updateReceivedContentBytes(size_t payload_length, bool end_stream) {
     received_content_bytes_ += payload_length;
     if (!content_length_.has_value()) {
