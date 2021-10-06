@@ -175,6 +175,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/mirror/tclap/archive/tclap-{version}-release-final.tar.gz"],
         release_date = "2011-04-16",
         use_category = ["other"],
+        cpe = "cpe:2.3:a:tclap_project:tclap:*",
     ),
     com_github_fmtlib_fmt = dict(
         project_name = "fmt",
@@ -271,7 +272,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-10-01",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
     ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
@@ -355,7 +356,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
         release_date = "2021-06-07",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:apache:skywalking:*",
     ),
     com_github_skyapm_cpp2sky = dict(
         project_name = "cpp2sky",
@@ -555,6 +556,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2020-08-06",
+        # cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp: ?
         cpe = "cpe:2.3:a:json_project:json:*",
     ),
     # This is an external dependency needed while running the
@@ -619,6 +621,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
         release_date = "2020-09-10",
         use_category = ["test_only"],
+        cpe = "cpe:2.3:a:google:google_test:*",
     ),
     com_google_protobuf = dict(
         project_name = "Protocol Buffers",
@@ -767,7 +770,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-04-05",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:bytecodealliance:cranelift-codegen:*",
     ),
     com_github_wasm_c_api = dict(
         project_name = "wasm-c-api",
@@ -782,6 +785,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-01-11",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
+        # cpe = "cpe:2.3:a:bytecodealliance:cranelift-codegen:*", ?
         cpe = "N/A",
     ),
     io_opencensus_cpp = dict(
@@ -899,7 +903,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.rbac.matchers.upstream_ip_port",
         ],
         release_date = "2020-04-02",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:google:flatbuffers:*",
     ),
     com_googlesource_code_re2 = dict(
         project_name = "RE2",
@@ -927,6 +931,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
         release_date = "2021-07-09",
         use_category = ["test_only"],
+        cpe = "cpe:2.3:a:llvm:compiler-rt:*",
     ),
     upb = dict(
         project_name = "upb",
