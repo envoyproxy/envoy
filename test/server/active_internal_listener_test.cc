@@ -110,7 +110,6 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
 }
 
 TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
-
   addListener();
   expectFilterChainFactory();
 
@@ -166,6 +165,25 @@ TEST_F(ActiveInternalListenerTest, PausedListenerAcceptNewSocket) {
 
   expectFilterChainFactory();
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
+      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(nullptr));
+  internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
+}
+
+TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
+  addListenerWithRealNetworkListener();
+  internal_listener_->pauseListening();
+
+  expectFilterChainFactory();
+  Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
+
+  auto filter_factory_callback = std::make_shared<std::vector<Network::FilterFactoryCb>>();
+  filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+  auto transport_socket_factory = Network::Test::createRawBufferSocketFactory();
+
+  EXPECT_CALL(manager_, findFilterChain(_)).WillOnce(Return(filter_chain_.get()));
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
       .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
