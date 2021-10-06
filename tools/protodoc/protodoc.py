@@ -38,7 +38,7 @@ from xds.annotations.v3 import status_pb2 as xds_status_pb2
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
 
 # Last documented v2 api version
-ENVOY_LAST_V2_VERSION = "1.17.2"
+ENVOY_LAST_V2_VERSION = "1.17"
 
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'

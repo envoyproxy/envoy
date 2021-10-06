@@ -14,6 +14,7 @@
 import os
 import sys
 import argparse
+import string
 
 import pytz
 
@@ -21,12 +22,25 @@ import github
 
 import exports
 import utils
-
 from colorama import Fore, Style
 from packaging import version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
+GITHUB_REPO_LOCATION = "envoyproxy/envoy"
+
+BODY_TPL = """
+Package Name: ${dep}
+Current Version: ${metadata_version}@${release_date}
+Available Version: ${tag_name}@${created_at}
+Upstream link: https://github.com/${package_name}
+"""
+
+CLOSING_TPL = """
+New version is available for this package
+New Version: ${tag_name}@${created_at}
+Upstream Link: https://github.com/${full_name}
+"""
 
 
 # Thrown on errors related to release date or version.
@@ -61,22 +75,33 @@ def verify_and_print_latest_release(dep, repo, metadata_version, release_date, c
         # check for --check_deps flag, To run this only on github action schedule
         # and it does not bloat CI on every push
         if create_issue:
-            create_issues(dep, metadata_version, release_date, latest_release)
+            create_issues(dep, repo, metadata_version, release_date, latest_release)
+
+
+def is_sha(text):
+    if len(text) != 40:
+        return False
+    try:
+        int(text, 16)
+    except ValueError:
+        return False
+    return True
 
 
 # create issue for stale dependency
-def create_issues(dep, metadata_version, release_date, latest_release):
+def create_issues(dep, package_repo, metadata_version, release_date, latest_release):
     """Create issues in GitHub.
 
     Args:
         dep : name of the deps
-        metadata_version :
+        package_repo: package Url
+        metadata_version: current version information
         release_date : old release_date
         latest_release : latest_release (name and date )
     """
     access_token = os.getenv('GITHUB_TOKEN')
     git = github.Github(access_token)
-    repo = git.get_repo('envoyproxy/envoy')
+    repo = git.get_repo(GITHUB_REPO_LOCATION)
     # Find GitHub label objects for LABELS.
     labels = []
     for label in repo.get_labels():
@@ -84,8 +109,19 @@ def create_issues(dep, metadata_version, release_date, latest_release):
             labels.append(label.name)
     if len(labels) != len(LABELS):
         raise DependencyUpdateError('Unknown labels (expected %s, got %s)' % (LABELS, labels))
-    body = f'*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>:{latest_release.tag_name}@<{latest_release.created_at}>'
-    title = f'Newer release available {dep}: {latest_release.tag_name}'
+    # trunctate metadata_version to 7 char if its sha_hash
+    if is_sha(metadata_version):
+        metadata_version = metadata_version[0:7]
+    title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
+    # search for old package opened issue and close them
+    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
+    body = string.Template(BODY_TPL).substitute(
+        dep=dep,
+        metadata_version=metadata_version,
+        release_date=release_date,
+        tag_name=latest_release.tag_name,
+        created_at=latest_release.created_at,
+        package_name=package_repo.full_name)
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
@@ -100,13 +136,55 @@ def create_issues(dep, metadata_version, release_date, latest_release):
 
 # checks if issue exist
 def issues_exist(title, git):
-    query = f'repo:envoyproxy/envoy {title} in:title'
+    # search for common title
+    title_search = title[0:title.index("(") - 1]
+    query = f'repo:{GITHUB_REPO_LOCATION} {title_search} in:title'
     try:
         issues = git.search_issues(query)
     except github.GithubException as e:
         print(f'There is a problem looking for issue title: {title}, received {e}')
         raise
     return issues.totalCount > 0
+
+
+# search for issue by title and delete old issue if new package version is available
+def search_old_version_open_issue_exist(title, git, package_repo, latest_release):
+    # search for only "Newer release available {dep}:" as will be common in dep issue
+    title_search = title[0:title.index(":")]
+    query = f'repo:{GITHUB_REPO_LOCATION} {title_search} in:title is:open'
+    # there might be more than one issue
+    # if current package version == issue package version no need to do anything, right issue is open
+    # if current package version != issue_title_version means a newer updated version is available
+    # and close old issue
+    issues = git.search_issues(query)
+    for issue in issues:
+        issue_version = get_package_version_from_issue(issue.title)
+        if issue_version != latest_release.tag_name:
+            close_old_issue(git, issue.number, latest_release, package_repo)
+
+
+def get_package_version_from_issue(issue_title):
+    # issue title create by github action has two form
+    return issue_title.split(":")[1].split("(")[0].strip()
+
+
+def close_old_issue(git, issue_number, latest_release, package_repo):
+    repo = git.get_repo(GITHUB_REPO_LOCATION)
+    closing_comment = string.Template(CLOSING_TPL)
+    try:
+        issue = repo.get_issue(number=issue_number)
+        print(f'Publishing closing comment... ')
+        issue.create_comment(
+            closing_comment.substitute(
+                tag_name=latest_release.tag_name,
+                created_at=latest_release.created_at,
+                full_name=package_repo.full_name))
+        print(f'Closing this issue as new package is available')
+        issue.edit(state='closed')
+    except github.GithubException as e:
+        print(f'There was a problem in publishing comment or closing this issue {e}')
+        raise
+    return
 
 
 # Print GitHub release date, throw ReleaseDateVersionError on mismatch with metadata release date.
