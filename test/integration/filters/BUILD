@@ -618,3 +618,18 @@ envoy_cc_test_library(
         "@com_google_absl//absl/strings:str_format",
     ],
 )
+
+envoy_cc_test_library(
+    name = "listener_typed_metadata_filter_lib",
+    hdrs = [
+        "listener_typed_metadata_filter.h",
+    ],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/network:listener_interface",
+        "//envoy/registry",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
+)
