@@ -19,7 +19,7 @@ Removed Config or Runtime
 
 New Features
 ------------
-* dns: added :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return both V4 and V6 addresses.
+* dns: added :ref:`ALL <envoy_v3_api_enum_value_config.cluster.v3.Cluster.DnsLookupFamily.ALL>` option to return both IPv4 and IPv6 addresses.
 
 Deprecated
 ----------
