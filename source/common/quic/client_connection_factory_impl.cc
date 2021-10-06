@@ -48,17 +48,16 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(
       server_id_{getConfig(transport_socket_factory).serverNameIndication(),
                  static_cast<uint16_t>(server_addr->ip()->port()), false},
       transport_socket_factory_(transport_socket_factory), time_source_(time_source),
-      quic_config_(quic_config), buffer_limit_(buffer_limit) {
-  quiche::FlagRegistry::getInstance();
-}
+      quic_config_(quic_config), buffer_limit_(buffer_limit) {}
 
 std::unique_ptr<Network::ClientConnection>
 createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& dispatcher,
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
+  // This flag must be set to fix a QUICHE issue which may crash Envoy during connection close.
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
+
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   auto config = info_impl->cryptoConfig();
   if (config == nullptr) {

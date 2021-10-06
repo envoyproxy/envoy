@@ -24,6 +24,7 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
+        "@com_github_google_quiche//:quic_core_flags_list_lib",
     ],
 )
 

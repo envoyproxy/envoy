@@ -3028,6 +3028,7 @@ envoy_cc_library(
     deps = [
         ":quic_platform_base",
         ":quic_platform_export",
+        ":quiche_common_platform",
     ],
 )
 

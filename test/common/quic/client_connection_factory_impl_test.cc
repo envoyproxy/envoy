@@ -11,6 +11,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 
 using testing::Return;
 
@@ -50,6 +51,7 @@ protected:
 };
 
 TEST_F(QuicNetworkConnectionTest, BufferLimits) {
+  TestScopedRuntime scoped_runtime;
   initialize();
 
   quic::QuicConfig config;

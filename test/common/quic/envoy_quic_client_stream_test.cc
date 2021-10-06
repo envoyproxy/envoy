@@ -21,6 +21,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -61,6 +62,7 @@ public:
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
         request_trailers_{{"trailer-key", "trailer-value"}} {
+    TestScopedRuntime scoped_runtime;
     SetQuicReloadableFlag(quic_single_ack_in_packet2, false);
     quic_stream_->setResponseDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);

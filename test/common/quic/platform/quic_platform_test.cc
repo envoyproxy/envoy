@@ -21,6 +21,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -497,8 +498,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 }
 
 TEST_F(QuicPlatformTest, QuicFlags) {
-  auto& flag_registry = quiche::FlagRegistry::getInstance();
-  flag_registry.resetFlags();
+  Envoy::TestScopedRuntime scoped_runtime;
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
   EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_true));
@@ -512,19 +512,6 @@ TEST_F(QuicPlatformTest, QuicFlags) {
 
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
   SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
-  EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-
-  flag_registry.resetFlags();
-  EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_true));
-  EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
-  flag_registry.findFlag("FLAGS_quic_reloadable_flag_quic_testonly_default_false")
-      ->setValueFromString("true");
-  flag_registry.findFlag("FLAGS_quic_restart_flag_quic_testonly_default_true")
-      ->setValueFromString("0");
-  flag_registry.findFlag("FLAGS_quic_time_wait_list_seconds")->setValueFromString("100");
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_testonly_default_false));
-  EXPECT_FALSE(GetQuicRestartFlag(quic_testonly_default_true));
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
 }
 

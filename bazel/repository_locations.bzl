@@ -838,7 +838,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "ababed9c36cb16e43e7f1d508ae4a6ea89831752944fded3fb4fd2b3bead0bad",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
-        use_category = ["dataplane_core"],
+        use_category = ["controlplane", "dataplane_core"],
         release_date = "2021-10-06",
         cpe = "N/A",
     ),

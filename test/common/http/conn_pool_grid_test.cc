@@ -14,6 +14,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -615,6 +616,7 @@ TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingPort) {
 
 // Test that when the alternate protocol specifies an invalid ALPN, then the HTTP/3 pool is skipped.
 TEST_F(ConnectivityGridTest, SuccessWithoutHttp3NoMatchingAlpn) {
+  TestScopedRuntime scoped_runtime;
   AlternateProtocolsCacheImpl::Origin origin("https", "hostname", 9000);
   std::vector<AlternateProtocolsCacheImpl::AlternateProtocol> protocols = {
       {"http/2", "", origin.port_, simTime().monotonicTime() + Seconds(5)}};
@@ -683,6 +685,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
 }
 
 TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
+  TestScopedRuntime scoped_runtime;
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 
   testing::InSequence s;

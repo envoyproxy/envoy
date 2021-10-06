@@ -43,6 +43,7 @@ envoy_cc_test(
         "//test/extensions/transport_sockets/tls:ssl_test_utils",
         "//test/mocks/api:api_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:epoll_server_lib",

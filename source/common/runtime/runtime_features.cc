@@ -55,6 +55,7 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
+    "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
@@ -123,10 +124,46 @@ constexpr const char* disabled_runtime_features[] = {
 };
 
 RuntimeFeatures::RuntimeFeatures() {
+#ifdef ENVOY_ENABLE_QUIC
+#define STRINGIFY(X) #X
+#define QUIC_FLAG(flag, value)                                                                     \
+  if (value) {                                                                                     \
+    if (absl::StartsWith(#flag, "FLAGS_quic_reloadable_flag")) {                                   \
+      enabled_features_.insert(STRINGIFY(envoy.reloadable_features.flag));                         \
+    } else if (absl::StartsWith(#flag, "FLAGS_quic_restart_flag")) {                               \
+      enabled_features_.insert(STRINGIFY(envoy.restart_features.flag));                            \
+    }                                                                                              \
+  } else {                                                                                         \
+    if (absl::StartsWith(#flag, "FLAGS_quic_reloadable_flag")) {                                   \
+      disabled_features_.insert(STRINGIFY(envoy.reloadable_features.flag));                        \
+    } else if (absl::StartsWith(#flag, "FLAGS_quic_restart_flag")) {                               \
+      disabled_features_.insert(STRINGIFY(envoy.restart_features.flag));                           \
+    }                                                                                              \
+  }
+// Apply QUICHE upstream default values at first + some additional flags used in tests.
+// These may be overridden by Envoy default settings below.
+#include "quiche/quic/core/quic_flags_list.h"
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_restart_flag_spdy_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_reloadable_flag_http2_testonly_default_true, true)
+  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
+  QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
+#undef QUIC_FLAG
+#endif
+
   for (auto& feature : runtime_features) {
+    if (disabled_features_.contains(feature)) {
+      disabled_features_.erase(feature);
+    }
     enabled_features_.insert(feature);
   }
   for (auto& feature : disabled_runtime_features) {
+    if (enabled_features_.contains(feature)) {
+      enabled_features_.erase(feature);
+    }
     disabled_features_.insert(feature);
   }
 }
