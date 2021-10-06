@@ -788,11 +788,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
-void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
-  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
-}
-
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                       HttpProtocolOptions& protocol_options) {
   if (cluster.typed_extension_protocol_options().contains(
