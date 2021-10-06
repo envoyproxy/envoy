@@ -57,7 +57,6 @@ public:
     return unit_;
   }
   void recordValue(uint64_t value) override;
-  void recordFloatValue(double value) override;
 
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
@@ -92,7 +91,6 @@ public:
   // Stats::Histogram
   Histogram::Unit unit() const override;
   void recordValue(uint64_t value) override;
-  void recordFloatValue(double value) override;
 
   /**
    * This method is called during the main stats flush process for each of the histograms. It
@@ -164,9 +162,6 @@ public:
   ScopePtr scopeFromStatName(StatName name) override;
   void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override {
     return default_scope_->deliverHistogramToSinks(histogram, value);
-  }
-  void deliverHistogramToSinksFloat(const Histogram& histogram, double value) override {
-    return default_scope_->deliverHistogramToSinksFloat(histogram, value);
   }
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
@@ -334,7 +329,6 @@ private:
     Counter& counterFromStatNameWithTags(const StatName& name,
                                          StatNameTagVectorOptConstRef tags) override;
     void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) override;
-    void deliverHistogramToSinksFloat(const Histogram& histogram, double value) override;
     Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                      Gauge::ImportMode import_mode) override;
     Histogram& histogramFromStatNameWithTags(const StatName& name,

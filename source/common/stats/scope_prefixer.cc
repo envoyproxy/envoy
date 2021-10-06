@@ -74,9 +74,5 @@ void ScopePrefixer::deliverHistogramToSinks(const Histogram& histograms, uint64_
   scope_.deliverHistogramToSinks(histograms, val);
 }
 
-void ScopePrefixer::deliverHistogramToSinksFloat(const Histogram& histograms, double val) {
-  scope_.deliverHistogramToSinksFloat(histograms, val);
-}
-
 } // namespace Stats
 } // namespace Envoy

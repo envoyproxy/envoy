@@ -106,9 +106,6 @@ public:
   // Stats::Histogram
   Unit unit() const override { return unit_; };
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
-  void recordFloatValue(double value) override {
-    parent_.deliverHistogramToSinksFloat(*this, value);
-  }
 
   bool used() const override { return true; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
@@ -135,7 +132,6 @@ public:
 
   Unit unit() const override { return Unit::Null; };
   void recordValue(uint64_t) override {}
-  void recordFloatValue(double) override {}
 
 private:
   SymbolTable& symbol_table_;

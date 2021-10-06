@@ -27,7 +27,6 @@ public:
   TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                StatNameTagVectorOptConstRef tags) override;
   void deliverHistogramToSinks(const Histogram& histograms, uint64_t val) override;
-  void deliverHistogramToSinksFloat(const Histogram& histograms, double val) override;
 
   Counter& counterFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());

@@ -117,13 +117,7 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   tls_->getTyped<Writer>().write(message);
 }
 
-void UdpStatsdSink::onHistogramCompleteFloat(const Stats::Histogram& histogram, double value) {
-  const std::string message = buildMessage(histogram, value, "|h");
-  tls_->getTyped<Writer>().write(message);
-}
-
-template <typename ValueType>
-const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, ValueType value,
+const std::string UdpStatsdSink::buildMessage(const Stats::Metric& metric, uint64_t value,
                                               const std::string& type) const {
   switch (tag_format_.tag_position) {
   case Statsd::TagPosition::TagAfterValue: {
@@ -291,15 +285,6 @@ void TcpStatsdSink::TlsSink::onTimespanComplete(const std::string& name,
   ASSERT(current_slice_mem_ == nullptr);
   Buffer::OwnedImpl buffer(
       fmt::format("{}.{}:{}|ms\n", parent_.getPrefix().c_str(), name, ms.count()));
-  write(buffer);
-}
-
-void TcpStatsdSink::TlsSink::onHistogramCompleteFloat(const std::string& name, double value) {
-  // Ultimately it would be nice to perf optimize this path also, but it's not very frequent. It's
-  // also currently not possible that this interleaves with any counter/gauge flushing.
-  // See the comment at UdpStatsdSink::onHistogramComplete with respect to unit suffixes.
-  ASSERT(current_slice_mem_ == nullptr);
-  Buffer::OwnedImpl buffer(fmt::format("{}.{}:{}|h\n", parent_.getPrefix().c_str(), name, value));
   write(buffer);
 }
 

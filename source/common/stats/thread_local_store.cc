@@ -584,22 +584,6 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
   }
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinksFloat(const Histogram& histogram,
-                                                                   double value) {
-  // Thread local deliveries must be blocked outright for histograms and timers during shutdown.
-  // This is because the sinks may end up trying to create new connections via the thread local
-  // cluster manager which may already be destroyed (there is no way to sequence this because the
-  // cluster manager destroying can create deliveries). We special case this explicitly to avoid
-  // having to implement a shutdown() method (or similar) on every TLS object.
-  if (parent_.shutting_down_) {
-    return;
-  }
-
-  for (Sink& sink : parent_.timer_sinks_) {
-    sink.onHistogramCompleteFloat(histogram, value);
-  }
-}
-
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatNameWithTags(
     const StatName& name, StatNameTagVectorOptConstRef stat_name_tags,
     Gauge::ImportMode import_mode) {
@@ -836,13 +820,7 @@ ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
 
 void ThreadLocalHistogramImpl::recordValue(uint64_t value) {
   ASSERT(std::this_thread::get_id() == created_thread_id_);
-  hist_insert_intscale(histograms_[current_active_], value, 0 /* scale*/, 1 /* count */);
-  used_ = true;
-}
-
-void ThreadLocalHistogramImpl::recordFloatValue(double value) {
-  ASSERT(std::this_thread::get_id() == created_thread_id_);
-  hist_insert(histograms_[current_active_], value, 1 /* count */);
+  hist_insert_intscale(histograms_[current_active_], value, 0, 1);
   used_ = true;
 }
 
@@ -924,12 +902,6 @@ void ParentHistogramImpl::recordValue(uint64_t value) {
   Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_);
   tls_histogram.recordValue(value);
   thread_local_store_.deliverHistogramToSinks(*this, value);
-}
-
-void ParentHistogramImpl::recordFloatValue(double value) {
-  Histogram& tls_histogram = thread_local_store_.tlsHistogram(*this, id_);
-  tls_histogram.recordFloatValue(value);
-  thread_local_store_.deliverHistogramToSinksFloat(*this, value);
 }
 
 bool ParentHistogramImpl::used() const {

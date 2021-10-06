@@ -51,8 +51,7 @@ public:
   Http::Code handlerHystrixEventStream(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance&, Server::AdminStream& admin_stream);
   void flush(Stats::MetricSnapshot& snapshot) override;
-  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
-  void onHistogramCompleteFloat(const Stats::Histogram&, double) override {}
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override{};
 
   /**
    * Register a new connection.

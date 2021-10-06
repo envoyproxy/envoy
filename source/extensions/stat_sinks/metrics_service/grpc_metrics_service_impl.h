@@ -134,7 +134,6 @@ public:
     grpc_metrics_streamer_->send(flusher_.flush(snapshot));
   }
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
-  void onHistogramCompleteFloat(const Stats::Histogram&, double) override {}
 
 private:
   const MetricsFlusher flusher_;

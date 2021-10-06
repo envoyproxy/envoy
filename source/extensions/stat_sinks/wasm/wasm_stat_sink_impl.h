@@ -34,11 +34,6 @@ public:
     (void)value;
   }
 
-  void onHistogramCompleteFloat(const Stats::Histogram& histogram, double value) override {
-    (void)histogram;
-    (void)value;
-  }
-
 private:
   PluginSharedPtr plugin_;
   PluginHandleSharedPtr singleton_;

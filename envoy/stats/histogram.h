@@ -117,8 +117,6 @@ public:
    * Records an unsigned value in the unit specified during the construction.
    */
   virtual void recordValue(uint64_t value) PURE;
-
-  virtual void recordFloatValue(double value) PURE;
 };
 
 using HistogramSharedPtr = RefcountPtr<Histogram>;

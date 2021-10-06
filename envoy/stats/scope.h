@@ -64,11 +64,6 @@ public:
   virtual void deliverHistogramToSinks(const Histogram& histogram, uint64_t value) PURE;
 
   /**
-   * Deliver an individual histogram value to all registered sinks.
-   */
-  virtual void deliverHistogramToSinksFloat(const Histogram& histogram, double value) PURE;
-
-  /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
    * @param name The name of the stat, obtained from the SymbolTable.
    * @return a counter within the scope's namespace.

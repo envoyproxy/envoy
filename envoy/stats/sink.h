@@ -68,11 +68,6 @@ public:
    * @param value the value of the sample.
    */
   virtual void onHistogramComplete(const Histogram& histogram, uint64_t value) PURE;
-
-  /**
-   * @see onHistogramComplete(); this version uses value type of double.
-   */
-  virtual void onHistogramCompleteFloat(const Histogram& histogram, double value) PURE;
 };
 
 using SinkPtr = std::unique_ptr<Sink>;
