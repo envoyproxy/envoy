@@ -104,7 +104,7 @@ private:
 
 } // namespace
 
-bool MainThread::isMainThread() { return ThreadIds::get().inMainOrTestThread(); }
+bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
 
 bool MainThread::hasMainThread() { return ThreadIds::get().hasMainThread(); }
 

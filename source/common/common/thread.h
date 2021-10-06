@@ -198,10 +198,8 @@ public:
 
   /**
    * Returns whether the current thread is the main thread or test thread.
-   *
-   * TODO(jmarantz): rename to isMainOrTestThread().
    */
-  static bool isMainThread();
+  static bool isMainOrTestThread();
 
   static bool hasMainThread();
 };
@@ -211,7 +209,7 @@ public:
 // worker thread.
 #define TRY_ASSERT_MAIN_THREAD                                                                     \
   try {                                                                                            \
-    ASSERT(Thread::MainThread::isMainThread());
+    ASSERT(Thread::MainThread::isMainOrTestThread());
 
 #define END_TRY }
 
