@@ -138,7 +138,6 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
   auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
       connectionSocket()->connectionInfoProvider().remoteAddress());
   auto probing_socket = createConnectionSocket(remote_address, new_local_address, nullptr);
-  probing_socket_ = probing_socket.get();
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
@@ -164,7 +163,6 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
     std::cout << "switched socket" << std::endl;
   } else {
     probing_socket.reset();
-    probing_socket_ = nullptr;
   }
 }
 
@@ -174,7 +172,6 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // scope.
   OnPathValidationFailureAtClient();
   CancelPathValidation();
-  probing_socket_ = nullptr;
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
@@ -186,17 +183,24 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
     OnCanWrite();
   }
 
+  bool is_probing_socket =
+      HasPendingPathValidation() &&
+      (&connection_socket ==
+       &static_cast<EnvoyQuicClientConnection::EnvoyQuicPathValidationContext*>(
+            GetPathValidationContext())
+            ->probingSocket());
+
   // It's possible for a write event callback to close the connection, in such case ignore read
   // event processing.
   // TODO(mattklein123): Right now QUIC client is hard coded to use GRO because it is probably the
   // right default for QUIC. Determine whether this should be configurable or not.
-  bool had_probing_socket = probing_socket_;
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(), true, packets_dropped_);
-    if (had_probing_socket && !probing_socket_) {
-      // Reading data from the probing socket could cause it to be deleted.
+    if (is_probing_socket && !HasPendingPathValidation() &&
+        connectionSocket().get() != &connection_socket) {
+      // Path validation has failed and |connection_socket| is deleted.
       return;
     }
     if (err == nullptr) {
@@ -232,6 +236,11 @@ EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseWriter() {
 std::unique_ptr<Network::ConnectionSocket>
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::releaseSocket() {
   return std::move(socket_);
+}
+
+Network::ConnectionSocket&
+EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::probingSocket() {
+  return *socket_;
 }
 
 EnvoyQuicClientConnection::EnvoyPathValidationResultDelegate::EnvoyPathValidationResultDelegate(

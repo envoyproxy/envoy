@@ -47,6 +47,8 @@ public:
 
     std::unique_ptr<EnvoyQuicPacketWriter> releaseWriter();
 
+    Network::ConnectionSocket& probingSocket();
+
     std::unique_ptr<Network::ConnectionSocket> releaseSocket();
 
   private:
@@ -133,7 +135,6 @@ private:
   OptRef<PacketsToReadDelegate> delegate_;
   uint32_t packets_dropped_{0};
   Event::Dispatcher& dispatcher_;
-  Network::ConnectionSocket* probing_socket_{nullptr};
   bool migrate_port_on_path_degrading_{false};
 };
 
