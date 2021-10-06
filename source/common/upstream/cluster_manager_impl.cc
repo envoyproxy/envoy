@@ -182,11 +182,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds;
+      Config::ScopedResume maybe_resume_eds_leds;
       if (cm_.adsMux()) {
-        const auto type_url =
+        const auto eds_type_url =
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_url);
+        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
       }
       initializeSecondaryClusters();
     }
@@ -1339,14 +1340,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbLeastRequestConfig(), cluster->lbConfig());
+        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
+        parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
           priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1358,9 +1361,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                     cluster->stats(), parent.parent_.runtime_,
-                                                     parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::ClusterProvided:
@@ -1663,7 +1667,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
     Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
-        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
+                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,

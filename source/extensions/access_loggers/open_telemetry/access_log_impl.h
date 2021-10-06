@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3alpha/logs_service.pb.h"
+#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
@@ -33,11 +33,10 @@ namespace OpenTelemetry {
  */
 class AccessLog : public Common::ImplBase {
 public:
-  AccessLog(::Envoy::AccessLog::FilterPtr&& filter,
-            envoy::extensions::access_loggers::open_telemetry::v3alpha::OpenTelemetryAccessLogConfig
-                config,
-            ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-            Stats::Scope& scope);
+  AccessLog(
+      ::Envoy::AccessLog::FilterPtr&& filter,
+      envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
+      ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:
   /**
@@ -55,7 +54,6 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  Stats::Scope& scope_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::unique_ptr<Formatter::StructFormatter> body_formatter_;

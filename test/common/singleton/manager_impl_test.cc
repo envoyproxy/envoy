@@ -42,6 +42,23 @@ TEST(SingletonManagerImplTest, Basic) {
   singleton.reset();
 }
 
+TEST(SingletonManagerImplTest, NonConstructingGetTyped) {
+  ManagerImpl manager(Thread::threadFactoryForTest());
+
+  // Access without first constructing should be null.
+  EXPECT_EQ(nullptr, manager.getTyped<TestSingleton>("test_singleton"));
+
+  std::shared_ptr<TestSingleton> singleton = std::make_shared<TestSingleton>();
+  // Use a construct on first use getter.
+  EXPECT_EQ(singleton, manager.get("test_singleton", [singleton] { return singleton; }));
+  // Now access should return the constructed singleton.
+  EXPECT_EQ(singleton, manager.getTyped<TestSingleton>("test_singleton"));
+  EXPECT_EQ(1UL, singleton.use_count());
+
+  EXPECT_CALL(*singleton, onDestroy());
+  singleton.reset();
+}
+
 } // namespace
 } // namespace Singleton
 } // namespace Envoy
