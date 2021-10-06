@@ -14,6 +14,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"
@@ -55,6 +56,7 @@ INSTANTIATE_TEST_SUITE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(tes
 
 int main(int argc, char** argv) {
   Envoy::TestEnvironment::initializeTestMain(argv[0]);
+  Envoy::Thread::TestThread test_thread;
 
   // Expected usage: <test path> <corpus paths..> [other gtest flags]
   RELEASE_ASSERT(argc >= 2, "");

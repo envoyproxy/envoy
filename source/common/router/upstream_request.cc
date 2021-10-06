@@ -394,12 +394,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
-      reset_reason = Http::StreamResetReason::ConnectionFailure;
-    } else {
-      reset_reason = Http::StreamResetReason::LocalReset;
-    }
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
