@@ -882,10 +882,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "FlatBuffers",
         project_desc = "Cross platform serialization library architected for maximum memory efficiency",
         project_url = "https://github.com/google/flatbuffers",
-        version = "a83caf5910644ba1c421c002ef68e42f21c15f9f",
-        sha256 = "b8efbc25721e76780752bad775a97c3f77a0250271e2db37fc747b20e8b0f24a",
+        version = "2.0.0",
+        sha256 = "9ddb9031798f4f8754d00fca2f1a68ecf9d0f83dfac7239af1311e4fd9a565c4",
         strip_prefix = "flatbuffers-{version}",
-        urls = ["https://github.com/google/flatbuffers/archive/{version}.tar.gz"],
+        urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -898,7 +898,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2020-04-02",
+        release_date = "2021-05-10",
         cpe = "N/A",
     ),
     com_googlesource_code_re2 = dict(
