@@ -38,8 +38,8 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             {{}},
-                                            {{}},
-                                            {{}},
+                                            Http::Utility::QueryParamsVector{},
+                                            {},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
                                             ProtobufWkt::Struct{}});
@@ -359,8 +359,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 Http::HeaderVector{},
                                 Http::HeaderVector{},
                                 std::move(headers_to_remove),
-                                {{}},
-                                {{}},
+                                Http::Utility::QueryParamsVector{},
+                                {},
                                 EMPTY_STRING,
                                 Http::Code::OK,
                                 ProtobufWkt::Struct{}}};
@@ -380,8 +380,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   {{}},
-                                  {{}},
-                                  {{}},
+                                  Http::Utility::QueryParamsVector{},
+                                  {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
                                   ProtobufWkt::Struct{}}};
