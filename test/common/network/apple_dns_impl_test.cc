@@ -77,8 +77,7 @@ public:
             EXPECT_FALSE(results.empty());
             absl::optional<bool> is_v4{};
             for (const auto& result : results) {
-              switch (lookup_family)
-              {
+              switch (lookup_family) {
               case DnsLookupFamily::V4Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv4());
                 break;
