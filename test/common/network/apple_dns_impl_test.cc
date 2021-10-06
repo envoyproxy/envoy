@@ -149,19 +149,25 @@ TEST_F(AppleDnsImplTest, LocalLookup) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
-TEST_F(AppleDnsImplTest, DnsIpAddressVersion) {
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionAuto) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::Auto,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
 
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4Preferred) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Preferred,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
 
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4Only) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V4Only,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
 
+TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6Only) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V6Only,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -222,10 +228,7 @@ TEST_F(AppleDnsImplTest, CallbackExceptionLocalResolution) {
 // Validate working of cancellation provided by ActiveDnsQuery return.
 TEST_F(AppleDnsImplTest, Cancel) {
   ActiveDnsQuery* query =
-      resolveWithUnreferencedParameters("some.domain", DnsLookupFamily::Auto, false);
-
-  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::Auto,
-                                             DnsResolver::ResolutionStatus::Success, true));
+      resolveWithUnreferencedParameters("google.com", DnsLookupFamily::Auto, false);
 
   ASSERT_NE(nullptr, query);
   query->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
