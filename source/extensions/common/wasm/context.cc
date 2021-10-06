@@ -994,7 +994,7 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   handler.token_ = token;
   auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */,
-      Grpc::CacheOption::CacheWhenRuntimeEnabled);
+      Grpc::CacheOption::AlwaysCache);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
@@ -1043,7 +1043,7 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
   handler.token_ = token;
   auto grpc_client = clusterManager().grpcAsyncClientManager().getOrCreateRawAsyncClient(
       service_proto, *wasm()->scope_, true /* skip_cluster_check */,
-      Grpc::CacheOption::CacheWhenRuntimeEnabled);
+      Grpc::CacheOption::AlwaysCache);
   grpc_initial_metadata_ = buildRequestHeaderMapFromPairs(initial_metadata);
 
   // set default hash policy to be based on :authority to enable consistent hash
