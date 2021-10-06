@@ -2,23 +2,21 @@
 
 # Launcher for building vcl
 
-import sys
 import os
 import subprocess
+import sys
 
 
 def main():
-    """
-  VCL builder script
-  ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  """
+    """ VCL builder script """
+
     # find path to helper script
     script_path = os.path.dirname(os.path.abspath(sys.argv[0]))
-    vcl_build = "{}/{}".format(script_path, sys.argv[1])
+    vcl_build = f"{script_path}/{sys.argv[1]}"
 
     # find path to vpp/vcl source code
     base_path = os.path.dirname(os.path.abspath(sys.argv[1]))
-    vpp_path = "{}/{}".format(base_path, "external/com_github_fdio_vpp_vcl")
+    vpp_path = f"{base_path}/external/com_github_fdio_vpp_vcl"
 
     # find path to dst folder
     dst_path = os.path.dirname(os.path.abspath(sys.argv[2]))

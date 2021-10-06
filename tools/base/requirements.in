@@ -18,6 +18,7 @@ frozendict
 gitpython
 jinja2
 pep8-naming
+ply
 pygithub
 pyreadline
 pytest
@@ -36,4 +37,3 @@ sphinx-rtd-theme
 sphinx-tabs
 verboselogs
 yapf
-ply
