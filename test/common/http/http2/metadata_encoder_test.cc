@@ -5,9 +5,6 @@
 #include "source/common/common/random_generator.h"
 #include "source/common/http/http2/metadata_decoder.h"
 #include "source/common/http/http2/metadata_encoder.h"
-#include "quiche/http2/adapter/callback_visitor.h"
-#include "quiche/http2/adapter/data_source.h"
-#include "quiche/http2/adapter/nghttp2_adapter.h"
 
 #include "test/test_common/logging.h"
 
@@ -15,6 +12,9 @@
 #include "gtest/gtest.h"
 #include "http2_frame.h"
 #include "nghttp2/nghttp2.h"
+#include "quiche/http2/adapter/callback_visitor.h"
+#include "quiche/http2/adapter/data_source.h"
+#include "quiche/http2/adapter/nghttp2_adapter.h"
 
 // A global variable in nghttp2 to disable preface and initial settings for tests.
 // TODO(soya3129): Remove after issue https://github.com/nghttp2/nghttp2/issues/1246 is fixed.
@@ -48,8 +48,9 @@ struct UserData {
 };
 
 // Nghttp2 callback function for receiving extension frame.
-static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/, const nghttp2_frame_hd* hd,
-                                            const uint8_t* data, size_t len, void* user_data) {
+static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/,
+                                            const nghttp2_frame_hd* hd, const uint8_t* data,
+                                            size_t len, void* user_data) {
   EXPECT_GE(hd->length, len);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
@@ -69,8 +70,8 @@ static int unpack_extension_callback(nghttp2_session* /*session*/, void** payloa
 }
 
 // Nghttp2 callback function for sending data to peer.
-static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len, int flags,
-                             void* user_data) {
+static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len,
+                             int flags, void* user_data) {
   EXPECT_LE(0, flags);
 
   TestBuffer* buffer = (reinterpret_cast<UserData*>(user_data))->output_buffer;
@@ -106,8 +107,8 @@ public:
 
     // Creates new nghttp2 session.
     nghttp2_enable_strict_preface = 0;
-    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(http2::adapter::Perspective::kClient,
-                                                                 *callbacks, &user_data_);
+    visitor_ = std::make_unique<http2::adapter::CallbackVisitor>(
+        http2::adapter::Perspective::kClient, *callbacks, &user_data_);
     session_ = http2::adapter::NgHttp2Adapter::CreateClientAdapter(*visitor_, option);
     nghttp2_enable_strict_preface = 1;
     nghttp2_option_del(option);
@@ -178,7 +179,6 @@ TEST_F(MetadataEncoderTest, TestDecodeBadData) {
   output_buffer_.buf[10] |= 0xff;
   decoder_->receiveMetadata(output_buffer_.buf, output_buffer_.length);
   EXPECT_FALSE(decoder_->onMetadataFrameComplete(true));
-
 }
 
 // Checks if accumulated metadata size reaches size limit, returns failure.
@@ -268,8 +268,8 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
   session_->ProcessBytes(ToStringView(output_buffer_.buf, consume_size));
-  session_->ProcessBytes(ToStringView(output_buffer_.buf + consume_size,
-                                           output_buffer_.length - consume_size));
+  session_->ProcessBytes(
+      ToStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
 }
 
 // Tests encoding/decoding large metadata map vectors.
@@ -291,8 +291,8 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
   session_->ProcessBytes(ToStringView(output_buffer_.buf, consume_size));
-  session_->ProcessBytes(ToStringView(output_buffer_.buf + consume_size,
-                                      output_buffer_.length - consume_size));
+  session_->ProcessBytes(
+      ToStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
 }
 
 // Tests encoding/decoding with fuzzed metadata size.
