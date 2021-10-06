@@ -110,6 +110,28 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheEvictOldEntries) {
   RawAsyncClientSharedPtr client0c = async_client_manager_.getOrCreateRawAsyncClient(
       grpc_service, scope_, true, CacheOption::AlwaysCache);
   EXPECT_NE(client0b.get(), client0c.get());
+
+  for (int i = 1; i <= 499; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true,
+                                                    CacheOption::AlwaysCache);
+  }
+
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("0");
+  RawAsyncClientSharedPtr client0d = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::AlwaysCache);
+  EXPECT_EQ(client0c.get(), client0d.get());
+
+  for (int i = 1; i <= 500; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    async_client_manager_.getOrCreateRawAsyncClient(grpc_service, scope_, true,
+                                                    CacheOption::AlwaysCache);
+  }
+
+  grpc_service.mutable_envoy_grpc()->set_cluster_name("0");
+  RawAsyncClientSharedPtr client0e = async_client_manager_.getOrCreateRawAsyncClient(
+      grpc_service, scope_, true, CacheOption::AlwaysCache);
+  EXPECT_NE(client0d.get(), client0e.get());
 }
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
