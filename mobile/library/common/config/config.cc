@@ -319,11 +319,6 @@ R"(
     // Therefore, the ejection time is short and the interval for unejection is tight, but not too
     // tight to cause unnecessary churn.
 R"(
-    outlier_detection: &base_outlier_detection
-      consecutive_5xx: 3
-      base_ejection_time: 0.001s
-      max_ejection_time: 0.001s
-      interval: 1s
     typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_clear
     connect_timeout: *connect_timeout
@@ -332,7 +327,6 @@ R"(
     transport_socket: { name: envoy.transport_sockets.raw_buffer }
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
-    outlier_detection: *base_outlier_detection
     typed_extension_protocol_options: *http1_protocol_options_defs
   - name: base_h2
     http2_protocol_options: {}
@@ -342,7 +336,6 @@ R"(
     transport_socket: *base_tls_h2_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
-    outlier_detection: *base_outlier_detection
     typed_extension_protocol_options: *base_protocol_options
   - name: base_alpn
     connect_timeout: *connect_timeout
@@ -351,7 +344,6 @@ R"(
     transport_socket: *base_tls_socket
     upstream_connection_options: *upstream_opts
     circuit_breakers: *circuit_breakers_settings
-    outlier_detection: *base_outlier_detection
     typed_extension_protocol_options: *base_protocol_options
 stats_flush_interval: *stats_flush_interval
 stats_sinks: *stats_sinks
@@ -365,9 +357,6 @@ stats_config:
         - safe_regex:
             google_re2: {}
             regex: '^cluster\.[\w]+?\.upstream_rq_[\w]+'
-        - safe_regex:
-            google_re2: {}
-            regex: '^cluster\.[\w]+?\.outlier_detection.*'
         - safe_regex:
             google_re2: {}
             regex: '^dns.apple.*'
