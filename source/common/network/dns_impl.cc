@@ -323,6 +323,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     break;
   // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
   // are being requested.
+  // TODO: DnsLookupFamily::Auto and DnsLookupFamily::V4Preferred could also do concurrent lookups.
+  // This will require some refactoring and should be done in a subsequent PR.
   case DnsLookupFamily::All:
     pending_resolution->getAddrInfo(AF_INET);
     pending_resolution->getAddrInfo(AF_INET6);
