@@ -15,6 +15,18 @@ def envoy_mobile_repositories():
     python_repos()
 
 def upstream_envoy_overrides():
+    # Workaround due to a Detekt version compatibility with protobuf: https://github.com/envoyproxy/envoy-mobile/issues/1869
+    http_archive(
+        name = "com_google_protobuf",
+        patch_args = ["-p1"],
+        patches = [
+            "@envoy_mobile//bazel:protobuf.patch",
+        ],
+        sha256 = "d7371dc2d46fddac1af8cb27c0394554b068768fc79ecaf5be1a1863e8ff3392",
+        strip_prefix = "protobuf-3.16.0",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
+    )
+
     # Workaround old NDK version breakages https://github.com/lyft/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
