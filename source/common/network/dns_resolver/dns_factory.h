@@ -153,7 +153,7 @@ template <class ConfigType>
 Network::DnsResolverFactory& createDnsResolverFactoryFromProto(
     const ConfigType& config,
     envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT(Thread::MainThread::isMainOrTestThread());
   typed_dns_resolver_config = makeDnsResolverConfig(config);
   return createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
 }
