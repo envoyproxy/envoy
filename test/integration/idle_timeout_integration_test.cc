@@ -211,7 +211,7 @@ TEST_P(IdleTimeoutIntegrationTest, MaxConnectionDurationBasic) {
     auto* max_connection_duration = http_protocol_options->mutable_max_connection_duration();
     max_connection_duration->set_seconds(1);
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
-                                      protocol_options);
+                                     protocol_options);
   });
   initialize();
 
