@@ -105,7 +105,7 @@ TEST_F(AsyncClientManagerImplTest, RawAsyncClientCacheEvictOldEntries) {
                                                     CacheOption::AlwaysCache);
   }
 
-  // Get a different raw async client bacause cache has been evicted.
+  // Get a different raw async client because cache has been evicted.
   grpc_service.mutable_envoy_grpc()->set_cluster_name("0");
   RawAsyncClientSharedPtr client0c = async_client_manager_.getOrCreateRawAsyncClient(
       grpc_service, scope_, true, CacheOption::AlwaysCache);
