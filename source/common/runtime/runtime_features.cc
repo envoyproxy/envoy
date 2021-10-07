@@ -113,8 +113,9 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // TODO(alyssawilk, junr03) flip this after Lyft tests.
+    // TODO(alyssawilk, junr03) flip these after Lyft tests.
     "envoy.reloadable_features.allow_multiple_dns_addresses",
+    "envoy.reloadable_features.send_dns_addresses_early",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.

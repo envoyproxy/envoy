@@ -1067,6 +1067,10 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 }
 
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
 
@@ -1109,9 +1113,9 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   // Make sure the store gets the first insert.
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|30|0"));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.1:80|30|0"));
   EXPECT_CALL(callbacks,
               onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
@@ -1150,13 +1154,13 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
 
   EXPECT_CALL(*timeout_timer, disableTimer());
-  // Make sure the store gets the updated address.
+  // Make sure the store gets the updated addresses
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|30|0\n10.0.0.1:80|30|0"));
   EXPECT_CALL(update_callbacks_,
               onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|30|0"));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.2"}, std::chrono::seconds(30)));
+             TestUtility::makeDnsResponse({"10.0.0.2", "10.0.0.1"}, std::chrono::seconds(30)));
 
   checkStats(3 /* attempt */, 3 /* success */, 0 /* failure */, 2 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
@@ -1172,11 +1176,57 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   // Address does not change.
   EXPECT_CALL(*timeout_timer, disableTimer());
-  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|40|0"));
+  EXPECT_CALL(*store, addOrUpdate("foo.com", "10.0.0.2:80|40|0\n10.0.0.1:80|40|0"));
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
-             TestUtility::makeDnsResponse({"10.0.0.2"}, std::chrono::seconds(40)));
+             TestUtility::makeDnsResponse({"10.0.0.2", "10.0.0.1"}, std::chrono::seconds(40)));
 }
+
+TEST_F(DnsCacheImplTest, CacheLoad) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+          {{"envoy.reloadable_features.send_dns_addresses_early", "true"},
+            {"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+
+  auto* time_source = new NiceMock<MockTimeSystem>();
+  context_.dispatcher_.time_system_.reset(time_source);
+
+  // Configure the cache.
+  MockKeyValueStoreFactory factory;
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+    return std::make_unique<
+        envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
+  }));
+  MockKeyValueStore* store{};
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+    auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
+    store = ret.get();
+    // Make sure there's an attempt to load from the key value store.
+    EXPECT_CALL(*store, iterate).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+      fn("foo.com", "10.0.0.2:80|40|0");
+      fn("bar.com", "1.1.1.1:1|20|1\n2.2.2.2:2|30|2");
+      // No port.
+      EXPECT_LOG_CONTAINS("warning", "Unable to parse cache line '1.1.1.1|20|1'",
+                          fn("eep.com", "1.1.1.1|20|1"));
+      // Won't be loaded becasue of prior error.
+      fn("eep.com", "1.1.1.1|20|1:1");
+    }));
+
+    return ret;
+  }));
+  Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
+  config_.mutable_key_value_config()->mutable_config()->set_name("mock_key_value_store_factory");
+
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("bar.com", DnsHostInfoEquals("1.1.1.1:1", "bar.com", false)));
+  initialize();
+  InSequence s;
+  ASSERT(store != nullptr);
+  EXPECT_EQ(2, TestUtility::findCounter(context_.scope_, "dns_cache.foo.cache_load")->value());
+}
+
 
 // Make sure the cache manager can handle the context going out of scope.
 TEST(DnsCacheManagerImplTest, TestLifetime) {

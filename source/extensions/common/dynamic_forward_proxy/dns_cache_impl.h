@@ -211,11 +211,14 @@ private:
 
   void addCacheEntry(const std::string& host,
                      const Network::Address::InstanceConstSharedPtr& address,
+                     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
                      const std::chrono::seconds ttl);
   void removeCacheEntry(const std::string& host);
   void loadCacheEntries(
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
   PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
+  absl::optional<Network::DnsResponse> parseValue(absl::string_view value,
+                                                  absl::optional<MonotonicTime>& resolution_time);
 
   Event::Dispatcher& main_thread_dispatcher_;
   const Network::DnsLookupFamily dns_lookup_family_;
