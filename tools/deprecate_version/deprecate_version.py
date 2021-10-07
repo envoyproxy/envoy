@@ -23,6 +23,8 @@ import sys
 import github
 from git import Repo
 
+import envoy_repo
+
 try:
     input = raw_input  # Python 2
 except NameError:
@@ -126,7 +128,7 @@ def create_issues(access_token, runtime_and_pr):
 def get_runtime_and_pr():
     """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
     """
-    repo = Repo(os.getcwd())
+    repo = Repo(envoy_repo.PATH)
 
     # grep source code looking for reloadable features which are true to find the
     # PR they were added.
