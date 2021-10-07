@@ -2,8 +2,8 @@
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -43,7 +43,7 @@ public:
 
 class ListenerTypedMetadataFilter : public Http::PassThroughFilter {
 public:
-  ListenerTypedMetadataFilter() { }
+  ListenerTypedMetadataFilter() {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
@@ -76,5 +76,5 @@ private:
 REGISTER_FACTORY(BazTypedMetadataFactory, Network::ListenerTypedMetadataFactory);
 REGISTER_FACTORY(ListenerTypedMetadataFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
-}
+} // namespace
 } // namespace Envoy
