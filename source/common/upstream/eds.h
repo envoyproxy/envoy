@@ -66,7 +66,10 @@ private:
 
   class BatchUpdateHelper : public PrioritySet::BatchUpdateCb {
   public:
-    BatchUpdateHelper(EdsClusterImpl& parent) : parent_(parent) {}
+    BatchUpdateHelper(
+        EdsClusterImpl& parent,
+        const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment)
+        : parent_(parent), cluster_load_assignment_(cluster_load_assignment) {}
 
     // Upstream::PrioritySet::BatchUpdateCb
     void batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) override;
@@ -79,6 +82,7 @@ private:
         absl::flat_hash_set<std::string>& all_new_hosts);
 
     EdsClusterImpl& parent_;
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
   Config::SubscriptionPtr subscription_;
@@ -96,8 +100,9 @@ private:
   // data.
   LedsConfigMap leds_localities_;
   // TODO(adisuissa): Avoid saving the entire cluster load assignment, only the
-  // relevant parts of the config for each locality.
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
+  // relevant parts of the config for each locality. Note that this field must
+  // be set when LEDS is used.
+  absl::optional<envoy::config::endpoint::v3::ClusterLoadAssignment> cluster_load_assignment_;
 };
 
 using EdsClusterImplSharedPtr = std::shared_ptr<EdsClusterImpl>;
