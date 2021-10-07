@@ -2016,4 +2016,129 @@ TEST_P(XdsTpAdsIntegrationTest, LedsTimeout) {
                               {}));
 }
 
+// Modifying a cluster to alternate use of EDS with and without LEDS.
+TEST_P(XdsTpAdsIntegrationTest, EdsAlternatingLedsUsage) {
+  initialize();
+  const auto cds_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+  const auto eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+
+  // Receive CDS request, and send a cluster with EDS.
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {},
+                                      {"xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                       "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                                      {}, true));
+  const std::string cluster_name = "xdstp://test/envoy.config.cluster.v3.Cluster/foo-cluster/"
+                                   "baz?xds.node.cluster=cluster_name&xds.node.id=node_name";
+  auto cluster_resource = buildCluster(cluster_name);
+  const std::string endpoints_name =
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz";
+  cluster_resource.mutable_eds_cluster_config()->set_service_name(endpoints_name);
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(cds_type_url, {}, {cluster_resource},
+                                                             {}, "1");
+
+  // Receive EDS request, and send ClusterLoadAssignment with one locality,
+  // that doesn't use LEDS.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {},
+                                      {endpoints_name}, {}));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment(endpoints_name)}, {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "1", {}, {}, {}));
+
+  // LDS/RDS xDS initialization (LDS via xdstp:// glob collection)
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {},
+                              {"xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                               "*?xds.node.cluster=cluster_name&xds.node.id=node_name"},
+                              {}));
+  const std::string route_name_0 =
+      "xdstp://test/envoy.config.route.v3.RouteConfiguration/route_config_0";
+  sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TypeUrl::get().Listener, {},
+      {buildListener("xdstp://test/envoy.config.listener.v3.Listener/foo-listener/"
+                     "bar?xds.node.cluster=cluster_name&xds.node.id=node_name",
+                     route_name_0)},
+      {}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {},
+                                      {route_name_0}, {}));
+  sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {}, {buildRouteConfig(route_name_0, cluster_name)},
+      {}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {}, {}, {}));
+
+  test_server_->waitForCounterEq("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Send a new EDS update that uses LEDS.
+  const auto leds_resource_prefix =
+      "xdstp://test/envoy.config.endpoint.v3.LbEndpoint/foo-endpoints/";
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      eds_type_url, {},
+      {buildClusterLoadAssignmentWithLeds(endpoints_name, absl::StrCat(leds_resource_prefix, "*"))},
+      {}, "2");
+
+  // Receive LEDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {},
+      {absl::StrCat(leds_resource_prefix, "*?xds.node.cluster=cluster_name&xds.node.id=node_name")},
+      {}));
+
+  // Make sure that traffic can still be sent to the endpoint (still using the
+  // EDS without LEDS).
+  makeSingleRequest();
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "2", {}, {}, {}));
+
+  // Send LEDS response with 2 endpoints.
+  const auto endpoint1_name = absl::StrCat(leds_resource_prefix, "endpoint_0",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  const auto endpoint2_name = absl::StrCat(leds_resource_prefix, "endpoint_1",
+                                           "?xds.node.cluster=cluster_name&xds.node.id=node_name");
+  sendExplicitResourcesDeltaDiscoveryResponse(
+      Config::TypeUrl::get().LbEndpoint,
+      {buildLbEndpointResource(endpoint1_name, "1"), buildLbEndpointResource(endpoint2_name, "1")},
+      {});
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "1", {}, {}, {}));
+
+  // Make sure that traffic can still be sent to the endpoint (now using the
+  // EDS with LEDS).
+  makeSingleRequest();
+
+  // Send a new EDS update that doesn't use LEDS.
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {},
+      {buildClusterLoadAssignment(endpoints_name)}, {}, "3");
+
+  // The server should remove interest in the old LEDS.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      leds_type_url, "", {}, {},
+      {absl::StrCat(leds_resource_prefix,
+                    "*?xds.node.cluster=cluster_name&xds.node.id=node_name")}));
+
+  // Receive the EDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "3", {}, {}, {}));
+
+  // Remove the LEDS endpoints.
+  sendExplicitResourcesDeltaDiscoveryResponse(Config::TypeUrl::get().LbEndpoint, {},
+                                              {endpoint1_name, endpoint2_name});
+
+  // Receive the LEDS ack.
+  EXPECT_TRUE(compareDiscoveryRequest(leds_type_url, "3", {}, {}, {}));
+
+  // Make sure that traffic can still be sent to the endpoint (now using the
+  // EDS without LEDS).
+  makeSingleRequest();
+}
+
 } // namespace Envoy
