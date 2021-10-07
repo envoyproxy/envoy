@@ -197,10 +197,13 @@ public:
   ~MainThread();
 
   /**
-   * Returns whether the current thread is the main thread or test thread.
+   * @return whether the current thread is the main thread or test thread.
    */
   static bool isMainOrTestThread();
 
+  /**
+   * @return whether a MainThread has been instantiated.
+   */
   static bool hasMainThread();
 };
 
