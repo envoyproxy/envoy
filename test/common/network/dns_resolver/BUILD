@@ -18,5 +18,6 @@ envoy_cc_test(
     deps = [
         "//source/common/network/dns_resolver:dns_factory_lib",
         "//source/extensions/network/dns_resolver/cares:config",
+        "//test/mocks/network:network_mocks",
     ],
 )
