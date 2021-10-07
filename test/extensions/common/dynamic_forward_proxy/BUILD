@@ -24,6 +24,7 @@ envoy_cc_test(
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",

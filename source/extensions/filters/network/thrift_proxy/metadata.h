@@ -53,6 +53,10 @@ public:
       copy->setMessageType(messageType());
     }
 
+    if (hasReplyType()) {
+      copy->setReplyType(replyType());
+    }
+
     Http::HeaderMapImpl::copyFrom(copy->headers(), headers());
     copy->mutableSpans().assign(spans().begin(), spans().end());
 
@@ -115,6 +119,10 @@ public:
   MessageType messageType() const { return msg_type_.value(); }
   void setMessageType(MessageType msg_type) { msg_type_ = msg_type; }
 
+  bool hasReplyType() const { return reply_type_.has_value(); }
+  ReplyType replyType() const { return reply_type_.value(); }
+  void setReplyType(ReplyType reply_type) { reply_type_ = reply_type; }
+
   /**
    * @return HeaderMap of current headers (never throws)
    */
@@ -168,6 +176,7 @@ private:
   absl::optional<std::string> method_name_{};
   absl::optional<int32_t> seq_id_{};
   absl::optional<MessageType> msg_type_{};
+  absl::optional<ReplyType> reply_type_{};
   Http::HeaderMapPtr headers_{Http::RequestHeaderMapImpl::create()};
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;

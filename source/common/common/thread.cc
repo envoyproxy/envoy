@@ -99,7 +99,7 @@ private:
 
 } // namespace
 
-bool MainThread::isMainThread() { return ThreadIds::get().inMainOrTestThread(); }
+bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
 
 TestThread::TestThread() { ThreadIds::get().registerTestThread(); }
 
