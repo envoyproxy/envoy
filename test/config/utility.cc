@@ -653,6 +653,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  ASSERT_TRUE(static_resources->listeners_size() > 0);
+  auto* listener = static_resources->mutable_listeners(0);
+  auto* map = listener->mutable_metadata()->mutable_typed_filter_metadata();
+  (*map)[std::string(key)] = packed_value;
+};
+
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
   RELEASE_ASSERT(!finalized_, "");

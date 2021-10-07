@@ -621,8 +621,8 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "listener_typed_metadata_filter_lib",
-    hdrs = [
-        "listener_typed_metadata_filter.h",
+    srcs = [
+        "listener_typed_metadata_filter.cc",
     ],
     deps = [
         "//envoy/http:filter_interface",
@@ -631,5 +631,6 @@ envoy_cc_test_library(
         "//source/common/protobuf",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
 )

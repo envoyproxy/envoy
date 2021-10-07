@@ -2,15 +2,19 @@
 #include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 
-#include "source/common/protobuf/protobuf.h"
-#include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/protobuf/protobuf.h"
+
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
-
 namespace {
-inline constexpr absl::string_view kMetadataKey = "test.listener.typed.metadata";
-}
+
+const std::string kFilterName = "listener-typed-metadata-filter";
+const std::string kMetadataKey = "test.listener.typed.metadata";
+const std::string kExpectedMetadataValue = "hello world";
 
 // A test filter that verifies the typed metadata attached to the listener is stored correctly.
 class Baz : public Config::TypedMetadata::Object {
@@ -23,7 +27,7 @@ public:
   std::string name() const override { return kMetadataKey; }
 
   std::unique_ptr<const Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  parse(const ProtobufWkt::Struct&) const override {
     ADD_FAILURE() << "Filter should not parse struct-typed metadata.";
     return nullptr;
   }
@@ -39,25 +43,31 @@ public:
 
 class ListenerTypedMetadataFilter : public Http::PassThroughFilter {
 public:
-  ListenerTypedMetadataFilter() {}
+  ListenerTypedMetadataFilter() { }
+
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
+                                       "Successfully handled request.");
+    return Http::FilterHeadersStatus::Continue;
+  }
 };
 
 class ListenerTypedMetadataFilterFactory
-    : public Extensions::HttpFilters::Common::FactoryBase<ProtobufWkt::Empty> {
+    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  ListenerTypedMetadataFilterFactory() : FactoryBase("set-response-code-filter") {}
+  ListenerTypedMetadataFilterFactory() : EmptyHttpFilterConfig(kFilterName) {}
 
 private:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtobufWkt::Empty&, const std::string&,
-                                    Server::Configuration::FactoryContext& context) override {
+  Http::FilterFactoryCb createFilter(const std::string&,
+                                     Server::Configuration::FactoryContext& context) override {
 
+    // Main assertions to ensure the metadata from the listener was parsed correctly.
     const auto& typed_metadata = context.listenerTypedMetadata();
-    const Baz* value = typed_metadata.get(kMetadataKey);
-    EXPECT_NEQ(value, nullptr);
-    EXPECT_FALSE(value->item.empty());
+    const Baz* value = typed_metadata.get<Baz>(kMetadataKey);
+    EXPECT_NE(value, nullptr);
+    EXPECT_EQ(value->item_, kExpectedMetadataValue);
 
-    return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<ListenerTypedMetadataFilter>());
     };
   }
@@ -66,4 +76,5 @@ private:
 REGISTER_FACTORY(BazTypedMetadataFactory, Network::ListenerTypedMetadataFactory);
 REGISTER_FACTORY(ListenerTypedMetadataFilterFactory,
                  Server::Configuration::NamedHttpFilterConfigFactory);
+}
 } // namespace Envoy

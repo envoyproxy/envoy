@@ -316,6 +316,9 @@ public:
   // Enable deprecated v2 API resources via the runtime.
   void enableDeprecatedV2Api();
 
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");
