@@ -154,8 +154,8 @@ public:
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-          SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
-        }
+    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
+  }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
