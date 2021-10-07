@@ -2,6 +2,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/http/header_evaluator.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -17,6 +18,14 @@ namespace TcpProxy {
 
 class GenericConnectionPoolCallbacks;
 class GenericUpstream;
+
+class TunnelingConfigHelper {
+public:
+  virtual ~TunnelingConfigHelper() = default;
+  virtual const std::string& hostname() const PURE;
+  virtual bool usePost() const PURE;
+  virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
+};
 
 // An API for wrapping either a TCP or an HTTP connection pool.
 class GenericConnPool : public Logger::Loggable<Logger::Id::router> {
@@ -125,8 +134,7 @@ public:
    */
   virtual GenericConnPoolPtr
   createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        const absl::optional<TunnelingConfig>& config,
-                        Upstream::LoadBalancerContext* context,
+                        const TunnelingConfigHelper* config, Upstream::LoadBalancerContext* context,
                         Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const PURE;
 };
 

@@ -57,5 +57,5 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: www.google.com
-                port_value: 443
+                address: 127.0.0.1
+                port_value: 10002

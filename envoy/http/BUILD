@@ -182,3 +182,12 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "header_evaluator",
+    hdrs = ["header_evaluator.h"],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+    ],
+)

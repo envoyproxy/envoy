@@ -1,4 +1,5 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "tcp_proxy.h"
 
 #include <cstdint>
 #include <memory>
@@ -74,6 +75,8 @@ Config::SharedConfig::SharedConfig(
   }
   if (config.has_tunneling_config()) {
     tunneling_config_ = config.tunneling_config();
+    tunneling_config_helper_ =
+        std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config());
   }
   if (config.has_max_downstream_connection_duration()) {
     const uint64_t connection_duration =
@@ -421,8 +424,8 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
     return false;
   }
 
-  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfig(), this,
-                                                      *upstream_callbacks_);
+  generic_conn_pool_ = factory->createGenericConnPool(cluster, config_->tunnelingConfigHelper(),
+                                                      this, *upstream_callbacks_);
   if (generic_conn_pool_) {
     connecting_ = true;
     connect_attempts_++;

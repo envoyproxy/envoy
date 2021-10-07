@@ -58,10 +58,9 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                           const TunnelingConfig& config)
-    : config_(config), response_decoder_(*this), upstream_callbacks_(callbacks) {
-  header_parser_ = Envoy::Router::HeaderParser::configure(config_.headers_to_add());
-}
+                           const TunnelingConfigHelper& config)
+    : config_(config), header_parser_(config.headerEvaluator()), response_decoder_(*this),
+      upstream_callbacks_(callbacks) {}
 
 HttpUpstream::~HttpUpstream() { resetEncoder(Network::ConnectionEvent::LocalClose); }
 
@@ -192,7 +191,8 @@ void TcpConnPool::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data
 }
 
 HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                           Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
+                           Upstream::LoadBalancerContext* context,
+                           const TunnelingConfigHelper& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecType type)
     : config_(config), type_(type), upstream_callbacks_(upstream_callbacks) {
@@ -251,7 +251,7 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config)
+                             const TunnelingConfigHelper& config)
     : HttpUpstream(callbacks, config) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
@@ -268,25 +268,25 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   const std::string& scheme =
       is_ssl ? Http::Headers::get().SchemeValues.Https : Http::Headers::get().SchemeValues.Http;
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
       {Http::Headers::get().Path, "/"},
       {Http::Headers::get().Scheme, scheme},
   });
 
-  if (!config_.use_post()) {
+  if (!config_.usePost()) {
     headers->addReference(Http::Headers::get().Protocol,
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
+  header_parser_.evaluateHeaders(*headers, nullptr /*stream_info*/);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
 }
 
 Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config)
+                             const TunnelingConfigHelper& config)
     : HttpUpstream(callbacks, config) {}
 
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
@@ -296,16 +296,16 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
   ASSERT(request_encoder_->http1StreamEncoderOptions() != absl::nullopt);
 
   auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
-      {Http::Headers::get().Method, config_.use_post() ? "POST" : "CONNECT"},
+      {Http::Headers::get().Method, config_.usePost() ? "POST" : "CONNECT"},
       {Http::Headers::get().Host, config_.hostname()},
   });
 
-  if (config_.use_post()) {
+  if (config_.usePost()) {
     // Path is required for POST requests.
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
+  header_parser_.evaluateHeaders(*headers, nullptr /*stream_info*/);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

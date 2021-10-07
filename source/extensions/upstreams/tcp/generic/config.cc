@@ -13,9 +13,9 @@ namespace Generic {
 
 TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     Upstream::ThreadLocalCluster& thread_local_cluster,
-    const absl::optional<TunnelingConfig>& config, Upstream::LoadBalancerContext* context,
+    const TcpProxy::TunnelingConfigHelper* config, Upstream::LoadBalancerContext* context,
     Envoy::Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks) const {
-  if (config.has_value()) {
+  if (config != nullptr) {
     Http::CodecType pool_type;
     if ((thread_local_cluster.info()->features() & Upstream::ClusterInfo::Features::HTTP2) != 0) {
       pool_type = Http::CodecType::HTTP2;
@@ -25,8 +25,8 @@ TcpProxy::GenericConnPoolPtr GenericConnPoolFactory::createGenericConnPool(
     } else {
       pool_type = Http::CodecType::HTTP1;
     }
-    auto ret = std::make_unique<TcpProxy::HttpConnPool>(
-        thread_local_cluster, context, config.value(), upstream_callbacks, pool_type);
+    auto ret = std::make_unique<TcpProxy::HttpConnPool>(thread_local_cluster, context, *config,
+                                                        upstream_callbacks, pool_type);
     return (ret->valid() ? std::move(ret) : nullptr);
   }
   auto ret =
