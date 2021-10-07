@@ -510,6 +510,43 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
 }
 
+TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
+  concurrency_ = 2;
+  initialize();
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto old_self_addr = quic_connection_->self_address();
+  quic_connection_->OnPathDegradingDetected();
+  ASSERT_FALSE(quic_connection_->waitForPathResponse(std::chrono::milliseconds(2000)));
+  auto self_addr = quic_connection_->self_address();
+  EXPECT_EQ(old_self_addr, self_addr);
+
+  // Send the rest data.
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+}
+
 TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   concurrency_ = 2;
   validation_failure_on_path_response_ = true;

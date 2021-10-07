@@ -167,7 +167,7 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
     std::unique_ptr<quic::QuicPathValidationContext> /*context*/) {
-  // Note that the probing socket and probing writer will be deleted once |context| goes out of
+  // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient();
   CancelPathValidation();
@@ -197,16 +197,16 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
         *this, dispatcher_.timeSource(), true, packets_dropped_);
-    if (is_probing_socket && !HasPendingPathValidation() &&
-        connectionSocket().get() != &connection_socket) {
-      // Path validation has failed and |connection_socket| is deleted.
-      return;
-    }
     if (err == nullptr) {
-      connection_socket.ioHandle().activateFileEvents(Event::FileReadyType::Read);
-      return;
-    }
-    if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
+      // In the case where the path validation fails, the probing socket will be closed and its IO
+      // events are no longer interesting.
+      if (!is_probing_socket || HasPendingPathValidation() ||
+          connectionSocket().get() == &connection_socket) {
+        connection_socket.ioHandle().activateFileEvents(Event::FileReadyType::Read);
+        return;
+      }
+
+    } else if (err->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       ENVOY_CONN_LOG(error, "recvmsg result {}: {}", *this, static_cast<int>(err->getErrorCode()),
                      err->getErrorDetails());
     }

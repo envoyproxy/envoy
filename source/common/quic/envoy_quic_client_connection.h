@@ -34,40 +34,6 @@ class EnvoyQuicClientConnection : public quic::QuicConnection,
                                   public QuicNetworkConnection,
                                   public Network::UdpPacketProcessor {
 public:
-  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
-  public:
-    EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
-                                   quic::QuicSocketAddress& peer_address,
-                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
-                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
-
-    ~EnvoyQuicPathValidationContext() override;
-
-    quic::QuicPacketWriter* WriterToUse() override;
-
-    EnvoyQuicPacketWriter* releaseWriter();
-
-    Network::ConnectionSocket& probingSocket();
-
-    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
-
-  private:
-    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
-    Network::ConnectionSocketPtr socket_;
-  };
-
-  class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
-  public:
-    explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
-
-    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
-
-    void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
-
-  private:
-    EnvoyQuicClientConnection& connection_;
-  };
-
   // A connection socket will be created with given |local_addr|. If binding
   // port not provided in |local_addr|, pick up a random port.
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
@@ -121,6 +87,39 @@ public:
   }
 
 private:
+  class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
+  public:
+    EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
+                                   quic::QuicSocketAddress& peer_address,
+                                   std::unique_ptr<EnvoyQuicPacketWriter> writer,
+                                   std::unique_ptr<Network::ConnectionSocket> probing_socket);
+
+    ~EnvoyQuicPathValidationContext() override;
+
+    quic::QuicPacketWriter* WriterToUse() override;
+
+    EnvoyQuicPacketWriter* releaseWriter();
+
+    Network::ConnectionSocket& probingSocket();
+
+    std::unique_ptr<Network::ConnectionSocket> releaseSocket();
+
+  private:
+    std::unique_ptr<EnvoyQuicPacketWriter> writer_;
+    Network::ConnectionSocketPtr socket_;
+  };
+
+  class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
+  public:
+    explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);
+
+    void OnPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+    void OnPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context) override;
+
+  private:
+    EnvoyQuicClientConnection& connection_;
+  };
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory,
