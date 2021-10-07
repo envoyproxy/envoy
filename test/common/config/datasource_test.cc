@@ -586,6 +586,41 @@ TEST_F(AsyncDataSourceTest, BaseIntervalTest) {
   EXPECT_THROW(TestUtility::loadFromYamlAndValidate(yaml, config), EnvoyException);
 }
 
+TEST(DataSourceTest, WellKnownEnvironmentVariableTest) {
+  using DataSourcePb = envoy::config::core::v3::DataSource;
+  DataSourcePb config;
+
+  std::string yaml = R"EOF(
+    environment_variable:
+      PATH
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(DataSourcePb::SpecifierCase::kEnvironmentVariable, config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "PATH");
+  Api::ApiPtr api = Api::createApiForTest();
+  std::string path_data = DataSource::read(config, false, *api);
+  EXPECT_TRUE(path_data.size() > 0);
+}
+
+TEST(DataSourceTest, MissingEnvironmentVariableTest) {
+  using DataSourcePb = envoy::config::core::v3::DataSource;
+  DataSourcePb config;
+
+  std::string yaml = R"EOF(
+    environment_variable:
+      ThisVariableDoesntExist
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(DataSourcePb::SpecifierCase::kEnvironmentVariable, config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
+  std::string path_data = DataSource::read(config, true, *api);
+  EXPECT_TRUE(path_data.empty());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

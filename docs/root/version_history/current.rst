@@ -23,6 +23,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* DataSource: added :ref:`environment_variable <envoy_v3_api_msg_config.core.v3.datasource>` to the datasource.
 * http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 
 Deprecated
