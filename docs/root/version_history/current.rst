@@ -25,6 +25,7 @@ Removed Config or Runtime
 New Features
 ------------
 * http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
+* thrift_proxy: add upstream response zone metrics in the form `cluster.cluster_name.zone.local_zone.upstream_zone.thrift.upstream_resp_success`.
 
 Deprecated
 ----------
