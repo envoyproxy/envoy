@@ -170,7 +170,6 @@ void EnvoyQuicClientConnection::onPathValidationFailure(
   // Note that the probing socket and probing writer will be deleted once context goes out of
   // scope.
   OnPathValidationFailureAtClient();
-  CancelPathValidation();
 }
 
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
