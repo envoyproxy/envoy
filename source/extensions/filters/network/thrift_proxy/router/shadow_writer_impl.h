@@ -59,21 +59,8 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   // ProtocolConverter
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     metadata_ = metadata;
-    first_reply_field_ =
-        (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
-    return FilterStatus::Continue;
-  }
-  FilterStatus messageEnd() override {
-    if (first_reply_field_) {
-      success_ = true;
-      first_reply_field_ = false;
-    }
-    return FilterStatus::Continue;
-  }
-  FilterStatus fieldBegin(absl::string_view, FieldType&, int16_t& field_id) override {
-    if (first_reply_field_) {
-      success_ = (field_id == 0);
-      first_reply_field_ = false;
+    if (metadata_->hasReplyType()) {
+      success_ = metadata_->replyType() == ReplyType::Success;
     }
     return FilterStatus::Continue;
   }
@@ -97,7 +84,6 @@ struct NullResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
   MessageMetadataSharedPtr metadata_;
   absl::optional<bool> success_;
   bool complete_ : 1;
-  bool first_reply_field_ : 1;
 };
 using NullResponseDecoderPtr = std::unique_ptr<NullResponseDecoder>;
 
