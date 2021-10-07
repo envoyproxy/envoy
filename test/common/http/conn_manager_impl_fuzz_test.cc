@@ -208,10 +208,6 @@ public:
   const Http::PathTransformer& forwardingPathTransformer() const override {
     return forwarding_path_transformer_;
   }
-
-  const Http::PathTransformer& filterPathTransformer() const override {
-    return filter_path_transformer_;
-  }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {

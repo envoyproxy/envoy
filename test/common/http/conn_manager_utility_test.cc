@@ -168,7 +168,6 @@ public:
   std::string empty_node_;
   std::string via_;
   std::unique_ptr<PathTransformer> forwarding_path_transformer_;
-  std::unique_ptr<PathTransformer> filter_path_transformer_;
 };
 
 // Tests for ConnectionManagerUtility::determineNextProtocol.
@@ -1493,10 +1492,6 @@ TEST_F(ConnectionManagerUtilityTest, SanitizeEmptyPath) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>(
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
-          KEEP_UNCHANGED,
-      false, false);
   TestRequestHeaderMapImpl original_headers;
 
   TestRequestHeaderMapImpl header_map(original_headers);
@@ -1511,10 +1506,8 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../a");
 
@@ -1529,10 +1522,8 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz");
 
@@ -1547,10 +1538,8 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/../abc");
 
@@ -1565,10 +1554,8 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
@@ -1583,10 +1570,8 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       false, true);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz///abc");
 
@@ -1601,10 +1586,8 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       false, true);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz/..//abc");
 
@@ -1616,10 +1599,8 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
 // maybeNormalizeHost() removes port part from host header.
 TEST_F(ConnectionManagerUtilityTest, RemovePort) {
   forwarding_path_transformer_ = std::make_unique<PathTransformer>();
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   ON_CALL(config_, stripPortType()).WillByDefault(Return(Http::StripPortType::MatchingHost));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setHost("host:443");
@@ -1648,10 +1629,8 @@ TEST_F(ConnectionManagerUtilityTest, RemovePort) {
 // maybeNormalizeHost() removes trailing dot of host from host header.
 TEST_F(ConnectionManagerUtilityTest, RemoveTrailingDot) {
   forwarding_path_transformer_ = std::make_unique<PathTransformer>();
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   ON_CALL(config_, shouldStripTrailingHostDot()).WillByDefault(Return(true));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setHost("host.");
@@ -1701,10 +1680,8 @@ TEST_F(ConnectionManagerUtilityTest, KeepEscapedSlashesWhenConfigured) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2fabc%5Cqrt");
 
@@ -1721,10 +1698,8 @@ TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesPresentAndConfiguredT
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           REJECT_REQUEST,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2F..//abc");
 
@@ -1745,10 +1720,8 @@ TEST_F(ConnectionManagerUtilityTest, RejectIfEscapedSlashesNotPresentAndConfigur
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           REJECT_REQUEST,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%EA/abc");
 
@@ -1765,10 +1738,8 @@ TEST_F(ConnectionManagerUtilityTest, RedirectIfEscapedSlashesPresentAndConfigure
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_REDIRECT,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2F../%5cabc");
 
@@ -1786,10 +1757,8 @@ TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesNotFoundAndConfigur
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_REDIRECT,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%30..//abc");
 
@@ -1806,10 +1775,8 @@ TEST_F(ConnectionManagerUtilityTest, ContinueIfEscapedSlashesPresentAndConfigure
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_FORWARD,
       false, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2F../%5Cabc");
 
@@ -1825,10 +1792,8 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesAndChromiumNormalization) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_FORWARD,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2f../%5Cabc");
 
@@ -1845,10 +1810,8 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeSlashesRedirectAndChromiumNormaliza
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_REDIRECT,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   // %00 is an invalid sequence in URL path and causes path normalization to fail.
   original_headers.setPath("/xyz%2f../%5Cabc%00");
@@ -1864,10 +1827,8 @@ TEST_F(ConnectionManagerUtilityTest, UnescapeAndMergeSlashes) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_REDIRECT,
       false, true);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2f/..//abc%5C%5c");
 
@@ -1884,10 +1845,8 @@ TEST_F(ConnectionManagerUtilityTest, AllNormalizations) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_FORWARD,
       true, true);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2f..%5c/%2Fabc");
 
@@ -1903,10 +1862,8 @@ TEST_F(ConnectionManagerUtilityTest, RedirectAfterAllOtherNormalizations) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           UNESCAPE_AND_REDIRECT,
       true, true);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl original_headers;
   original_headers.setPath("/xyz%2f..%5c/%2Fabc");
 
@@ -2048,10 +2005,8 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
 
 TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
   forwarding_path_transformer_ = std::make_unique<PathTransformer>();
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl header_map{{":path", "/foo/bar#boom"}};
   EXPECT_EQ(NormalizePathAction::Reject,
             ConnectionManagerUtility::maybeNormalizePath(header_map, config_));
@@ -2071,10 +2026,8 @@ TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   // ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map_with_percent_23, config_));
@@ -2084,10 +2037,8 @@ TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
 
 TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
   forwarding_path_transformer_ = std::make_unique<PathTransformer>();
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
@@ -2116,10 +2067,8 @@ TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   // Check that normalization does not "see" stripped path
   TestRequestHeaderMapImpl header_map_with_fragment2{{":path", "/foo/../baz/#fragment"}};
   EXPECT_EQ(NormalizePathAction::Continue,
@@ -2129,10 +2078,8 @@ TEST_F(ConnectionManagerUtilityTest, DropFragmentFromPathWithOverride) {
 
 TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
   forwarding_path_transformer_ = std::make_unique<PathTransformer>();
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http_reject_path_with_fragment", "false"}});
@@ -2164,10 +2111,8 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,
       true, false);
-  filter_path_transformer_ = std::make_unique<PathTransformer>();
   ON_CALL(config_, forwardingPathTransformer())
       .WillByDefault(ReturnRef(*forwarding_path_transformer_));
-  ON_CALL(config_, filterPathTransformer()).WillByDefault(ReturnRef(*filter_path_transformer_));
   TestRequestHeaderMapImpl header_map_with_fragment2{{":path", "/foo/../baz/#fragment"}};
   EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map_with_fragment2, config_));

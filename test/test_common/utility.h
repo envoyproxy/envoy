@@ -1054,8 +1054,6 @@ public:
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
   INLINE_REQ_RESP_STRING_HEADERS(DEFINE_TEST_INLINE_STRING_HEADER_FUNCS)
   INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_TEST_INLINE_NUMERIC_HEADER_FUNCS)
-  absl::string_view getForwardingPath() override { return forwarding_path_; }
-  absl::string_view getFilterPath() override { return filter_path_; }
 
   // Tracing::TraceContext
   absl::string_view protocol() const override { return header_map_->getProtocolValue(); }
@@ -1087,13 +1085,6 @@ public:
     ASSERT(header_map_);
     header_map_->setByReferenceKey(key, val);
   }
-
-private:
-  void setForwardingPath(absl::string_view path) override { forwarding_path_ = std::string(path); }
-  void setFilterPath(absl::string_view path) override { filter_path_ = std::string(path); }
-
-  std::string forwarding_path_;
-  std::string filter_path_;
 };
 
 using TestRequestTrailerMapImpl = TestHeaderMapImplBase<RequestTrailerMap, RequestTrailerMapImpl>;

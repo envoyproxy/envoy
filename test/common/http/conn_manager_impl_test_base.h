@@ -146,7 +146,6 @@ public:
   const PathTransformer& forwardingPathTransformer() const override {
     return forwarding_path_transformer_;
   }
-  const PathTransformer& filterPathTransformer() const override { return filter_path_transformer_; }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
@@ -231,7 +230,6 @@ public:
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
   PathTransformer forwarding_path_transformer_;
-  PathTransformer filter_path_transformer_;
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

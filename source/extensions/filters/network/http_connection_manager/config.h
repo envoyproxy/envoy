@@ -211,9 +211,6 @@ public:
   }
   std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  const Http::PathTransformer& filterPathTransformer() const override {
-    return filter_path_transformer_;
-  }
   const Http::PathTransformer& forwardingPathTransformer() const override {
     return forwarding_path_transformer_;
   }

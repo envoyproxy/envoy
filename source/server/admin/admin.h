@@ -209,7 +209,6 @@ public:
   const Http::PathTransformer& forwardingPathTransformer() const override {
     return path_transformer_;
   }
-  const Http::PathTransformer& filterPathTransformer() const override { return path_transformer_; }
 
 private:
   /**

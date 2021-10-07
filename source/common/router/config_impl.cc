@@ -590,10 +590,6 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     request_headers_parser_->evaluateHeaders(headers, stream_info);
   }
 
-  // Restore the forwarding path if none of the filter mutate the path.
-  if (headers.Path() && headers.getFilterPath() == headers.getPathValue()) {
-    headers.setPath(std::string(headers.getForwardingPath()));
-  }
   // Restore the port if this was a CONNECT request.
   // Note this will restore the port for HTTP/2 CONNECT-upgrades as well as as HTTP/1.1 style
   // CONNECT requests.

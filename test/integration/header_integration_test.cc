@@ -290,12 +290,6 @@ public:
                 TestUtility::parseYaml<envoy::type::http::v3::PathTransformation>(
                     forwarding_transformation_.value()));
           }
-          if (filter_transformation_.has_value()) {
-            hcm.mutable_path_normalization_options()
-                ->mutable_http_filter_transformation()
-                ->CopyFrom(TestUtility::parseYaml<envoy::type::http::v3::PathTransformation>(
-                    filter_transformation_.value()));
-          }
 
           envoy::extensions::filters::http::router::v3::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
@@ -470,7 +464,7 @@ protected:
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
   absl::optional<std::string> forwarding_transformation_;
-  absl::optional<std::string> filter_transformation_;
+  absl::optional<std::string> sformation_;
 }; // namespace Envoy
 
 INSTANTIATE_TEST_SUITE_P(
@@ -1085,10 +1079,6 @@ TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) 
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
               )EOF");
-  filter_transformation_ = std::string(
-      R"EOF(
-      operations:
-              )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
@@ -1114,43 +1104,6 @@ TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) 
       });
 }
 
-// Validate that filter path normalization is not visible to upstream server.
-TEST_P(HeaderIntegrationTest, TestFilterPathNormalizationInvisibleToUpstream) {
-  forwarding_transformation_ = std::string(
-      R"EOF(
-      operations:
-              )EOF");
-  filter_transformation_ = std::string(
-      R"EOF(
-      operations:
-      - normalize_path_rfc_3986: {}
-        normalize_path_action: CONTINUE
-              )EOF");
-  initializeFilter(HeaderMode::Append, false);
-  performRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/private/../public"},
-          {":scheme", "http"},
-          {":authority", "path-sanitization.com"},
-      },
-      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
-                                     {":path", "/private/../public"},
-                                     {":method", "GET"},
-                                     {"x-site", "public"}},
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
-          {"x-unmodified", "response"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"x-unmodified", "response"},
-          {":status", "200"},
-      });
-}
-
 // Validate that new path normalization api take precedence.
 // Old api set path normalization off, new api set path normalization on, should normalize.
 TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigured) {
@@ -1160,10 +1113,6 @@ TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigu
       operations:
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
-              )EOF");
-  filter_transformation_ = std::string(
-      R"EOF(
-      operations:
               )EOF");
   initializeFilter(HeaderMode::Append, false);
   performRequest(
@@ -1200,10 +1149,6 @@ TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
         normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
-              )EOF");
-  filter_transformation_ = std::string(
-      R"EOF(
-      operations:
               )EOF");
   EXPECT_DEATH(initializeFilter(HeaderMode::Append, false), "Details: Lds update failed.");
 }

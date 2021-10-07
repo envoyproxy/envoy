@@ -510,22 +510,7 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
     return final_action;
   }
   ASSERT(forwarding_path.has_value());
-  absl::optional<std::string> filter_path;
-
-  request_headers.setForwardingPath(forwarding_path.value());
-  filter_path = config.filterPathTransformer().transform(forwarding_path.value(), final_action);
-
-  if (final_action == NormalizePathAction::Continue) {
-    if (filter_path.has_value()) {
-      request_headers.setPath(filter_path.value());
-      request_headers.setFilterPath(filter_path.value());
-    } else {
-      return NormalizePathAction::Reject;
-    }
-  } else if (final_action == NormalizePathAction::Redirect) {
-    ASSERT(forwarding_path.has_value());
-    request_headers.setPath(forwarding_path.value());
-  }
+  request_headers.setPath(forwarding_path.value());
   return final_action;
 }
 
