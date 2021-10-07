@@ -206,9 +206,7 @@ public:
   }
   uint64_t maxRequestsPerConnection() const override { return 0; }
 
-  const Http::PathTransformer& forwardingPathTransformer() const override {
-    return path_transformer_;
-  }
+  const Http::PathTransformer& pathTransformer() const override { return path_transformer_; }
 
 private:
   /**

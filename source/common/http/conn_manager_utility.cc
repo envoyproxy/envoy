@@ -504,13 +504,13 @@ ConnectionManagerUtility::maybeNormalizePath(RequestHeaderMap& request_headers,
   NormalizePathAction final_action = NormalizePathAction::Continue;
 
   const auto original_path = request_headers.getPathValue();
-  absl::optional<std::string> forwarding_path =
-      config.forwardingPathTransformer().transform(original_path, final_action);
+  absl::optional<std::string> path =
+      config.pathTransformer().transform(original_path, final_action);
   if (final_action == NormalizePathAction::Reject) {
     return final_action;
   }
-  ASSERT(forwarding_path.has_value());
-  request_headers.setPath(forwarding_path.value());
+  ASSERT(path.has_value());
+  request_headers.setPath(path.value());
   return final_action;
 }
 

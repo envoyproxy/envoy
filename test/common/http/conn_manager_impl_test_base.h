@@ -143,9 +143,7 @@ public:
     return headers_with_underscores_action_;
   }
   const LocalReply::LocalReply& localReply() const override { return *local_reply_; }
-  const PathTransformer& forwardingPathTransformer() const override {
-    return forwarding_path_transformer_;
-  }
+  const PathTransformer& pathTransformer() const override { return path_transformer_; }
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction
       pathWithEscapedSlashesAction() const override {
@@ -229,7 +227,7 @@ public:
   std::vector<MockStreamDecoderFilter*> decoder_filters_;
   std::vector<MockStreamEncoderFilter*> encoder_filters_;
   std::shared_ptr<AccessLog::MockInstance> log_handler_;
-  PathTransformer forwarding_path_transformer_;
+  PathTransformer path_transformer_;
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::

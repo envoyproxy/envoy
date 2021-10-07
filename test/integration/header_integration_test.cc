@@ -285,10 +285,10 @@ public:
           // Overwrite default config with our own.
           TestUtility::loadFromYaml(http_connection_mgr_config, hcm);
 
-          if (forwarding_transformation_.has_value()) {
-            hcm.mutable_path_normalization_options()->mutable_forwarding_transformation()->CopyFrom(
+          if (transformation_.has_value()) {
+            hcm.mutable_path_normalization_options()->mutable_transformation()->CopyFrom(
                 TestUtility::parseYaml<envoy::type::http::v3::PathTransformation>(
-                    forwarding_transformation_.value()));
+                    transformation_.value()));
           }
 
           envoy::extensions::filters::http::router::v3::Router router_config;
@@ -463,7 +463,7 @@ protected:
               KEEP_UNCHANGED};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
-  absl::optional<std::string> forwarding_transformation_;
+  absl::optional<std::string> transformation_;
   absl::optional<std::string> sformation_;
 }; // namespace Envoy
 
@@ -1043,7 +1043,7 @@ TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
 // Route selection and path to upstream are the exact string literal
 // from downstream.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
               )EOF");
@@ -1072,8 +1072,8 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteWhenNormalizePathOff) {
       });
 }
 
-TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) {
-  forwarding_transformation_ = std::string(
+TEST_P(HeaderIntegrationTest, TestPathNormalizationVisibleToUpstream) {
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1108,7 +1108,7 @@ TEST_P(HeaderIntegrationTest, TestForwardingPathNormalizationVisibleToUpstream) 
 // Old api set path normalization off, new api set path normalization on, should normalize.
 TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigured) {
   normalize_path_ = false;
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1142,7 +1142,7 @@ TEST_P(HeaderIntegrationTest, TestOldPathNormalizationApiIgnoreWhenNewApiConfigu
 // Validate that envoy reject configuration when operations are duplicate in the same
 // transformation.
 TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1157,7 +1157,7 @@ TEST_P(HeaderIntegrationTest, TestDuplicateOperationInPathTransformation) {
 // Path to decide route and path to upstream are both
 // the normalized.
 TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1190,7 +1190,7 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
 
 // Validates that Envoy by default does not modify escaped slashes.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1226,7 +1226,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
 TEST_P(HeaderIntegrationTest, EscapedSlashesAndPathTransformationConfigurationConflict) {
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::REJECT_REQUEST;
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1285,7 +1285,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRejected) {
 
 // Normalizing the path trigger reject action.
 TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
-  forwarding_transformation_ = R"EOF(
+  transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
         normalize_path_action: REJECT
@@ -1311,7 +1311,7 @@ TEST_P(HeaderIntegrationTest, RejectedWithPathNormalized) {
 
 // Validates that Envoy does not modify escaped slashes when configured.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
-  forwarding_transformation_ = std::string(
+  transformation_ = std::string(
       R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
@@ -1344,7 +1344,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
 
 // Validates that Envoy forwards unescaped slashes when configured.
 TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
-  forwarding_transformation_ = R"EOF(
+  transformation_ = R"EOF(
       operations:
       - unescape_slashes: {}
         normalize_path_action: CONTINUE
@@ -1402,7 +1402,7 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
 
 // Path normalization triggers redirect action.
 TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
-  forwarding_transformation_ = R"EOF(
+  transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
         normalize_path_action: REDIRECT
@@ -1430,7 +1430,7 @@ TEST_P(HeaderIntegrationTest, PathNormalizedAndRedirect) {
 
 // Path normalization triggers redirect action.
 TEST_P(HeaderIntegrationTest, RedirectOverwriteContinueAction) {
-  forwarding_transformation_ = R"EOF(
+  transformation_ = R"EOF(
       operations:
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE

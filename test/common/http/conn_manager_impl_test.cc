@@ -428,7 +428,7 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -477,7 +477,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
@@ -527,7 +527,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
@@ -573,7 +573,7 @@ TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejected) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   testPathNormalization(
       TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%5c../"}, {":method", "GET"}},
@@ -592,7 +592,7 @@ TEST_F(HttpConnectionManagerImplTest, PathRejectedAfterMergeSlashes) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
       v3::HttpConnectionManager::REJECT_REQUEST;
@@ -616,7 +616,7 @@ TEST_F(HttpConnectionManagerImplTest, PathRejectedAfterRfcNormalize) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
                                                  {":path", "/x/%2E%2e/z"},
@@ -634,7 +634,7 @@ TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRedirected) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
   testPathNormalization(
       TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/abc%2f../"}, {":method", "GET"}},
       TestResponseHeaderMapImpl{{":status", "307"}, {"location", "/abc/../"}});
@@ -653,7 +653,7 @@ TEST_F(HttpConnectionManagerImplTest, PathWithEscapedSlashesRejectedIfGRPC) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
   testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
                                                  {":path", "/abc%2fdef"},
                                                  {":method", "GET"},
@@ -681,7 +681,7 @@ TEST_F(HttpConnectionManagerImplTest, PathRedirectAfterMergeSlashesIfGRPC) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   testPathNormalization(TestRequestHeaderMapImpl{{":authority", "host"},
                                                  {":path", "/abc//fdef"},
@@ -708,7 +708,7 @@ TEST_F(HttpConnectionManagerImplTest, EscapedSlashesRedirectedAfterOtherNormaliz
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   // Both Chromium URL normalization and merge slashes should happen if request is redirected
   // due to escaped slash sequences.
@@ -733,7 +733,7 @@ TEST_F(HttpConnectionManagerImplTest, RedirectedSpecifiedForMergeSlashes) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   // Both Chromium URL normalization and merge slashes should happen BECAUSE REDIRECT don't
   // terminate transformation.
@@ -756,7 +756,7 @@ TEST_F(HttpConnectionManagerImplTest, RedirectedSpecifiedForRfcNormalize) {
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   // Both Chromium URL normalization and merge slashes should happen BECAUSE REDIRECT don't
   // terminate transformation.
@@ -781,7 +781,7 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
 )EOF";
   envoy::type::http::v3::PathTransformation path_transformer;
   TestUtility::loadFromYaml(path_transformer_yaml, path_transformer);
-  forwarding_path_transformer_ = PathTransformer(path_transformer);
+  path_transformer_ = PathTransformer(path_transformer);
 
   const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
   const std::string normalized_path = "/z/def";

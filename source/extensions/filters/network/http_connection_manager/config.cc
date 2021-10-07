@@ -353,10 +353,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     }
     path_with_escaped_slashes_action_ = envoy::extensions::filters::network::
         http_connection_manager::v3::HttpConnectionManager::KEEP_UNCHANGED;
-    forwarding_path_transformer_ =
-        Http::PathTransformer(config.path_normalization_options().forwarding_transformation());
+    path_transformer_ = Http::PathTransformer(config.path_normalization_options().transformation());
   } else {
-    forwarding_path_transformer_ =
+    path_transformer_ =
         Http::PathTransformer(path_with_escaped_slashes_action_, normalize_path_, merge_slashes_);
   }
 

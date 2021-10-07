@@ -1067,14 +1067,12 @@ TEST_F(HttpConnectionManagerConfigTest, DuplicatePathTransformation) {
   route_config:
     name: local_route
   path_normalization_options:
-    forwarding_transformation:
+    transformation:
       operations:
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
       - normalize_path_rfc_3986: {}
         normalize_path_action: CONTINUE
-    http_filter_transformation:
-      operations:
   merge_slashes: true
   normalize_path: true
   http_filters:
