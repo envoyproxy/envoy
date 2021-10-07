@@ -34,7 +34,7 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
 
   return std::make_unique<CELAccessLogExtensionFilter>(getOrCreateBuilder(),
                                                        parse_status.value().expr());
-#elif
+#else
   return nullptr;
 #endif
 }
