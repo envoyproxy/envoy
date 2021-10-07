@@ -43,7 +43,7 @@ public:
 
 class ListenerTypedMetadataFilter : public Http::PassThroughFilter {
 public:
-  ListenerTypedMetadataFilter() {}
+  ListenerTypedMetadataFilter() = default;
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
     decoder_callbacks_->sendLocalReply(Envoy::Http::Code::OK, "", nullptr, absl::nullopt,
