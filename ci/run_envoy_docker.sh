@@ -29,7 +29,7 @@ if is_windows; then
   SOURCE_DIR_MOUNT_DEST=C:/source
   START_COMMAND=("bash" "-c" "cd /c/source && export HOME=/c/build && $*")
 else
-  [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
+  [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="gpt4/envoy-build-centos"
   # We run as root and later drop permissions. This is required to setup the USER
   # in useradd below, which is need for correct Python execution in the Docker
   # environment.
@@ -49,7 +49,7 @@ fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
-[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="${ENVOY_BUILD_SHA}"
+[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="974f996fd8da8e7825eeff515e40d42bb4a3c413-amd64"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR="${DEFAULT_ENVOY_DOCKER_BUILD_DIR}"
 # Replace backslash with forward slash for Windows style paths
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
@@ -60,6 +60,8 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
 
 export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+
+echo "PULLING: ${ENVOY_BUILD_IMAGE}"
 
 time docker pull "${ENVOY_BUILD_IMAGE}"
 
