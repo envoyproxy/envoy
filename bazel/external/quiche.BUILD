@@ -127,6 +127,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        ":http2_core_http2_trace_logging_lib",
         ":http2_core_priority_write_scheduler_lib",
         ":spdy_core_framer_lib",
         ":spdy_core_header_block_lib",
@@ -156,6 +157,21 @@ envoy_cc_library(
     deps = [
         ":http2_core_write_scheduler_lib",
         ":quiche_common_platform",
+        ":spdy_core_protocol_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "http2_core_http2_trace_logging_lib",
+    hdrs = ["quiche/http2/core/http2_trace_logging.h"],
+    srcs = ["quiche/http2/core/http2_trace_logging.cc"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform",
+        ":spdy_core_headers_handler_interface_lib",
+        ":spdy_core_http2_deframer_lib",
+        ":spdy_core_recording_headers_handler_lib",
         ":spdy_core_protocol_lib",
     ],
 )
@@ -1005,6 +1021,17 @@ envoy_cc_library(
         ":quiche_common_platform",
         ":spdy_core_alt_svc_wire_format_lib",
         ":spdy_core_header_block_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_core_recording_headers_handler_lib",
+    srcs = ["quiche/spdy/core/recording_headers_handler.cc"],
+    hdrs = ["quiche/spdy/core/recording_headers_handler.h"],
+    repository = "@envoy",
+    deps = [
+        ":spdy_core_headers_handler_interface_lib",
+	":spdy_core_header_block_lib",
     ],
 )
 
