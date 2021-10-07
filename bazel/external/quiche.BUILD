@@ -163,16 +163,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "http2_core_http2_trace_logging_lib",
-    hdrs = ["quiche/http2/core/http2_trace_logging.h"],
     srcs = ["quiche/http2/core/http2_trace_logging.cc"],
+    hdrs = ["quiche/http2/core/http2_trace_logging.h"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":quiche_common_platform",
         ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_http2_deframer_lib",
-        ":spdy_core_recording_headers_handler_lib",
         ":spdy_core_protocol_lib",
+        ":spdy_core_recording_headers_handler_lib",
     ],
 )
 
@@ -1030,8 +1030,8 @@ envoy_cc_library(
     hdrs = ["quiche/spdy/core/recording_headers_handler.h"],
     repository = "@envoy",
     deps = [
-        ":spdy_core_headers_handler_interface_lib",
         ":spdy_core_header_block_lib",
+        ":spdy_core_headers_handler_interface_lib",
     ],
 )
 
