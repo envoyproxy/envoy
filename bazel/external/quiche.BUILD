@@ -1031,7 +1031,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":spdy_core_headers_handler_interface_lib",
-	":spdy_core_header_block_lib",
+        ":spdy_core_header_block_lib",
     ],
 )
 
