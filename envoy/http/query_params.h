@@ -1,8 +1,8 @@
 #pragma once
 
 #include <map>
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace Envoy {
 namespace Http {
