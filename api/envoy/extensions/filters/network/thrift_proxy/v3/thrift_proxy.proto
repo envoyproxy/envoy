@@ -85,8 +85,8 @@ message ThriftProxy {
   repeated ThriftFilter thrift_filters = 5;
 
   // If set to true, Envoy will try to skip decode data after metadata in the Thrift message.
-  // This mode will only work if the upstream and downstream protocols are the same and the transport
-  // is the same, the transport type is framed and the protocol is not Twitter. Otherwise Envoy will
+  // This mode will only work if the upstream and downstream protocols are the same and the transports
+  // are Framed or Header, and the protocol is not Twitter. Otherwise Envoy will
   // fallback to decode the data.
   bool payload_passthrough = 6;
 

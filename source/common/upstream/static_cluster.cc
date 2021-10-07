@@ -25,6 +25,12 @@ StaticClusterImpl::StaticClusterImpl(
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
+    // TODO(adisuissa): Implement LEDS support for STATIC clusters.
+    if (locality_lb_endpoint.has_leds_cluster_locality_config()) {
+      throw EnvoyException(
+          fmt::format("LEDS is only supported when EDS is used. Static cluster {} cannot use LEDS.",
+                      cluster.name()));
+    }
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(), resolveProtoAddress(lb_endpoint.endpoint().address()),

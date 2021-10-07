@@ -3,7 +3,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/enum_to_int.h"
 
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -2,8 +2,8 @@
 
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
-#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_outbound_record.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_record_extractor.h"
+#include "contrib/kafka/filters/network/source/mesh/outbound_record.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 

@@ -22,13 +22,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "matchers_lib",
     srcs = ["matchers.cc"],
-    hdrs = ["matchers.h"],
+    hdrs = [
+        "matcher_extension.h",
+        "matchers.h",
+    ],
     external_deps = ["abseil_optional"],
     deps = [
         "//envoy/http:header_map_interface",
         "//envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",

@@ -827,6 +827,7 @@ envoy_proto_library(
     srcs = ["round_robin_load_balancer_fuzz.proto"],
     deps = [
         "//test/common/upstream:zone_aware_load_balancer_fuzz_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg",
     ],
 )
 
