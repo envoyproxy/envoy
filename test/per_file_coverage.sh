@@ -8,7 +8,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:78.5"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
-"source/common/config/xds_mux:94.5"
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
