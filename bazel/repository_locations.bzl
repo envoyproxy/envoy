@@ -556,8 +556,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2020-08-06",
-        # cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp: ?
-        cpe = "cpe:2.3:a:json_project:json:*",
+        cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
     # envoy docker image. A bazel target has been created since
@@ -770,7 +769,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-04-05",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        cpe = "cpe:2.3:a:bytecodealliance:cranelift-codegen:*",
+        cpe = "cpe:2.3:a:bytecodealliance:wasmtime:*",
     ),
     com_github_wasm_c_api = dict(
         project_name = "wasm-c-api",
@@ -785,7 +784,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-01-11",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        # cpe = "cpe:2.3:a:bytecodealliance:cranelift-codegen:*", ?
         cpe = "N/A",
     ),
     io_opencensus_cpp = dict(
