@@ -64,7 +64,11 @@ private:
                                               RawAsyncClientSharedPtr, MessageUtil, MessageUtil>;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    ~RawAsyncClientCache() { lru_cache_.clear(); }
+    RawAsyncClientCache() {
+      double timeout = 0.2;
+      lru_cache_.setMaxIdleSeconds(timeout);
+    }
+    ~RawAsyncClientCache() override { lru_cache_.clear(); }
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
