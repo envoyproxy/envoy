@@ -33,13 +33,13 @@ BODY_TPL = """
 Package Name: ${dep}
 Current Version: ${metadata_version}@${release_date}
 Available Version: ${tag_name}@${created_at}
-Upstream link: https://github.com/${package_name}
+Upstream latest release link: https://github.com/${package_name}/releases/latest
 """
 
 CLOSING_TPL = """
 New version is available for this package
 New Version: ${tag_name}@${created_at}
-Upstream Link: https://github.com/${full_name}
+Upstream latest release link: https://github.com/${full_name}/releases/latest
 """
 
 
