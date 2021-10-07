@@ -100,7 +100,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
     postinit_callback_handler_ = main_common->server()->lifecycleNotifier().registerCallback(
         Envoy::Server::ServerLifecycleNotifier::Stage::PostInit, [this]() -> void {
-          ASSERT(Thread::MainThread::isMainThread());
+          ASSERT(Thread::MainThread::isMainOrTestThread());
 
           network_configurator_ =
               Network::ConfiguratorFactory{server_->serverFactoryContext()}.get();

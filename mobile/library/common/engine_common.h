@@ -39,6 +39,7 @@ private:
   Envoy::TerminateHandler log_on_terminate_;
 #endif
 
+  Thread::MainThread register_main_thread_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_; // NO_CHECK_FORMAT(real_time)
   DefaultListenerHooks default_listener_hooks_;
