@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.0" # Raise when QUIC coverage goes up
+"source/common:95.8" # Raise when QUIC coverage goes up
 "source/common/api:79.8"
 "source/common/api/posix:78.5"
 "source/common/common/posix:92.7"
@@ -30,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/upstream:96.2"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
-"source/extensions/common:95.9"
+"source/extensions/common:95.6"
 "source/extensions/common/tap:94.2"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
