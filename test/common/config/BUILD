@@ -367,8 +367,8 @@ envoy_cc_test(
         "//source/common/config:type_to_endpoint_lib",
         "//test/config:v2_link_hacks",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/thrift_route/v3:pkg_cc_proto",
     ],
 )
 

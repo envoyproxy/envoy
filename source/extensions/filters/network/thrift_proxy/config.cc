@@ -147,8 +147,7 @@ ConfigImpl::ConfigImpl(
     }
   }
 
-  if (config.route_specifier_case() == envoy::extensions::filters::network::thrift_proxy::v3::
-                                           ThriftProxy::RouteSpecifierCase::kRds) {
+  if (config.has_rds()) {
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         config.rds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
   } else {

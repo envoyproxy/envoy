@@ -1,6 +1,6 @@
 #include "envoy/api/v2/rds.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/rds.pb.h"
 #include "envoy/service/route/v3/rds.pb.h"
+#include "envoy/service/thrift_route/v3/rds.pb.h"
 
 #include "source/common/config/type_to_endpoint.h"
 
@@ -45,10 +45,10 @@ TEST(TypeToEndpoint, All) {
 
 TEST(TypeToEndpoint, Thrift) {
   // The dummy messages are included for link purposes only.
-  envoy::extensions::filters::network::thrift_proxy::v3::RdsDummy _v3_rds_dummy;
+  envoy::service::thrift_route::v3::RdsDummy _v3_rds_dummy;
 
   EXPECT_EQ(
-      "envoy.extensions.filters.network.thrift_proxy.v3.RouteDiscoveryService.StreamRoutes",
+      "envoy.service.thrift_route.v3.RouteDiscoveryService.StreamRoutes",
       sotwGrpcMethod(
           "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration")
           .full_name());
