@@ -23,6 +23,7 @@ Removed Config or Runtime
 
 New Features
 ------------
+* http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 
 Deprecated
 ----------
