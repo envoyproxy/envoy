@@ -198,10 +198,12 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
   if (dual_resolution_) {
     dual_resolution_ = false;
 
-    if (dns_lookup_family_ == DnsLookupFamily::Auto || dns_lookup_family_ == DnsLookupFamily::All) {
+    // Perform a second lookup for DnsLookupFamily::Auto and DnsLookupFamily::V4Preferred, given
+    // that the first lookup failed to return any addresses. Note that DnsLookupFamily::All issues
+    // both lookups concurrently so there is no need to fire a second lookup here.
+    if (dns_lookup_family_ == DnsLookupFamily::Auto) {
       getAddrInfo(AF_INET);
-    } else {
-      ASSERT(dns_lookup_family_ == DnsLookupFamily::V4Preferred);
+    } else if (dns_lookup_family_ == DnsLookupFamily::V4Preferred) {
       getAddrInfo(AF_INET6);
     }
 
@@ -310,11 +312,23 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     pending_resolution->dual_resolution_ = true;
   }
 
-  if (dns_lookup_family == DnsLookupFamily::V4Only ||
-      dns_lookup_family == DnsLookupFamily::V4Preferred) {
+  switch (dns_lookup_family) {
+  case DnsLookupFamily::V4Only:
+  case DnsLookupFamily::V4Preferred:
     pending_resolution->getAddrInfo(AF_INET);
-  } else {
+    break;
+  case DnsLookupFamily::V6Only:
+  case DnsLookupFamily::Auto:
     pending_resolution->getAddrInfo(AF_INET6);
+    break;
+  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
+  // are being requested.
+  case DnsLookupFamily::All:
+    pending_resolution->getAddrInfo(AF_INET);
+    pending_resolution->getAddrInfo(AF_INET6);
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (pending_resolution->completed_) {
