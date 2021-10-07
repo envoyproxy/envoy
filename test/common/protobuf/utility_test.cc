@@ -48,30 +48,17 @@ using testing::HasSubstr;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
-  RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
+  explicit RuntimeStatsHelper()
       : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
-                         Stats::Gauge::ImportMode::NeverImport)) {
-    if (allow_deprecated_v2_api) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
-          {"envoy.features.enable_all_deprecated_features", "true"},
-      });
-    }
-  }
+                         Stats::Gauge::ImportMode::NeverImport)) {}
 
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
 };
 
 class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
-// TODO(htuch): During/before the v2 removal, cleanup the various examples that explicitly refer to
-// v2 API protos and replace with upgrade examples not tie to the concrete API.
-class ProtobufV2ApiUtilityTest : public testing::Test, protected RuntimeStatsHelper {
-public:
-  ProtobufV2ApiUtilityTest() : RuntimeStatsHelper(true) {}
-};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -1367,7 +1354,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToWrongType) {
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;

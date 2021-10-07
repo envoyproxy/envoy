@@ -304,15 +304,12 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+  autonomous_upstream_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                          {":path", "/healthcheck"},
-                                                                          {":authority", "host"},
-                                                                          {"connection", "close"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {"connection", "close"}});
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
