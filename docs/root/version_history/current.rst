@@ -63,6 +63,7 @@ New Features
 * windows: added a new container image based on Windows Nanoserver 2022.
 * xds: re-introduced unified delta and sotw xDS multiplexers that share most of the implementation. Added a new runtime config ``envoy.reloadable_features.unified_mux`` (disabled by default) that when enabled, switches xDS to use unified multiplexers.
 * xray: request direction (``ingress`` or ``egress``) is recorded as X-Ray trace segment's annotation by name ``direction``.
+* http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 
 Deprecated
 ----------
