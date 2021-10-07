@@ -1172,8 +1172,11 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
     return false;
   }
   // Currently this method is only used to verify server certs, so hard-code "ssl_server" for now.
-  if (!X509_STORE_CTX_set_default(ctx.get(), "ssl_server")) {
-    error_details = "Failed to verify certificate chain: X509_STORE_CTX_set_default";
+  if (!X509_STORE_CTX_set_default(ctx.get(), "ssl_server") ||
+      !X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx.get()),
+                              SSL_CTX_get0_param(const_cast<SSL_CTX*>(ssl_ctx)))) {
+    error_details =
+        "Failed to verify certificate chain: fail to setup X509_STORE_CTX or its param.";
     return false;
   }
 
