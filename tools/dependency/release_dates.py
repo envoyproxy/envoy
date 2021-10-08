@@ -40,7 +40,7 @@ CLOSING_TPL = """
 New version is available for this package
 New Version: ${tag_name}@${created_at}
 Upstream releases: https://github.com/${full_name}/releases
-New Issue Link: https://github.com/${GITHUB_REPO_LOCATION}/issues/${number}
+New Issue Link: https://github.com/${repo_location}/issues/${number}
 """
 
 
@@ -181,7 +181,7 @@ def close_old_issue(git, issue_number, latest_release, package_repo):
                 tag_name=latest_release.tag_name,
                 created_at=latest_release.created_at,
                 full_name=package_repo.full_name,
-                GITHUB_REPO_LOCATION=GITHUB_REPO_LOCATION,
+                repo_location=GITHUB_REPO_LOCATION,
                 number=latest_release.latest_issue_number))
         print(f'Closing this issue as new package is available')
         issue.edit(state='closed')
