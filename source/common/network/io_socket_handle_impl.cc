@@ -650,5 +650,9 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
+absl::optional<std::string> interfaceName() {
+  return absl::nullopt;
+}
+
 } // namespace Network
 } // namespace Envoy
