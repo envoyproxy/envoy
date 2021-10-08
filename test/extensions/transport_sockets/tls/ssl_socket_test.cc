@@ -4586,7 +4586,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
   // The test checks that revoked certificate will makes the validation fails even if we set
-  // only_verify_final_certificate_crl to true.
+  // only_verify_leaf_cert_crl to true.
   //
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
@@ -4605,7 +4605,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
-      only_verify_final_certificate_crl: true
+      only_verify_leaf_cert_crl: true
 )EOF";
 
   // This should succeed, since the certificate has not been revoked.
@@ -4625,7 +4625,7 @@ TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
 
 TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
   // The test checks that revoked certificate will makes the validation fails even if we set
-  // only_verify_final_certificate_crl to true.
+  // only_verify_leaf_cert_crl to true.
   //
   // Trust chain contains:
   //  - Root authority certificate (i.e., ca_cert.pem)
@@ -4644,7 +4644,7 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
     validation_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
-      only_verify_final_certificate_crl: true
+      only_verify_leaf_cert_crl: true
 )EOF";
 
   // This should fail, since the certificate has been revoked.

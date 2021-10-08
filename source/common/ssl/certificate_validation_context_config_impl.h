@@ -48,7 +48,7 @@ public:
 
   Api::Api& api() const override { return api_; }
 
-  bool onlyVerifyFinalCertificateCrl() const override { return only_verify_final_certificate_crl_; }
+  bool onlyVerifyFinalCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
 
 private:
   const std::string ca_cert_;
@@ -63,7 +63,7 @@ private:
       TrustChainVerification trust_chain_verification_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_;
   Api::Api& api_;
-  const bool only_verify_final_certificate_crl_;
+  const bool only_verify_leaf_cert_crl_;
 };
 
 } // namespace Ssl

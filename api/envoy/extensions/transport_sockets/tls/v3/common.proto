@@ -293,7 +293,7 @@ message CertificateValidationContext {
   // provided for all certificate authorities in that chain. Failure to do so will result in
   // verification failure for both revoked and unrevoked certificates from that chain.
   // The behavior of requiring all certificates to contain CRLs if any do can be altered by
-  // setting :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>`
+  // setting :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>`
   // true. If set to true, only the final certificate in the chain undergoes CRL verification.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
@@ -421,7 +421,7 @@ message CertificateValidationContext {
   // for all certificate authorities in that chain. Failure to do so will
   // result in verification failure for both revoked and unrevoked certificates
   // from that chain. This default behavior can be altered by setting
-  // :ref:`only_verify_final_certificate_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_final_certificate_crl>` to
+  // :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>` to
   // true.
   config.core.v3.DataSource crl = 7;
 
@@ -441,5 +441,5 @@ message CertificateValidationContext {
 
   // If this option is set to true, only the certificate at the end of the
   // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
-  bool only_verify_final_certificate_crl = 14;
+  bool only_verify_leaf_cert_crl = 14;
 }
