@@ -592,8 +592,7 @@ TEST(PacketLoss, LossTest) {
   sin.sin_family = kernel_version;
   sin.sin_port = 0;
   EXPECT_EQ(1,
-            inet_pton(kernel_version,
-            Network::Test::getLoopbackAddressUrlString(version).c_str(),
+            inet_pton(kernel_version, Network::Test::getLoopbackAddressUrlString(version).c_str(),
                       &sin.sin_addr));
   ASSERT_EQ(0, bind(fd, reinterpret_cast<sockaddr*>(&storage), sizeof(storage)));
 
@@ -604,8 +603,7 @@ TEST(PacketLoss, LossTest) {
   // Set the buffer size artificially small.
   int receive_buffer_size = 1000;
   ASSERT_EQ(
-      0, setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receive_buffer_size,
-      sizeof(receive_buffer_size)));
+      0, setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receive_buffer_size, sizeof(receive_buffer_size)));
 
   // Send a packet.
   char buf[2048];
