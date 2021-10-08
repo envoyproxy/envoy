@@ -81,7 +81,7 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type, Stats::Scope& scope));
+               Common::GrpcAccessLoggerType logger_type));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081
@@ -95,18 +95,18 @@ TEST(TcpGrpcAccessLog, TlsLifetimeCheck) {
     envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config;
     config.mutable_common_config()->set_transport_api_version(
         envoy::config::core::v3::ApiVersion::V3);
-    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _, _))
+    EXPECT_CALL(*logger_cache, getOrCreateLogger(_, _))
         .WillOnce([](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
                          common_config,
-                     Common::GrpcAccessLoggerType type, Stats::Scope&) {
+                     Common::GrpcAccessLoggerType type) {
           // This is a part of the actual getOrCreateLogger code path and shouldn't crash.
           std::make_pair(MessageUtil::hash(common_config), type);
           return nullptr;
         });
     // Set tls callback in the TcpGrpcAccessLog constructor,
     // but it is not called yet since we have defer_data_ = true.
-    const auto access_log = std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config,
-                                                               tls, logger_cache, scope);
+    const auto access_log =
+        std::make_unique<TcpGrpcAccessLog>(AccessLog::FilterPtr{filter}, config, tls, logger_cache);
     // Intentionally make access_log die earlier in this scope to simulate the situation where the
     // creator has been deleted yet the tls callback is not called yet.
   }

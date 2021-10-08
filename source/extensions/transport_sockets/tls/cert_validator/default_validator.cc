@@ -195,6 +195,7 @@ int DefaultCertValidator::doVerifyCertChain(
 
     if (ret <= 0) {
       stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, "{}", Utility::getX509VerificationErrorInfo(store_ctx));
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }

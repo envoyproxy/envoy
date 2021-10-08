@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
@@ -15,7 +15,7 @@ namespace ExternalProcessing {
 class ExternalProcessorStream {
 public:
   virtual ~ExternalProcessorStream() = default;
-  virtual void send(envoy::service::ext_proc::v3alpha::ProcessingRequest&& request,
+  virtual void send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
                     bool end_stream) PURE;
   // Idempotent close. Return true if it actually closed.
   virtual bool close() PURE;
@@ -27,7 +27,7 @@ class ExternalProcessorCallbacks {
 public:
   virtual ~ExternalProcessorCallbacks() = default;
   virtual void onReceiveMessage(
-      std::unique_ptr<envoy::service::ext_proc::v3alpha::ProcessingResponse>&& response) PURE;
+      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) PURE;
   virtual void onGrpcError(Grpc::Status::GrpcStatus error) PURE;
   virtual void onGrpcClose() PURE;
 };
