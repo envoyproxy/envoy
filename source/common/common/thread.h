@@ -204,7 +204,7 @@ public:
   /**
    * @return whether a MainThread has been instantiated.
    */
-  static bool hasMainThread();
+  static bool isMainThreadActive();
 };
 
 // To improve exception safety in data plane, we plan to forbid the use of raw try in the core code

@@ -14,7 +14,7 @@ void TestListener::OnTestEnd(const ::testing::TestInfo& test_info) {
                               "]: Active singletons exist. Something is leaking. Consider "
                               "commenting out this assert and letting the heap checker run:\n",
                               active_singletons));
-  RELEASE_ASSERT(!Thread::MainThread::hasMainThread(),
+  RELEASE_ASSERT(!Thread::MainThread::isMainThreadActive(),
                  absl::StrCat("MainThreadLeak: [", test_info.test_suite_name(), ".",
                               test_info.name(), "] test exited before main thread shut down"));
 }

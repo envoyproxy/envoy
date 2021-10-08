@@ -31,7 +31,7 @@ struct ThreadIds {
     return main_thread_id_ == id || test_thread_id_ == id;
   }
 
-  bool hasMainThread() const {
+  bool isMainThreadActive() const {
     absl::MutexLock lock(&mutex_);
     return main_thread_use_count_ != 0;
   }
@@ -106,7 +106,7 @@ private:
 
 bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
 
-bool MainThread::hasMainThread() { return ThreadIds::get().hasMainThread(); }
+bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
 
 TestThread::TestThread() { ThreadIds::get().registerTestThread(); }
 
