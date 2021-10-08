@@ -104,8 +104,8 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
 
   const mode_t mode = 0777;
-  PipeInstance pipe(path, mode);
-  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
+  Address::PipeInstance pipe(path, mode);
+  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
   SocketImpl socket(Socket::Type::Stream, address, nullptr);
 
   EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
