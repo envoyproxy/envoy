@@ -18,11 +18,11 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
     : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
       resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
-  using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
+  using envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
 
@@ -189,8 +189,8 @@ void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
 }
 
 bool DnsFilterEnvoyConfig::loadServerConfig(
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
-        ServerContextConfig& config,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ServerContextConfig&
+        config,
     envoy::data::dns::v3::DnsTable& table) {
   using envoy::data::dns::v3::DnsTable;
 

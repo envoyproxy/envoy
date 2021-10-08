@@ -43,7 +43,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 56]
+// [#next-free-field: 57]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -345,6 +345,35 @@ message Cluster {
     bool list_as_any = 7;
   }
 
+  // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
+  message SlowStartConfig {
+    // Represents the size of slow start window.
+    // If set, the newly created host remains in slow start mode starting from its creation time
+    // for the duration of slow start window.
+    google.protobuf.Duration slow_start_window = 1;
+
+    // This parameter controls the speed of traffic increase over the slow start window. Defaults to 1.0,
+    // so that endpoint would get linearly increasing amount of traffic.
+    // When increasing the value for this parameter, the speed of traffic ramp-up increases non-linearly.
+    // The value of aggression parameter should be greater than 0.0.
+    // By tuning the parameter, is possible to achieve polynomial or exponential shape of ramp-up curve.
+    //
+    // During slow start window, effective weight of an endpoint would be scaled with time factor and aggression:
+    // `new_weight = weight * time_factor ^ (1 / aggression)`,
+    // where `time_factor=(time_since_start_seconds / slow_start_time_seconds)`.
+    //
+    // As time progresses, more and more traffic would be sent to endpoint, which is in slow start window.
+    // Once host exits slow start, time_factor and aggression no longer affect its weight.
+    core.v3.RuntimeDouble aggression = 2;
+  }
+
+  // Specific configuration for the RoundRobin load balancing policy.
+  message RoundRobinLbConfig {
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 1;
+  }
+
   // Specific configuration for the LeastRequest load balancing policy.
   message LeastRequestLbConfig {
     option (udpa.annotations.versioning).previous_message_type =
@@ -378,6 +407,10 @@ message Cluster {
     // .. note::
     //   This setting only takes effect if all host weights are not equal.
     core.v3.RuntimeDouble active_request_bias = 2;
+
+    // Configuration for slow start mode.
+    // If this configuration is not set, slow start will not be not enabled.
+    SlowStartConfig slow_start_config = 3;
   }
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
@@ -959,6 +992,9 @@ message Cluster {
 
     // Optional configuration for the LeastRequest load balancing policy.
     LeastRequestLbConfig least_request_lb_config = 37;
+
+    // Optional configuration for the RoundRobin load balancing policy.
+    RoundRobinLbConfig round_robin_lb_config = 56;
   }
 
   // Common configuration for all load balancer implementations.

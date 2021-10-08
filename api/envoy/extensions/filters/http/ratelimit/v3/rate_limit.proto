@@ -8,7 +8,6 @@ import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";

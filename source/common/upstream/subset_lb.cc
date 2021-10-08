@@ -26,19 +26,23 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>& lb_maglev_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+        round_robin_config,
     const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    TimeSource& time_source)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
-      lb_maglev_config_(lb_maglev_config), least_request_config_(least_request_config),
-      common_config_(common_config), stats_(stats), scope_(scope), runtime_(runtime),
-      random_(random), fallback_policy_(subsets.fallbackPolicy()),
+      lb_maglev_config_(lb_maglev_config), round_robin_config_(round_robin_config),
+      least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
+      scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
       default_subset_metadata_(subsets.defaultSubset().fields().begin(),
                                subsets.defaultSubset().fields().end()),
       subset_selectors_(subsets.subsetSelectors()), original_priority_set_(priority_set),
       original_local_priority_set_(local_priority_set),
       locality_weight_aware_(subsets.localityWeightAware()),
-      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
+      scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()),
+      time_source_(time_source) {
   ASSERT(subsets.isEnabled());
 
   if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
@@ -751,7 +755,8 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
   case LoadBalancerType::LeastRequest:
     lb_ = std::make_unique<LeastRequestLoadBalancer>(
         *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
-        subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_);
+        subset_lb.random_, subset_lb.common_config_, subset_lb.least_request_config_,
+        subset_lb.time_source_);
     break;
 
   case LoadBalancerType::Random:
@@ -761,9 +766,10 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
     break;
 
   case LoadBalancerType::RoundRobin:
-    lb_ = std::make_unique<RoundRobinLoadBalancer>(*this, subset_lb.original_local_priority_set_,
-                                                   subset_lb.stats_, subset_lb.runtime_,
-                                                   subset_lb.random_, subset_lb.common_config_);
+    lb_ = std::make_unique<RoundRobinLoadBalancer>(
+        *this, subset_lb.original_local_priority_set_, subset_lb.stats_, subset_lb.runtime_,
+        subset_lb.random_, subset_lb.common_config_, subset_lb.round_robin_config_,
+        subset_lb.time_source_);
     break;
 
   case LoadBalancerType::RingHash:
