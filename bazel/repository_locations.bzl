@@ -1078,8 +1078,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ANTLR Rules for Bazel",
         project_desc = "Bazel rules for ANTLR",
         project_url = "https://github.com/marcohu/rules_antlr",
-        version = "3cc2f9502a54ceb7b79b37383316b23c4da66f9a",
-        sha256 = "7249d1569293d9b239e23c65f6b4c81a07da921738bde0dfeb231ed98be40429",
+        version = "0.5.0",
+        sha256 = "26e6a83c665cf6c1093b628b3a749071322f0f70305d12ede30909695ed85591",
         strip_prefix = "rules_antlr-{version}",
         urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
         # ANTLR has a runtime component, so is not purely build.
@@ -1092,7 +1092,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.filters.network.wasm",
             "envoy.stat_sinks.wasm",
         ],
-        release_date = "2019-06-21",
+        release_date = "2020-01-21",
         cpe = "N/A",
     ),
     antlr4_runtimes = dict(
