@@ -101,9 +101,11 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
 }
 
 TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
-  const mode_t mode = 0;
-  Address::PipeInstance pipe("foo", mode);
-  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  PipeInstance pipe(path, mode);
+  InstanceConstSharedPtr address = std::make_shared<PipeInstance>(pipe);
   SocketImpl socket(Socket::Type::Stream, address, nullptr);
 
   EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
