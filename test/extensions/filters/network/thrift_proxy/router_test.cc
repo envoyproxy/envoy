@@ -107,8 +107,8 @@ public:
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
     upstream_locality_.set_zone("other_zone_name");
-    host_ = new NiceMock<Upstream::MockHostDescription>();
-    ON_CALL(*host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_, locality())
+        .WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void initializeRouter(bool use_real_shadow_writer = false) {
@@ -502,7 +502,6 @@ public:
   int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
-  NiceMock<Upstream::MockHostDescription>* host_{};
   envoy::config::core::v3::Locality upstream_locality_;
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
