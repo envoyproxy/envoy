@@ -650,8 +650,48 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
-absl::optional<std::string> interfaceName() {
-  return absl::nullopt;
+absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
+  absl::optional<std::string> interface_name{};
+#ifdef SUPPORTS_GETIFADDRS
+  Address::InstanceConstSharedPtr socket_address = localAddress();
+  if (!socket_address) {
+    return absl::nullopt;
+  }
+
+  struct ifaddrs* ifaddr;
+  struct ifaddrs* ifa;
+
+  const int rc = getifaddrs(&ifaddr);
+  RELEASE_ASSERT(!rc, "");
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const struct sockaddr_storage* addr =
+          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      Address::InstanceConstSharedPtr interface_address = Address::addressFromSockAddrOrThrow(
+          *addr,
+          (ifa->ifa_addr->sa_family == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+
+      if (!interface_address) {
+        continue;
+      }
+
+      if (*socket_address == *interface_address) {
+        interface_name = std::string{ifa->ifa_name};
+        break;
+      }
+    }
+  }
+
+  if (ifaddr) {
+    freeifaddrs(ifaddr);
+  }
+#endif
+  return interface_name;
 }
 
 } // namespace Network
