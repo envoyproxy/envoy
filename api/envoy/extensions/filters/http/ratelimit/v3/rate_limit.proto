@@ -5,7 +5,6 @@ package envoy.extensions.filters.http.ratelimit.v3;
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/ratelimit/v3/rls.proto";
 import "envoy/config/route/v3/route_components.proto";
-import "envoy/extensions/common/ratelimit/v3/ratelimit.proto";
 import "envoy/type/metadata/v3/metadata.proto";
 
 import "google/protobuf/duration.proto";
@@ -104,7 +103,9 @@ message RateLimit {
   // the `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
   //
   // Disabled by default.
-  common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
+  //
+  // [#next-major-version: unify with local ratelimit, should use common.ratelimit.v3.XRateLimitHeadersRFCVersion instead.]
+  XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 8
       [(validate.rules).enum = {defined_only: true}];
 
   // Disables emitting the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header

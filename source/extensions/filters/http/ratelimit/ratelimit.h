@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/http/context.h"
 #include "envoy/http/filter.h"
@@ -48,8 +47,9 @@ public:
                                                     : stringToType(config.request_type())),
         local_info_(local_info), scope_(scope), runtime_(runtime),
         failure_mode_deny_(config.failure_mode_deny()),
-        enable_x_ratelimit_headers_(config.enable_x_ratelimit_headers() ==
-                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
+        enable_x_ratelimit_headers_(
+            config.enable_x_ratelimit_headers() ==
+            envoy::extensions::filters::http::ratelimit::v3::RateLimit::DRAFT_VERSION_03),
         disable_x_envoy_ratelimited_header_(config.disable_x_envoy_ratelimited_header()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
