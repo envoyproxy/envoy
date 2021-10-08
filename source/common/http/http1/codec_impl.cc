@@ -92,7 +92,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
       is_response_to_connect_request_(false),
-      bytes_meter_(new StreamInfo::BytesMeter{connection.getBytesMeter()}) {
+      bytes_meter_(new StreamInfo::BytesMeter{connection.bytes_meter_before_stream_}) {
   connection_.getBytesMeter().clear();
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
