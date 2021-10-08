@@ -271,6 +271,13 @@ public:
 
   bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
 
+  StreamInfo::BytesMeterSharedPtr&& releaseBytesMeter() {
+    if (bytes_meter_before_stream_ == nullptr) {
+      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
+    }
+    return std::move(bytes_meter_before_stream_);
+  }
+
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
                  MessageType type, uint32_t max_headers_kb, const uint32_t max_headers_count);
@@ -318,7 +325,7 @@ protected:
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
   const bool no_chunked_encoding_header_for_304_ : 1;
-  StreamInfo::BytesMeter bytes_meter_before_stream_;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -447,7 +454,6 @@ private:
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
-  friend class StreamEncoderImpl;
 };
 
 /**
@@ -503,7 +509,10 @@ private:
     if (active_request_.has_value()) {
       return *(active_request_->response_encoder_.getStream().bytesMeter());
     }
-    return bytes_meter_before_stream_;
+    if (bytes_meter_before_stream_ == nullptr) {
+      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
+    }
+    return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override;
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
@@ -595,7 +604,10 @@ private:
     if (pending_response_.has_value()) {
       return *(pending_response_->encoder_.getStream().bytesMeter());
     }
-    return bytes_meter_before_stream_;
+    if (bytes_meter_before_stream_ == nullptr) {
+      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
+    }
+    return *bytes_meter_before_stream_;
   }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
