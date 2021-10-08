@@ -282,7 +282,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
-bool OsSysCallsImpl::supportsGetifaddrs() {
+bool OsSysCallsImpl::supportsGetifaddrs() const {
 // https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   return false;
