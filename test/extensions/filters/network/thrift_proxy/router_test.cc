@@ -1209,8 +1209,10 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
       .WillByDefault(ReturnRef(cluster_scope));
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
   EXPECT_CALL(cluster_scope, counter("zone.zone_name.other_zone_name.thrift.upstream_resp_reply"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
+  EXPECT_CALL(cluster_scope,
+              counter("zone.zone_name.other_zone_name.thrift.upstream_resp_success"));
 
   EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
@@ -1232,6 +1234,8 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500));
+  EXPECT_CALL(cluster_scope, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name,
