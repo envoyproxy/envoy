@@ -315,7 +315,8 @@ void UpstreamRequest::chargeResponseTiming() {
   const std::chrono::milliseconds response_time =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  parent_.recordResponseDuration(upstream_host_, response_time.count(), Stats::Histogram::Unit::Milliseconds);
+  parent_.recordResponseDuration(upstream_host_, response_time.count(),
+                                 Stats::Histogram::Unit::Milliseconds);
 }
 
 } // namespace Router
