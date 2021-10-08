@@ -91,7 +91,9 @@ const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false) {
+      is_response_to_connect_request_(false),
+      bytes_meter_(new StreamInfo::BytesMeter{connection.getBytesMeter()}) {
+  connection_.getBytesMeter().clear();
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -1143,8 +1145,6 @@ Status ServerConnectionImpl::onMessageBeginBase() {
     ASSERT(!active_request_.has_value());
     active_request_.emplace(*this);
     auto& active_request = active_request_.value();
-    getBytesMeter().addWireBytesReceived(bytes_meter_before_stream_.wireBytesReceived());
-    getBytesMeter().addHeaderBytesReceived(bytes_meter_before_stream_.headerBytesReceived());
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
     }

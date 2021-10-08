@@ -248,6 +248,12 @@ struct BytesMeter {
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+  void clear() {
+    header_bytes_sent_ = 0;
+    header_bytes_received_ = 0;
+    wire_bytes_sent_ = 0;
+    wire_bytes_received_ = 0;
+  }
 
 private:
   uint64_t header_bytes_sent_{};
