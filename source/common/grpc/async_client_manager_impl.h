@@ -10,10 +10,6 @@
 
 #include "source/common/grpc/stat_names.h"
 
-#include "simple_lru_cache/simple_lru_cache_inl.h"
-
-using ::google::simple_lru_cache::SimpleLRUCache;
-
 namespace Envoy {
 namespace Grpc {
 
@@ -60,21 +56,30 @@ public:
                                               bool skip_cluster_check) override;
 
 private:
-  using RawAsyncClientLRUMap = SimpleLRUCache<envoy::config::core::v3::GrpcService,
-                                              RawAsyncClientSharedPtr, MessageUtil, MessageUtil>;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    RawAsyncClientCache() {
-      double timeout = 0.2;
-      lru_cache_.setMaxIdleSeconds(timeout);
+    RawAsyncClientCache(Event::Dispatcher& dispatcher) {
+      timer_ = dispatcher.createTimer([this] {
+        refresh();
+        timer_->enableTimer(RefreshInterval);
+      });
+      timer_->enableTimer(RefreshInterval);
     }
-    ~RawAsyncClientCache() override { lru_cache_.clear(); }
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
+    void refresh();
+
   private:
-    RawAsyncClientLRUMap lru_cache_{500};
+    absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
+                        MessageUtil>
+        kvs_;
+    absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil> idle_keys_;
+    absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil>
+        active_keys_;
+    Envoy::Event::TimerPtr timer_;
+    static constexpr std::chrono::milliseconds RefreshInterval{50000};
   };
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;

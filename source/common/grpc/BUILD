@@ -42,7 +42,6 @@ envoy_cc_library(
     name = "async_client_manager_lib",
     srcs = ["async_client_manager_impl.cc"],
     hdrs = ["async_client_manager_impl.h"],
-    external_deps = ["simple_lru_cache_lib"],
     deps = [
         ":async_client_lib",
         ":context_lib",

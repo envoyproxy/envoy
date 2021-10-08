@@ -53,8 +53,9 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                Api::Api& api, const StatNames& stat_names)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
       raw_async_client_cache_(tls_) {
-  raw_async_client_cache_.set(
-      [](Event::Dispatcher&) { return std::make_shared<RawAsyncClientCache>(); });
+  raw_async_client_cache_.set([](Event::Dispatcher& dispatcher) {
+    return std::make_shared<RawAsyncClientCache>(dispatcher);
+  });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
@@ -150,16 +151,30 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) {
-  RawAsyncClientLRUMap::ScopedLookup lookup(&lru_cache_, config);
-  if (lookup.found()) {
-    return *(lookup.value());
+  auto it = kvs_.find(config);
+  if (it == kvs_.end()) {
+    return nullptr;
   }
-  return nullptr;
+  if (idle_keys_.find(config) != idle_keys_.end()) {
+    idle_keys_.erase(config);
+    active_keys_.insert(config);
+  }
+  return it->second;
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  lru_cache_.insert(config, new RawAsyncClientSharedPtr{client}, 1);
+  kvs_[config] = client;
+  active_keys_.insert(config);
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::refresh() {
+  // Remove all the cache entries idle in the last interval.
+  for (auto const& config : idle_keys_) {
+    kvs_.erase(config);
+  }
+  // Reset all the entries to be idle at the beginning of next interval.
+  idle_keys_ = std::move(active_keys_);
 }
 
 } // namespace Grpc
