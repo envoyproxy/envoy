@@ -175,6 +175,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/mirror/tclap/archive/tclap-{version}-release-final.tar.gz"],
         release_date = "2011-04-16",
         use_category = ["other"],
+        cpe = "cpe:2.3:a:tclap_project:tclap:*",
     ),
     com_github_fmtlib_fmt = dict(
         project_name = "fmt",
@@ -271,7 +272,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-10-01",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.tls.key_providers.cryptomb"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:intel:cryptography_for_intel_integrated_performance_primitives:*",
     ),
     com_github_luajit_luajit = dict(
         project_name = "LuaJIT",
@@ -355,7 +356,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
         release_date = "2021-06-07",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:apache:skywalking:*",
     ),
     com_github_skyapm_cpp2sky = dict(
         project_name = "cpp2sky",
@@ -555,7 +556,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # replacement for protobuf JSON.
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2021-08-26",
-        cpe = "cpe:2.3:a:json_project:json:*",
+        cpe = "cpe:2.3:a:json-for-modern-cpp_project:json-for-modern-cpp:*",
     ),
     # This is an external dependency needed while running the
     # envoy docker image. A bazel target has been created since
@@ -619,6 +620,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/googletest/archive/{version}.tar.gz"],
         release_date = "2020-09-10",
         use_category = ["test_only"],
+        cpe = "cpe:2.3:a:google:google_test:*",
     ),
     com_google_protobuf = dict(
         project_name = "Protocol Buffers",
@@ -767,7 +769,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-04-05",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.wasmtime"],
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:bytecodealliance:wasmtime:*",
     ),
     com_github_wasm_c_api = dict(
         project_name = "wasm-c-api",
@@ -834,12 +836,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "4c1d482ab708b6e945afc53816e1bf5dc342f11e",
-        sha256 = "454002442133ed5dfff59686a8569effc48aabb21a756b92e1ab2173f632cc14",
+        version = "72442c9337bac2fa6865e223e56fe9aac90d84a8",
+        sha256 = "ababed9c36cb16e43e7f1d508ae4a6ea89831752944fded3fb4fd2b3bead0bad",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2021-09-27",
+        release_date = "2021-10-06",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -859,10 +861,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Common Expression Language (CEL) C++ library",
         project_desc = "Common Expression Language (CEL) C++ library",
         project_url = "https://opensource.google/projects/cel",
-        version = "0.6.1",
-        sha256 = "d001494f1aa7d88172af944233fac3d7f83d9183d66590aa787aa2a35aab0440",
+        version = "89d81b2d2c24943b6e4fd5e8fc321099c2ab6d3f",
+        sha256 = "1408ef31e77ed847b420ff108da9652ad1702401008f2a75b671fba860a9707d",
         strip_prefix = "cel-cpp-{version}",
-        urls = ["https://github.com/google/cel-cpp/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
             "envoy.access_loggers.wasm",
@@ -875,7 +877,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.stat_sinks.wasm",
             "envoy.rbac.matchers.upstream_ip_port",
         ],
-        release_date = "2021-06-28",
+        release_date = "2021-10-07",
         cpe = "N/A",
     ),
     com_github_google_flatbuffers = dict(
@@ -899,7 +901,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.rbac.matchers.upstream_ip_port",
         ],
         release_date = "2021-05-10",
-        cpe = "N/A",
+        cpe = "cpe:2.3:a:google:flatbuffers:*",
     ),
     com_googlesource_code_re2 = dict(
         project_name = "RE2",
@@ -927,6 +929,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/compiler-rt-{version}.src.tar.xz"],
         release_date = "2021-07-09",
         use_category = ["test_only"],
+        cpe = "cpe:2.3:a:llvm:compiler-rt:*",
     ),
     upb = dict(
         project_name = "upb",
