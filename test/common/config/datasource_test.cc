@@ -9,6 +9,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -618,6 +619,32 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
   EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
+}
+
+TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
+  using DataSourcePb = envoy::config::core::v3::DataSource;
+  DataSourcePb config;
+  TestEnvironment::setEnvVar("ThisVariableIsEmpty", "", 1);
+
+  std::string yaml = R"EOF(
+    environment_variable:
+      ThisVariableIsEmpty
+  )EOF";
+  TestUtility::loadFromYamlAndValidate(yaml, config);
+
+  EXPECT_EQ(DataSourcePb::SpecifierCase::kEnvironmentVariable, config.specifier_case());
+  EXPECT_EQ(config.environment_variable(), "ThisVariableIsEmpty");
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
+#ifdef WIN32
+  // Windows doesn't support empty environment variables.
+  EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
+#else
+  auto envrionment_variable = DataSource::read(config, true, *api);
+  EXPECT_TRUE(environment_variable.empty());
+#endif
+
+  TestEnvironment::unsetEnvVar("ThisVariableIsEmpty");
 }
 
 } // namespace
