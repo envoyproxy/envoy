@@ -84,8 +84,8 @@ public:
               case DnsLookupFamily::V6Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv6());
                 break;
-              // In CI these modes could return either IPv4 or IPv6 with the non-mocked API calls. But
-              // regardless of the family all returned addresses need to be one _or_ the other.
+              // In CI these modes could return either IPv4 or IPv6 with the non-mocked API calls.
+              // But regardless of the family all returned addresses need to be one _or_ the other.
               case DnsLookupFamily::V4Preferred:
               case DnsLookupFamily::Auto:
                 // Set the expectation for subsequent responses based on the first one.
