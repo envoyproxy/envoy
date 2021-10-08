@@ -22,7 +22,11 @@ public:
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
         client_(client) {}
 
-  virtual ~BufferedAsyncClient() { cleanup(); }
+  ~BufferedAsyncClient() {
+    if (active_stream_ != nullptr) {
+      active_stream_ = nullptr;
+    }
+  }
 
   void bufferMessage(RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
@@ -74,15 +78,9 @@ public:
     message_buffer_.at(message_id).first = BufferState::Buffered;
   }
 
-  void cleanup() {
-    if (active_stream_ != nullptr) {
-      active_stream_ = nullptr;
-    }
-  }
-
   bool hasActiveStream() { return active_stream_ != nullptr; }
 
-  const absl::flat_hash_map<uint64_t, std::pair<BufferState, RequestType>>& messageBuffer() {
+  const absl::btree_map<uint64_t, std::pair<BufferState, RequestType>>& messageBuffer() {
     return message_buffer_;
   }
 
