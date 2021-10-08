@@ -15,6 +15,7 @@ envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
     deps = [
+        "//source/common/event:dispatcher_lib",
         "//source/common/grpc:async_client_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",

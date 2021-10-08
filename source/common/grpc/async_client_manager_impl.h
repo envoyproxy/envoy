@@ -54,8 +54,6 @@ public:
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::config::core::v3::GrpcService& config,
                                               Stats::Scope& scope,
                                               bool skip_cluster_check) override;
-
-private:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     RawAsyncClientCache(Event::Dispatcher& dispatcher) {
@@ -81,6 +79,8 @@ private:
     Envoy::Event::TimerPtr timer_;
     static constexpr std::chrono::milliseconds RefreshInterval{50000};
   };
+
+private:
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;

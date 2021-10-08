@@ -1,7 +1,10 @@
+#include <memory>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "source/common/api/api_impl.h"
+#include "source/common/event/dispatcher_impl.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -20,6 +23,38 @@ using ::testing::Return;
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+class AsyncClientCacheTest : public testing::Test {
+public:
+  AsyncClientCacheTest()
+      : api_(Api::createApiForTest(stats_, time_system_)),
+        dispatcher_("test_thread", *api_, time_system_), client_cache_(dispatcher_) {}
+
+  void step() {
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), dispatcher_,
+                                   Event::Dispatcher::RunType::NonBlock);
+  }
+  Envoy::Stats::IsolatedStoreImpl stats_;
+  Event::SimulatedTimeSystem time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherImpl dispatcher_;
+  AsyncClientManagerImpl::RawAsyncClientCache client_cache_;
+};
+
+TEST_F(AsyncClientCacheTest, CacheEviction) {
+  envoy::config::core::v3::GrpcService foo_service;
+  foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
+  client_cache_.setCache(foo_service, foo_client);
+  step();
+  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  step();
+  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  for (int i = 0; i < 8; i++) {
+    step();
+  }
+  EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
+}
 
 class AsyncClientManagerImplTest : public testing::Test {
 public:
