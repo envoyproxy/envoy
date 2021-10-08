@@ -617,8 +617,7 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
   EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
   Api::ApiPtr api = Api::createApiForTest();
   EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
-  std::string path_data = DataSource::read(config, true, *api);
-  EXPECT_TRUE(path_data.empty());
+  EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
 }
 
 } // namespace
