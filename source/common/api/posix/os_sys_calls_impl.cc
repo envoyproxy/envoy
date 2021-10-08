@@ -282,6 +282,14 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
+bool OsSysCallsImpl::supportsGetifaddrs() {
+// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  return false;
+#endif
+  return true;
+}
+
 SysCallIntResult OsSysCallsImpl::getifaddrs(struct ifaddrs** ifap) {
   const int rc = ::getifaddrs(ifap);
   return {rc, rc != -1 ? 0 : errno};
