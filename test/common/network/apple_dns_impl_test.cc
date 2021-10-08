@@ -110,6 +110,7 @@ public:
                 } else {
                   EXPECT_NE(nullptr, result.address_->ip()->ipv6());
                 }
+                break;
               default:
                 NOT_REACHED_GCOVR_EXCL_LINE;
               }
