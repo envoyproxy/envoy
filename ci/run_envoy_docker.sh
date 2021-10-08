@@ -49,7 +49,7 @@ fi
 
 # The IMAGE_ID defaults to the CI hash but can be set to an arbitrary image ID (found with 'docker
 # images').
-[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="974f996fd8da8e7825eeff515e40d42bb4a3c413-amd64"
+[[ -z "${IMAGE_ID}" ]] && IMAGE_ID="c082f20169b1aa8bd8a1a280272f14dd0b922a53-amd64"
 [[ -z "${ENVOY_DOCKER_BUILD_DIR}" ]] && ENVOY_DOCKER_BUILD_DIR="${DEFAULT_ENVOY_DOCKER_BUILD_DIR}"
 # Replace backslash with forward slash for Windows style paths
 ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR//\\//}"
