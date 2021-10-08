@@ -126,8 +126,13 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopbackV4) {
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
-  EXPECT_TRUE(maybe_interface_name.has_value());
-  EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
+
+  Api::OsSysCallsSingleton::get().supportsGetifaddrs() {
+    EXPECT_TRUE(maybe_interface_name.has_value());
+    EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
+  } else {
+    EXPECT_FALSE(maybe_interface_name.has_value());
+  }
 }
 
 } // namespace
