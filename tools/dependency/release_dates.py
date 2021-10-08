@@ -125,14 +125,14 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
     if issues_exist(title, git):
         print("Issue with %s already exists" % title)
         print('  >> Issue already exists, not posting!')
-    else:
-        print('Creating issues...')
-        try:
-            issue_created = repo.create_issue(title, body=body, labels=LABELS)
-            latest_release.latest_issue_number = issue_created.number
-        except github.GithubException as e:
-            print(f'Unable to create issue, received error: {e}')
-            raise
+        return
+    print('Creating issues...')
+    try:
+        issue_created = repo.create_issue(title, body=body, labels=LABELS)
+        latest_release.latest_issue_number = issue_created.number
+    except github.GithubException as e:
+        print(f'Unable to create issue, received error: {e}')
+        raise
     search_old_version_open_issue_exist(title, git, package_repo, latest_release)
 
 
