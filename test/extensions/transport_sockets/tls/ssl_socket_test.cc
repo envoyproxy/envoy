@@ -302,7 +302,7 @@ private:
   bool ocsp_stapling_enabled_{false};
   std::string expected_transport_failure_reason_contains_;
   std::string not_expected_client_stats_;
-  int expected_verify_error_code_ = -1;
+  int expected_verify_error_code_{-1};
 };
 
 void testUtil(const TestUtilOptions& options) {
