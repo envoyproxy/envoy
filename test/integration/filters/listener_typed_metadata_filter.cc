@@ -12,9 +12,9 @@
 namespace Envoy {
 namespace {
 
-const std::string kFilterName = "listener-typed-metadata-filter";
-const std::string kMetadataKey = "test.listener.typed.metadata";
-const std::string kExpectedMetadataValue = "hello world";
+constexpr absl::string_view kFilterName = "listener-typed-metadata-filter";
+constexpr absl::string_view kMetadataKey = "test.listener.typed.metadata";
+constexpr absl::string_view kExpectedMetadataValue = "hello world";
 
 // A test filter that verifies the typed metadata attached to the listener is stored correctly.
 class Baz : public Config::TypedMetadata::Object {
@@ -24,7 +24,7 @@ public:
 
 class BazTypedMetadataFactory : public Network::ListenerTypedMetadataFactory {
 public:
-  std::string name() const override { return kMetadataKey; }
+  std::string name() const override { return std::string(kMetadataKey); }
 
   std::unique_ptr<const Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct&) const override {
@@ -55,7 +55,7 @@ public:
 class ListenerTypedMetadataFilterFactory
     : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
 public:
-  ListenerTypedMetadataFilterFactory() : EmptyHttpFilterConfig(kFilterName) {}
+  ListenerTypedMetadataFilterFactory() : EmptyHttpFilterConfig(std::string(kFilterName)) {}
 
 private:
   Http::FilterFactoryCb createFilter(const std::string&,
@@ -63,7 +63,7 @@ private:
 
     // Main assertions to ensure the metadata from the listener was parsed correctly.
     const auto& typed_metadata = context.listenerTypedMetadata();
-    const Baz* value = typed_metadata.get<Baz>(kMetadataKey);
+    const Baz* value = typed_metadata.get<Baz>(std::string(kMetadataKey));
     EXPECT_NE(value, nullptr);
     EXPECT_EQ(value->item_, kExpectedMetadataValue);
 
