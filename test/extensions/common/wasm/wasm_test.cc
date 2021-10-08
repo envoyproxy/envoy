@@ -569,13 +569,8 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-#ifdef ZLIBNG_VERSION
-        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 22")));
-        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 22 -> 2000")));
-#else
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
-#endif
         return root_context;
       });
   wasm->start(plugin);

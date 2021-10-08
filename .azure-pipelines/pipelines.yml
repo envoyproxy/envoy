@@ -513,10 +513,22 @@ stages:
       condition: always()
 
   - job: docker
+    strategy:
+      matrix:
+        windows2019:
+          imageName: 'windows-latest'
+          windowsBuildType: "windows"
+          windowsImageBase: "mcr.microsoft.com/windows/servercore"
+          windowsImageTag: "ltsc2019"
+        windows2022:
+          imageName: 'windows-2022'
+          windowsBuildType: "windows-ltsc2022"
+          windowsImageBase: "mcr.microsoft.com/windows/nanoserver"
+          windowsImageTag: "ltsc2022"
     dependsOn: ["release"]
     timeoutInMinutes: 120
     pool:
-      vmImage: "windows-latest"
+      vmImage: $(imageName)
     steps:
     - task: DownloadBuildArtifacts@0
       inputs:
@@ -537,6 +549,9 @@ stages:
         AZP_SHA1: $(Build.SourceVersion)
         DOCKERHUB_USERNAME: $(DockerUsername)
         DOCKERHUB_PASSWORD: $(DockerPassword)
+        WINDOWS_BUILD_TYPE: $(windowsBuildType)
+        WINDOWS_IMAGE_BASE: $(windowsImageBase)
+        WINDOWS_IMAGE_TAG: $(windowsImageTag)
     - task: PublishBuildArtifacts@1
       inputs:
         pathtoPublish: "$(Build.StagingDirectory)/build_images"
