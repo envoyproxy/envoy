@@ -164,14 +164,14 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  kvs_[config] = client;
+  cache_[config] = client;
   active_keys_.insert(config);
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::refresh() {
   // Remove all the cache entries idle in the last interval.
   for (auto const& config : idle_keys_) {
-    kvs_.erase(config);
+    cache_.erase(config);
   }
   // Reset all the entries to be idle at the beginning of next interval.
   idle_keys_ = std::move(active_keys_);

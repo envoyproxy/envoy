@@ -72,7 +72,7 @@ public:
   private:
     absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
                         MessageUtil>
-        kvs_;
+        cache_;
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil> idle_keys_;
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil>
         active_keys_;

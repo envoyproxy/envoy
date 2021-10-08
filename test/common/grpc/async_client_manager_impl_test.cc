@@ -27,17 +27,17 @@ namespace {
 class AsyncClientCacheTest : public testing::Test {
 public:
   AsyncClientCacheTest()
-      : api_(Api::createApiForTest(stats_, time_system_)),
-        dispatcher_("test_thread", *api_, time_system_), client_cache_(dispatcher_) {}
+      : api_(Api::createApiForTest(time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
   void step() {
-    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), dispatcher_,
+    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), *dispatcher_,
                                    Event::Dispatcher::RunType::NonBlock);
   }
   Envoy::Stats::IsolatedStoreImpl stats_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
+  Event::DispatcherPtr dispatcher_;
   AsyncClientManagerImpl::RawAsyncClientCache client_cache_;
 };
 
