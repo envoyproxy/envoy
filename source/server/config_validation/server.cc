@@ -5,6 +5,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "source/common/common/utility.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/event/real_time_system.h"
 #include "source/common/local_info/local_info_impl.h"
@@ -123,6 +125,8 @@ void ValidationInstance::shutdown() {
     config_.clusterManager()->shutdown();
   }
   thread_local_.shutdownThread();
+  Config::GrpcMuxImpl::shutdownAll();
+  Config::NewGrpcMuxImpl::shutdownAll();
   dispatcher_->shutdown();
 }
 
