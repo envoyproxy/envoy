@@ -5,6 +5,7 @@
 
 #include "source/common/upstream/load_stats_reporter.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -216,6 +217,134 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(14));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+}
+
+HostSharedPtr makeTestHost(const std::string& hostname,
+                           const ::envoy::config::core::v3::Locality& locality) {
+  const auto host = std::make_shared<NiceMock<::Envoy::Upstream::MockHost>>();
+  ON_CALL(*host, hostname()).WillByDefault(::testing::ReturnRef(hostname));
+  ON_CALL(*host, locality()).WillByDefault(::testing::ReturnRef(locality));
+  return host;
+}
+
+// Validate that per-locality metrics are aggregated across hosts and included in the load report.
+TEST_F(LoadStatsReporterTest, UpstreamLocalityStats) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({});
+  createLoadStatsReporter();
+  time_system_.setMonotonicTime(std::chrono::microseconds(3));
+
+  // Set up some load metrics
+  NiceMock<MockClusterMockPrioritySet> cluster;
+  MockHostSet& host_set_ = *cluster.prioritySet().getMockHostSet(0);
+
+  ::envoy::config::core::v3::Locality locality0, locality1;
+  locality0.set_region("mars");
+  locality1.set_region("jupiter");
+  HostSharedPtr host0 = makeTestHost("host0", locality0), host1 = makeTestHost("host1", locality0),
+                host2 = makeTestHost("host2", locality1);
+  host_set_.hosts_per_locality_ = makeHostsPerLocality({{host0, host1}, {host2}});
+
+  host0->stats().rq_success_.inc();
+  host0->loadMetricStats().add("metric_a", 0.11111);
+  host0->loadMetricStats().add("metric_b", 1.0);
+
+  host0->stats().rq_success_.inc();
+  host0->loadMetricStats().add("metric_a", 0.33333);
+  host0->loadMetricStats().add("metric_c", 3.14159);
+
+  host1->stats().rq_success_.inc();
+  host1->loadMetricStats().add("metric_a", 0.44444);
+  host1->loadMetricStats().add("metric_b", 0.12345);
+
+  host2->stats().rq_success_.inc();
+  host2->loadMetricStats().add("metric_a", 10.01);
+  host2->loadMetricStats().add("metric_c", 20.02);
+  host2->loadMetricStats().add("metric_d", 30.03);
+
+  cluster.info_->eds_service_name_ = "bar";
+  MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", cluster}}, {}};
+  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
+  deliverLoadStatsResponse({"foo"});
+  // First stats report on timer tick.
+  time_system_.setMonotonicTime(std::chrono::microseconds(4));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("bar");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
+
+    auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality0_stats->mutable_locality()->set_region("mars");
+    expected_locality0_stats->set_total_successful_requests(3);
+    auto locality0_metric_a = expected_locality0_stats->add_load_metric_stats();
+    locality0_metric_a->set_metric_name("metric_a");
+    locality0_metric_a->set_num_requests_finished_with_metric(3);
+    locality0_metric_a->set_total_metric_value(0.88888);
+    auto locality0_metric_b = expected_locality0_stats->add_load_metric_stats();
+    locality0_metric_b->set_metric_name("metric_b");
+    locality0_metric_b->set_num_requests_finished_with_metric(2);
+    locality0_metric_b->set_total_metric_value(1.12345);
+    auto locality0_metric_c = expected_locality0_stats->add_load_metric_stats();
+    locality0_metric_c->set_metric_name("metric_c");
+    locality0_metric_c->set_num_requests_finished_with_metric(1);
+    locality0_metric_c->set_total_metric_value(3.14159);
+
+    auto expected_locality1_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality1_stats->mutable_locality()->set_region("jupiter");
+    expected_locality1_stats->set_total_successful_requests(1);
+    auto locality1_metric_a = expected_locality1_stats->add_load_metric_stats();
+    locality1_metric_a->set_metric_name("metric_a");
+    locality1_metric_a->set_num_requests_finished_with_metric(1);
+    locality1_metric_a->set_total_metric_value(10.01);
+    auto locality1_metric_c = expected_locality1_stats->add_load_metric_stats();
+    locality1_metric_c->set_metric_name("metric_c");
+    locality1_metric_c->set_num_requests_finished_with_metric(1);
+    locality1_metric_c->set_total_metric_value(20.02);
+    auto locality1_metric_d = expected_locality1_stats->add_load_metric_stats();
+    locality1_metric_d->set_metric_name("metric_d");
+    locality1_metric_d->set_num_requests_finished_with_metric(1);
+    locality1_metric_d->set_total_metric_value(30.03);
+
+    expectSendMessage({expected_cluster_stats});
+  }
+  EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
+  response_timer_cb_();
+
+  // Traffic between previous request and next response. Previous latched metrics are cleared.
+  host1->stats().rq_success_.inc();
+  host1->loadMetricStats().add("metric_a", 1.41421);
+  host1->loadMetricStats().add("metric_e", 2.71828);
+
+  time_system_.setMonotonicTime(std::chrono::microseconds(6));
+  deliverLoadStatsResponse({"foo"});
+  // Second stats report on timer tick.
+  time_system_.setMonotonicTime(std::chrono::microseconds(28));
+  {
+    envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("bar");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
+
+    auto expected_locality0_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality0_stats->mutable_locality()->set_region("mars");
+    expected_locality0_stats->set_total_successful_requests(1);
+    auto locality0_metric_a = expected_locality0_stats->add_load_metric_stats();
+    locality0_metric_a->set_metric_name("metric_a");
+    locality0_metric_a->set_num_requests_finished_with_metric(1);
+    locality0_metric_a->set_total_metric_value(1.41421);
+    auto locality0_metric_e = expected_locality0_stats->add_load_metric_stats();
+    locality0_metric_e->set_metric_name("metric_e");
+    locality0_metric_e->set_num_requests_finished_with_metric(1);
+    locality0_metric_e->set_total_metric_value(2.71828);
+
+    // No stats for locality 1 since there was no traffic to it.
+    expectSendMessage({expected_cluster_stats});
   }
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();

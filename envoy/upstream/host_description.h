@@ -55,6 +55,47 @@ struct HostStats {
   }
 };
 
+/**
+ * Weakly-named load metrics to be reported as EndpointLoadMetricStats. Individual stats are
+ * accumulated by calling add(), which combines stats with the same name. The aggregated stats are
+ * retrieved by calling latch(), which also clears the current load metrics.
+ */
+class LoadMetricStats {
+public:
+  struct Stat {
+    uint64_t num_requests_with_metric;
+    double total_metric_value;
+  };
+
+  using StatsMap = absl::flat_hash_map<std::string, Stat>;
+
+  LoadMetricStats() : map_(std::make_unique<StatsMap>()) {}
+
+  // Adds the given stat to the map. If the stat already exists in the map, then the stat is
+  // combined with the existing map entry by incrementing num_requests_with_metric and summing the
+  // total_metric_value fields.
+  void add(const std::string& key, double value) {
+    absl::MutexLock lock(&mu_);
+    ++(*map_)[key].num_requests_with_metric;
+    (*map_)[key].total_metric_value += value;
+  }
+
+  // Returns an owning pointer to the current load metrics and clears the map.
+  std::unique_ptr<StatsMap> latch() {
+    absl::MutexLock lock(&mu_);
+    std::unique_ptr<StatsMap> latched = std::move(map_);
+    map_ = std::make_unique<StatsMap>();
+    return latched;
+  }
+
+private:
+  absl::Mutex mu_;
+  std::unique_ptr<StatsMap> map_ ABSL_GUARDED_BY(mu_);
+
+  LoadMetricStats(const LoadMetricStats&) = delete;
+  LoadMetricStats& operator=(const LoadMetricStats&) = delete;
+};
+
 class ClusterInfo;
 
 /**
@@ -130,6 +171,11 @@ public:
    * @return host specific stats.
    */
   virtual HostStats& stats() const PURE;
+
+  /**
+   * @return custom stats for multi-dimensional load balancing.
+   */
+  virtual LoadMetricStats& loadMetricStats() const PURE;
 
   /**
    * @return the locality of the host (deployment specific). This will be the default instance if

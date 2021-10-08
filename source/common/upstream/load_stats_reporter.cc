@@ -80,11 +80,19 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
+        LoadMetricStats::StatsMap load_metrics;
         for (const auto& host : hosts) {
           rq_success += host->stats().rq_success_.latch();
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
           rq_issued += host->stats().rq_total_.latch();
+          const std::unique_ptr<LoadMetricStats::StatsMap> latched_stats =
+              host->loadMetricStats().latch();
+          for (const auto& metric : *latched_stats) {
+            const std::string& name = metric.first;
+            load_metrics[name].num_requests_with_metric += metric.second.num_requests_with_metric;
+            load_metrics[name].total_metric_value += metric.second.total_metric_value;
+          }
         }
         if (rq_success + rq_error + rq_active != 0) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
@@ -94,6 +102,13 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           locality_stats->set_total_error_requests(rq_error);
           locality_stats->set_total_requests_in_progress(rq_active);
           locality_stats->set_total_issued_requests(rq_issued);
+          for (const auto& metric : load_metrics) {
+            auto* load_metric_stats = locality_stats->add_load_metric_stats();
+            load_metric_stats->set_metric_name(metric.first);
+            load_metric_stats->set_num_requests_finished_with_metric(
+                metric.second.num_requests_with_metric);
+            load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+          }
         }
       }
     }
