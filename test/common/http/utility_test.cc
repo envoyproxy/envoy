@@ -95,9 +95,11 @@ TEST(HttpUtility, stripQueryString) {
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/")), "/");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/?")), "/");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1&y=2")), "/");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo")), "/foo");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?")), "/foo");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there&good=bye")), "/foo");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?")), "/foo/");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?x=1")), "/foo/");
   EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar")), "/foo/bar");
