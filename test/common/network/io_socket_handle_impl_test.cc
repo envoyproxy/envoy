@@ -108,6 +108,11 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
   SocketImpl socket(Socket::Type::Stream, address, nullptr);
 
+  EXPECT_TRUE(socket.ioHandle().isOpen()) << pipe.asString();
+
+  Api::SysCallIntResult result = socket.bind(address);
+  ASSERT_EQ(result.return_value_, 0);
+
   EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
 }
 
