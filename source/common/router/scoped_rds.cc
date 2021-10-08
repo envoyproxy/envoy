@@ -93,8 +93,7 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
       name_(std::move(name)),
       config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
       rds_config_source_(std::move(rds_config_source)) {
-  for (size_t i = 0; i < config_protos.size(); ++i) {
-    std::unique_ptr<const Protobuf::Message> config_proto = std::move(config_protos[i]);
+  for (std::unique_ptr<const Protobuf::Message>& config_proto : config_protos) {
     auto scoped_route_config =
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
             *config_proto, factory_context.messageValidationContext().staticValidationVisitor());
