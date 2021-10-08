@@ -8,6 +8,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,7 +24,7 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(IoSocketHandleImplTest, TestIoSocketError) {
+TEST(IoSocketHandleImpl, TestIoSocketError) {
   EXPECT_DEBUG_DEATH(IoSocketError(SOCKET_ERROR_AGAIN),
                      ".*assert failure: .* Details: Didn't use getIoSocketEagainInstance.*");
   EXPECT_EQ(errorDetails(SOCKET_ERROR_AGAIN),
@@ -98,6 +99,21 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
   EXPECT_THAT(io_handle.lastRoundTripTime(),
               Eq(std::chrono::duration_cast<std::chrono::milliseconds>(rtt)));
 }
+
+class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
+INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopbackV4) {
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(GetParam()));
+
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+  EXPECT_TRUE(maybe_interface_name.has_value());
+  EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

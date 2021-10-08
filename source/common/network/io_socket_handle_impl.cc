@@ -651,10 +651,10 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
 }
 
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
-  absl::optional<std::string> interface_name{};
+  absl::optional<std::string> selected_interface_name{};
 #ifdef SUPPORTS_GETIFADDRS
   Address::InstanceConstSharedPtr socket_address = localAddress();
-  if (!socket_address) {
+  if (!(socket_address && socket_address->type() == Address::Type::Ip)) {
     return absl::nullopt;
   }
 
@@ -669,7 +669,11 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
       continue;
     }
 
-    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+    if ((socket_address->ip()->version() == Address::IpVersion::v4 &&
+         ifa->ifa_addr->sa_family == AF_INET) ||
+        (socket_address->ip()->version() == Address::IpVersion::v6 &&
+         ifa->ifa_addr->sa_family == AF_INET6)) {
+
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
       Address::InstanceConstSharedPtr interface_address = Address::addressFromSockAddrOrThrow(
@@ -680,8 +684,25 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
         continue;
       }
 
-      if (*socket_address == *interface_address) {
-        interface_name = std::string{ifa->ifa_name};
+      // Compare address _without port_.
+      // TODO: create common addressAsStringWithoutPort method to simplify code here.
+      absl::uint128 socket_address_value;
+      absl::uint128 interface_address_value;
+      switch (socket_address->ip()->version()) {
+      case Address::IpVersion::v4:
+        socket_address_value = socket_address->ip()->ipv4()->address();
+        interface_address_value = interface_address->ip()->ipv4()->address();
+        break;
+      case Address::IpVersion::v6:
+        socket_address_value = socket_address->ip()->ipv6()->address();
+        interface_address_value = interface_address->ip()->ipv6()->address();
+        break;
+      default:
+        NOT_REACHED_GCOVR_EXCL_LINE;
+      }
+
+      if (socket_address_value == interface_address_value) {
+        selected_interface_name = std::string{ifa->ifa_name};
         break;
       }
     }
@@ -691,7 +712,7 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
     freeifaddrs(ifaddr);
   }
 #endif
-  return interface_name;
+  return selected_interface_name;
 }
 
 } // namespace Network
