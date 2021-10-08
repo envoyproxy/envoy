@@ -100,6 +100,15 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
               Eq(std::chrono::duration_cast<std::chrono::milliseconds>(rtt)));
 }
 
+TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
+  const mode_t mode = 0;
+  Address::PipeInstance pipe("foo", mode);
+  Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
+  SocketImpl socket(Socket::Type::Stream, address, nullptr);
+
+  EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
