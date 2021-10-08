@@ -59,6 +59,7 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
   request.set_name("Alice");
   buffered_client.bufferMessage(request);
   const auto inflight_message_ids = buffered_client.sendBufferedMessages();
+  EXPECT_TRUE(buffered_client.hasActiveStream());
   EXPECT_EQ(1, inflight_message_ids.size());
 
   // Re-buffer, and transport.
@@ -104,6 +105,7 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
   buffered_client.bufferMessage(request);
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+  EXPECT_TRUE(buffered_client.hasActiveStream());
 }
 
 TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
@@ -126,6 +128,7 @@ TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
   buffered_client.bufferMessage(request);
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+  EXPECT_TRUE(buffered_client.hasActiveStream());
 }
 
 } // namespace
