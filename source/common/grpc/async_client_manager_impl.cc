@@ -151,8 +151,8 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) {
-  auto it = kvs_.find(config);
-  if (it == kvs_.end()) {
+  auto it = cache_.find(config);
+  if (it == cache_.end()) {
     return nullptr;
   }
   if (idle_keys_.find(config) != idle_keys_.end()) {

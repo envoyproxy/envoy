@@ -56,7 +56,7 @@ public:
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    RawAsyncClientCache(Event::Dispatcher& dispatcher) {
+    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) {
       timer_ = dispatcher.createTimer([this] {
         refresh();
         timer_->enableTimer(RefreshInterval);

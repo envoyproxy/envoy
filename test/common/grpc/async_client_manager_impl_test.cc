@@ -30,9 +30,11 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
-  void step() {
-    time_system_.advanceTimeAndRun(std::chrono::milliseconds(10000), *dispatcher_,
-                                   Event::Dispatcher::RunType::NonBlock);
+  void waitForSeconds(size_t seconds) {
+    for (size_t i = 0; i < seconds; i++) {
+      time_system_.advanceTimeAndRun(std::chrono::milliseconds(1000), *dispatcher_,
+                                     Event::Dispatcher::RunType::NonBlock);
+    }
   }
   Envoy::Stats::IsolatedStoreImpl stats_;
   Event::SimulatedTimeSystem time_system_;
@@ -46,13 +48,11 @@ TEST_F(AsyncClientCacheTest, CacheEviction) {
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
-  step();
+  waitForSeconds(10);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
-  step();
+  waitForSeconds(10);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
-  for (int i = 0; i < 8; i++) {
-    step();
-  }
+  waitForSeconds(80);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
 }
 
