@@ -282,5 +282,12 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, EOPNOTSUPP};
 }
 
+SysCallIntResult OsSysCallsImpl::getifaddrs(struct ifaddrs** ifap) {
+  const int rc = ::getifaddrs(ifap);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
+void OsSysCallsImpl::freeifaddrs(struct ifaddrs* ifp) { ::freeifaddrs(ifp); }
+
 } // namespace Api
 } // namespace Envoy
