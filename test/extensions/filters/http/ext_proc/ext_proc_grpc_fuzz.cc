@@ -18,8 +18,8 @@
 // 7. Remove locks after crash is addressed by separate issue
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
 #include "source/common/network/address_impl.h"
@@ -36,9 +36,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
@@ -216,7 +216,7 @@ public:
     }
   }
 
-  envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;

@@ -2,12 +2,14 @@
 #include <iostream>
 #include <string>
 
+#include "source/common/common/thread.h"
 #include "source/exe/platform_impl.h"
 
 #include "test/test_common/test_runtime.h"
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
+  Envoy::Thread::TestThread test_thread;
   Envoy::Options options(argc, argv);
 
   const bool enforce_coverage = options.failUnder() != 0.0;

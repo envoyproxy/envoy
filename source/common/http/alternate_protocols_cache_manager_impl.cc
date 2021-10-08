@@ -22,7 +22,8 @@ AlternateProtocolsCacheManagerImpl::AlternateProtocolsCacheManagerImpl(
 }
 
 AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
-    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) {
+    const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
+    Event::Dispatcher& dispatcher) {
   if (options.has_key_value_store_config() && data_.concurrency_ != 1) {
     throw EnvoyException(
         fmt::format("options has key value store but Envoy has concurrency = {} : {}",
@@ -46,12 +47,12 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
     MessageUtil::anyConvertAndValidate(options.key_value_store_config().typed_config(), kv_config,
                                        data_.validation_visitor_);
     auto& factory = Config::Utility::getAndCheckFactory<KeyValueStoreFactory>(kv_config.config());
-    store = factory.createStore(kv_config, data_.validation_visitor_, data_.dispatcher_,
-                                data_.file_system_);
+    store =
+        factory.createStore(kv_config, data_.validation_visitor_, dispatcher, data_.file_system_);
   }
 
   AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
-      data_.dispatcher_.timeSource(), std::move(store), options.max_entries().value());
+      dispatcher.timeSource(), std::move(store), options.max_entries().value());
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }

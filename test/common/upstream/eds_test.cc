@@ -2308,6 +2308,29 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
   }
 }
 
+// Validate that onConfigUpdate() with a config that contains both LEDS config
+// source and explicit list of endpoints is rejected.
+TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  // Add an endpoint.
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // Configure an LEDS data source.
+  auto* leds_conf = endpoints->mutable_leds_cluster_locality_config();
+  leds_conf->set_leds_collection_name("xdstp://foo/leds/collection");
+  initialize();
+
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException,
+                            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+                            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

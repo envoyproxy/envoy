@@ -5,8 +5,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-static constexpr char kExternalMethod[] =
-    "envoy.service.ext_proc.v3alpha.ExternalProcessor.Process";
+static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
 
 ExternalProcessorClientImpl::ExternalProcessorClientImpl(
     Grpc::AsyncClientManager& client_manager,
@@ -35,8 +34,8 @@ ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
   stream_ = client_.start(*descriptor, *this, options);
 }
 
-void ExternalProcessorStreamImpl::send(
-    envoy::service::ext_proc::v3alpha::ProcessingRequest&& request, bool end_stream) {
+void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
+                                       bool end_stream) {
   stream_.sendMessage(std::move(request), end_stream);
 }
 

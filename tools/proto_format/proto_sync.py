@@ -180,6 +180,13 @@ def get_destination_path(src):
                     package))
 
         dst_path = pathlib.Path('contrib').joinpath(dst_path)
+    # Non-contrib can not use alpha.
+    if not 'contrib' in src:
+        if not 'v2alpha' in package and 'alpha' in package:
+            raise ProtoSyncError(
+                "package '{}' uses an alpha namespace. This is not allowed. Instead mark with "
+                "(xds.annotations.v3.file_status).work_in_progress or related annotation.".format(
+                    package))
     return dst_path
 
 

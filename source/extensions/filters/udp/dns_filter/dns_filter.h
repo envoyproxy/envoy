@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/event/file_event.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
 
@@ -78,7 +78,7 @@ class DnsFilterEnvoyConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilterEnvoyConfig(
       Server::Configuration::ListenerFactoryContext& context,
-      const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config);
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config);
 
   DnsFilterStats& stats() const { return stats_; }
   const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
@@ -105,9 +105,10 @@ private:
                                  POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
   }
 
-  bool loadServerConfig(const envoy::extensions::filters::udp::dns_filter::v3alpha::
-                            DnsFilterConfig::ServerContextConfig& config,
-                        envoy::data::dns::v3::DnsTable& table);
+  bool loadServerConfig(
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ServerContextConfig&
+          config,
+      envoy::data::dns::v3::DnsTable& table);
 
   void addEndpointToSuffix(const absl::string_view suffix, const absl::string_view domain_name,
                            DnsEndpointConfig& endpoint_config);
