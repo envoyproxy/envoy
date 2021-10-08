@@ -88,6 +88,7 @@ public:
               // regardless of the family all returned addresses need to be one _or_ the other.
               case DnsLookupFamily::V4Preferred:
               case DnsLookupFamily::Auto:
+              case DnsLookupFamily::All:
                 // Set the expectation for subsequent responses based on the first one.
                 if (!is_v4.has_value()) {
                   if (result.address_->ip()->ipv4()) {
