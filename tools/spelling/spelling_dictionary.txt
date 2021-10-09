@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARRAYSIZE
 ARN
 ASAN
 ASCII
@@ -814,6 +815,7 @@ megamiss
 mem
 memcmp
 memcpy
+memset
 memoize
 mergeable
 messagename
