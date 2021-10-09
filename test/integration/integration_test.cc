@@ -1275,17 +1275,8 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-// Test that Envoy by default returns HTTP code 502 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorDefault) {
-  testRouterUpstreamProtocolError("502", "UPE");
-}
-
-// Test runtime overwrite to return 503 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorRuntimeOverwrite) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.return_502_for_upstream_protocol_errors", "false");
-  testRouterUpstreamProtocolError("503", "UC");
-}
+// Test that Envoy returns HTTP code 502 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolError) { testRouterUpstreamProtocolError("502", "UPE"); }
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();
