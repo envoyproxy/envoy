@@ -1261,6 +1261,19 @@ virtual_hosts:
                 - header:
                     key: x-route-header
                     value: match_tree_2
+          "/new_endpoint/baz":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /something/else
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree_2
   )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1281,6 +1294,8 @@ virtual_hosts:
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("match_tree_2", headers.get_("x-route-header"));
   }
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
+    EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 // Validates that we fail creating a route config with the match tree unless the runtime flag is
