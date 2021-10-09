@@ -1545,7 +1545,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match.result_) {
-      // The only possible action that can be used within the route matching context 
+      // The only possible action that can be used within the route matching context
       // is the RouteMatchAction, so this must be true.
       ASSERT(match.result_->typeUrl() == RouteMatchAction::staticTypeUrl());
       ASSERT(dynamic_cast<RouteMatchAction*>(match.result_.get()));

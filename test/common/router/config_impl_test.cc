@@ -1294,8 +1294,8 @@ virtual_hosts:
     route->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("match_tree_2", headers.get_("x-route-header"));
   }
-    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
-    EXPECT_EQ(nullptr, config.route(headers, 0));
+  Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
+  EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
 // Validates that we fail creating a route config with the match tree unless the runtime flag is
