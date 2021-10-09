@@ -127,7 +127,7 @@ TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopbackV4) {
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
 
-  Api::OsSysCallsSingleton::get().supportsGetifaddrs() {
+  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
     EXPECT_TRUE(maybe_interface_name.has_value());
     EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
   } else {

@@ -651,8 +651,11 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
 }
 
 absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
-  absl::optional<std::string> selected_interface_name{};
-#ifdef SUPPORTS_GETIFADDRS
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  if (!os_syscalls_singleton.supportsGetifaddrs()) {
+    return absl::nullopt;
+  }
+
   Address::InstanceConstSharedPtr socket_address = localAddress();
   if (!(socket_address && socket_address->type() == Address::Type::Ip)) {
     return absl::nullopt;
@@ -661,9 +664,10 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
 
-  const int rc = getifaddrs(&ifaddr);
-  RELEASE_ASSERT(!rc, "");
+  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(&ifaddr);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
 
+  absl::optional<std::string> selected_interface_name{};
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
     if (ifa->ifa_addr == nullptr) {
       continue;
@@ -709,9 +713,9 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   }
 
   if (ifaddr) {
-    freeifaddrs(ifaddr);
+    os_syscalls_singleton.freeifaddrs(ifaddr);
   }
-#endif
+
   return selected_interface_name;
 }
 
