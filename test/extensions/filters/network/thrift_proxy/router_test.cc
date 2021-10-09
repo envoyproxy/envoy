@@ -106,9 +106,6 @@ public:
         }),
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
-    upstream_locality_.set_zone("other_zone_name");
-    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_, locality())
-        .WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void initializeRouter(bool use_real_shadow_writer = false) {
@@ -140,6 +137,12 @@ public:
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(sequence_id);
+  }
+
+  void initializeUpstreamZone() {
+    upstream_locality_.set_zone("other_zone_name");
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_, locality())
+        .WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
@@ -1209,10 +1212,7 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
       .WillByDefault(ReturnRef(cluster_scope));
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_rq_call"));
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_reply"));
-  EXPECT_CALL(cluster_scope, counter("zone.zone_name.other_zone_name.thrift.upstream_resp_reply"));
   EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_success"));
-  EXPECT_CALL(cluster_scope,
-              counter("zone.zone_name.other_zone_name.thrift.upstream_resp_success"));
 
   EXPECT_CALL(cluster_scope, histogram("thrift.upstream_rq_size", Stats::Histogram::Unit::Bytes));
   EXPECT_CALL(cluster_scope,
@@ -1234,13 +1234,6 @@ TEST_P(ThriftRouterFieldTypeTest, CallWithUpstreamRqTime) {
   EXPECT_CALL(cluster_scope,
               deliverHistogramToSinks(
                   testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), 500));
-  EXPECT_CALL(cluster_scope, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
-                                       Stats::Histogram::Unit::Milliseconds));
-  EXPECT_CALL(cluster_scope,
-              deliverHistogramToSinks(
-                  testing::Property(&Stats::Metric::name,
-                                    "zone.zone_name.other_zone_name.thrift.upstream_rq_time"),
-                  500));
   returnResponse();
   destroyRouter();
 }
@@ -1270,17 +1263,11 @@ TEST_P(ThriftRouterFieldTypeTest, Call_Error) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_reply")
                      .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
-                     .value());
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_success")
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_error")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_error")
                      .value());
 }
 
@@ -1309,10 +1296,6 @@ TEST_P(ThriftRouterFieldTypeTest, Exception) {
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_exception")
                      .value());
-  EXPECT_EQ(1UL,
-            context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_exception")
-                .value());
 }
 
 TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
@@ -1331,10 +1314,6 @@ TEST_P(ThriftRouterFieldTypeTest, UnknownMessageTypes) {
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_invalid_type")
-                     .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString(
-                         "zone.zone_name.other_zone_name.thrift.upstream_resp_invalid_type")
                      .value());
 }
 
@@ -1631,6 +1610,89 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   destroyRouter();
 
   shadow_writer_impl_ = nullptr;
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallSuccess) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                     .value());
+  EXPECT_EQ(1UL,
+            context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_success")
+                .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallError) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, false);
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_error")
+                     .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallException) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  EXPECT_EQ(1UL,
+            context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_exception")
+                .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallWithRqTime) {
+  NiceMock<Stats::MockStore> cluster_scope;
+  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+      .WillByDefault(ReturnRef(cluster_scope));
+
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+
+  EXPECT_CALL(cluster_scope,
+              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+  EXPECT_CALL(cluster_scope, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name,
+                                    "zone.zone_name.other_zone_name.thrift.upstream_rq_time"),
+                  500));
+  returnResponse();
 }
 
 } // namespace Router
