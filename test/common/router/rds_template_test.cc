@@ -91,7 +91,8 @@ public:
 TEST_F(RdsImplTest, Basic) {
   setup();
 
-  EXPECT_FALSE(config_update_->parsedConfiguration());
+  EXPECT_TRUE(config_update_->parsedConfiguration());
+  EXPECT_EQ(nullptr, config_update_->parsedConfiguration()->route("foo"));
   EXPECT_FALSE(config_update_->configInfo().has_value());
 
   const std::string response1_json = R"EOF(

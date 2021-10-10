@@ -132,10 +132,17 @@ void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscription* subscription,
-    Server::Configuration::ServerFactoryContext& factory_context, ConfigFactory& config_factory)
-    : base_(RdsRouteConfigSubscriptionSharedPtr(subscription), factory_context, config_factory),
+    Server::Configuration::ServerFactoryContext& factory_context,
+    const RouteConfigProviderManager::OptionalHttpFilters& optional_http_filters)
+    : base_(RdsRouteConfigSubscriptionSharedPtr(subscription), factory_context),
       subscription_(subscription), config_update_info_(subscription->routeConfigUpdate()),
-      config_factory_(config_factory), factory_context_(factory_context) {
+      factory_context_(factory_context),
+      validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
+      optional_http_filters_(optional_http_filters) {
+  // The subscription referenced by the 'base_' and by 'this' is the same.
+  // But the subscription contains two references back to the provider.
+  // One is in Rds::RdsRouteConfigSubscription other in RdsRouteConfigSubscription part.
+  // The first is already initialized by the 'base_' so need to set back to 'this'.
   base_.subscription().routeConfigProvider().emplace(this);
   subscription_->routeConfigProvider().emplace(this);
 }
@@ -182,7 +189,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
 void RdsRouteConfigProviderImpl::validateConfig(
     const envoy::config::route::v3::RouteConfiguration& config) const {
   // TODO(lizan): consider cache the config here until onConfigUpdate.
-  config_factory_.createConfig(config);
+  ConfigImpl validation_config(config, optional_http_filters_, factory_context_, validator_, false);
 }
 
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
@@ -227,11 +234,10 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
         new RouteConfigUpdateReceiverImpl(factory_context, optional_http_filters));
     RdsRouteConfigSubscription* subscription(new RdsRouteConfigSubscription(
         config_update, rds, manager_identifier, factory_context, stat_prefix, *this));
-    init_manager.add(subscription->initTarget());
     RdsRouteConfigProviderImplSharedPtr new_provider{
-        new RdsRouteConfigProviderImpl(subscription, factory_context, *config_update)};
+        new RdsRouteConfigProviderImpl(subscription, factory_context, optional_http_filters)};
     insertDynamicProvider(manager_identifier, new_provider,
-                          &new_provider->subscription().initTarget());
+                          &new_provider->subscription().initTarget(), init_manager);
     return new_provider;
   } else {
     RouteConfigProviderSharedPtr existing_provider_downcasted =

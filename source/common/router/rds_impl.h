@@ -152,9 +152,10 @@ struct UpdateOnDemandCallback {
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  RdsRouteConfigProviderImpl(RdsRouteConfigSubscription* subscription,
-                             Server::Configuration::ServerFactoryContext& factory_context,
-                             ConfigFactory& config_factory);
+  RdsRouteConfigProviderImpl(
+      RdsRouteConfigSubscription* subscription,
+      Server::Configuration::ServerFactoryContext& factory_context,
+      const RouteConfigProviderManager::OptionalHttpFilters& optional_http_filters);
 
   ~RdsRouteConfigProviderImpl() override;
 
@@ -176,15 +177,14 @@ private:
 
   // The pointer is owned by base_, here it is just stored as raw pointer to avoid downcasting.
   RdsRouteConfigSubscription* subscription_;
-
   RouteConfigUpdateReceiver* config_update_info_;
-  ConfigFactory& config_factory_;
-
   Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  const RouteConfigProviderManager::OptionalHttpFilters optional_http_filters_;
 };
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;

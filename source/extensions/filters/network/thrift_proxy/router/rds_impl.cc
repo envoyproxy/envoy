@@ -58,12 +58,10 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfi
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         std::move(config_update), rds.config_source(), rds.route_config_name(), manager_identifier,
         factory_context, stat_prefix, *this));
-    init_manager.add(subscription->initTarget());
-
     RdsRouteConfigProviderImplSharedPtr new_provider{
-        new RdsRouteConfigProviderImpl(std::move(subscription), factory_context, *this)};
+        new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
     insertDynamicProvider(manager_identifier, new_provider,
-                          &new_provider->subscription().initTarget());
+                          &new_provider->subscription().initTarget(), init_manager);
     return new_provider;
   } else {
     return existing_provider;

@@ -18,7 +18,7 @@ public:
                                 ConfigFactory<RouteConfiguration, Config>& config_factory)
       : time_source_(factory_context.timeSource()),
         route_config_proto_(std::make_unique<RouteConfiguration>()), last_config_hash_(0ull),
-        config_factory_(config_factory) {}
+        config_(config_factory.createConfig()), config_factory_(config_factory) {}
 
   bool updateHash(const RouteConfiguration& rc) {
     const uint64_t new_hash = MessageUtil::hash(rc);

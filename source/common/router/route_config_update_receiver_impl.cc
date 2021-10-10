@@ -108,14 +108,14 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   }
 }
 
-ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::createConfig(
+ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::ConfigFactoryImpl::createConfig(
     const envoy::config::route::v3::RouteConfiguration& rc) const {
   return std::make_shared<ConfigImpl>(
       rc, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 }
 
-ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::createConfig() const {
+ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::ConfigFactoryImpl::createConfig() const {
   return std::make_shared<NullConfigImpl>();
 }
 

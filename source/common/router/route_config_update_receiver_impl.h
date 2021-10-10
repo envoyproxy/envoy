@@ -18,17 +18,15 @@
 namespace Envoy {
 namespace Router {
 
-class RouteConfigUpdateReceiverImpl
-    : public RouteConfigUpdateReceiver,
-      public Rds::ConfigFactory<envoy::config::route::v3::RouteConfiguration, Config> {
+class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
                                 const OptionalHttpFilters& optional_http_filters)
-      : base_(factory_context, *this), factory_context_(factory_context),
-        last_vhds_config_hash_(0ul),
+      : config_factory_(factory_context, optional_http_filters),
+        base_(factory_context, config_factory_), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
-        vhds_configuration_changed_(true), optional_http_filters_(optional_http_filters) {}
+        vhds_configuration_changed_(true) {}
 
   void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
@@ -64,21 +62,32 @@ public:
     return resource_ids_in_last_update_;
   }
 
-  // Rds::ConfigFactory
-  ConfigConstSharedPtr
-  createConfig(const envoy::config::route::v3::RouteConfiguration& rc) const override;
-  ConfigConstSharedPtr createConfig() const override;
-
 private:
+  class ConfigFactoryImpl
+      : public Rds::ConfigFactory<envoy::config::route::v3::RouteConfiguration, Config> {
+  public:
+    ConfigFactoryImpl(Server::Configuration::ServerFactoryContext& factory_context,
+                      const OptionalHttpFilters& optional_http_filters)
+        : factory_context_(factory_context), optional_http_filters_(optional_http_filters) {}
+
+    // Rds::ConfigFactory
+    ConfigConstSharedPtr
+    createConfig(const envoy::config::route::v3::RouteConfiguration& rc) const override;
+    ConfigConstSharedPtr createConfig() const override;
+
+  private:
+    Server::Configuration::ServerFactoryContext& factory_context_;
+    const OptionalHttpFilters optional_http_filters_;
+  };
+  ConfigFactoryImpl config_factory_;
+
   Rds::RouteConfigUpdateReceiverImpl<envoy::config::route::v3::RouteConfiguration, Config> base_;
 
-  Server::Configuration::ServerFactoryContext& factory_context_;
   uint64_t last_vhds_config_hash_;
   std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts_;
   std::unique_ptr<std::map<std::string, envoy::config::route::v3::VirtualHost>> vhds_virtual_hosts_;
   std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
-  const OptionalHttpFilters optional_http_filters_;
 };
 
 } // namespace Router

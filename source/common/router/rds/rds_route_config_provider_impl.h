@@ -9,7 +9,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/router/rds/config_factory.h"
 #include "source/common/router/rds/rds_route_config_subscription.h"
 
 namespace Envoy {
@@ -26,20 +25,13 @@ class RdsRouteConfigProviderImpl : public RouteConfigProvider<RouteConfiguration
 public:
   RdsRouteConfigProviderImpl(
       RdsRouteConfigSubscriptionSharedPtr<RouteConfiguration, Config>&& subscription,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      ConfigFactory<RouteConfiguration, Config>& config_factory)
+      Server::Configuration::ServerFactoryContext& factory_context)
       : subscription_(std::move(subscription)),
         config_update_info_(subscription_->routeConfigUpdate()),
         tls_(factory_context.threadLocal()) {
 
-    std::shared_ptr<const Config> initial_config;
-    if (config_update_info_->configInfo().has_value()) {
-      initial_config =
-          config_factory.createConfig(subscription_->routeConfigUpdate()->protobufConfiguration());
-    } else {
-      initial_config = config_factory.createConfig();
-    }
-
+    auto initial_config = config_update_info_->parsedConfiguration();
+    ASSERT(initial_config);
     tls_.set([initial_config](Event::Dispatcher&) {
       return std::make_shared<ThreadLocalConfig>(initial_config);
     });

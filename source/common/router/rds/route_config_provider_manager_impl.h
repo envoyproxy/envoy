@@ -85,7 +85,8 @@ protected:
 
   void insertDynamicProvider(int64_t manager_identifier,
                              RouteConfigProviderSharedPtr<RouteConfiguration, Config> provider,
-                             const Init::Target* init_target) {
+                             const Init::Target* init_target, Init::Manager& init_manager) {
+    init_manager.add(*init_target);
     dynamic_route_config_providers_.insert(
         {manager_identifier,
          std::make_pair(std::weak_ptr<RouteConfigProvider<RouteConfiguration, Config>>(provider),
