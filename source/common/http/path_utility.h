@@ -20,14 +20,6 @@ namespace Http {
  */
 class PathUtil {
 public:
-  // Returns true if the normalization succeeds.
-  // If it is successful, the path header will be updated with the normalized path.
-  // Requires the Path header be present.
-  static bool canonicalPath(RequestHeaderMap& headers);
-  // Merges two or more adjacent slashes in path part of URI into one.
-  // Requires the Path header be present.
-  static void mergeSlashes(RequestHeaderMap& headers);
-
   enum class UnescapeSlashesResult {
     // No escaped slash sequences were found and URL path has not been modified.
     NotFound = 0,

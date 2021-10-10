@@ -20,14 +20,13 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
     auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(
         input.canonical_path().request_headers(), {},
         {":path"}); // needs to have path header in order to be valid
-    Http::PathUtil::canonicalPath(request_headers);
-    ASSERT(!request_headers.getPathValue().empty());
+    ASSERT(Http::PathTransformer::rfcNormalize(request_headers.getPathValue()).has_value());
     break;
   }
   case test::common::http::PathUtilityTestCase::kMergeSlashes: {
     auto request_headers = fromHeaders<Http::TestRequestHeaderMapImpl>(
         input.merge_slashes().request_headers(), {}, {":path"});
-    Http::PathUtil::mergeSlashes(request_headers);
+    Http::PathTransformer::mergeSlashes(request_headers.getPathValue());
     break;
   }
   case test::common::http::PathUtilityTestCase::kRemoveQueryAndFragment: {

@@ -41,28 +41,6 @@ void unescapeInPath(std::string& path, absl::string_view escape_sequence,
 
 } // namespace
 
-/* static */
-bool PathUtil::canonicalPath(RequestHeaderMap& headers) {
-  ASSERT(headers.Path());
-  const auto original_path = headers.getPathValue();
-  const absl::optional<std::string> normalized_path = PathTransformer::rfcNormalize(original_path);
-  if (!normalized_path.has_value()) {
-    return false;
-  }
-  headers.setPath(normalized_path.value());
-  return true;
-}
-
-void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
-  ASSERT(headers.Path());
-  const auto original_path = headers.getPathValue();
-  const absl::optional<std::string> normalized =
-      PathTransformer::mergeSlashes(original_path).value();
-  if (normalized.has_value()) {
-    headers.setPath(normalized.value());
-  }
-}
-
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {
   absl::string_view ret = path;
   // Trim query parameters and/or fragment if present.

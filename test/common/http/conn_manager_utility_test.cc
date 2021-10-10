@@ -2007,7 +2007,6 @@ TEST_F(ConnectionManagerUtilityTest, RejectPathWithFragmentByDefault) {
           KEEP_UNCHANGED,
       true, false);
   ON_CALL(config_, pathTransformer()).WillByDefault(ReturnRef(*path_transformer_));
-  // ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   EXPECT_EQ(NormalizePathAction::Continue,
             ConnectionManagerUtility::maybeNormalizePath(header_map_with_percent_23, config_));
   // Path normalization should collapse /../
@@ -2082,7 +2081,6 @@ TEST_F(ConnectionManagerUtilityTest, KeepFragmentFromPathWithBothOverrides) {
             ConnectionManagerUtility::maybeNormalizePath(header_map_with_empty_fragment, config_));
   EXPECT_EQ(header_map_with_empty_fragment.getPathValue(), "/foo/baz/#");
 
-  // ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   path_transformer_ = std::make_unique<PathTransformer>(
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
           KEEP_UNCHANGED,

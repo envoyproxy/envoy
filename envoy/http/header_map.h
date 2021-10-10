@@ -22,7 +22,6 @@
 
 namespace Envoy {
 namespace Http {
-class ConnectionManagerUtility;
 // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
 // never contain embedded NULLs.
 static inline bool validHeaderString(absl::string_view s) {
@@ -827,9 +826,6 @@ class RequestHeaderMap
 public:
   INLINE_REQ_STRING_HEADERS(DEFINE_INLINE_STRING_HEADER)
   INLINE_REQ_NUMERIC_HEADERS(DEFINE_INLINE_NUMERIC_HEADER)
-
-private:
-  friend class ConnectionManagerUtility;
 };
 using RequestHeaderMapPtr = std::unique_ptr<RequestHeaderMap>;
 using RequestHeaderMapOptRef = OptRef<RequestHeaderMap>;
