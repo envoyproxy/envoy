@@ -22,6 +22,7 @@
 
 namespace Envoy {
 namespace Http {
+
 // Used by ASSERTs to validate internal consistency. E.g. valid HTTP header keys/values should
 // never contain embedded NULLs.
 static inline bool validHeaderString(absl::string_view s) {

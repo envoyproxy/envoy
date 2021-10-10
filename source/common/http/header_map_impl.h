@@ -510,7 +510,9 @@ private:
     INLINE_REQ_RESP_STRING_HEADERS(DEFINE_HEADER_HANDLE)
     INLINE_REQ_RESP_NUMERIC_HEADERS(DEFINE_HEADER_HANDLE)
   };
+
   using HeaderHandles = ConstSingleton<HeaderHandleValues>;
+
   RequestHeaderMapImpl() { clearInline(); }
 
   HeaderEntryImpl* inline_headers_[];
