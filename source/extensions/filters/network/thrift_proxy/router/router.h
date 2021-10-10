@@ -386,12 +386,10 @@ private:
     if (!upstream_host || local_zone_name_.empty()) {
       return;
     }
-
     const auto& upstream_zone_name = upstream_host->localityZoneStatName();
     if (upstream_zone_name.empty()) {
       return;
     }
-
     const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
         symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
     cluster.statsScope().counterFromStatName(Stats::StatName(zone_stat_name_storage.get())).inc();
@@ -408,12 +406,10 @@ private:
     if (!upstream_host || local_zone_name_.empty()) {
       return;
     }
-
     const auto& upstream_zone_name = upstream_host->localityZoneStatName();
     if (upstream_zone_name.empty()) {
       return;
     }
-
     const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
         symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
     cluster.statsScope()
