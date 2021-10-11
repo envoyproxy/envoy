@@ -530,7 +530,8 @@ class FormatChecker:
                 continue
             if "}" in line:
                 break
-
+            if "//" in line:
+                break
             match = FLAG_REGEX.match(line)
             if not match:
                 error_messages.append("%s does not look like a reloadable flag" % line)

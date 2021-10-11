@@ -51,6 +51,7 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+// clang-format off
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
@@ -97,10 +98,13 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
+    // Misplaced flags: please do not add flags to this section.
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
+    // End misplaced flags: please do not add flags in this section.
 };
+// clang-format on
 
 // This is a section for officially sanctioned runtime features which are too
 // high risk to be enabled by default. Examples where we have opted to land
