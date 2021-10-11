@@ -714,7 +714,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   ASSERT_TRUE(optional_it1.has_value());
   EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
 
-  Api::MockOsSysCalls os_sys_calls;
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
 #if defined(__APPLE__) || defined(WIN32)
