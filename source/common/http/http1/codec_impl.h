@@ -86,7 +86,7 @@ public:
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection);
+  StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
@@ -140,8 +140,9 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, bool stream_error_on_invalid_http_message)
-      : StreamEncoderImpl(connection),
+  ResponseEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
+                      bool stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection, std::move(bytes_meter)),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
 
   ~ResponseEncoderImpl() override {
@@ -180,7 +181,8 @@ private:
  */
 class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  RequestEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter)
+      : StreamEncoderImpl(connection, std::move(bytes_meter)) {}
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
@@ -270,13 +272,6 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
   bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
-
-  StreamInfo::BytesMeterSharedPtr&& releaseBytesMeter() {
-    if (bytes_meter_before_stream_ == nullptr) {
-      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
-    }
-    return std::move(bytes_meter_before_stream_);
-  }
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
@@ -473,8 +468,8 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ServerConnectionImpl& connection)
-        : response_encoder_(connection,
+    ActiveRequest(ServerConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter)
+        : response_encoder_(connection, std::move(bytes_meter),
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
     void dumpState(std::ostream& os, int indent_level) const;
@@ -586,9 +581,9 @@ public:
 
 private:
   struct PendingResponse {
-    PendingResponse(ConnectionImpl& connection, ResponseDecoder* decoder)
-        : encoder_(connection), decoder_(decoder) {}
-
+    PendingResponse(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
+                    ResponseDecoder* decoder)
+        : encoder_(connection, std::move(bytes_meter)), decoder_(decoder) {}
     RequestEncoderImpl encoder_;
     ResponseDecoder* decoder_;
   };

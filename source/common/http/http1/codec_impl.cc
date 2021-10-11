@@ -88,10 +88,14 @@ const std::string StreamEncoderImpl::CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
-StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
+                                     StreamInfo::BytesMeterSharedPtr&& bytes_meter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), bytes_meter_(connection.releaseBytesMeter()) {
+      is_response_to_connect_request_(false), bytes_meter_(bytes_meter) {
+  if (!bytes_meter_) {
+    bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
+  }
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -1141,7 +1145,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
 Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this);
+    active_request_.emplace(*this, std::move(bytes_meter_before_stream_));
     auto& active_request = active_request_.value();
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
@@ -1299,7 +1303,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 
   ASSERT(!pending_response_.has_value());
   ASSERT(pending_response_done_);
-  pending_response_.emplace(*this, &response_decoder);
+  pending_response_.emplace(*this, std::move(bytes_meter_before_stream_), &response_decoder);
   pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
