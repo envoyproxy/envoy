@@ -2171,7 +2171,7 @@ http_filters:
   config_discovery:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
-      "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
     - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
