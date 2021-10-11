@@ -17,7 +17,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
@@ -94,7 +93,6 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
-  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -332,10 +330,12 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
+
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
-      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
+      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
+      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
+      use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -570,6 +570,21 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";
+}
+
+envoy::service::discovery::v3::DeltaDiscoveryResponse
+BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
+    const std::string& type_url,
+    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+    const std::vector<std::string>& removed) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info("system_version_info_this_is_a_test");
+  response.set_type_url(type_url);
+  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
+  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+  static int next_nonce_counter = 0;
+  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+  return response;
 }
 
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(

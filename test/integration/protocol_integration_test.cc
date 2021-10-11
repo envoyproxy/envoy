@@ -53,12 +53,6 @@ void setDoNotValidateRouteConfig(
   route_config->mutable_validate_clusters()->set_value(false);
 };
 
-// TODO(#2557) fix all the failures.
-#define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
-    return;                                                                                        \
-  }
-
 TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
@@ -168,48 +162,6 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ(upstream_request_->headers().ContentLength(), nullptr);
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("600", response->headers().getStatusValue());
-}
-
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ComputedHealthCheck) {
-  config_helper_.prependFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ModifyBuffer) {
-  config_helper_.prependFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
@@ -581,8 +533,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
-  // TODO(danzh) re-enable after adding http3 option "allow_connect".
-  EXCLUDE_DOWNSTREAM_HTTP3;
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
     // For QUIC, even through the headers are not sent upstream, the stream will
     // be created. Use the autonomous upstream and allow incomplete streams.
@@ -592,15 +542,10 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   // Faulty filter that removed host in a CONNECT request.
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void { ConfigHelper::setConnectConfig(hcm, false, false); });
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    // Clone the whole listener.
-    auto static_resources = bootstrap.mutable_static_resources();
-    auto* old_listener = static_resources->mutable_listeners(0);
-    auto* cloned_listener = static_resources->add_listeners();
-    cloned_listener->CopyFrom(*old_listener);
-    old_listener->set_name("http_forward");
-  });
+              hcm) -> void {
+        ConfigHelper::setConnectConfig(hcm, false, false,
+                                       downstreamProtocol() == Http::CodecType::HTTP3);
+      });
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                                "type.googleapis.com/google.protobuf.Empty } }");
@@ -611,9 +556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, FaultyFilterWithConnect) {
   auto headers = Http::TestRequestHeaderMapImpl{
       {":method", "CONNECT"}, {":scheme", "http"}, {":authority", "www.host.com:80"}};
 
-  auto response = (downstream_protocol_ == Http::CodecType::HTTP1)
-                      ? std::move((codec_client_->startRequest(headers)).second)
-                      : codec_client_->makeHeaderOnlyRequest(headers);
+  auto response = std::move((codec_client_->startRequest(headers)).second);
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -2666,8 +2609,6 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 // Make sure that with override_stream_error_on_invalid_http_message true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
-  // TODO(danzh) add "allow_connect" to http3 options.
-  EXCLUDE_DOWNSTREAM_HTTP3;
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
@@ -2684,8 +2625,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host"}});
 
   ASSERT_TRUE(response->waitForReset());
   EXPECT_FALSE(codec_client_->disconnected());

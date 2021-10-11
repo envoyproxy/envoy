@@ -87,6 +87,7 @@ envoy_cc_library(
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
         "//source/common/upstream:upstream_lib",
         "//source/common/quic:quic_stat_names_lib",
+        "//source/server:factory_context_base_impl_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -103,6 +104,14 @@ envoy_cc_library(
     hdrs = ["cluster_update_tracker.h"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "retry_factory_lib",
+    hdrs = ["retry_factory.h"],
+    deps = [
+        "//envoy/upstream:retry_interface",
     ],
 )
 
@@ -408,6 +417,7 @@ envoy_cc_library(
     hdrs = ["eds.h"],
     deps = [
         ":cluster_factory_lib",
+        ":leds_lib",
         ":upstream_includes",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_factory_interface",
@@ -499,6 +509,7 @@ envoy_cc_library(
         "//envoy/network:listen_socket_interface",
         "//envoy/ssl:context_interface",
         "//envoy/upstream:health_checker_interface",
+        "//source/common/common:dns_utils_lib",
         "//source/common/common:enum_to_int",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",

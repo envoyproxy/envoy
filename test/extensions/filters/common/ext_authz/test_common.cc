@@ -82,8 +82,13 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
   }
   if (!downstream_headers.empty()) {
     for (auto& header : downstream_headers) {
-      authz_response.response_headers_to_add.emplace_back(
-          Http::LowerCaseString(header.header().key()), header.header().value());
+      if (header.append().value()) {
+        authz_response.response_headers_to_add.emplace_back(
+            Http::LowerCaseString(header.header().key()), header.header().value());
+      } else {
+        authz_response.response_headers_to_set.emplace_back(
+            Http::LowerCaseString(header.header().key()), header.header().value());
+      }
     }
   }
   return authz_response;
@@ -123,6 +128,19 @@ bool TestCommon::compareVectorOfHeaderName(const std::vector<Http::LowerCaseStri
                                            const std::vector<Http::LowerCaseString>& rhs) {
   return std::set<Http::LowerCaseString>(lhs.begin(), lhs.end()) ==
          std::set<Http::LowerCaseString>(rhs.begin(), rhs.end());
+}
+
+bool TestCommon::compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
+                                                 const std::vector<std::string>& rhs) {
+  return std::set<std::string>(lhs.begin(), lhs.end()) ==
+         std::set<std::string>(rhs.begin(), rhs.end());
+}
+
+// TODO(esmet): This belongs in a QueryParams class
+bool TestCommon::compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
+                                          const Http::Utility::QueryParamsVector& rhs) {
+  return std::set<std::pair<std::string, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<std::string, std::string>>(rhs.begin(), rhs.end());
 }
 
 } // namespace ExtAuthz

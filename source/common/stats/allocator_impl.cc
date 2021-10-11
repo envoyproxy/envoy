@@ -65,8 +65,8 @@ void AllocatorImpl::debugPrint() {
 // which we need in order to clean up the counter and gauge maps in that class
 // when they are destroyed.
 //
-// We implement the RefcountInterface API, using 16 bits that would otherwise be
-// wasted in the alignment padding next to flags_.
+// We implement the RefcountInterface API to avoid weak counter and destructor overhead in
+// shared_ptr.
 template <class BaseClass> class StatsSharedImpl : public MetricImpl<BaseClass> {
 public:
   StatsSharedImpl(StatName name, AllocatorImpl& alloc, StatName tag_extracted_name,

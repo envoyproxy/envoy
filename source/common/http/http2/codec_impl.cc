@@ -34,7 +34,7 @@ namespace Http {
 namespace Http2 {
 
 // Changes or additions to details should be reflected in
-// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
+// docs/root/configuration/http/http_conn_man/response_code_details.rst
 class Http2ResponseCodeDetailValues {
 public:
   // Invalid HTTP header field was received and stream is going to be
@@ -1728,14 +1728,9 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  StreamResetReason reason = StreamResetReason::LocalReset;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-    reason = StreamResetReason::ProtocolError;
-    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
-  }
+  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
 
-  return reason;
+  return StreamResetReason::ProtocolError;
 }
 
 ServerConnectionImpl::ServerConnectionImpl(

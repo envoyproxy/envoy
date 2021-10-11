@@ -106,7 +106,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory);
+    initialize(std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -166,16 +166,26 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  store.forEachCounter([this](std::size_t size) mutable { counters_.reserve(size); },
-                       [this](Stats::Counter& counter) mutable {
-                         counters_.push_back({counter.latch(), counter});
-                       });
+  store.forEachCounter(
+      [this](std::size_t size) mutable {
+        snapped_counters_.reserve(size);
+        counters_.reserve(size);
+      },
+      [this](Stats::Counter& counter) mutable {
+        snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
+        counters_.push_back({counter.latch(), counter});
+      });
 
-  store.forEachGauge([this](std::size_t size) mutable { gauges_.reserve(size); },
-                     [this](Stats::Gauge& gauge) mutable {
-                       ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
-                       gauges_.push_back(gauge);
-                     });
+  store.forEachGauge(
+      [this](std::size_t size) mutable {
+        snapped_gauges_.reserve(size);
+        gauges_.reserve(size);
+      },
+      [this](Stats::Gauge& gauge) mutable {
+        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+        gauges_.push_back(gauge);
+      });
 
   snapped_histograms_ = store.histograms();
   histograms_.reserve(snapped_histograms_.size());
@@ -184,8 +194,14 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
   }
 
   store.forEachTextReadout(
-      [this](std::size_t size) mutable { text_readouts_.reserve(size); },
-      [this](Stats::TextReadout& text_readout) { text_readouts_.push_back(text_readout); });
+      [this](std::size_t size) mutable {
+        snapped_text_readouts_.reserve(size);
+        text_readouts_.reserve(size);
+      },
+      [this](Stats::TextReadout& text_readout) {
+        snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+        text_readouts_.push_back(text_readout);
+      });
 
   snapshot_time_ = time_source.systemTime();
 }
@@ -346,11 +362,10 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
-void InstanceImpl::initialize(const Options& options,
-                              Network::Address::InstanceConstSharedPtr local_address,
+void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
-            options.restartEpoch(), restarter_.baseId(), restarter_.version());
+            options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -358,7 +373,7 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
@@ -397,10 +412,9 @@ void InstanceImpl::initialize(const Options& options,
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
-  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
-      server_stats_->static_unknown_fields_);
-  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
-      server_stats_->dynamic_unknown_fields_);
+  validation_context_.setCounters(server_stats_->static_unknown_fields_,
+                                  server_stats_->dynamic_unknown_fields_,
+                                  server_stats_->wip_protos_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -456,7 +470,7 @@ void InstanceImpl::initialize(const Options& options,
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+      options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
   Configuration::InitialImpl initial_config(bootstrap_);
 
@@ -480,7 +494,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -563,7 +577,7 @@ void InstanceImpl::initialize(const Options& options,
   initial_config.initAdminAccessLog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));
@@ -914,7 +928,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT(Thread::MainThread::isMainOrTestThread());
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

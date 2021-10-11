@@ -1,6 +1,7 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
 load("//source/extensions:all_extensions.bzl", "envoy_all_extensions")
 load("//tools/base:envoy_python.bzl", "envoy_py_binary")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,7 +17,7 @@ envoy_py_binary(
         "//test/extensions/filters/network/common/fuzz:uber_per_readfilter.cc",
     ] + envoy_all_extensions(),
     deps = [
-        "//tools/base:checker",
-        "//tools/base:utils",
+        requirement("envoy.base.checker"),
+        requirement("envoy.base.utils"),
     ],
 )

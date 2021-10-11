@@ -169,10 +169,12 @@ def envoy_cc_test(
         linkstatic = envoy_linkstatic(),
         malloc = tcmalloc_external_dep(repository),
         deps = envoy_stdlib_deps() + deps + [envoy_external_dep_path(dep) for dep in external_deps + ["googletest"]] + [
-            repository + "//test:test_pch",
             repository + "//test:main",
             repository + "//test/test_common:test_version_linkstamp",
-        ],
+        ] + select({
+            repository + "//bazel:clang_pch_build": [repository + "//test:test_pch"],
+            "//conditions:default": [],
+        }),
         # from https://github.com/google/googletest/blob/6e1970e2376c14bf658eb88f655a054030353f9f/googlemock/src/gmock.cc#L51
         # 2 - by default, mocks act as StrictMocks.
         args = args + ["--gmock_default_mock_behavior=2"],

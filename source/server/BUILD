@@ -272,7 +272,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )
 
@@ -535,6 +535,14 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config_impl.h"],
     deps = [
         "//envoy/server:resource_monitor_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "factory_context_base_impl_lib",
+    hdrs = ["factory_context_base_impl.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
     ],
 )
 
