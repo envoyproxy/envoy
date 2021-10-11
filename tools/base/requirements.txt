@@ -181,7 +181,7 @@ coloredlogs==15.0.1 \
     # via
     #   -r requirements.in
     #   envoy.base.runner
-coverage==6.0 \
+coverage[toml]==6.0 \
     --hash=sha256:08fd55d2e00dac4c18a2fa26281076035ec86e764acdc198b9185ce749ada58f \
     --hash=sha256:11ce082eb0f7c2bbfe96f6c8bcc3a339daac57de4dc0f3186069ec5c58da911c \
     --hash=sha256:17983f6ccc47f4864fd16d20ff677782b23d1207bf222d10e4d676e4636b0872 \
@@ -319,9 +319,9 @@ envoy.gpg.identity==0.0.2 \
 envoy.gpg.sign==0.0.3 \
     --hash=sha256:31667931f5d7ff05fd809b89748f277511486311c777652af4cb8889bd641049
     # via -r requirements.in
-flake8==3.9.2 \
-    --hash=sha256:07528381786f2a6237b061f6e96610a4167b226cb926e2aa2b6b1d78057c576b \
-    --hash=sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907
+flake8==4.0.1 \
+    --hash=sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d \
+    --hash=sha256:806e034dda44114815e23c16ef92f95c91e4c71100ff52813adf7132a6ad870d
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
@@ -497,17 +497,17 @@ py==1.10.0 \
     --hash=sha256:21b81bda15b66ef5e1a777a21c4dcd9c20ad3efd0b3f817e7a809035269e1bd3 \
     --hash=sha256:3b80836aa6d1feeaa108e046da6423ab8f6ceda6468545ae8d02d9d58d18818a
     # via pytest
-pycodestyle==2.7.0 \
-    --hash=sha256:514f76d918fcc0b55c6680472f0a37970994e07bbb80725808c17089be302068 \
-    --hash=sha256:c389c1d06bf7904078ca03399a4816f974a1d590090fecea0c63ec26ebaf1cef
+pycodestyle==2.8.0 \
+    --hash=sha256:720f8b39dde8b293825e7ff02c475f3077124006db4f440dcbc9a20b76548a20 \
+    --hash=sha256:eddd5847ef438ea1c7870ca7eb78a9d47ce0cdb4851a5523949f2601d0cbbe7f
     # via flake8
 pycparser==2.20 \
     --hash=sha256:2d475327684562c3a96cc71adf7dc8c4f0565175cf86b6d7a404ff4c771f15f0 \
     --hash=sha256:7582ad22678f0fcd81102833f60ef8d0e57288b6b5fb00323d101be910e35705
     # via cffi
-pyflakes==2.3.1 \
-    --hash=sha256:7893783d01b8a89811dd72d7dfd4d84ff098e5eed95cfa8905b22bbffe52efc3 \
-    --hash=sha256:f5bc8ecabc05bb9d291eb5203d6810b49040f6ff446a756326104746cc00c1db
+pyflakes==2.4.0 \
+    --hash=sha256:05a85c2872edf37a4ed30b0cce2f6093e1d0581f8c19d7393122da7e25b2b24c \
+    --hash=sha256:3bb3a3f256f4b7968c9c788781e4ff07dce46bdf12339dcda61053375426ee2e
     # via flake8
 pygithub==1.55 \
     --hash=sha256:1bbfff9372047ff3f21d5cd8e07720f3dbfdaf6462fcaed9d815f528f1ba7283 \
@@ -707,9 +707,11 @@ sphinxext-rediraffe==0.2.7 \
 toml==0.10.2 \
     --hash=sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b \
     --hash=sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f
-    # via
-    #   coverage
-    #   pytest
+    # via pytest
+tomli==1.2.1 \
+    --hash=sha256:8dd0e9524d6f386271a36b41dbf6c57d8e32fd96fd22b6584679dc569d20899f \
+    --hash=sha256:a5b75cb6f3968abb47af1b40c1819dc519ea82bcc065776a866e8d74c5ca9442
+    # via coverage
 trycast==0.3.0 \
     --hash=sha256:1b7b4c0d4b0d674770a53f34a762e52a6cd6879eb251ab21625602699920080d \
     --hash=sha256:687185b812e8d1c45f2ba841e8de7bdcdee0695dcf3464f206800505d4c65f26
