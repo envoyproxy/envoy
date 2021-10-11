@@ -53,7 +53,7 @@ message RateLimitRequest {
 }
 
 // A response from a ShouldRateLimit call.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RateLimitResponse {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
@@ -103,8 +103,15 @@ message RateLimitResponse {
     Unit unit = 2;
   }
 
-  // Cacheable quota for responses, see documentation for the :ref:`quota
-  // <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.quota>` field.
+  // Cacheable quota for responses.
+  // Quota can be granted at different levels: either for each individual descriptor or for the whole descriptor set.
+  // This is a certain number of requests over a period of time.
+  // The client may cache this result and apply the effective RateLimitResponse to future matching
+  // requests without querying rate limit service.
+  //
+  // When quota expires due to timeout, a new RLS request will also be made.
+  // The implementation may choose to preemptively query the rate limit server for more quota on or
+  // before expiration or before the available quota runs out.
   // [#not-implemented-hide:]
   message Quota {
     // Number of matching requests granted in quota. Must be 1 or more.
@@ -114,6 +121,15 @@ message RateLimitResponse {
       // Point in time at which the quota expires.
       google.protobuf.Timestamp valid_until = 2;
     }
+
+    // The unique id that is associated with each Quota either at individual descriptor level or whole descriptor set level.
+    //
+    // For a matching policy with boolean logic, for example, match: "request.headers['environment'] == 'staging' || request.headers['environment'] == 'dev'"),
+    // the request_headers action produces a distinct list of descriptors for each possible value of the ‘environment’ header even though the granted quota is same.
+    // Thus, the client will use this id information (returned from RLS server) to correctly correlate the multiple descriptors/descriptor sets that have been granted with same quota (i.e., share the same quota among multiple descriptors or descriptor sets.)
+    //
+    // If id is empty, this id field will be ignored. If quota for the same id changes (e.g. due to configuration update), the old quota will be overridden by the new one. Shared quotas referenced by ID will still adhere to expiration after `valid_until`.
+    string id = 3;
   }
 
   // [#next-free-field: 6]
@@ -133,12 +149,9 @@ message RateLimitResponse {
     // Duration until reset of the current limit window.
     google.protobuf.Duration duration_until_reset = 4;
 
-    // Quota granted for the descriptor. This is a certain number of requests over a period of time.
-    // The client may cache this result and apply the effective RateLimitResponse to future matching
-    // requests containing a matching descriptor without querying rate limit service.
-    //
     // Quota is available for a request if its descriptor set has cached quota available for all
     // descriptors.
+    // This is for each individual descriptor in the descriptor set. The client will perform matches for each individual descriptor against available per-descriptor quota.
     //
     // If quota is available, a RLS request will not be made and the quota will be reduced by 1 for
     // all matching descriptors.
@@ -159,10 +172,6 @@ message RateLimitResponse {
     //    If the server did not provide a quota, such as the quota message is empty for some of
     //    the descriptors, then the request admission is determined by the
     //    :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
-    //
-    // When quota expires due to timeout, a new RLS request will also be made.
-    // The implementation may choose to preemptively query the rate limit server for more quota on or
-    // before expiration or before the available quota runs out.
     // [#not-implemented-hide:]
     Quota quota = 5;
   }
@@ -193,4 +202,17 @@ message RateLimitResponse {
   // - :ref:`envoy.filters.network.ratelimit <config_network_filters_ratelimit_dynamic_metadata>` for network filter.
   // - :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit_dynamic_metadata>` for Thrift filter.
   google.protobuf.Struct dynamic_metadata = 6;
+
+  // Quota is available for a request if its entire descriptor set has cached quota available.
+  // This is a union of all descriptors in the descriptor set. Clients can use the quota for future matches if and only if the descriptor set matches what was sent in the request that originated this response.
+  //
+  // If quota is available, a RLS request will not be made and the quota will be reduced by 1.
+  // If quota is not available (i.e., a cached entry doesn't exist for a RLS descriptor set), a RLS request will be triggered.
+  // If the server did not provide a quota, such as the quota message is empty then the request admission is determined by the
+  // :ref:`overall_code <envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.overall_code>`.
+  //
+  // If there is not sufficient quota and the cached entry exists for a RLS descriptor set is out-of-quota but not expired,
+  // the request will be treated as OVER_LIMIT.
+  // [#not-implemented-hide:]
+  Quota quota = 7;
 }

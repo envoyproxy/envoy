@@ -1,6 +1,6 @@
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "test/test_common/network_utility.h"
 
@@ -14,8 +14,8 @@ namespace ExternalProcessing {
 
 grpc::Status ProcessorWrapper::Process(
     grpc::ServerContext* ctx,
-    grpc::ServerReaderWriter<envoy::service::ext_proc::v3alpha::ProcessingResponse,
-                             envoy::service::ext_proc::v3alpha::ProcessingRequest>* stream) {
+    grpc::ServerReaderWriter<envoy::service::ext_proc::v3::ProcessingResponse,
+                             envoy::service::ext_proc::v3::ProcessingRequest>* stream) {
   if (context_callback_) {
     (*context_callback_)(ctx);
   }

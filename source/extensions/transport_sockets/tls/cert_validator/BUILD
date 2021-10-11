@@ -33,6 +33,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",

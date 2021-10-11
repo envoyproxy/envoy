@@ -404,5 +404,9 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
+SysCallIntResult OsSysCallsImpl::getifaddrs(struct ifaddrs**) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+void OsSysCallsImpl::freeifaddrs(struct ifaddrs*) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
 } // namespace Api
 } // namespace Envoy

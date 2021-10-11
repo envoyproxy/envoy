@@ -11,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using testing::Invoke;
 using testing::Unused;
@@ -42,7 +42,7 @@ protected:
   Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused, Unused) {
     auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client,
-                startRaw("envoy.service.ext_proc.v3alpha.ExternalProcessor", "Process", _, _))
+                startRaw("envoy.service.ext_proc.v3.ExternalProcessor", "Process", _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doStartRaw));
     return async_client;
   }

@@ -160,6 +160,13 @@ public:
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                     const std::string& leds_collection_name);
+
+  static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(const std::string& address,
+                                                                 uint32_t port);
+
   static envoy::config::listener::v3::Listener
   buildBaseListener(const std::string& name, const std::string& address,
                     const std::string& filter_chains = "");
@@ -305,9 +312,6 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
-
-  // Enable deprecated v2 API resources via the runtime.
-  void enableDeprecatedV2Api();
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

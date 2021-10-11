@@ -11,7 +11,7 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 namespace {
 
-using envoy::service::ext_proc::v3alpha::BodyMutation;
+using envoy::service::ext_proc::v3::BodyMutation;
 
 using Http::LowerCaseString;
 
@@ -53,7 +53,7 @@ TEST(MutationUtils, TestApplyMutations) {
       {"x-envoy-strange-thing", "No"},
   };
 
-  envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key("x-append-this");
@@ -135,7 +135,7 @@ TEST(MutationUtils, TestApplyMutations) {
 
 TEST(MutationUtils, TestNonAppendableHeaders) {
   Http::TestRequestHeaderMapImpl headers;
-  envoy::service::ext_proc::v3alpha::HeaderMutation mutation;
+  envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   s->mutable_append()->set_value(true);
   s->mutable_header()->set_key(":path");

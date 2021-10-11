@@ -26,7 +26,7 @@ Configuration
 
 The filter is configured with the name *envoy.filters.http.cdn_loop*.
 
-The :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig>` has two fields.
+The :ref:`filter config <envoy_v3_api_msg_extensions.filters.http.cdn_loop.v3.CdnLoopConfig>` has two fields.
 
 * The *cdn_id* field sets the identifier that the filter will look for within and append to the
   CDN-Loop header. RFC 8586 calls this field the "cdn-id"; "cdn-id" can either be a pseudonym or a

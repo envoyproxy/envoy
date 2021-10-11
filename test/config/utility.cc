@@ -508,6 +508,39 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
   return cluster_load_assignment;
 }
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                 const std::string& leds_collection_name) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+        leds_cluster_locality_config:
+          leds_config:
+            resource_api_version: V3
+            ads: {{}}
+          leds_collection_name: {}
+    )EOF",
+                                        name, leds_collection_name),
+                            cluster_load_assignment);
+  return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::LbEndpoint ConfigHelper::buildLbEndpoint(const std::string& address,
+                                                                      uint32_t port) {
+  API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      endpoint:
+        address:
+          socket_address:
+            address: {}
+            port_value: {}
+    )EOF",
+                                        address, port),
+                            lb_endpoint);
+  return lb_endpoint;
+}
+
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
@@ -753,11 +786,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
-}
-
-void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
-  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
