@@ -143,7 +143,6 @@ protected:
   testing::NiceMock<quic::test::MockPacketWriter> writer_;
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   TestEnvoyQuicClientConnection* quic_connection_;
   quic::QuicConfig quic_config_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
@@ -158,6 +157,7 @@ protected:
   testing::StrictMock<Stats::MockCounter> write_total_;
   testing::StrictMock<Stats::MockGauge> write_current_;
   Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   QuicHttpClientConnectionImpl http_connection_;
 };
 

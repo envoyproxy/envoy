@@ -133,13 +133,13 @@ protected:
   Network::Address::InstanceConstSharedPtr peer_addr_;
   Network::Address::InstanceConstSharedPtr self_addr_;
   MockDelegate delegate_;
-  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
   quic::QuicStreamId stream_id_{4u};
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
+  envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   EnvoyQuicClientStream* quic_stream_;
   Http::MockResponseDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
