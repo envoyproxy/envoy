@@ -13,7 +13,6 @@ namespace Envoy {
 namespace {
 
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                   public Event::TestUsingSimulatedTime,
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
@@ -62,7 +61,7 @@ typed_config:
 
     // Setup the initial CDS cluster.
     cluster_.mutable_connect_timeout()->CopyFrom(
-        Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+        Protobuf::util::TimeUtil::MillisecondsToDuration(5000));
     cluster_.set_name("cluster_0");
     cluster_.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
 
@@ -148,6 +147,12 @@ typed_config:
   bool use_cache_file_{};
 };
 
+class ProxyFilterWithSimtimeIntegrationTest : public ProxyFilterIntegrationTest,
+                                              public Event::TestUsingSimulatedTime {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterWithSimtimeIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -230,7 +235,7 @@ TEST_P(ProxyFilterIntegrationTest, ReloadClusterAndAttachToCache) {
 }
 
 // Verify that we expire hosts.
-TEST_P(ProxyFilterIntegrationTest, RemoveHostViaTTL) {
+TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveHostViaTTL) {
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -433,15 +438,11 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
       {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  // because this test uses simtime, you must explicitly advance time for the
+  // happy eyeballs timer to fire.
 
-  // This should _not_ require a 10+s wait.
-  // For some reason the next attempt alarm, which has a 300ms timeout is not
-  // firing, so this doesn't fail until the connect timeout fires.
-  // TODO(alyssawilk) figure out what the heck is going on here.
-  while (test_server_->counter("cluster.cluster_0.upstream_rq_total")->value() == 0) {
-    usleep(1000);
-  }
-
+  // Wait for the request to be received.
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
   EXPECT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
