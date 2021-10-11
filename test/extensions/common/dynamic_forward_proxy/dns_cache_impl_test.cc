@@ -7,6 +7,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/server/factory_context_base_impl.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -20,6 +21,7 @@
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+using testing::AtLeast;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Return;
@@ -207,6 +209,54 @@ TEST_F(DnsCacheImplTest, ResolveSuccess) {
 
   checkStats(3 /* attempt */, 3 /* success */, 0 /* failure */, 2 /* address changed */,
              1 /* added */, 0 /* removed */, 1 /* num hosts */);
+}
+
+// Verify the force refresh API works as expected.
+TEST_F(DnsCacheImplTest, ForceRefresh) {
+  initialize();
+  InSequence s;
+
+  // No hosts so should not do anything.
+  dns_cache_->forceRefreshHosts();
+  checkStats(0 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             0 /* added */, 0 /* removed */, 0 /* num hosts */);
+
+  MockLoadDnsCacheEntryCallbacks callbacks;
+  Network::DnsResolver::ResolveCb resolve_cb;
+  Event::MockTimer* resolve_timer = new Event::MockTimer(&context_.dispatcher_);
+  Event::MockTimer* timeout_timer = new Event::MockTimer(&context_.dispatcher_);
+  EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
+  EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
+      .WillOnce(DoAll(SaveArg<2>(&resolve_cb), Return(&resolver_->active_query_)));
+  auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
+  EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::Loading, result.status_);
+  EXPECT_NE(result.handle_, nullptr);
+  EXPECT_EQ(absl::nullopt, result.host_info_);
+
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Query in progress so should do nothing.
+  dns_cache_->forceRefreshHosts();
+  checkStats(1 /* attempt */, 0 /* success */, 0 /* failure */, 0 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  EXPECT_CALL(*timeout_timer, disableTimer());
+  EXPECT_CALL(update_callbacks_,
+              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(callbacks,
+              onLoadDnsCacheComplete(DnsHostInfoEquals("10.0.0.1:80", "foo.com", false)));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(6000), _));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
+             TestUtility::makeDnsResponse({"10.0.0.1"}));
+
+  checkStats(1 /* attempt */, 1 /* success */, 0 /* failure */, 1 /* address changed */,
+             1 /* added */, 0 /* removed */, 1 /* num hosts */);
+
+  // Should force a refresh. Ignore strict mock failures on the enabled() call.
+  EXPECT_CALL(*timeout_timer, enabled()).Times(AtLeast(0));
+  EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(0), _));
+  dns_cache_->forceRefreshHosts();
 }
 
 // Ipv4 address.
@@ -930,6 +980,23 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
                             "config specified DNS cache 'foo' with different settings");
 }
 
+TEST(DnsCacheManagerImplTest, LookupByName) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  DnsCacheManagerImpl cache_manager(context);
+
+  EXPECT_EQ(cache_manager.lookUpCacheByName("foo"), nullptr);
+
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
+  config1.set_name("foo");
+
+  auto cache1 = cache_manager.getCache(config1);
+  EXPECT_NE(cache1, nullptr);
+
+  auto cache2 = cache_manager.lookUpCacheByName("foo");
+  EXPECT_NE(cache2, nullptr);
+  EXPECT_EQ(cache1, cache2);
+}
+
 TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
@@ -1115,6 +1182,21 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(40000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"10.0.0.2"}, std::chrono::seconds(40)));
+}
+
+// Make sure the cache manager can handle the context going out of scope.
+TEST(DnsCacheManagerImplTest, TestLifetime) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  std::unique_ptr<DnsCacheManagerImpl> cache_manager;
+
+  {
+    Server::FactoryContextBaseImpl scoped_context(context);
+    cache_manager = std::make_unique<DnsCacheManagerImpl>(scoped_context);
+  }
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
+  config1.set_name("foo");
+
+  EXPECT_TRUE(cache_manager->getCache(config1) != nullptr);
 }
 
 } // namespace

@@ -254,4 +254,4 @@ The following table shows the available Docker images
    building Envoy and related containers. This image requires 4-5GB of available disk space to use.
 
    All the docker images are available in Docker Hub, but `its rate limit policy <https://www.docker.com/increase-rate-limits>`_
-   doesn't apply to users since the "envoyproxy" namespace is whitelisted.
+   doesn't apply to users since the "envoyproxy" namespace is allowlisted.

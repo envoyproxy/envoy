@@ -22,6 +22,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+Repick
 btree
 CAS
 CB
@@ -851,6 +852,7 @@ namespaced
 namespaces
 namespacing
 nan
+nanos
 natively
 ndk
 netblock
@@ -1087,6 +1089,7 @@ setsockopt
 sig
 sigaction
 sigactions
+sigaltstack
 siginfo
 signalstack
 siloed
@@ -1291,3 +1294,10 @@ zlib
 OBQ
 SemVer
 SCM
+SCTP
+CRLF
+clen
+crlf
+ep
+suri
+transid

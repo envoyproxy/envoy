@@ -95,10 +95,7 @@ void ThreadAwareLoadBalancerBase::initialize() {
   // complicated initialization as the load balancer would need its own initialized callback. I
   // think the synchronous/asynchronous split is probably the best option.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector&, const HostVector&) -> void {
-        refresh();
-        threadSafeSetCrossPriorityHostMap(priority_set_.crossPriorityHostMap());
-      });
+      [this](uint32_t, const HostVector&, const HostVector&) -> void { refresh(); });
 
   refresh();
 }
@@ -134,6 +131,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
     factory_->healthy_per_priority_load_ = healthy_per_priority_load;
     factory_->degraded_per_priority_load_ = degraded_per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
+    factory_->cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
   }
 }
 
@@ -181,8 +179,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
-  auto lb = std::make_unique<LoadBalancerImpl>(
-      stats_, random_, thread_aware_lb_.threadSafeGetCrossPriorityHostMap());
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
@@ -190,6 +187,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
   lb->healthy_per_priority_load_ = healthy_per_priority_load_;
   lb->degraded_per_priority_load_ = degraded_per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
+  lb->cross_priority_host_map_ = cross_priority_host_map_;
 
   return lb;
 }

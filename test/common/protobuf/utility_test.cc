@@ -21,6 +21,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
+#include "test/common/protobuf/utility_test_file_wip.pb.h"
+#include "test/common/protobuf/utility_test_file_wip_2.pb.h"
+#include "test/common/protobuf/utility_test_message_field_wip.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -45,30 +48,17 @@ using testing::HasSubstr;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
-  RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
+  explicit RuntimeStatsHelper()
       : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
-                         Stats::Gauge::ImportMode::NeverImport)) {
-    if (allow_deprecated_v2_api) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
-          {"envoy.features.enable_all_deprecated_features", "true"},
-      });
-    }
-  }
+                         Stats::Gauge::ImportMode::NeverImport)) {}
 
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
 };
 
 class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
-// TODO(htuch): During/before the v2 removal, cleanup the various examples that explicitly refer to
-// v2 API protos and replace with upgrade examples not tie to the concrete API.
-class ProtobufV2ApiUtilityTest : public testing::Test, protected RuntimeStatsHelper {
-public:
-  ProtobufV2ApiUtilityTest() : RuntimeStatsHelper(true) {}
-};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -448,6 +438,37 @@ insensitive_string: This field should not be redacted.
 insensitive_repeated_string:
   - This field should not be redacted (1 of 2).
   - This field should not be redacted (2 of 2).
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Fields that are values in a sensitive map should be redacted.
+TEST_F(ProtobufUtilityTest, RedactMap) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string_map:
+  "a": "b"
+sensitive_int_map:
+  "x": 12345
+insensitive_string_map:
+  "c": "d"
+insensitive_int_map:
+  "y": 123456
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string_map:
+  "a": "[redacted]"
+sensitive_int_map:
+  "x":
+insensitive_string_map:
+  "c": "d"
+insensitive_int_map:
+  "y": 123456
 )EOF",
                             expected);
 
@@ -1333,7 +1354,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToWrongType) {
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -1558,6 +1579,76 @@ TEST(DurationUtilTest, OutOfRange) {
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
   }
+}
+
+// Verify WIP accounting of the file based annotations. This test uses the strict validator to test
+// that code path.
+TEST_F(ProtobufUtilityTest, MessageInWipFile) {
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::StrictValidationVisitorImpl validation_visitor;
+
+  utility_test::file_wip::Foo foo;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.file_wip.Foo' is contained in proto file "
+      "'test/common/protobuf/utility_test_file_wip.proto' marked as work-in-progress. API features "
+      "marked as work-in-progress are not considered stable, are not covered by the threat model, "
+      "are not supported by the security team, and are subject to breaking changes. Do not use "
+      "this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
+
+  utility_test::file_wip_2::Foo foo2;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.file_wip_2.Foo' is contained in proto file "
+      "'test/common/protobuf/utility_test_file_wip_2.proto' marked as work-in-progress. API "
+      "features marked as work-in-progress are not considered stable, are not covered by the "
+      "threat model, are not supported by the security team, and are subject to breaking changes. "
+      "Do not use this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo2, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
+}
+
+// Verify WIP accounting for message and field annotations. This test uses the warning validator
+// to test that code path.
+TEST_F(ProtobufUtilityTest, MessageWip) {
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& unknown_counter = stats.counter("unknown_counter");
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::WarningValidationVisitorImpl validation_visitor;
+
+  utility_test::message_field_wip::Foo foo;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.message_field_wip.Foo' is marked as work-in-progress. API features "
+      "marked as work-in-progress are not considered stable, are not covered by the threat model, "
+      "are not supported by the security team, and are subject to breaking changes. Do not use "
+      "this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(unknown_counter, wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
+
+  utility_test::message_field_wip::Bar bar;
+  EXPECT_NO_LOGS(MessageUtil::checkForUnexpectedFields(bar, validation_visitor));
+
+  bar.set_test_field(true);
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "field 'utility_test.message_field_wip.Bar.test_field' is marked as work-in-progress. API "
+      "features marked as work-in-progress are not considered stable, are not covered by the "
+      "threat model, are not supported by the security team, and are subject to breaking changes. "
+      "Do not use this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(bar, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
 }
 
 class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {

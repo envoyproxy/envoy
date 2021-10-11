@@ -320,6 +320,14 @@ following are the command line options that Envoy supports.
   or count occurrences of unknown fields, in the interest of configuration processing speed. If
   :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
 
+  .. attention::
+
+    In addition to not logging warnings or counting occurrences of unknown fields, setting this
+    option also disables counting and warnings of deprecated fields as well as work-in-progress
+    message and fields. It is *strongly* recommended that this option is not set on at least a
+    small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
+    deprecated, or work-in-progress usage.
+
 .. option:: --disable-extensions <extension list>
 
   *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled

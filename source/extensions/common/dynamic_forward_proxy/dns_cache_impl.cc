@@ -2,14 +2,12 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/common/stl_helpers.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
-
-// TODO(mattklein123): Move DNS family helpers to a smaller include.
-#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,7 +20,7 @@ DnsCacheImpl::DnsCacheImpl(
     : main_thread_dispatcher_(context.mainThreadDispatcher()),
       config_(config),
       random_generator_(context.api().randomGenerator()),
-      dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
+      dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
       tls_slot_(context.threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
@@ -52,10 +50,7 @@ DnsCacheImpl::DnsCacheImpl(
     // cache to load an entry. Further if this particular resolution fails all the is lost is the
     // potential optimization of having the entry be preresolved the first time a true consumer of
     // this DNS cache asks for it.
-    main_thread_dispatcher_.post(
-        [this, host = hostname.address(), default_port = hostname.port_value()]() {
-          startCacheLoad(host, default_port);
-        });
+    startCacheLoad(hostname.address(), hostname.port_value());
   }
 }
 
@@ -231,7 +226,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
   auto& primary_host = getPrimaryHost(host);
-  ENVOY_LOG(debug, "host='{}' resolution timeout", host);
+  ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
@@ -269,6 +264,23 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
     notifyThreads(host, primary_host.host_info_);
   } else {
     startResolve(host, primary_host);
+  }
+}
+
+void DnsCacheImpl::forceRefreshHosts() {
+  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
+  for (auto& primary_host : primary_hosts_) {
+    // Avoid holding the lock for longer than necessary by just triggering the refresh timer for
+    // each host IFF the host is not already refreshing.
+    // TODO(mattklein123): In the future we may want to cancel an ongoing refresh and start a new
+    // one to avoid a situation in which an older refresh races with a concurrent network change,
+    // for example.
+    if (primary_host.second->active_query_ == nullptr) {
+      ASSERT(!primary_host.second->timeout_timer_->enabled());
+      primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
+      ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'",
+                      primary_host.first);
+    }
   }
 }
 
@@ -376,7 +388,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
     primary_host_info->failure_backoff_strategy_->reset(std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
     primary_host_info->refresh_timer_->enableTimer(dns_ttl);
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
-              refresh_interval_.count());
+              dns_ttl.count() * 1000);
   } else {
     const uint64_t refresh_interval = primary_host_info->failure_backoff_strategy_->nextBackOffMs();
     primary_host_info->refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
