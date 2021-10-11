@@ -383,16 +383,11 @@ private:
                               const Stats::StatName& stat_name) const {
     const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({stat_name});
     cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
-    if (!upstream_host || local_zone_name_.empty()) {
-      return;
-    }
-    const auto& upstream_zone_name = upstream_host->localityZoneStatName();
-    if (upstream_zone_name.empty()) {
-      return;
-    }
     const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
-        symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
-    cluster.statsScope().counterFromStatName(Stats::StatName(zone_stat_name_storage.get())).inc();
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope().counterFromStatName(Stats::StatName(zone_stat_name_storage.get())).inc();
+    }
   }
 
   void recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
@@ -403,18 +398,26 @@ private:
     cluster.statsScope()
         .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
         .recordValue(value);
+    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope()
+          .histogramFromStatName(Stats::StatName(zone_stat_name_storage.get()), unit)
+          .recordValue(value);
+    }
+  }
+
+  Stats::SymbolTable::StoragePtr
+  upstreamZoneStatName(Upstream::HostDescriptionConstSharedPtr upstream_host,
+                       const Stats::StatName& stat_name) const {
     if (!upstream_host || local_zone_name_.empty()) {
-      return;
+      return nullptr;
     }
     const auto& upstream_zone_name = upstream_host->localityZoneStatName();
     if (upstream_zone_name.empty()) {
-      return;
+      return nullptr;
     }
-    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
-        symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
-    cluster.statsScope()
-        .histogramFromStatName(Stats::StatName(zone_stat_name_storage.get()), unit)
-        .recordValue(value);
+    return symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
   }
 
   RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
