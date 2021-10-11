@@ -38,7 +38,6 @@ public:
   void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 

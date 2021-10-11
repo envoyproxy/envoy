@@ -577,10 +577,6 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
 
 ActiveClient::~ActiveClient() { releaseResourcesBase(); }
 
-void ActiveClient::onEvent(Network::ConnectionEvent event) {
-  parent_.onConnectionEvent(*this, "", event);
-}
-
 void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
     resources_released_ = true;
