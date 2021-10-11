@@ -239,35 +239,36 @@ void Utility::throwWithMalformedIp(absl::string_view ip_address) {
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr ret;
-#ifdef SUPPORTS_GETIFADDRS
-  struct ifaddrs* ifaddr;
-  struct ifaddrs* ifa;
+  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    struct ifaddrs* ifaddr;
+    struct ifaddrs* ifa;
 
-  const int rc = getifaddrs(&ifaddr);
-  RELEASE_ASSERT(!rc, "");
+    const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(&ifaddr);
+    RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
 
-  // man getifaddrs(3)
-  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
-    }
+    // man getifaddrs(3)
+    for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+      if (ifa->ifa_addr == nullptr) {
+        continue;
+      }
 
-    if ((ifa->ifa_addr->sa_family == AF_INET && version == Address::IpVersion::v4) ||
-        (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
-      const struct sockaddr_storage* addr =
-          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::addressFromSockAddrOrThrow(
-          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-      if (!isLoopbackAddress(*ret)) {
-        break;
+      if ((ifa->ifa_addr->sa_family == AF_INET && version == Address::IpVersion::v4) ||
+          (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
+        const struct sockaddr_storage* addr =
+            reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+        ret = Address::addressFromSockAddrOrThrow(*addr, (version == Address::IpVersion::v4)
+                                                             ? sizeof(sockaddr_in)
+                                                             : sizeof(sockaddr_in6));
+        if (!isLoopbackAddress(*ret)) {
+          break;
+        }
       }
     }
-  }
 
-  if (ifaddr) {
-    freeifaddrs(ifaddr);
+    if (ifaddr) {
+      Api::OsSysCallsSingleton::get().freeifaddrs(ifaddr);
+    }
   }
-#endif
 
   // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {

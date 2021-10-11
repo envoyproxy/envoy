@@ -119,6 +119,14 @@ enum class MessageType {
 };
 
 /**
+ * A Reply message is either a success or an error (IDL exception)
+ */
+enum class ReplyType {
+  Success,
+  Error,
+};
+
+/**
  * Thrift protocol struct field types.
  * See https://github.com/apache/thrift/blob/master/lib/cpp/src/thrift/protocol/TProtocol.h
  */
