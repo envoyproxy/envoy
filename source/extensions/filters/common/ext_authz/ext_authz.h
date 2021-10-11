@@ -12,6 +12,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -84,6 +85,11 @@ struct Response {
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
   std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
+  // A set of query string parameters to be set (possibly overwritten) on the
+  // request to the upstream server.
+  Http::Utility::QueryParamsVector query_parameters_to_set;
+  // A set of query string parameters to remove from the request to the upstream server.
+  std::vector<std::string> query_parameters_to_remove;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.
