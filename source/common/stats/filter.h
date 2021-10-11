@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/stats/store.h"
 
 #include "source/common/stats/symbol_table_impl.h"
