@@ -17,7 +17,7 @@ namespace {
 
 class FilterTest : public ::testing::Test {
 public:
-  FilterTest() : filter_(stats_) {
+  FilterTest() : filter_(stats_, decoder_callbacks_.dispatcher()) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -72,7 +72,7 @@ public:
     filter_.encodeComplete();
   }
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   Stats::MockCounter error_counter_;
   Stats::MockCounter success_counter_;

@@ -71,10 +71,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
-    // Enable this flag for test coverage.
-    SetQuicReloadableFlag(quic_tls_set_signature_algorithm_prefs, true);
-  }
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -324,6 +321,9 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   auto response = std::move(encoder_decoder.second);
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
+  while (!quic_connection_->IsHandshakeConfirmed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
 
   // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =

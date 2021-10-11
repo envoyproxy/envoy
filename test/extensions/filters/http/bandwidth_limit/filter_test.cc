@@ -23,7 +23,7 @@ public:
   FilterTest() = default;
 
   void setup(const std::string& yaml) {
-    envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit config;
+    envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_shared<FilterConfig>(config, stats_, runtime_, time_system_, true);
     filter_ = std::make_shared<BandwidthLimiter>(config_);

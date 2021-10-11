@@ -33,6 +33,13 @@ protected:
   void setupSocket(const Network::Socket::OptionsSharedPtr& options);
   void setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options);
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr address) override;
+
+  void close() override {
+    if (io_handle_ != nullptr && io_handle_->isOpen()) {
+      io_handle_->close();
+    }
+  }
+  bool isOpen() const override { return io_handle_ != nullptr && io_handle_->isOpen(); }
 };
 
 /**
@@ -79,6 +86,16 @@ public:
 
   Socket::Type socketType() const override { return T::type; }
 
+  SocketPtr duplicate() override {
+    if (io_handle_ == nullptr) {
+      // This is a listen socket that does not bind to port. Pass nullptr socket options.
+      return std::make_unique<NetworkListenSocket<T>>(connection_info_provider_->localAddress(),
+                                                      /*options=*/nullptr, /*bind_to_port*/ false);
+    } else {
+      return ListenSocketImpl::duplicate();
+    }
+  }
+
   // These four overrides are introduced to perform check. A null io handle is possible only if the
   // the owner socket is a listen socket that does not bind to port.
   IoHandle& ioHandle() override {
@@ -97,8 +114,9 @@ public:
     }
   }
   bool isOpen() const override {
-    ASSERT(io_handle_ != nullptr);
-    return io_handle_->isOpen();
+    return io_handle_ == nullptr ? false // Consider listen socket as closed if it does not bind to
+                                         // port. No fd will leak.
+                                 : io_handle_->isOpen();
   }
 
 protected:

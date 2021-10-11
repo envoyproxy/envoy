@@ -7,6 +7,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/server/factory_context_base_impl.h"
 
 #include "test/extensions/common/dynamic_forward_proxy/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
@@ -1175,6 +1176,21 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   EXPECT_CALL(*resolve_timer, enableTimer(std::chrono::milliseconds(60000), _));
   resolve_cb(Network::DnsResolver::ResolutionStatus::Success,
              TestUtility::makeDnsResponse({"10.0.0.2"}, std::chrono::seconds(40)));
+}
+
+// Make sure the cache manager can handle the context going out of scope.
+TEST(DnsCacheManagerImplTest, TestLifetime) {
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  std::unique_ptr<DnsCacheManagerImpl> cache_manager;
+
+  {
+    Server::FactoryContextBaseImpl scoped_context(context);
+    cache_manager = std::make_unique<DnsCacheManagerImpl>(scoped_context);
+  }
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
+  config1.set_name("foo");
+
+  EXPECT_TRUE(cache_manager->getCache(config1) != nullptr);
 }
 
 } // namespace

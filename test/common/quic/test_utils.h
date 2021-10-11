@@ -105,10 +105,10 @@ public:
                quic::EncryptionLevel level));
   MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
   MOCK_METHOD(void, MaybeSendRstStreamFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error,
+              (quic::QuicStreamId id, quic::QuicResetStreamError error,
                quic::QuicStreamOffset bytes_written));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
-              (quic::QuicStreamId id, quic::QuicRstStreamErrorCode error));
+              (quic::QuicStreamId id, quic::QuicResetStreamError error));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   absl::string_view requestedServerName() const override {

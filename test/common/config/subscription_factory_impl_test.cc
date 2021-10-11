@@ -341,6 +341,18 @@ TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedApiType) {
       EnvoyException, "Unknown xdstp:// transport API type in api_type: GRPC");
 }
 
+TEST_F(SubscriptionFactoryTest, GrpcCollectionSubscriptionUnsupportedConfigSpecifierType) {
+  envoy::config::core::v3::ConfigSource config;
+  config.set_path("/path/foo/bar");
+  EXPECT_THROW_WITH_REGEX(
+      collectionSubscriptionFromUrl(
+          "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar", config)
+          ->start({}),
+      EnvoyException,
+      "Missing or not supported config source specifier in envoy::config::core::v3::ConfigSource "
+      "for a collection. Only ADS and gRPC in delta-xDS mode are supported.");
+}
+
 TEST_F(SubscriptionFactoryTest, GrpcCollectionAggregatedSubscription) {
   envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

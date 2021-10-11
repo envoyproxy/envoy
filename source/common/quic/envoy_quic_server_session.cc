@@ -133,7 +133,7 @@ void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
 }
 
 void EnvoyQuicServerSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
-                                                     quic::QuicRstStreamErrorCode error,
+                                                     quic::QuicResetStreamError error,
                                                      quic::QuicStreamOffset bytes_written) {
   QuicServerSessionBase::MaybeSendRstStreamFrame(id, error, bytes_written);
   quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, error, /*from_self*/ true,
@@ -142,7 +142,7 @@ void EnvoyQuicServerSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
 
 void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicServerSessionBase::OnRstStream(frame);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error_code,
+  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error(),
                                                    /*from_self*/ false, /*is_upstream*/ false);
 }
 

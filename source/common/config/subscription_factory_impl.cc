@@ -42,7 +42,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
-    const auto transport_api_version = envoy::config::core::v3::ApiVersion::V3;
     switch (api_config_source.api_type()) {
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
@@ -53,9 +52,9 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       return std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_,
           api_.randomGenerator(), Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source),
-          restMethod(type_url, transport_api_version), type_url, callbacks, resource_decoder, stats,
-          Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
+          callbacks, resource_decoder, stats, Utility::configSourceInitialFetchTimeout(config),
+          validation_visitor_);
     case envoy::config::core::v3::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::GrpcMuxImpl>(
@@ -63,8 +62,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope, true)
                   ->createUncachedRawAsyncClient(),
-              dispatcher_, sotwGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
-              scope, Utility::parseRateLimitSettings(api_config_source),
+              dispatcher_, sotwGrpcMethod(type_url), api_.randomGenerator(), scope,
+              Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config),
@@ -75,8 +74,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope, true)
                   ->createUncachedRawAsyncClient(),
-              dispatcher_, deltaGrpcMethod(type_url, transport_api_version), api_.randomGenerator(),
-              scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
+              dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_),
           callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
@@ -116,37 +115,55 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
           fmt::format("xdstp:// type does not match {} in {}", resource_type,
                       Config::XdsResourceIdentifier::encodeUrl(collection_locator)));
     }
-    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
-    Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
-                                                            api_config_source);
+    switch (config.config_source_specifier_case()) {
+    case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
+      const envoy::config::core::v3::ApiConfigSource& api_config_source =
+          config.api_config_source();
+      Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.primaryClusters(),
+                                                              api_config_source);
 
-    SubscriptionOptions options;
-    // All Envoy collections currently are xDS resource graph roots and require node context
-    // parameters.
-    options.add_xdstp_node_context_params_ = true;
-    switch (api_config_source.api_type()) {
-    case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
-      const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
-      return std::make_unique<GrpcCollectionSubscriptionImpl>(
-          collection_locator,
-          std::make_shared<Config::NewGrpcMuxImpl>(
-              Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                             api_config_source, scope, true)
-                  ->createUncachedRawAsyncClient(),
-              dispatcher_, deltaGrpcMethod(type_url, envoy::config::core::v3::ApiVersion::V3),
-              api_.randomGenerator(), scope, Utility::parseRateLimitSettings(api_config_source),
-              local_info_),
-          callbacks, resource_decoder, stats, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), false, options);
+      SubscriptionOptions options;
+      // All Envoy collections currently are xDS resource graph roots and require node context
+      // parameters.
+      options.add_xdstp_node_context_params_ = true;
+      switch (api_config_source.api_type()) {
+      case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
+        const std::string type_url = TypeUtil::descriptorFullNameToTypeUrl(resource_type);
+        return std::make_unique<GrpcCollectionSubscriptionImpl>(
+            collection_locator,
+            std::make_shared<Config::NewGrpcMuxImpl>(
+                Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                               api_config_source, scope, true)
+                    ->createUncachedRawAsyncClient(),
+                dispatcher_, deltaGrpcMethod(type_url), api_.randomGenerator(), scope,
+                Utility::parseRateLimitSettings(api_config_source), local_info_),
+            callbacks, resource_decoder, stats, dispatcher_,
+            Utility::configSourceInitialFetchTimeout(config), false, options);
+      }
+      case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+        return std::make_unique<GrpcCollectionSubscriptionImpl>(
+            collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
+            Utility::configSourceInitialFetchTimeout(config), false, options);
+      }
+      default:
+        throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
+                                         api_config_source.DebugString()));
+      }
     }
-    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC: {
+    case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
+      // TODO(adisuissa): verify that the ADS is set up in delta-xDS mode.
+      SubscriptionOptions options;
+      // All Envoy collections currently are xDS resource graph roots and require node context
+      // parameters.
+      options.add_xdstp_node_context_params_ = true;
       return std::make_unique<GrpcCollectionSubscriptionImpl>(
           collection_locator, cm_.adsMux(), callbacks, resource_decoder, stats, dispatcher_,
-          Utility::configSourceInitialFetchTimeout(config), false, options);
+          Utility::configSourceInitialFetchTimeout(config), true, options);
     }
     default:
-      throw EnvoyException(fmt::format("Unknown xdstp:// transport API type in {}",
-                                       api_config_source.DebugString()));
+      throw EnvoyException("Missing or not supported config source specifier in "
+                           "envoy::config::core::v3::ConfigSource for a collection. Only ADS and "
+                           "gRPC in delta-xDS mode are supported.");
     }
   }
   default:
