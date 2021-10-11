@@ -72,16 +72,16 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     if (cluster.info()->edsServiceName().has_value()) {
       cluster_stats->set_cluster_service_name(cluster.info()->edsServiceName().value());
     }
-    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+    for (const HostSetPtr& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
-      for (auto& hosts : host_set->hostsPerLocality().get()) {
+      for (const HostVector& hosts : host_set->hostsPerLocality().get()) {
         ASSERT(!hosts.empty());
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
         LoadMetricStats::StatsMap load_metrics;
-        for (const auto& host : hosts) {
+        for (const HostSharedPtr& host : hosts) {
           rq_success += host->stats().rq_success_.latch();
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
@@ -90,8 +90,9 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               host->loadMetricStats().latch();
           for (const auto& metric : *latched_stats) {
             const std::string& name = metric.first;
-            load_metrics[name].num_requests_with_metric += metric.second.num_requests_with_metric;
-            load_metrics[name].total_metric_value += metric.second.total_metric_value;
+            LoadMetricStats::Stat& stat = load_metrics[name];
+            stat.num_requests_with_metric += metric.second.num_requests_with_metric;
+            stat.total_metric_value += metric.second.total_metric_value;
           }
         }
         if (rq_success + rq_error + rq_active != 0) {

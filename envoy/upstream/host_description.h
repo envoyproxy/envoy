@@ -63,8 +63,8 @@ struct HostStats {
 class LoadMetricStats {
 public:
   struct Stat {
-    uint64_t num_requests_with_metric;
-    double total_metric_value;
+    uint64_t num_requests_with_metric = 0;
+    double total_metric_value = 0.0;
   };
 
   using StatsMap = absl::flat_hash_map<std::string, Stat>;
@@ -76,8 +76,9 @@ public:
   // total_metric_value fields.
   void add(const std::string& key, double value) {
     absl::MutexLock lock(&mu_);
-    ++(*map_)[key].num_requests_with_metric;
-    (*map_)[key].total_metric_value += value;
+    Stat& stat = (*map_)[key];
+    ++stat.num_requests_with_metric;
+    stat.total_metric_value += value;
   }
 
   // Returns an owning pointer to the current load metrics and clears the map.
