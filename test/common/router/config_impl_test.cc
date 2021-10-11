@@ -1315,19 +1315,6 @@ virtual_hosts:
           header_name: :path
       exact_match_map:
         map:
-          "/new_endpoint/foo":
-            action:
-              name: route
-              typed_config:
-                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                match:
-                  prefix: /
-                route:
-                  cluster: root_ww2
-                request_headers_to_add:
-                - header:
-                    key: x-route-header
-                    value: match_tree
           "/new_endpoint/bar":
             action:
               name: route
@@ -1383,7 +1370,42 @@ virtual_hosts:
                 - header:
                     key: x-route-header
                     value: match_tree
-          "/new_endpoint/bar":
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
+      "only match on request headers, saw "
+      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+}
+
+// Validates that we fail creating a route config if an invalid data input is used.
+TEST_F(RouteMatcherTest, TestMatchInvalidInputTwoMatchers) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
+
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  routes:
+    - match: { prefix: "/" }
+      route: { cluster: "regex" }
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
             action:
               name: route
               typed_config:
@@ -1395,7 +1417,7 @@ virtual_hosts:
                 request_headers_to_add:
                 - header:
                     key: x-route-header
-                    value: match_tree_2
+                    value: match_tree
   )EOF";
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -1403,9 +1425,7 @@ virtual_hosts:
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
-      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
-      "only match on request headers, saw "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+      "cannot set both matcher and routes on virtual host");
 }
 
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
