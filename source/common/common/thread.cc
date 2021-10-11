@@ -29,13 +29,13 @@ struct ThreadIds {
     // result in the correct result even without a lock.
     std::thread::id id = std::this_thread::get_id();
     return main_thread_id_ == id ||
-        // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
+    // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
 #ifdef __linux__
-        getpid() == syscall(SYS_gettid)
+           getpid() == syscall(SYS_gettid)
 #elif defined(__APPLE__)
-        pthread_main_np() != 0
+           pthread_main_np() != 0
 #else
-        true
+           true
 #endif
         ;
   }

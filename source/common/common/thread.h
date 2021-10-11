@@ -172,9 +172,8 @@ public:
 // we figure this out automatically from the platform.
 //
 // TODO(jmarantz): Remove this declaration after Nov 15, 2021 to allow
-// references from other repos to be cleaned up.
-struct TestThread {
-};
+// references from other repositories to be cleaned up.
+struct TestThread {};
 
 // RAII object to declare the MainThread. This should be declared in the thread
 // function or equivalent.
