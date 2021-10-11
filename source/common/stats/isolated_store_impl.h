@@ -103,7 +103,9 @@ public:
 
   void forEachStat(std::function<void(std::size_t)> f_size,
                    std::function<void(Base&)> f_stat) const {
-    f_size(stats_.size());
+    if (f_size != nullptr) {
+      f_size(stats_.size());
+    }
     for (auto const& stat : stats_) {
       f_stat(*stat.second);
     }
