@@ -28,7 +28,16 @@ struct ThreadIds {
     // and are cleared when being released. All possible thread orderings
     // result in the correct result even without a lock.
     std::thread::id id = std::this_thread::get_id();
-    return main_thread_id_ == id || test_thread_id_ == id;
+    return main_thread_id_ == id || //test_thread_id_ == id
+#ifdef __linux__
+        // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
+        getpid() == syscall(SYS_gettid)
+#elif defined(__APPLE__)
+        pthread_main_np() != 0
+#else
+        true
+#endif
+        ;
   }
 
   bool isMainThreadActive() const {
