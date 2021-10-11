@@ -116,12 +116,39 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   EXPECT_FALSE(socket.ioHandle().interfaceName().has_value());
 }
 
+TEST(IoSocketHandleImpl, ExplicitDoesNotSupportGetifaddrs) {
+
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4));
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(false));
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+  EXPECT_FALSE(maybe_interface_name.has_value());
+}
+
+TEST(IoSocketHandleImpl, InterfaceNameForLoopbackExplicitV6) {
+  auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v6));
+
+  const auto maybe_interface_name = socket->ioHandle().interfaceName();
+
+  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    EXPECT_TRUE(maybe_interface_name.has_value());
+    EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
+  } else {
+    EXPECT_FALSE(maybe_interface_name.has_value());
+  }
+}
+
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopbackV4) {
+TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
       Network::Test::getCanonicalLoopbackAddress(GetParam()));
 
