@@ -98,8 +98,6 @@ struct Response {
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
   ProtobufWkt::Struct dynamic_metadata;
-
-  friend void PrintTo(const Response& response, std::ostream* os);
 };
 
 using ResponsePtr = std::unique_ptr<Response>;
