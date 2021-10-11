@@ -404,7 +404,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
 HeaderUtility::HeaderValidationResult
 HeaderUtility::validateContentLength(absl::string_view header_value,
                                      bool override_stream_error_on_invalid_http_message,
-                                     bool& should_close_connection) {
+                                     bool& should_close_connection, size_t& content_length_output) {
   should_close_connection = false;
   std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
   absl::optional<uint64_t> content_length;
@@ -429,6 +429,7 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
       return HeaderValidationResult::REJECT;
     }
   }
+  content_length_output = content_length.value();
   return HeaderValidationResult::ACCEPT;
 }
 
