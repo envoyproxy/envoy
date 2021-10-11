@@ -193,8 +193,25 @@ public:
 
   /**
    * @return whether the current thread is the main thread or test thread.
+   *
+   * Determines whether we are currently running on the main-thread or
+   * test-thread. We need to allow for either one because we don't establish
+   * the full threading model in all unit tests.
    */
-  static bool isMainOrTestThread();
+  static bool isMainOrTestThread() { return isMainThread() || isTestThread(); }
+
+  /**
+   * @return whether the current thread is the main thread.
+   */
+  static bool isMainThread();
+
+  /**
+   * @return whether the current thread is the test thread.
+   *
+   * Note, on the Windows platform, this always returns true. On MacOS and
+   * Linux, system-dependent calls are used to detect the test-thread.
+   */
+  static bool isTestThread();
 
   /**
    * @return whether a MainThread has been instantiated.

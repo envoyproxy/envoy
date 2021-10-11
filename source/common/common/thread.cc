@@ -20,24 +20,20 @@ namespace {
 // call-sites for isMainThread(), which might be a bit of work, but will make
 // tests more hermetic.
 struct ThreadIds {
-  // Determines whether we are currently running on the main-thread or
-  // test-thread. We need to allow for either one because we don't establish
-  // the full threading model in all unit tests.
-  bool inMainOrTestThread() const {
-    // We don't take the lock when testing the thread IDs, as they are atomic,
-    // and are cleared when being released. All possible thread orderings
-    // result in the correct result even without a lock.
-    std::thread::id id = std::this_thread::get_id();
-    return main_thread_id_ == id ||
+  // We don't take the lock when testing the thread IDs, as they are atomic,
+  // and are cleared when being released. All possible thread orderings
+  // result in the correct result even without a lock.
+  bool inMainThread() const { return std::this_thread::get_id() == main_thread_id_; }
+
+  bool inTestThread() const {
     // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
 #ifdef __linux__
-           getpid() == syscall(SYS_gettid)
+    return getpid() == syscall(SYS_gettid);
 #elif defined(__APPLE__)
-           pthread_main_np() != 0
+    return pthread_main_np() != 0;
 #else
-           true
+    return true;
 #endif
-        ;
   }
 
   bool isMainThreadActive() const {
@@ -86,7 +82,9 @@ private:
 
 } // namespace
 
-bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
+bool MainThread::isMainThread() { return ThreadIds::get().inMainThread(); }
+
+bool MainThread::isTestThread() { return ThreadIds::get().inTestThread(); }
 
 bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
 
