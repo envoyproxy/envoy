@@ -26,40 +26,44 @@ public:
   };
 
   using OrderedSet = std::set<SharedStat, CompareNames>;
+  using OrderedSetIter = typename OrderedSet::iterator;
 
   void setUsedOnly(bool used_only) { used_only_ = used_only; }
 
-  SharedStatVector getFilteredStatsAfter(uint32_t num_stats, StatName last) const {
+  SharedStatVector getFilteredStatsAfter(uint32_t num_stats, StatName after) const {
     CompareNames compare_names(symbol_table_);
     OrderedSet top(compare_names);
-    forEach([&top, this, last, num_stats](StatType& stat) {
+    forEach([&top, this, after, num_stats](StatType& stat) {
         // If we are filtering out non-empties, and this is empty,
         // then skip this one.
         if (used_only_ && !stat.used()) {
           return;
         }
 
-        // Filter out stats that are alphabetically earlier than 'last'.
-        if (!last.empty() && !symbol_table_.lessThan(last, stat.statName())) {
+        // Filter out stats that are alphabetically earlier than 'after'.
+        if (!after.empty() && !symbol_table_.lessThan(after, stat.statName())) {
           return;
         }
 
-        // Optimistically insert the element in the 'top' set.
-        SharedStat shared_stat(&stat);
-        top.insert(shared_stat);
-
-        // If the top set has now grown bigger than our target count
-        // then remove the last element. This algorithm runs in
-        // M*log(num_stats + 1) time, where M is the total number
-        // of this particular stat-type.
+        // Check whether 'stat' should be admitted into the 'top' set. This
+        // algorithm runs in M*log(num_stats + 1) time, where M is the total
+        // number of this particular stat-type.
         //
-        // Note that we've done the cheap used() filtering before
-        // the set insertion work, to try to reduce number of log(NumStats)
-        // set mutations.
-        if (top.size() > num_stats) {
-          typename OrderedSet::iterator last = top.end();
+        // We do the cheap used() filtering and the comparison with the last
+        // element before the set insertion work, to try to reduce number of
+        // log(NumStats) set mutations.
+        bool do_insert = top.size() < num_stats;
+        if (!do_insert) {
+          OrderedSetIter last = top.end();
           --last;
-          top.erase(last);
+          if (symbol_table_.lessThan(stat.statName(), (*last)->statName())) {
+            top.erase(last);
+            do_insert = true;
+          }
+        }
+
+        if (do_insert) {
+          top.insert(SharedStat(&stat));
         }
       });
     return SharedStatVector(top.begin(), top.end());
