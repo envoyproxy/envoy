@@ -1207,7 +1207,7 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
       // No port.
       EXPECT_LOG_CONTAINS("warning", "Unable to parse cache line '1.1.1.1|20|1'",
                           fn("eep.com", "1.1.1.1|20|1"));
-      // Won't be loaded becasue of prior error.
+      // Won't be loaded because of prior error.
       fn("eep.com", "1.1.1.1|20|1:1");
     }));
 

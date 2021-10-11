@@ -438,8 +438,6 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
       {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
 
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-  // because this test uses simtime, you must explicitly advance time for the
-  // happy eyeballs timer to fire.
 
   // Wait for the request to be received.
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_rq_total", 1);
