@@ -149,8 +149,6 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests", "true");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
