@@ -28,7 +28,7 @@ envoy_cc_library(
         "//source/common/runtime:runtime_lib",
         "//source/common/stats:timespan_lib",
         "//source/extensions/filters/http/common:stream_rate_limiter_lib",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +41,6 @@ envoy_cc_extension(
         "//envoy/http:filter_interface",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )

@@ -293,15 +293,25 @@ struct mmsghdr {
 };
 #endif
 
-#define SUPPORTS_GETIFADDRS
-#ifdef WIN32
-#undef SUPPORTS_GETIFADDRS
+// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+#if defined(WIN32) || (defined(__ANDROID_API__) && __ANDROID_API__ < 24)
+// Posix structure necessary for getifaddrs definition.
+struct ifaddrs {
+  struct ifaddrs* ifa_next;
+  char* ifa_name;
+  unsigned int ifa_flags;
+  struct sockaddr* ifa_addr;
+  struct sockaddr* ifa_netmask;
+  struct sockaddr* ifa_dstaddr;
+  void* ifa_data;
+};
 #endif
 
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+// TODO: Remove once bazel supports NDKs > 21
+#define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #ifdef __ANDROID_API__
 #if __ANDROID_API__ < 24
-#undef SUPPORTS_GETIFADDRS
+#undef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #endif // __ANDROID_API__ < 24
 #endif // ifdef __ANDROID_API__
 
