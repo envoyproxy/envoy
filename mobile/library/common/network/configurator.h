@@ -34,6 +34,15 @@ public:
   std::vector<std::string> enumerateV6Interfaces();
 
   /**
+   * @param family, network family of the interface.
+   * @param select_flags, flags which MUST be set for each returned interface.
+   * @param reject_flags, flags which MUST NOT be set for any returned interface.
+   * @returns a list of local network interfaces filtered by the providered flags.
+   */
+  std::vector<std::string> enumerateInterfaces(unsigned short family, unsigned int select_flags,
+                                               unsigned int reject_flags);
+
+  /**
    * @returns the current OS default/preferred network class.
    */
   envoy_network_t getPreferredNetwork();
@@ -62,7 +71,8 @@ public:
                                                     bool override_interface);
 
 private:
-  std::vector<std::string> enumerateInterfaces(unsigned short family);
+  Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(envoy_network_t network);
+  const std::string getActiveAlternateInterface(envoy_network_t network, unsigned short family);
   DnsCacheManagerSharedPtr dns_cache_manager_;
   static std::atomic<envoy_network_t> preferred_network_;
 };
