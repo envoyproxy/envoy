@@ -10,6 +10,9 @@
 namespace Envoy {
 namespace Router {
 
+/**
+ * A provider for constant route configurations.
+ */
 class RouteConfigProvider
     : public Rds::RouteConfigProvider<envoy::config::route::v3::RouteConfiguration, Config> {
 public:

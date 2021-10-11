@@ -16,6 +16,9 @@
 namespace Envoy {
 namespace Router {
 
+/**
+ * A primitive that keeps track of updates to a RouteConfiguration.
+ */
 class RouteConfigUpdateReceiver
     : public Rds::RouteConfigUpdateReceiver<envoy::config::route::v3::RouteConfiguration, Config> {
 public:

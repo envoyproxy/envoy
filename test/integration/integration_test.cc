@@ -304,15 +304,12 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+  autonomous_upstream_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                          {":path", "/healthcheck"},
-                                                                          {":authority", "host"},
-                                                                          {"connection", "close"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {"connection", "close"}});
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
@@ -1278,17 +1275,8 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-// Test that Envoy by default returns HTTP code 502 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorDefault) {
-  testRouterUpstreamProtocolError("502", "UPE");
-}
-
-// Test runtime overwrite to return 503 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorRuntimeOverwrite) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.return_502_for_upstream_protocol_errors", "false");
-  testRouterUpstreamProtocolError("503", "UC");
-}
+// Test that Envoy returns HTTP code 502 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolError) { testRouterUpstreamProtocolError("502", "UPE"); }
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();

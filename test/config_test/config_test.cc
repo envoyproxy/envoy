@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -95,6 +96,12 @@ public:
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
+
+    // For configuration/example tests we don't fail if WIP APIs are used.
+    EXPECT_CALL(server_.validation_context_.static_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+    EXPECT_CALL(server_.validation_context_.dynamic_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(

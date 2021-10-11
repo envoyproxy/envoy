@@ -164,48 +164,6 @@ TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
   EXPECT_EQ("600", response->headers().getStatusValue());
 }
 
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ComputedHealthCheck) {
-  config_helper_.prependFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
-// Add a health check filter and verify correct computation of health based on upstream status.
-TEST_P(DownstreamProtocolIntegrationTest, ModifyBuffer) {
-  config_helper_.prependFilter(R"EOF(
-name: health_check
-typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
-    pass_through_mode: false
-    cluster_min_healthy_percentages:
-        example_cluster_name: { value: 75 }
-)EOF");
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForEndStream());
-
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("503", response->headers().getStatusValue());
-}
-
 // Verifies behavior for https://github.com/envoyproxy/envoy/pull/11248
 TEST_P(ProtocolIntegrationTest, AddBodyToRequestAndWaitForIt) {
   config_helper_.prependFilter(R"EOF(

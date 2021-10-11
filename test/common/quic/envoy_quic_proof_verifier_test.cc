@@ -7,6 +7,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -78,7 +79,7 @@ protected:
   const std::string empty_string_;
   const std::vector<std::string> empty_string_list_;
   const std::string cert_chain_{quic::test::kTestCertificateChainPem};
-  const std::string root_ca_cert_;
+  std::string root_ca_cert_;
   const std::string leaf_cert_;
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_validator_config_{
       absl::nullopt};
@@ -117,6 +118,12 @@ TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureFromSsl) {
       << error_details;
   EXPECT_EQ("X509_verify_cert: certificate verification error at depth 1: certificate has expired",
             error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidCA) {
+  root_ca_cert_ = "invalid root CA";
+  EXPECT_THROW_WITH_REGEX(configCertVerificationDetails(true), EnvoyException,
+                          "Failed to load trusted CA certificates from");
 }
 
 TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureInvalidLeafCert) {
@@ -190,6 +197,77 @@ VdGXMAjeXhnOnPvmDi5hUz/uvI+Pg6cNmUoCRwSCnK/DazhA
             verifier_->VerifyCertChain("www.google.com", 54321, chain, ocsp_response, cert_sct,
                                        nullptr, &error_details, nullptr, nullptr, nullptr));
   EXPECT_EQ("Invalid leaf cert, only P-256 ECDSA certificates are supported", error_details);
+}
+
+TEST_F(EnvoyQuicProofVerifierTest, VerifyCertChainFailureNonServerAuthEKU) {
+  // Override the CA cert with cert copied from test/config/integration/certs/cacert.pem.
+  root_ca_cert_ = R"(-----BEGIN CERTIFICATE-----
+MIID3TCCAsWgAwIBAgIUdCu/mLip3X/We37vh3BA9u/nxakwDQYJKoZIhvcNAQEL
+BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
+DVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5n
+aW5lZXJpbmcxEDAOBgNVBAMMB1Rlc3QgQ0EwHhcNMjAwODA1MTkxNjAwWhcNMjIw
+ODA1MTkxNjAwWjB2MQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEW
+MBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwETHlmdDEZMBcGA1UECwwQ
+THlmdCBFbmdpbmVlcmluZzEQMA4GA1UEAwwHVGVzdCBDQTCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBALu2Ihi4DmaQG7zySZlWyM9SjxOXCI5840V7Hn0C
+XoiI8sQQmKSC2YCzsaphQoJ0lXCi6Y47o5FkooYyLeNDQTGS0nh+IWm5RCyochtO
+fnaKPv/hYxhpyFQEwkJkbF1Zt1s6j2rq5MzmbWZx090uXZEE82DNZ9QJaMPu6VWt
+iwGoGoS5HF5HNlUVxLNUsklNH0ZfDafR7/LC2ty1vO1c6EJ6yCGiyJZZ7Ilbz27Q
+HPAUd8CcDNKCHZDoMWkLSLN3Nj1MvPVZ5HDsHiNHXthP+zV8FQtloAuZ8Srsmlyg
+rJREkc7gF3f6HrH5ShNhsRFFc53NUjDbYZuha1u4hiOE8lcCAwEAAaNjMGEwDwYD
+VR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAQYwHQYDVR0OBBYEFJZL2ixTtL6V
+xpNz4qekny4NchiHMB8GA1UdIwQYMBaAFJZL2ixTtL6VxpNz4qekny4NchiHMA0G
+CSqGSIb3DQEBCwUAA4IBAQAcgG+AaCdrUFEVJDn9UsO7zqzQ3c1VOp+WAtAU8OQK
+Oc4vJYVVKpDs8OZFxmukCeqm1gz2zDeH7TfgCs5UnLtkplx1YO1bd9qvserJVHiD
+LAK+Yl24ZEbrHPaq0zI1RLchqYUOGWmi51pcXi1gsfc8DQ3GqIXoai6kYJeV3jFJ
+jxpQSR32nx6oNN/6kVKlgmBjlWrOy7JyDXGim6Z97TzmS6Clctewmw/5gZ9g+M8e
+g0ZdFbFkNUjzSNm44hiDX8nR6yJRn+gLaARaJvp1dnT+MlvofZuER17WYKH4OyMs
+ie3qKR3an4KC20CtFbpZfv540BVuTTOCtQ5xqZ/LTE78
+-----END CERTIFICATE-----)";
+  configCertVerificationDetails(true);
+  const std::string ocsp_response;
+  const std::string cert_sct;
+  std::string error_details;
+  // This is a cert generated with the test/config/integration/certs/certs.sh. And the config that
+  // used to generate this cert is same as test/config/integration/certs/servercert.cfg but with
+  // 'extKeyUsage: clientAuth'.
+  const std::string certs{R"(-----BEGIN CERTIFICATE-----
+MIIEYjCCA0qgAwIBAgIUWzmfQSTX8xfzUzdByjCjCJN8E/wwDQYJKoZIhvcNAQEL
+BQAwdjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExFjAUBgNVBAcM
+DVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsMEEx5ZnQgRW5n
+aW5lZXJpbmcxEDAOBgNVBAMMB1Rlc3QgQ0EwHhcNMjEwOTI5MTY0NTM3WhcNMjMw
+OTI5MTY0NTM3WjCBpjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWEx
+FjAUBgNVBAcMDVNhbiBGcmFuY2lzY28xDTALBgNVBAoMBEx5ZnQxGTAXBgNVBAsM
+EEx5ZnQgRW5naW5lZXJpbmcxGjAYBgNVBAMMEVRlc3QgQmFja2VuZCBUZWFtMSQw
+IgYJKoZIhvcNAQkBFhViYWNrZW5kLXRlYW1AbHlmdC5jb20wggEiMA0GCSqGSIb3
+DQEBAQUAA4IBDwAwggEKAoIBAQC9JgaI7hxjPM0tsUna/QmivBdKbCrLnLW9Teak
+RH/Ebg68ovyvrRIlybDT6XhKi+iVpzVY9kqxhGHgrFDgGLBakVMiYJ5EjIgHfoo4
+UUAHwIYbunJluYCgANzpprBsvTC/yFYDVMqUrjvwHsoYYVm36io994k9+t813b70
+o0l7/PraBsKkz8NcY2V2mrd/yHn/0HAhv3hl6iiJme9yURuDYQrae2ACSrQtsbel
+KwdZ/Re71Z1awz0OQmAjMa2HuCop+Q/1QLnqBekT5+DH1qKUzJ3Jkq6NRkERXOpi
+87j04rtCBteCogrO67qnuBZ2lH3jYEMb+lQdLkyNMLltBSdLAgMBAAGjgbYwgbMw
+DAYDVR0TAQH/BAIwADALBgNVHQ8EBAMCBeAwEwYDVR0lBAwwCgYIKwYBBQUHAwIw
+QQYDVR0RBDowOIYec3BpZmZlOi8vbHlmdC5jb20vYmFja2VuZC10ZWFtgghseWZ0
+LmNvbYIMd3d3Lmx5ZnQuY29tMB0GA1UdDgQWBBTZdxNltzTEpl+A1UpK8BsxkkIG
+hjAfBgNVHSMEGDAWgBSWS9osU7S+lcaTc+KnpJ8uDXIYhzANBgkqhkiG9w0BAQsF
+AAOCAQEAhiXkQJZ53L3uoQMX6xNhAFThomirnLm2RT10kPIbr5mmf3wcR8+EKrWX
+dWCj56bk1tSDbQZqx33DSGbhvNaydggbo69Pkie5b7J9O7AWzT21NME6Jis9hHED
+VUI63L+7SgJ2oZs0o8xccUaLFeknuNdQL4qUEwhMwCC8kYLz+c6g0qwDwZi1MtdL
+YR4qm2S6KveVPGzBHpUjfWf/whSCM3JN5Fm8gWfC6d6XEYz6z1dZrj3lpwmhRgF6
+Wb72f68jzCQ3BFqKRFsJI2xz3EP6PoQ+e6EQjMpjQLomxIhIN/aTsgrKwA5wf6vQ
+ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
+-----END CERTIFICATE-----)"};
+  std::stringstream pem_stream(certs);
+  std::vector<std::string> chain = quic::CertificateView::LoadPemFromStream(&pem_stream);
+  std::unique_ptr<quic::CertificateView> cert_view =
+      quic::CertificateView::ParseSingleCertificate(chain[0]);
+  ASSERT(cert_view);
+  EXPECT_EQ(quic::QUIC_FAILURE,
+            verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct, nullptr,
+                                       &error_details, nullptr, nullptr, nullptr));
+  EXPECT_EQ("X509_verify_cert: certificate verification error at depth 0: unsupported certificate "
+            "purpose",
+            error_details);
 }
 
 } // namespace Quic

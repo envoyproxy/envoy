@@ -18,6 +18,13 @@ public:
         singleton_manager_(singleton_manager), validation_visitor_(validation_visitor),
         scope_(scope), thread_local_(local) {}
 
+  FactoryContextBaseImpl(Configuration::FactoryContextBase& config)
+      : options_(config.options()), main_thread_dispatcher_(config.mainThreadDispatcher()),
+        api_(config.api()), local_info_(config.localInfo()), admin_(config.admin()),
+        runtime_(config.runtime()), singleton_manager_(config.singletonManager()),
+        validation_visitor_(config.messageValidationVisitor()), scope_(config.scope()),
+        thread_local_(config.threadLocal()) {}
+
   // FactoryContextBase
   const Options& options() override { return options_; };
   Event::Dispatcher& mainThreadDispatcher() override { return main_thread_dispatcher_; };
@@ -42,8 +49,8 @@ private:
   Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Stats::Store& scope_;
-  ThreadLocal::Instance& thread_local_;
+  Stats::Scope& scope_;
+  ThreadLocal::SlotAllocator& thread_local_;
 };
 
 } // namespace Server

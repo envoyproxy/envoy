@@ -1728,14 +1728,9 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  StreamResetReason reason = StreamResetReason::LocalReset;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-    reason = StreamResetReason::ProtocolError;
-    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
-  }
+  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
 
-  return reason;
+  return StreamResetReason::ProtocolError;
 }
 
 ServerConnectionImpl::ServerConnectionImpl(
