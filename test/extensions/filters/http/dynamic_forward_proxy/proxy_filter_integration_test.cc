@@ -147,8 +147,8 @@ typed_config:
   bool use_cache_file_{};
 };
 
-class ProxyFilterWithSimtimeIntegrationTest : public ProxyFilterIntegrationTest,
-                                              public Event::TestUsingSimulatedTime {};
+class ProxyFilterWithSimtimeIntegrationTest : public Event::TestUsingSimulatedTime,
+                                              public ProxyFilterIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterWithSimtimeIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
