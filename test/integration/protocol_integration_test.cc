@@ -493,6 +493,27 @@ TEST_P(ProtocolIntegrationTest, 304HeadResponseWithoutContentLengthLegacy) {
   EXPECT_TRUE(response->headers().get(Http::LowerCaseString("content-length")).empty());
 }
 
+// Tests that the response to a HEAD request can have content-length header but empty body.
+TEST_P(ProtocolIntegrationTest, 200HeadResponseWithContentLength) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "HEAD"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"if-none-match", "\"1234567890\""}});
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "123"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(
+      "123",
+      response->headers().get(Http::LowerCaseString("content-length"))[0]->value().getStringView());
+}
+
 // Tests missing headers needed for H/1 codec first line.
 TEST_P(DownstreamProtocolIntegrationTest, DownstreamRequestWithFaultyFilter) {
   if (upstreamProtocol() == Http::CodecType::HTTP3) {
@@ -3156,6 +3177,56 @@ TEST_P(ProtocolIntegrationTest, FragmentStrippedFromPathWithOverride) {
   EXPECT_TRUE(upstream_request_->complete());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ContentLengthSmallerThanPayload) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"content-length", "123"}},
+                                         1024);
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    waitForNextUpstreamRequest();
+    // HTTP/1.x requests get the payload length from Content-Length header. The remaining bytes is
+    // parsed as another request.
+    EXPECT_EQ(123u, upstream_request_->body().length());
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_TRUE(response->complete());
+  } else {
+    // Inconsistency in content-length header and the actually body length should be treated as a
+    // stream error.
+    ASSERT_TRUE(response->waitForReset());
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
+    // HTTP/1.x request rely on Content-Length header to determine payload length. So there is no
+    // inconsistency but the request will hang there waiting for the rest bytes.
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"},
+                                                                        {"content-length", "1025"}},
+                                         1024);
+
+  // Inconsistency in content-length header and the actually body length should be treated as a
+  // stream error.
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 }
 
 } // namespace Envoy
