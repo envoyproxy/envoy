@@ -43,7 +43,6 @@ int main(int argc, char** argv) {
   }
 
   TestEnvironment::initializeTestMain(argv[0]);
-  Thread::TestThread test_thread;
 
   // Suppressing non-error messages in benchmark tests. This hides warning
   // messages that appear when using a runtime feature when there isn't an initialized

@@ -168,16 +168,12 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
-// RAII object to declare the TestThread. This should be declared in main() or
-// equivalent for any test binaries.
+// Deprecated RAII object to declare the TestThread. This is no longer needed as
+// we figure this out automatically from the platform.
 //
-// Generally we expect TestThread to be instantiated only once on main() for
-// each test binary, though nested instantiations are allowed as long as the
-// thread ID does not change.
-class TestThread {
-public:
-  TestThread();
-  ~TestThread();
+// TODO(jmarantz): Remove this declaration after Nov 15, 2021 to allow
+// references from other repos to be cleaned up.
+struct TestThread {
 };
 
 // RAII object to declare the MainThread. This should be declared in the thread

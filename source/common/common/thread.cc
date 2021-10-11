@@ -28,9 +28,9 @@ struct ThreadIds {
     // and are cleared when being released. All possible thread orderings
     // result in the correct result even without a lock.
     std::thread::id id = std::this_thread::get_id();
-    return main_thread_id_ == id || //test_thread_id_ == id
-#ifdef __linux__
+    return main_thread_id_ == id ||
         // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
+#ifdef __linux__
         getpid() == syscall(SYS_gettid)
 #elif defined(__APPLE__)
         pthread_main_np() != 0
@@ -62,20 +62,6 @@ struct ThreadIds {
     }
   }
 
-  // Call this when the TestThread exits. Nested semantics are supported, so
-  // that if multiple TestThread instances are declared, we unwind them
-  // properly.
-  void releaseTestThread() {
-    absl::MutexLock lock(&mutex_);
-    ASSERT(test_thread_use_count_ > 0);
-    ASSERT(std::this_thread::get_id() == test_thread_id_);
-    if (--test_thread_use_count_ == 0) {
-      // Clearing the thread ID when its use-count goes to zero allows us
-      // to read the atomic without taking a lock.
-      test_thread_id_ = std::thread::id{};
-    }
-  }
-
   // Declares current thread as the main one, or verifies that the current
   // thread matches any previous declarations.
   void registerMainThread() {
@@ -87,27 +73,14 @@ struct ThreadIds {
     }
   }
 
-  // Declares current thread as the test thread, or verifies that the current
-  // thread matches any previous declarations.
-  void registerTestThread() {
-    absl::MutexLock lock(&mutex_);
-    if (++test_thread_use_count_ > 1) {
-      ASSERT(std::this_thread::get_id() == test_thread_id_);
-    } else {
-      test_thread_id_ = std::this_thread::get_id();
-    }
-  }
-
 private:
   // The atomic thread IDs can be read without a mutex, but they are written
   // under a mutex so that they are consistent with their use_counts. this
   // avoids the possibility of two threads racing to claim being the main/test
   // thread.
   std::atomic<std::thread::id> main_thread_id_;
-  std::atomic<std::thread::id> test_thread_id_;
 
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
-  int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
 };
 
@@ -116,10 +89,6 @@ private:
 bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
 
 bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
-
-TestThread::TestThread() { ThreadIds::get().registerTestThread(); }
-
-TestThread::~TestThread() { ThreadIds::get().releaseTestThread(); }
 
 MainThread::MainThread() { ThreadIds::get().registerMainThread(); }
 
