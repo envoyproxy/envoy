@@ -1087,9 +1087,7 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 }
 
 } // namespace
