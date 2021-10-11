@@ -126,7 +126,6 @@ public:
                  Server::Configuration::FactoryContext& context);
     const TcpProxyStats& stats() { return stats_; }
     const absl::optional<std::chrono::milliseconds>& idleTimeout() { return idle_timeout_; }
-    const absl::optional<TunnelingConfig> tunnelingConfig() { return tunneling_config_; }
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectinDuration() const {
       return max_downstream_connection_duration_;
     }
@@ -141,7 +140,6 @@ public:
 
     const TcpProxyStats stats_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
-    absl::optional<TunnelingConfig> tunneling_config_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
   };
 
@@ -169,9 +167,6 @@ public:
   }
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectinDuration();
-  }
-  const absl::optional<TunnelingConfig> tunnelingConfig() {
-    return shared_config_->tunnelingConfig();
   }
   const TunnelingConfigHelper* tunnelingConfigHelper() {
     return shared_config_->tunneling_config_helper_.get();

@@ -74,7 +74,6 @@ Config::SharedConfig::SharedConfig(
     idle_timeout_ = std::chrono::hours(1);
   }
   if (config.has_tunneling_config()) {
-    tunneling_config_ = config.tunneling_config();
     tunneling_config_helper_ =
         std::make_unique<TunnelingConfigHelperImpl>(config.tunneling_config());
   }
