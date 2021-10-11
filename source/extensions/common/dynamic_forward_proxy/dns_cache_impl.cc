@@ -480,10 +480,10 @@ DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
   parent_.stats_.num_hosts_.dec();
 }
 
-void DnsCacheImpl::addCacheEntry(const std::string& host,
-                                 const Network::Address::InstanceConstSharedPtr& address,
-                                 const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
-                                 const std::chrono::seconds ttl) {
+void DnsCacheImpl::addCacheEntry(
+    const std::string& host, const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    const std::chrono::seconds ttl) {
   if (!key_value_store_) {
     return;
   }
@@ -492,11 +492,11 @@ void DnsCacheImpl::addCacheEntry(const std::string& host,
       std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
   std::string value;
   if (address_list.empty()) {
-      value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+    value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
   } else {
     for (auto& addr : address_list) {
-      value += absl::StrCat((value.empty() ? "" : "\n"),
-                            addr->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
+                            seconds_since_epoch);
     }
   }
   key_value_store_->addOrUpdate(host, value);
@@ -509,8 +509,8 @@ void DnsCacheImpl::removeCacheEntry(const std::string& host) {
   key_value_store_->remove(host);
 }
 
-absl::optional<Network::DnsResponse> DnsCacheImpl::parseValue(absl::string_view value,
-                                                              absl::optional<MonotonicTime>& resolution_time) {
+absl::optional<Network::DnsResponse>
+DnsCacheImpl::parseValue(absl::string_view value, absl::optional<MonotonicTime>& resolution_time) {
   Network::Address::InstanceConstSharedPtr address;
   const auto parts = StringUtil::splitToken(value, "|");
   std::chrono::seconds ttl(0);
@@ -531,7 +531,7 @@ absl::optional<Network::DnsResponse> DnsCacheImpl::parseValue(absl::string_view 
       const std::chrono::seconds seconds_since_epoch =
           std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
       resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
-          (seconds_since_epoch - std::chrono::seconds(epoch_int));
+                        (seconds_since_epoch - std::chrono::seconds(epoch_int));
     }
   } else {
     ENVOY_LOG(warn, "Incorrect number of tokens in the cache line");

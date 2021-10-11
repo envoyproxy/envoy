@@ -1069,7 +1069,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1185,8 +1185,8 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 TEST_F(DnsCacheImplTest, CacheLoad) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-          {{"envoy.reloadable_features.send_dns_addresses_early", "true"},
-            {"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+      {{"envoy.reloadable_features.send_dns_addresses_early", "true"},
+       {"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1226,7 +1226,6 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
   ASSERT(store != nullptr);
   EXPECT_EQ(2, TestUtility::findCounter(context_.scope_, "dns_cache.foo.cache_load")->value());
 }
-
 
 // Make sure the cache manager can handle the context going out of scope.
 TEST(DnsCacheManagerImplTest, TestLifetime) {

@@ -130,9 +130,9 @@ void LogicalDnsCluster::startResolve() {
           auto address_list = DnsUtils::generateAddressList(response, port);
 
           if (!logical_host_) {
-            logical_host_ =
-                std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),
-                                              lbEndpoint(), nullptr, time_source_);
+            logical_host_ = std::make_shared<LogicalHost>(info_, hostname_, new_address,
+                                                          address_list, localityLbEndpoint(),
+                                                          lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr);

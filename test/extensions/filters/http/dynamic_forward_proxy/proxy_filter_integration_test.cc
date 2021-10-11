@@ -127,14 +127,16 @@ typed_config:
     } else {
       HttpIntegrationTest::createUpstreams();
     }
-    if (write_cache_file_) {
-      std::string host =
-          fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
-      std::string value =
+    if (use_cache_file_) {
+      cache_file_value_contents_ +=
           absl::StrCat(Network::Test::getLoopbackAddressUrlString(version_), ":",
                        fake_upstreams_[0]->localAddress()->ip()->port(), "|1000000|0");
-      TestEnvironment::writeStringToFileForTest(
-          "dns_cache.txt", absl::StrCat(host.length(), "\n", host, value.length(), "\n", value));
+      std::string host =
+          fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+      TestEnvironment::writeStringToFileForTest("dns_cache.txt",
+                                                absl::StrCat(host.length(), "\n", host,
+                                                             cache_file_value_contents_.length(),
+                                                             "\n", cache_file_value_contents_));
     }
   }
 
@@ -142,7 +144,8 @@ typed_config:
   std::string upstream_cert_name_{"upstreamlocalhost"};
   CdsHelper cds_helper_;
   envoy::config::cluster::v3::Cluster cluster_;
-  bool write_cache_file_{};
+  std::string cache_file_value_contents_;
+  bool use_cache_file_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyFilterIntegrationTest,
@@ -398,7 +401,7 @@ TEST_P(ProxyFilterIntegrationTest, DnsCacheCircuitBreakersInvoked) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
-  write_cache_file_ = true;
+  use_cache_file_ = true;
 
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -409,6 +412,37 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFile) {
   auto response =
       sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
   checkSimpleRequestSuccess(1024, 1024, response.get());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_http1_total")->value());
+}
+
+TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
+  autonomous_upstream_ = true;
+
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.allow_multiple_dns_addresses",
+                                    "true");
+  use_cache_file_ = true;
+  // Prepend a bad address
+  cache_file_value_contents_ = "99.99.99.99:1|1000000|0\n";
+
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  std::string host = fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // This should _not_ require a 10+s wait.
+  // For some reason the next attempt alarm, which has a 300ms timeout is not
+  // firing, so this doesn't fail until the connect timeout fires.
+  // TODO(alyssawilk) figure out what the heck is going on here.
+  while (test_server_->counter("cluster.cluster_0.upstream_rq_total")->value() == 0) {
+    usleep(1000);
+  }
+
+  EXPECT_TRUE(response->waitForEndStream());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.cache_load")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
 }

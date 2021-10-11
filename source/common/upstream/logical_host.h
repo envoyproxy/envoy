@@ -18,6 +18,7 @@ public:
   LogicalHost(
       const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
       const Network::Address::InstanceConstSharedPtr& address,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
       const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
       const Network::TransportSocketOptionsConstSharedPtr& override_transport_socket_options,
@@ -28,7 +29,9 @@ public:
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                  lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
                  lb_endpoint.health_status(), time_source),
-        override_transport_socket_options_(override_transport_socket_options) {}
+        override_transport_socket_options_(override_transport_socket_options) {
+    setAddressList(address_list);
+  }
 
   // Set the new address. Updates are typically rare so a R/W lock is used for address updates.
   // Note that the health check address update requires no lock to be held since it is only
