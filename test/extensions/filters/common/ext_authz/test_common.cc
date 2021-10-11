@@ -14,8 +14,10 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const ResponsePtr& ptr, std::ostream* os) { PrintTo(*ptr, os); }
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const Response& response, std::ostream* os) {
   (*os) << "\n{\n  check_status: " << int(response.status)
         << "\n  headers_to_append: " << response.headers_to_append
