@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace BandwidthLimitFilter {
 
 using EnableMode =
-    envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit_EnableMode;
+    envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit_EnableMode;
 
 TEST(Factory, GlobalEmptyConfig) {
   const std::string yaml = R"(

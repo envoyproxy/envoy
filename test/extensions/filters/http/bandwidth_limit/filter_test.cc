@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/bandwidth_limit/v3alpha/bandwidth_limit.pb.h"
+#include "envoy/extensions/filters/http/bandwidth_limit/v3/bandwidth_limit.pb.h"
 
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 

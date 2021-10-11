@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.http.bandwidth_limit.v3alpha;
+package envoy.extensions.filters.http.bandwidth_limit.v3;
 
 import "envoy/config/core/v3/base.proto";
 
@@ -10,10 +10,9 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.bandwidth_limit.v3";
 option java_outer_classname = "BandwidthLimitProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bandwidth limit]
@@ -68,15 +67,15 @@ message BandwidthLimit {
   // to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
 
-  // Optional Flag to enable response trailers.
+  // Enable response trailers.
   //
   // .. note::
-  //   If set true, the response trailer "bandwidth-request-delay-ms" and "bandwidth-response-delay-ms"
-  //   will be added.
-  //   bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer.
-  //   bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer.
-  //   If enable_mode is DISABLED or REQUEST, the trailers will not be set.
-  //   If the request/response delay time is 0, the trailers will not be set.
+  //   1. If set true, the response trailers *bandwidth-request-delay-ms* and *bandwidth-response-delay-ms*
+  //      will be added, prefixed by *response_trailer_prefix*.
+  //   1. bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer.
+  //   1. bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer.
+  //   1. If :ref:`enable_mode <envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.enable_mode>` is DISABLED or REQUEST, the trailers will not be set.
+  //   1. If the request/response delay time is 0, the trailers will not be set.
   //
   bool enable_response_trailers = 6;
 
