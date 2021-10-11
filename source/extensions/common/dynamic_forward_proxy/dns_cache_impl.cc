@@ -167,21 +167,7 @@ absl::optional<const DnsHostInfoSharedPtr> DnsCacheImpl::getHost(absl::string_vi
 
 DnsCacheImpl::AddUpdateCallbacksHandlePtr
 DnsCacheImpl::addUpdateCallbacks(UpdateCallbacks& callbacks) {
-  DnsCacheImpl::AddUpdateCallbacksHandlePtr ret =
-      std::make_unique<AddUpdateCallbacksHandleImpl>(update_callbacks_, callbacks);
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.send_dns_addresses_early")) {
-    return ret;
-  }
-  // TODO(alyssawilk) may need to rate limit?
-  absl::ReaderMutexLock reader_lock{&primary_hosts_lock_};
-  for (const auto& hosts : primary_hosts_) {
-    if (hosts.second && hosts.second->host_info_ && hosts.second->host_info_->address()) {
-      callbacks.onDnsHostAddOrUpdate(hosts.first, hosts.second->host_info_);
-    }
-  }
-
-  return ret;
+  return std::make_unique<AddUpdateCallbacksHandleImpl>(update_callbacks_, callbacks);
 }
 
 void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port) {

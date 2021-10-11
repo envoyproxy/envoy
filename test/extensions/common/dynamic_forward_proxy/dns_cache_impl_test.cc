@@ -1185,8 +1185,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 TEST_F(DnsCacheImplTest, CacheLoad) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.send_dns_addresses_early", "true"},
-       {"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
+      {{"envoy.reloadable_features.allow_multiple_dns_addresses", "true"}});
 
   auto* time_source = new NiceMock<MockTimeSystem>();
   context_.dispatcher_.time_system_.reset(time_source);
@@ -1217,14 +1216,27 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   config_.mutable_key_value_config()->mutable_config()->set_name("mock_key_value_store_factory");
 
-  EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("foo.com", DnsHostInfoEquals("10.0.0.2:80", "foo.com", false)));
-  EXPECT_CALL(update_callbacks_,
-              onDnsHostAddOrUpdate("bar.com", DnsHostInfoEquals("1.1.1.1:1", "bar.com", false)));
   initialize();
-  InSequence s;
   ASSERT(store != nullptr);
   EXPECT_EQ(2, TestUtility::findCounter(context_.scope_, "dns_cache.foo.cache_load")->value());
+
+  {
+    MockLoadDnsCacheEntryCallbacks callbacks;
+    auto result = dns_cache_->loadDnsCacheEntry("foo.com", 80, callbacks);
+    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+    EXPECT_EQ(result.handle_, nullptr);
+    EXPECT_NE(absl::nullopt, result.host_info_);
+    EXPECT_EQ(1, result.host_info_.value()->addressList().size());
+  }
+
+  {
+    MockLoadDnsCacheEntryCallbacks callbacks;
+    auto result = dns_cache_->loadDnsCacheEntry("bar.com", 80, callbacks);
+    EXPECT_EQ(DnsCache::LoadDnsCacheEntryStatus::InCache, result.status_);
+    EXPECT_EQ(result.handle_, nullptr);
+    ASSERT_NE(absl::nullopt, result.host_info_);
+    EXPECT_EQ(2, result.host_info_.value()->addressList().size());
+  }
 }
 
 // Make sure the cache manager can handle the context going out of scope.
