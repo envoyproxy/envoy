@@ -22,7 +22,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::TestParamInfo;
+using testing::_;
 using testing::AtLeast;
 using testing::Combine;
 using testing::ContainsRegex;
@@ -32,8 +32,8 @@ using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
+using ::testing::TestParamInfo;
 using testing::Values;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -1593,7 +1593,7 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   shadow_clusters.try_emplace("shadow_cluster_1", std::make_shared<ShadowClusterInfo>());
   shadow_clusters.try_emplace("shadow_cluster_2", std::make_shared<ShadowClusterInfo>());
 
-  for (auto & [ name, shadow_cluster_info ] : shadow_clusters) {
+  for (auto& [name, shadow_cluster_info] : shadow_clusters) {
     auto& shadow_cluster = shadow_cluster_info->cluster;
     auto& upstream_connection = shadow_cluster_info->connection;
     auto& conn_state = shadow_cluster_info->conn_state;
