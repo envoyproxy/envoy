@@ -16,7 +16,10 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const ResponsePtr& ptr, std::ostream* os);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const Response& response, std::ostream* os);
 
 struct KeyValueOption {
