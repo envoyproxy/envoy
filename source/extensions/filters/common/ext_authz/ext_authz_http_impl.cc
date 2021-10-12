@@ -38,6 +38,8 @@ const Response& errorResponse() {
                                             Http::HeaderVector{},
                                             Http::HeaderVector{},
                                             {{}},
+                                            Http::Utility::QueryParamsVector{},
+                                            {},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
                                             ProtobufWkt::Struct{}});
@@ -350,9 +352,17 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                        config_->upstreamHeaderToAppendMatchers(),
                        config_->clientHeaderOnSuccessMatchers(),
                        config_->dynamicMetadataMatchers(),
-                       Response{CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{},
-                                Http::HeaderVector{}, Http::HeaderVector{}, Http::HeaderVector{},
-                                std::move(headers_to_remove), EMPTY_STRING, Http::Code::OK,
+                       Response{CheckStatus::OK,
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                Http::HeaderVector{},
+                                std::move(headers_to_remove),
+                                Http::Utility::QueryParamsVector{},
+                                {},
+                                EMPTY_STRING,
+                                Http::Code::OK,
                                 ProtobufWkt::Struct{}}};
     return std::move(ok.response_);
   }
@@ -370,6 +380,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   Http::HeaderVector{},
                                   Http::HeaderVector{},
                                   {{}},
+                                  Http::Utility::QueryParamsVector{},
+                                  {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
                                   ProtobufWkt::Struct{}}};

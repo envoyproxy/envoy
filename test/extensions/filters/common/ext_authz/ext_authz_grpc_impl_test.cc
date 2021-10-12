@@ -315,6 +315,46 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+// Test the client when an OK response is received with additional query string parameters.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
+  initialize();
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  const Http::Utility::QueryParamsVector query_parameters_to_set{{"add-me", "yes"}};
+  for (const auto& [key, value] : query_parameters_to_set) {
+    auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
+    query_parameter->set_key(key);
+    query_parameter->set_value(value);
+  }
+
+  const std::vector<std::string> query_parameters_to_remove{"remove-me"};
+  for (const auto& key : query_parameters_to_remove) {
+    check_response->mutable_ok_response()->add_query_parameters_to_remove(key);
+  }
+
+  // This is the expected authz response.
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::OK;
+  authz_response.query_parameters_to_set = {{"add-me", "yes"}};
+  authz_response.query_parameters_to_remove = {"remove-me"};
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters
