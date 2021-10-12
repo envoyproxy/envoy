@@ -279,11 +279,13 @@ public:
     const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
 
-    if (filter_it != request_metadata.end() && route_criteria != nullptr) {
-      metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
-    } else if (filter_it != request_metadata.end()) {
-      metadata_match_criteria_ =
-          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    if (filter_it != request_metadata.end()) {
+      if (route_criteria != nullptr) {
+        metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+      } else {
+        metadata_match_criteria_ =
+            std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+      }
     } else {
       return route_criteria;
     }

@@ -137,7 +137,7 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
-    ProtobufWkt::Struct request_struct, route_struct;
+    ProtobufWkt::Struct request_struct;
     ProtobufWkt::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
@@ -154,13 +154,13 @@ public:
     val.set_string_value("v3.0");
     fields_map = *request_struct.mutable_fields();
     fields_map["version"] = val;
-    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
 
     if (route_entry_has_match) {
-      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+      ON_CALL(route_entry_, metadataMatchCriteria())
           .WillByDefault(Return(&route_entry_matches));
     } else {
-      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+      ON_CALL(route_entry_, metadataMatchCriteria())
           .WillByDefault(Return(nullptr));
     }
 
@@ -179,6 +179,48 @@ public:
     // `version` should be what came from the request, overriding the route entry.
     EXPECT_EQ((*it)->name(), "version");
     EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  }
+
+  void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
+    ProtobufWkt::Struct route_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *route_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria())
+          .WillByDefault(Return(&route_entry_matches));
+
+      EXPECT_NE(nullptr, router_->metadataMatchCriteria());
+      
+      auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+      EXPECT_EQ(match.size(), 2);
+      auto it = match.begin();
+
+      // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+      // below matters.
+
+      // `stage` was set by the route entry.
+      EXPECT_EQ((*it)->name(), "stage");
+      EXPECT_EQ((*it)->value().value().string_value(), "devel");
+      it++;
+
+      // `version` was set by the route entry.
+      EXPECT_EQ((*it)->name(), "version");
+      EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    } else {
+      ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+          .WillByDefault(Return(nullptr));
+
+      EXPECT_EQ(nullptr, router_->metadataMatchCriteria());
+    }
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
@@ -742,18 +784,40 @@ TEST_F(ThriftRouterTest, NoCluster) {
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
+// Test for request metadata is not empty
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequest) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
 
+  // Test case for router filter metadata is not empty
   verifyMetadataMatchCriteriaFromRequest(true);
 }
 
+// Test for request metadata is not empty
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
 
+  // Test case for router filter metadata is empty
   verifyMetadataMatchCriteriaFromRequest(false);
+}
+
+// Test for request metadata is empty
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRoute) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  // Test case for router filter metadata is not empty
+  verifyMetadataMatchCriteriaFromRoute(true);
+}
+
+// Test for request metadata is empty
+TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  // Test case for router filter metadata is empty
+  verifyMetadataMatchCriteriaFromRoute(false);
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
