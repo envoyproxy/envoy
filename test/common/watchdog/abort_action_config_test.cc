@@ -8,13 +8,19 @@
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Watchdog {
 namespace {
 
-TEST(AbortActionFactoryTest, CanCreateAction) {
+class AbortActionFactoryTest : public ::testing::TestWithParam<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(TypedStruct, AbortActionFactoryTest,
+                         ::testing::Values("xds.type.v3.TypedStruct", "udpa.type.v1.TypedStruct"));
+
+TEST_P(AbortActionFactoryTest, CanCreateAction) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::GuardDogActionFactory>::getFactory(
           "envoy.watchdog.abort_action");
@@ -22,13 +28,13 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
 
   // Create config and mock context
   envoy::config::bootstrap::v3::Watchdog::WatchdogAction config;
-  TestUtility::loadFromJson(
-      R"EOF(
+  TestUtility::loadFromJson(absl::StrFormat(
+                                R"EOF(
         {
           "config": {
             "name": "envoy.watchdog.abort_action",
             "typed_config": {
-              "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
+              "@type": "type.googleapis.com/%s",
               "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3.AbortActionConfig",
               "value": {
                 "wait_duration": "2s",
@@ -37,7 +43,8 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
           },
         }
       )EOF",
-      config);
+                                GetParam()),
+                            config);
 
   Stats::TestUtil::TestStore stats_;
   Event::MockDispatcher dispatcher;
