@@ -473,7 +473,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
-  client_quic_options_.mutable_migrate_port_on_path_degrading()->set_value(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
@@ -511,6 +510,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   concurrency_ = 2;
   initialize();
+  client_quic_options_.mutable_migrate_port_on_path_degrading()->set_value(false);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
@@ -549,7 +549,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   concurrency_ = 2;
   validation_failure_on_path_response_ = true;
   initialize();
-  client_quic_options_.mutable_migrate_port_on_path_degrading()->set_value(true);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
