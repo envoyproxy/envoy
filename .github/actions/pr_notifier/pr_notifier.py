@@ -230,7 +230,8 @@ if __name__ == '__main__':
             'Missing SLACK_BOT_TOKEN: please export token from https://api.slack.com/apps/A023NPQQ33K/oauth?'
             ' or disable actions via the instructions here: '
             'https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/'
-            'enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository')
+            'enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository'
+        )
 
         sys.exit(1)
 
