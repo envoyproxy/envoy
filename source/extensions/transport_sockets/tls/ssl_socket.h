@@ -86,9 +86,6 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   void shutdownBasic();
-  bool isThreadSafe() const {
-    return callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe();
-  }
 
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   Network::TransportSocketCallbacks* callbacks_{};
