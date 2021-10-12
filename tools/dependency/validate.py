@@ -220,9 +220,9 @@ class Validator(object):
         # these paths.
         queried_dataplane_core_min_deps = self._build_graph.query_external_deps(
             '//source/common/api/...', '//source/common/buffer/...',
-            '//source/common/chromium_url/...', '//source/common/crypto/...',
-            '//source/common/conn_pool/...', '//source/common/formatter/...',
-            '//source/common/http/...', '//source/common/ssl/...', '//source/common/tcp/...',
+            '//source/common/crypto/...', '//source/common/conn_pool/...',
+            '//source/common/formatter/...', '//source/common/http/...',
+            '//source/common/ssl/...', '//source/common/tcp/...',
             '//source/common/tcp_proxy/...', '//source/common/network/...')
         # It's hard to disentangle API and dataplane today.
         expected_dataplane_core_deps = self._dep_info.deps_by_use_category('dataplane_core').union(
