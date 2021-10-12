@@ -27,6 +27,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.improved_stream_limit_handling`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.return_502_for_upstream_protocol_errors``. Envoy will always return 502 code upon encountering upstream protocol error.
 * http: removed ``envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure`` and legacy code paths.
+* upstream: removed ``envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`` and legacy code paths.
 
 New Features
 ------------
