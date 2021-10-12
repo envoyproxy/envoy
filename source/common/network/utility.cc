@@ -591,7 +591,7 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
     Api::IoCallUint64Result result =
         receiveMessage(max_packet_size_with_gro, buffer, output, handle, local_address);
 
-    if (!result.ok()) {
+    if (!result.ok() || output.msg_[0].truncated_and_dropped_) {
       return result;
     }
 
