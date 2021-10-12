@@ -157,11 +157,9 @@ public:
     Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
 
     if (route_entry_has_match) {
-      ON_CALL(route_entry_, metadataMatchCriteria())
-          .WillByDefault(Return(&route_entry_matches));
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
     } else {
-      ON_CALL(route_entry_, metadataMatchCriteria())
-          .WillByDefault(Return(nullptr));
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
     }
 
     auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
@@ -195,11 +193,9 @@ public:
     Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(route_struct);
 
     if (route_entry_has_match) {
-      ON_CALL(route_entry_, metadataMatchCriteria())
-          .WillByDefault(Return(&route_entry_matches));
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
 
       EXPECT_NE(nullptr, router_->metadataMatchCriteria());
-      
       auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
       EXPECT_EQ(match.size(), 2);
       auto it = match.begin();
