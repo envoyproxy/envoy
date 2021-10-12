@@ -151,6 +151,48 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
       EnvoyException, "config must be present for global config");
 }
 
+TEST(ConfigTest, WrongCookieName) {
+const std::string yaml = R"EOF(
+config:
+  token_endpoint:
+    cluster: foo
+    uri: oauth.com/token
+    timeout: 3s
+  credentials:
+    client_id: "secret"
+    token_secret:
+      name: token
+    hmac_secret:
+      name: hmac
+    cookie_names:
+      bearer_token: "?"
+  authorization_endpoint: https://oauth.com/oauth/authorize/
+  redirect_uri: "%REQ(:x-forwarded-proto)%://%REQ(:authority)%/callback"
+  redirect_path_matcher:
+    path:
+      exact: /callback
+  signout_path:
+    path:
+      exact: /signout
+  auth_scopes:
+  - user
+  - openid
+  - email
+  resources:
+  - oauth2-resource
+  - http://example.com
+  - https://example.com
+    )EOF";
+
+  OAuth2Config factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
+                            EnvoyException, "value does not match regex pattern");
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions

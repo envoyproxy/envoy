@@ -28,13 +28,16 @@ message OAuth2Credentials {
     // that token is, if :ref:`forward_bearer_token <envoy_v3_api_field_extensions.filters.http.oauth2.v3alpha.OAuth2Config.forward_bearer_token>`
     // is set to true the filter will send over the bearer token as a cookie with this name to the
     // upstream. Defaults to ``BearerToken``.
-    string bearer_token = 1;
+    string bearer_token = 1
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // Cookie name to hold OAuth HMAC value. Defaults to ``OauthHMAC``.
-    string oauth_hmac = 2;
+    string oauth_hmac = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // Cookie name to hold OAuth expiry value. Defaults to ``OauthExpires``.
-    string oauth_expires = 3;
+    string oauth_expires = 3
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
   // The client_id to be used in the authorize calls. This value will be URL encoded when sent to the OAuth server.
