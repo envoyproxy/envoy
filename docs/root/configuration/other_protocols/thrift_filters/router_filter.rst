@@ -45,6 +45,17 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
 
+If the service zone is available for both the local service (via :option:`--service-zone`)
+and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,
+Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<to_zone>.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  thrift.upstream_resp_<\*>, Counter, "Total responses of each type (e.g., reply, success, etc.)"
+  thrift.upstream_rq_time, Histogram, Request time milliseconds
+
 .. note::
 
   The request and response size histograms include what's sent and received during protocol upgrade.

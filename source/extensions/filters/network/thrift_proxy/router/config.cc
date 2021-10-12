@@ -18,14 +18,15 @@ ThriftFilters::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoT
     const std::string& stat_prefix, Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(proto_config);
 
-  auto shadow_writer =
-      std::make_shared<ShadowWriterImpl>(context.clusterManager(), stat_prefix, context.scope(),
-                                         context.mainThreadDispatcher(), context.threadLocal());
+  auto shadow_writer = std::make_shared<ShadowWriterImpl>(
+      context.clusterManager(), stat_prefix, context.scope(), context.mainThreadDispatcher(),
+      context.threadLocal(), context.localInfo());
 
   return [&context, stat_prefix,
           shadow_writer](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(std::make_shared<Router>(
-        context.clusterManager(), stat_prefix, context.scope(), context.runtime(), *shadow_writer));
+    callbacks.addDecoderFilter(std::make_shared<Router>(context.clusterManager(), stat_prefix,
+                                                        context.scope(), context.runtime(),
+                                                        context.localInfo(), *shadow_writer));
   };
 }
 
