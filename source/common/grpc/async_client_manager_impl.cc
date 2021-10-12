@@ -156,8 +156,7 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     return nullptr;
   }
   if (idle_keys_.find(config) != idle_keys_.end()) {
-    idle_keys_.erase(config);
-    active_keys_.insert(config);
+    active_keys_.insert(idle_keys_.extract(config));
   }
   return it->second;
 }
@@ -168,9 +167,9 @@ void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
   active_keys_.insert(config);
 }
 
-void AsyncClientManagerImpl::RawAsyncClientCache::refresh() {
+void AsyncClientManagerImpl::RawAsyncClientCache::evictIdleEntries() {
   // Remove all the cache entries idle in the last interval.
-  for (auto const& config : idle_keys_) {
+  for (const auto& config : idle_keys_) {
     cache_.erase(config);
   }
   // Reset all the entries to be idle at the beginning of next interval.
