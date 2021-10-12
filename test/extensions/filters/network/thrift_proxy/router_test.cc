@@ -112,16 +112,15 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
     if (!use_real_shadow_writer) {
-      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                         context_.runtime(), context_.localInfo(), shadow_writer_);
+      router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
+                                         shadow_writer_);
     } else {
-      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
-          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal(),
-          context_.localInfo());
-      router_ =
-          std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                   context_.runtime(), context_.localInfo(), *shadow_writer_impl_);
+      shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(context_.clusterManager(), *stats_,
+                                                               dispatcher_, context_.threadLocal());
+      router_ = std::make_unique<Router>(context_.clusterManager(), *stats_, context_.runtime(),
+                                         *shadow_writer_impl_);
     }
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
@@ -491,6 +490,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
   std::unique_ptr<Router> router_;
+  std::shared_ptr<const RouterStats> stats_;
   MockShadowWriter shadow_writer_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_impl_;
 
