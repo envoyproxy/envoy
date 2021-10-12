@@ -116,8 +116,7 @@ private:
       stale_at_time_ = resolution_time + ttl;
     }
     bool isStale() {
-      const MonotonicTime stale_time = stale_at_time_;
-      return time_source_.monotonicTime() > stale_time;
+      return time_source_.monotonicTime() > static_cast<MonotonicTime>(stale_at_time_);
     }
 
     void setAddress(Network::Address::InstanceConstSharedPtr address) {
