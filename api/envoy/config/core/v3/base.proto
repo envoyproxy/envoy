@@ -296,6 +296,15 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+// Query parameter name/value pair.
+message QueryParameter {
+  // The key of the query parameter. Case sensitive.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The value of the query parameter.
+  string value = 2;
+}
+
 // Header name/value pair.
 message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";

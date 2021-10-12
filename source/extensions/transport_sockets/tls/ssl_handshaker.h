@@ -5,6 +5,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_callbacks.h"
+#include "envoy/server/options.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
@@ -69,15 +70,18 @@ using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;
 
 class HandshakerFactoryContextImpl : public Ssl::HandshakerFactoryContext {
 public:
-  HandshakerFactoryContextImpl(Api::Api& api, absl::string_view alpn_protocols)
-      : api_(api), alpn_protocols_(alpn_protocols) {}
+  HandshakerFactoryContextImpl(Api::Api& api, const Server::Options& options,
+                               absl::string_view alpn_protocols)
+      : api_(api), options_(options), alpn_protocols_(alpn_protocols) {}
 
   // HandshakerFactoryContext
   Api::Api& api() override { return api_; }
+  const Server::Options& options() const override { return options_; }
   absl::string_view alpnProtocols() const override { return alpn_protocols_; }
 
 private:
   Api::Api& api_;
+  const Server::Options& options_;
   const std::string alpn_protocols_;
 };
 
