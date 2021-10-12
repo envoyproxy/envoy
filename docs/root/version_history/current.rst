@@ -24,6 +24,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.dont_add_content_length_for_bodiless_requests deprecation`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.return_502_for_upstream_protocol_errors``. Envoy will always return 502 code upon encountering upstream protocol error.
 * http: removed ``envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure`` and legacy code paths.
+* local_ratelimit: added support for `X-RateLimit-*` headers as defined in `draft RFC <https://tools.ietf.org/id/draft-polli-ratelimit-headers-03.html>`_.
 
 New Features
 ------------
@@ -32,3 +33,4 @@ New Features
 
 Deprecated
 ----------
+* ratelimit: the :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.XRateLimitHeadersRFCVersion>` enum has been deprecated in favor of :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.common.ratelimit.v3.XRateLimitHeadersRFCVersion>`.
