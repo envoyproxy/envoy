@@ -1000,11 +1000,9 @@ insensitive_repeated_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-template <typename T>
-class TypedStructUtilityTest : public ProtobufUtilityTest {};
+template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
 
-using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct,
-                                          udpa::type::v1::TypedStruct>;
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
 TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
 
 // Empty `TypedStruct` can be trivially redacted.

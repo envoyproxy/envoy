@@ -329,9 +329,8 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   EXPECT_THAT(*config, ProtoEq(source_duration));
 }
 
-template<typename T>
-class UtilityTypedStructTest : public ::testing::Test {
- public:
+template <typename T> class UtilityTypedStructTest : public ::testing::Test {
+public:
   static void packTypedStructIntoAny(ProtobufWkt::Any& typed_config,
                                      const Protobuf::Message& inner) {
     T typed_struct;
@@ -342,8 +341,7 @@ class UtilityTypedStructTest : public ::testing::Test {
   }
 };
 
-using TypedStructTypes =
-    ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
 TYPED_TEST_SUITE(UtilityTypedStructTest, TypedStructTypes);
 
 // Verify that TypedStruct can be translated into google.protobuf.Struct
