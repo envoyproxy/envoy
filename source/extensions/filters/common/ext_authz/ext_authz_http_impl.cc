@@ -45,57 +45,63 @@ const Response& errorResponse() {
                                             ProtobufWkt::Struct{}});
 }
 
-// SuccessResponse used for creating either DENIED or OK authorization responses.
-struct SuccessResponse {
-  SuccessResponse(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
-                  const MatcherSharedPtr& append_matchers,
-                  const MatcherSharedPtr& response_matchers,
-                  const MatcherSharedPtr& dynamic_metadata_matchers, Response&& response)
-      : headers_(headers), matchers_(matchers), append_matchers_(append_matchers),
-        response_matchers_(response_matchers),
-        to_dynamic_metadata_matchers_(dynamic_metadata_matchers),
-        response_(std::make_unique<Response>(response)) {
-    headers_.iterate([this](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-      // UpstreamHeaderMatcher
-      if (matchers_->matches(header.key().getStringView())) {
-        response_->headers_to_set.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
-      }
-      if (append_matchers_->matches(header.key().getStringView())) {
-        // If there is an existing matching key in the current headers, the new entry will be
-        // appended with the same key. For example, given {"key": "value1"} headers, if there is
-        // a matching "key" from the authorization response headers {"key": "value2"}, the
-        // request to upstream server will have two entries for "key": {"key": "value1", "key":
-        // "value2"}.
-        response_->headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
-      }
-      if (response_matchers_->matches(header.key().getStringView())) {
-        // For HTTP implementation, the response headers from the auth server will, by default, be
-        // appended (using addCopy) to the encoded response headers.
-        response_->response_headers_to_add.emplace_back(
-            Http::LowerCaseString{std::string(header.key().getStringView())},
-            std::string(header.value().getStringView()));
-      }
-      if (to_dynamic_metadata_matchers_->matches(header.key().getStringView())) {
-        const std::string key{header.key().getStringView()};
-        const std::string value{header.value().getStringView()};
-        (*response_->dynamic_metadata.mutable_fields())[key] = ValueUtil::stringValue(value);
-      }
-      return Http::HeaderMap::Iterate::Continue;
-    });
-  }
+void populateFromStorageHeader(const Http::HeaderMap& headers,
+                               const Http::LowerCaseString& storage_header_name,
+                               std::vector<Http::LowerCaseString>& output) {
+  const auto& get_result = headers.get(storage_header_name);
+  for (size_t i = 0; i < get_result.size(); ++i) {
+    const Http::HeaderEntry* entry = get_result[i];
+    if (entry == nullptr) {
+      continue;
+    }
 
-  const Http::HeaderMap& headers_;
-  // All matchers below are used on headers_.
-  const MatcherSharedPtr& matchers_;
-  const MatcherSharedPtr& append_matchers_;
-  const MatcherSharedPtr& response_matchers_;
-  const MatcherSharedPtr& to_dynamic_metadata_matchers_;
-  ResponsePtr response_;
-};
+    absl::string_view storage_header_value = entry->value().getStringView();
+    std::vector<absl::string_view> header_names = StringUtil::splitToken(
+        storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
+    output.reserve(output.size() + header_names.size());
+    for (const auto& header_name : header_names) {
+      output.push_back(Http::LowerCaseString(std::string(header_name)));
+    }
+  }
+}
+
+void populateMatchedHeaders(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
+                            const MatcherSharedPtr& append_matchers,
+                            const MatcherSharedPtr& response_matchers,
+                            const MatcherSharedPtr& dynamic_metadata_matchers,
+                            ResponsePtr& response) {
+  headers.iterate([&](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+    // UpstreamHeaderMatcher
+    if (matchers->matches(header.key().getStringView())) {
+      response->headers_to_set.emplace_back(
+          Http::LowerCaseString{std::string(header.key().getStringView())},
+          std::string(header.value().getStringView()));
+    }
+    if (append_matchers->matches(header.key().getStringView())) {
+      // If there is an existing matching key in the current headers, the new entry will be
+      // appended with the same key. For example, given {"key": "value1"} headers, if there is
+      // a matching "key" from the authorization response headers {"key": "value2"}, the
+      // request to upstream server will have two entries for "key": {"key": "value1", "key":
+      // "value2"}.
+      response->headers_to_add.emplace_back(
+          Http::LowerCaseString{std::string(header.key().getStringView())},
+          std::string(header.value().getStringView()));
+    }
+    if (response_matchers->matches(header.key().getStringView())) {
+      // For HTTP implementation, the response headers from the auth server will, by default, be
+      // appended (using addCopy) to the encoded response headers.
+      response->response_headers_to_add.emplace_back(
+          Http::LowerCaseString{std::string(header.key().getStringView())},
+          std::string(header.value().getStringView()));
+    }
+    if (dynamic_metadata_matchers->matches(header.key().getStringView())) {
+      const std::string key{header.key().getStringView()};
+      const std::string value{header.value().getStringView()};
+      (*response->dynamic_metadata.mutable_fields())[key] = ValueUtil::stringValue(value);
+    }
+    return Http::HeaderMap::Iterate::Continue;
+  });
+}
 
 std::vector<Matchers::StringMatcherPtr>
 createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list) {
@@ -320,72 +326,29 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     return std::make_unique<Response>(errorResponse());
   }
 
-  // Extract headers-to-remove from the storage header coming from the
-  // authorization server.
-  const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
-  // If we are going to construct an Ok response we need to save the
-  // headers_to_remove in a variable first.
-  std::vector<Http::LowerCaseString> headers_to_remove;
+  ResponsePtr authz_response = std::make_unique<Response>(Response{});
   if (status_code == enumToInt(Http::Code::OK)) {
-    const auto& get_result = message->headers().get(storage_header_name);
-    for (size_t i = 0; i < get_result.size(); ++i) {
-      const Http::HeaderEntry* entry = get_result[i];
-      if (entry != nullptr) {
-        absl::string_view storage_header_value = entry->value().getStringView();
-        std::vector<absl::string_view> header_names = StringUtil::splitToken(
-            storage_header_value, ",", /*keep_empty_string=*/false, /*trim_whitespace=*/true);
-        headers_to_remove.reserve(headers_to_remove.size() + header_names.size());
-        for (const auto& header_name : header_names) {
-          headers_to_remove.push_back(Http::LowerCaseString(std::string(header_name)));
-        }
-      }
-    }
-  }
-  // Now remove the storage header from the authz server response headers before
-  // we reuse them to construct an Ok/Denied authorization response below.
-  message->headers().remove(storage_header_name);
+    authz_response->status = CheckStatus::OK;
+    authz_response->status_code = Http::Code::OK;
 
-  // Create an Ok authorization response.
-  if (status_code == enumToInt(Http::Code::OK)) {
-    SuccessResponse ok{message->headers(),
-                       config_->upstreamHeaderMatchers(),
-                       config_->upstreamHeaderToAppendMatchers(),
-                       config_->clientHeaderOnSuccessMatchers(),
-                       config_->dynamicMetadataMatchers(),
-                       Response{CheckStatus::OK,
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                Http::HeaderVector{},
-                                std::move(headers_to_remove),
-                                Http::Utility::QueryParamsVector{},
-                                {},
-                                EMPTY_STRING,
-                                Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
-    return std::move(ok.response_);
+    // Extract headers-to-remove from the storage header coming from the
+    // authorization server. Then, remove the storage header from the authz server response headers
+    // before we reuse them to construct an Ok/Denied authorization response below.
+    const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
+    populateFromStorageHeader(message->headers(), storage_header_name, authz_response->headers_to_remove);
+    message->headers().remove(storage_header_name);
+  } else {
+    authz_response->status = CheckStatus::Denied;
+    authz_response->status_code = static_cast<Http::Code>(status_code);
+    authz_response->body = message->bodyAsString();
   }
 
-  // Create a Denied authorization response.
-  SuccessResponse denied{message->headers(),
-                         config_->clientHeaderMatchers(),
+  // Given configured header matchers, populate the remaining authz_response fields.
+  populateMatchedHeaders(message->headers(), config_->upstreamHeaderMatchers(),
                          config_->upstreamHeaderToAppendMatchers(),
                          config_->clientHeaderOnSuccessMatchers(),
-                         config_->dynamicMetadataMatchers(),
-                         Response{CheckStatus::Denied,
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  Http::HeaderVector{},
-                                  {{}},
-                                  Http::Utility::QueryParamsVector{},
-                                  {},
-                                  message->bodyAsString(),
-                                  static_cast<Http::Code>(status_code),
-                                  ProtobufWkt::Struct{}}};
-  return std::move(denied.response_);
+                         config_->dynamicMetadataMatchers(), authz_response);
+  return authz_response;
 }
 
 } // namespace ExtAuthz
