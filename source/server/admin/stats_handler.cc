@@ -87,6 +87,23 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return handlerPrometheusStats(url, response_headers, response, admin_stream);
   }
 
+  if (format_value.value() == "html") {
+    /*
+    Stats::StatNamePool pool(server_.stats().symbolTable());
+    Stats::StatName after;
+    QueryParams::iterator after_iter = params.find("after");
+    if (after_iter != params.end()) {
+      after = pool.add(after_iter->second);
+    }
+    if (type == params.end()) {
+      response.add(fmt::format("&type=(: \"{}\"\n", error.what()));
+    }
+    QueryParams::iterator type_iter = params.find("type");
+    return handlerHtmlStats(url, response_headers, response, admin_stream, used_only,
+                            after, type);
+    */
+  }
+
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
     if (shouldShowMetric(*counter, used_only, regex)) {
