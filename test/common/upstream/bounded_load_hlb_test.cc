@@ -134,6 +134,12 @@ TEST_F(BoundedLoadHashingLoadBalancerTest, NoHosts) {
   lb_ = std::make_unique<TestBoundedLoadHashingLoadBalancer>(hlb_, normalized_host_weights, 1,
                                                              nullptr);
   EXPECT_EQ(lb_->chooseHost(1, 1), nullptr);
+
+  EXPECT_EQ(nullptr, hlb_->peekAnotherHost(nullptr));
+  EXPECT_FALSE(hlb_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(hlb_->selectPool(nullptr, *mock_host, hash_key).has_value());
 };
 
 // Works correctly for the case when no host is ever overloaded.

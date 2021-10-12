@@ -40,6 +40,16 @@ public:
   choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                  const DegradedLoad& degraded_per_priority_load);
 
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
+             std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
@@ -400,16 +410,6 @@ public:
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
-  // Pool selection not implemented.
-  absl::optional<Upstream::SelectedPoolAndConnection>
-  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
-             std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
-  }
-  // Lifetime tracking not implemented.
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-    return {};
-  }
 
 protected:
   struct Scheduler {
@@ -654,16 +654,6 @@ public:
   // Upstream::ZoneAwareLoadBalancerBase
   HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) override;
-  // Pool selection not implemented.
-  absl::optional<Upstream::SelectedPoolAndConnection>
-  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
-             std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
-  }
-  // Lifetime tracking selection not implemented.
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-    return {};
-  }
 
 protected:
   HostConstSharedPtr peekOrChoose(LoadBalancerContext* context, bool peek);
