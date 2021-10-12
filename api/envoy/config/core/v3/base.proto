@@ -380,7 +380,7 @@ message DataSource {
     string inline_string = 3;
 
     // Environment variable data source.
-    string environment_variable = 4 [(validate.rules).string = {min_bytes: 1}];
+    string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
   }
 }
 
