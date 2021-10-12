@@ -32,11 +32,10 @@ public:
 
   void waitForSeconds(size_t seconds) {
     for (size_t i = 0; i < seconds; i++) {
-      time_system_.advanceTimeAndRun(std::chrono::milliseconds(1000), *dispatcher_,
+      time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                      Event::Dispatcher::RunType::NonBlock);
     }
   }
-  Envoy::Stats::IsolatedStoreImpl stats_;
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

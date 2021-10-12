@@ -58,7 +58,7 @@ public:
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) {
       timer_ = dispatcher.createTimer([this] {
-        refresh();
+        evictIdleEntries();
         timer_->enableTimer(RefreshInterval);
       });
       timer_->enableTimer(RefreshInterval);
@@ -67,7 +67,7 @@ public:
                   const RawAsyncClientSharedPtr& client);
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
-    void refresh();
+    void evictIdleEntries();
 
   private:
     absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
