@@ -63,7 +63,6 @@ without further review.
 
 * All senior maintainers
 * Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
-* Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d)) (ddolguik@redhat.com)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 * William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 
