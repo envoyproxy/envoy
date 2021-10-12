@@ -10,12 +10,12 @@ build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
 build --ios_minimum_os=11.0
-build --ios_simulator_device="iPhone 12"
-build --ios_simulator_version=14.5
+build --ios_simulator_device="iPhone 13"
+build --ios_simulator_version=15.0
 build --spawn_strategy=local
 build --verbose_failures
 build --workspace_status_command=envoy/bazel/get_workspace_status
-build --xcode_version=12.5
+build --xcode_version=13.0
 build --javabase=@bazel_tools//tools/jdk:jdk
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
