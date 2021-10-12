@@ -40,8 +40,10 @@ public:
   virtual ~DynamicExtensionConfigProviderBase() = default;
 
   /**
-   * Update the provider with a new configuration.
-   * @param proto_config is the new configuration.
+   * Update the provider with a new configuration. This interface accepts proto rather than a
+   * factory callback so that it can be generic over factory types.
+   * @param proto_config is the new configuration. It is expected that the configuration has already
+   * been validated so that this method will not throw.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
    */

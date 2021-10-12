@@ -132,6 +132,8 @@ void FilterConfigSubscription::onConfigUpdate(
   for (auto* provider : filter_config_providers_) {
     provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
   }
+  // Finish validation by ensuring this doesn't throw.
+  factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
 
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
