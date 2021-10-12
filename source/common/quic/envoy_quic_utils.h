@@ -53,6 +53,9 @@ public:
   static constexpr absl::string_view too_many_trailers = "http3.too_many_trailers";
   // Too many headers were sent.
   static constexpr absl::string_view too_many_headers = "http3.too_many_headers";
+  // The payload size is different from what the content-length header indicated.
+  static constexpr absl::string_view inconsistent_content_length =
+      "http3.inconsistent_content_length";
 };
 
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
