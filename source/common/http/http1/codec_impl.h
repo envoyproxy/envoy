@@ -132,7 +132,7 @@ private:
   void flushOutput(bool end_encode = false);
 
   absl::string_view details_;
-  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  StreamInfo::BytesMeterSharedPtr bytes_meter_;
 };
 
 /**
