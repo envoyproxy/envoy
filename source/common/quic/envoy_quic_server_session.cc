@@ -38,11 +38,13 @@ std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
+  auto crypto_stream = crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
       crypto_config, compressed_certs_cache, this, stream_helper(),
       makeOptRefFromPtr(position_.has_value() ? &position_->filter_chain_.transportSocketFactory()
                                               : nullptr),
       dispatcher());
+  quic_ssl_info_->setSsl(crypto_stream->GetSsl());
+  return crypto_stream;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {

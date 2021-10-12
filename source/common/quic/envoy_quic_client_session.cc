@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
@@ -117,9 +118,18 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
-  return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
+  auto crypto_stream = crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
+  quic_ssl_info_->setSsl(crypto_stream->GetSsl());
+  return crypto_stream;
+}
+
+void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(
+    const quic::ProofVerifyDetails& verify_details) {
+  if (static_cast<const CertVerifyResult&>(verify_details).isValid()) {
+    quic_ssl_info_->onCertValidated();
+  }
 }
 
 } // namespace Quic

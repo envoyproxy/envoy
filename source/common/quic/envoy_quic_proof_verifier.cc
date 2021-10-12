@@ -12,14 +12,15 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
     const std::string& hostname, const uint16_t /*port*/, const std::vector<std::string>& certs,
     const std::string& /*ocsp_response*/, const std::string& /*cert_sct*/,
     const quic::ProofVerifyContext* /*context*/, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* /*details*/, uint8_t* /*out_alert*/,
+    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* /*out_alert*/,
     std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
-  ASSERT(!certs.empty());
+  ASSERT(!certs.empty() && details != nullptr);
   bssl::UniquePtr<STACK_OF(X509)> intermediates(sk_X509_new_null());
   bssl::UniquePtr<X509> leaf;
   for (size_t i = 0; i < certs.size(); i++) {
     bssl::UniquePtr<X509> cert = parseDERCertificate(certs[i], error_details);
     if (!cert) {
+      *details = std::make_unique<CertVerifyResult>(false);
       return quic::QUIC_FAILURE;
     }
     if (i == 0) {
@@ -33,6 +34,7 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   ASSERT(cert_view != nullptr);
   int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), error_details);
   if (sign_alg == 0) {
+    *details = std::make_unique<CertVerifyResult>(false);
     return quic::QUIC_FAILURE;
   }
   // We down cast rather than add verifyCertChain to Envoy::Ssl::Context because
@@ -41,16 +43,19 @@ quic::QuicAsyncStatus EnvoyQuicProofVerifier::VerifyCertChain(
   bool success = static_cast<Extensions::TransportSockets::Tls::ClientContextImpl*>(context_.get())
                      ->verifyCertChain(*leaf, *intermediates, *error_details);
   if (!success) {
+    *details = std::make_unique<CertVerifyResult>(false);
     return quic::QUIC_FAILURE;
   }
 
   for (const absl::string_view& config_san : cert_view->subject_alt_name_domains()) {
     if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname,
                                                                               config_san)) {
+      *details = std::make_unique<CertVerifyResult>(true);
       return quic::QUIC_SUCCESS;
     }
   }
   *error_details = absl::StrCat("Leaf certificate doesn't match hostname: ", hostname);
+  *details = std::make_unique<CertVerifyResult>(false);
   return quic::QUIC_FAILURE;
 }
 

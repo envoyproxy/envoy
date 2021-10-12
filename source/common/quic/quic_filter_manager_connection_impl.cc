@@ -3,6 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quic_ssl_connection_info.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -12,7 +14,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
-      network_connection_(&connection),
+      network_connection_(&connection), quic_ssl_info_(std::make_shared<QuicSslConnectionInfo>()),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(dispatcher.timeSource(),
@@ -117,8 +119,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  return nullptr;
+  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {

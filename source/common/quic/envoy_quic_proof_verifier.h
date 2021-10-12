@@ -6,6 +6,18 @@
 namespace Envoy {
 namespace Quic {
 
+class CertVerifyResult : public quic::ProofVerifyDetails {
+public:
+  explicit CertVerifyResult(bool is_valid) : is_valid_(is_valid) {}
+
+  ProofVerifyDetails* Clone() const { return new CertVerifyResult(is_valid_); }
+
+  bool isValid() const { return is_valid_; }
+
+private:
+  bool is_valid_{false};
+};
+
 // A quic::ProofVerifier implementation which verifies cert chain using SSL
 // client context config.
 class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {

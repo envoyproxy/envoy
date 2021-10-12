@@ -200,6 +200,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "quic_ssl_connection_info_lib",
+    hdrs = ["quic_ssl_connection_info.h"],
+    external_deps = ["ssl"],
+    tags = ["nofips"],
+    deps = [
+        "//source/extensions/transport_sockets/tls:connection_info_impl_base_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "quic_filter_manager_connection_lib",
     srcs = ["quic_filter_manager_connection_impl.cc"],
     hdrs = ["quic_filter_manager_connection_impl.h"],
@@ -207,6 +217,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_simulated_watermark_buffer_lib",
         ":quic_network_connection_lib",
+        ":quic_ssl_connection_info_lib",
         ":send_buffer_monitor_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:connection_interface",
@@ -261,6 +272,7 @@ envoy_cc_library(
     deps = [
         ":envoy_quic_client_connection_lib",
         ":envoy_quic_crypto_stream_factory_lib",
+        ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",

@@ -25,6 +25,7 @@
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
 #include "source/common/quic/send_buffer_monitor.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
 
 namespace Envoy {
 
@@ -161,14 +162,15 @@ protected:
   virtual bool hasDataToWrite() PURE;
 
   // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
-  virtual const quic::QuicConnection* quicConnection() const = 0;
-  virtual quic::QuicConnection* quicConnection() = 0;
+  virtual const quic::QuicConnection* quicConnection() const PURE;
+  virtual quic::QuicConnection* quicConnection() PURE;
 
   QuicNetworkConnection* network_connection_{nullptr};
 
   OptRef<Http::Http3::CodecStats> codec_stats_;
   OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
+  std::shared_ptr<QuicSslConnectionInfo> quic_ssl_info_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;
