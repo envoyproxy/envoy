@@ -98,6 +98,7 @@ public:
   void storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:
