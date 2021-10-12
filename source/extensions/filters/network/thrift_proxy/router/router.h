@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/router/router.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -117,7 +118,7 @@ struct RouterStats {
 class RequestOwner : public ProtocolConverter, public Logger::Loggable<Logger::Id::thrift> {
 public:
   RequestOwner(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-               Stats::Scope& scope)
+               Stats::Scope& scope, const LocalInfo::LocalInfo& local_info)
       : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
         stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
         symbol_table_(scope.symbolTable()),
@@ -131,7 +132,8 @@ public:
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
-        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")) {}
+        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
+        zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()) {}
   ~RequestOwner() override = default;
 
   /**
@@ -187,7 +189,8 @@ public:
    * @param value uint64_t the value of the duration.
    * @param unit Unit the unit of the duration.
    */
-  virtual void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) PURE;
+  virtual void recordResponseDuration(Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                      uint64_t value, Stats::Histogram::Unit unit) PURE;
 
   /**
    * @return Upstream::ClusterManager& the cluster manager.
@@ -207,72 +210,78 @@ public:
   /**
    * Increment counter for received responses that are replies.
    */
-  void incResponseReply(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_});
+  void incResponseReply(const Upstream::ClusterInfo& cluster,
+                        Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
   }
 
   /**
    * Increment counter for request calls.
    */
   void incRequestCall(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_call_});
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_call_);
   }
 
   /**
    * Increment counter for requests that are one way only.
    */
   void incRequestOneWay(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_oneway_});
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_oneway_);
   }
 
   /**
    * Increment counter for requests that are invalid.
    */
   void incRequestInvalid(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_invalid_type_});
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_invalid_type_);
   }
 
   /**
    * Increment counter for received responses that are replies that are successful.
    */
-  void incResponseReplySuccess(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_success_});
+  void incResponseReplySuccess(const Upstream::ClusterInfo& cluster,
+                               Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_success_);
   }
 
   /**
    * Increment counter for received responses that are replies that are an error.
    */
-  void incResponseReplyError(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_error_});
+  void incResponseReplyError(const Upstream::ClusterInfo& cluster,
+                             Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_error_);
   }
 
   /**
    * Increment counter for received responses that are exceptions.
    */
-  void incResponseException(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_exception_});
+  void incResponseException(const Upstream::ClusterInfo& cluster,
+                            Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_exception_);
   }
 
   /**
    * Increment counter for received responses that are invalid.
    */
-  void incResponseInvalidType(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_invalid_type_});
+  void incResponseInvalidType(const Upstream::ClusterInfo& cluster,
+                              Upstream::HostDescriptionConstSharedPtr upstream_host) {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_invalid_type_);
   }
 
   /**
    * Record a value for the request size histogram.
    */
   void recordUpstreamRequestSize(const Upstream::ClusterInfo& cluster, uint64_t value) {
-    recordClusterScopeHistogram(cluster, {upstream_rq_size_}, Stats::Histogram::Unit::Bytes, value);
+    recordClusterScopeHistogram(cluster, nullptr, upstream_rq_size_, Stats::Histogram::Unit::Bytes,
+                                value);
   }
 
   /**
    * Record a value for the response size histogram.
    */
   void recordUpstreamResponseSize(const Upstream::ClusterInfo& cluster, uint64_t value) {
-    recordClusterScopeHistogram(cluster, {upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
-                                value);
+    recordClusterScopeHistogram(cluster, nullptr, upstream_resp_size_,
+                                Stats::Histogram::Unit::Bytes, value);
   }
 
   /**
@@ -282,9 +291,10 @@ public:
    * @param value uint64_t the value of the duration.
    * @param unit Unit the unit of the duration.
    */
-  void recordClusterResponseDuration(const Upstream::ClusterInfo& cluster, uint64_t value,
-                                     Stats::Histogram::Unit unit) {
-    recordClusterScopeHistogram(cluster, {upstream_rq_time_}, unit, value);
+  void recordClusterResponseDuration(const Upstream::ClusterInfo& cluster,
+                                     Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                     uint64_t value, Stats::Histogram::Unit unit) {
+    recordClusterScopeHistogram(cluster, upstream_host, upstream_rq_time_, unit, value);
   }
 
 protected:
@@ -369,18 +379,45 @@ protected:
 
 private:
   void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
-                              const Stats::StatNameVec& names) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+                              Upstream::HostDescriptionConstSharedPtr upstream_host,
+                              const Stats::StatName& stat_name) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({stat_name});
     cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope().counterFromStatName(Stats::StatName(zone_stat_name_storage.get())).inc();
+    }
   }
 
   void recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
-                                   const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
+                                   Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                   const Stats::StatName& stat_name, Stats::Histogram::Unit unit,
                                    uint64_t value) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({stat_name});
     cluster.statsScope()
         .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
         .recordValue(value);
+    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope()
+          .histogramFromStatName(Stats::StatName(zone_stat_name_storage.get()), unit)
+          .recordValue(value);
+    }
+  }
+
+  Stats::SymbolTable::StoragePtr
+  upstreamZoneStatName(Upstream::HostDescriptionConstSharedPtr upstream_host,
+                       const Stats::StatName& stat_name) const {
+    if (!upstream_host || local_zone_name_.empty()) {
+      return nullptr;
+    }
+    const auto& upstream_zone_name = upstream_host->localityZoneStatName();
+    if (upstream_zone_name.empty()) {
+      return nullptr;
+    }
+    return symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
   }
 
   RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -404,6 +441,8 @@ private:
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName upstream_rq_size_;
   const Stats::StatName upstream_resp_size_;
+  const Stats::StatName zone_;
+  const Stats::StatName local_zone_name_;
 };
 
 /**
@@ -468,6 +507,11 @@ public:
    * @return Stats::Scope& the Scope used by the router.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return LocalInfo::LocalInfo& the local info used by the router.
+   */
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return Dispatcher& the dispatcher.

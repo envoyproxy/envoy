@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
@@ -113,12 +114,14 @@ public:
 
     if (!use_real_shadow_writer) {
       router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                         context_.runtime(), shadow_writer_);
+                                         context_.runtime(), context_.localInfo(), shadow_writer_);
     } else {
       shadow_writer_impl_ = std::make_shared<ShadowWriterImpl>(
-          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal());
-      router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
-                                         context_.runtime(), *shadow_writer_impl_);
+          context_.clusterManager(), "test", context_.scope(), dispatcher_, context_.threadLocal(),
+          context_.localInfo());
+      router_ =
+          std::make_unique<Router>(context_.clusterManager(), "test", context_.scope(),
+                                   context_.runtime(), context_.localInfo(), *shadow_writer_impl_);
     }
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
@@ -134,6 +137,12 @@ public:
     metadata_->setMethodName(method);
     metadata_->setMessageType(msg_type_);
     metadata_->setSequenceId(sequence_id);
+  }
+
+  void initializeUpstreamZone() {
+    upstream_locality_.set_zone("other_zone_name");
+    ON_CALL(*context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_, locality())
+        .WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
@@ -496,7 +505,7 @@ public:
   int32_t protocols_requested_{};
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
-  NiceMock<Upstream::MockHostDescription>* host_{};
+  envoy::config::core::v3::Locality upstream_locality_;
   Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
   RouteConstSharedPtr route_ptr_;
@@ -1601,6 +1610,89 @@ TEST_F(ThriftRouterTest, ShadowRequests) {
   destroyRouter();
 
   shadow_writer_impl_ = nullptr;
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallSuccess) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse();
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                     .value());
+  EXPECT_EQ(1UL,
+            context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_success")
+                .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallError) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Reply, false);
+
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_error")
+                     .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallException) {
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+  returnResponse(MessageType::Exception);
+  EXPECT_EQ(1UL,
+            context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_exception")
+                .value());
+}
+
+TEST_F(ThriftRouterTest, UpstreamZoneCallWithRqTime) {
+  NiceMock<Stats::MockStore> cluster_scope;
+  ON_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, statsScope())
+      .WillByDefault(ReturnRef(cluster_scope));
+
+  initializeRouter();
+  initializeUpstreamZone();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::I32);
+  completeRequest();
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
+  EXPECT_CALL(cluster_scope, histogram("thrift.upstream_resp_size", Stats::Histogram::Unit::Bytes));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_resp_size"), _));
+
+  EXPECT_CALL(cluster_scope,
+              histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name, "thrift.upstream_rq_time"), _));
+
+  EXPECT_CALL(cluster_scope, histogram("zone.zone_name.other_zone_name.thrift.upstream_rq_time",
+                                       Stats::Histogram::Unit::Milliseconds));
+  EXPECT_CALL(cluster_scope,
+              deliverHistogramToSinks(
+                  testing::Property(&Stats::Metric::name,
+                                    "zone.zone_name.other_zone_name.thrift.upstream_rq_time"),
+                  500));
+  returnResponse();
 }
 
 } // namespace Router

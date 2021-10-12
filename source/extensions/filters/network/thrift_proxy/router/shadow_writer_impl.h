@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/router/router.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -142,8 +143,9 @@ public:
   void continueDecoding() override { flushPendingCallbacks(); }
   void resetDownstreamConnection() override {}
   void sendLocalReply(const ThriftProxy::DirectResponse&, bool) override {}
-  void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) override {
-    recordClusterResponseDuration(*cluster_, value, unit);
+  void recordResponseDuration(Upstream::HostDescriptionConstSharedPtr upstream_host, uint64_t value,
+                              Stats::Histogram::Unit unit) override {
+    recordClusterResponseDuration(*cluster_, upstream_host, value, unit);
   }
 
   // RequestOwner::ProtocolConverter
@@ -248,9 +250,10 @@ class ShadowWriterImpl : public ShadowWriter, Logger::Loggable<Logger::Id::thrif
 public:
   ShadowWriterImpl(Upstream::ClusterManager& cm, const std::string& stat_prefix,
                    Stats::Scope& scope, Event::Dispatcher& dispatcher,
-                   ThreadLocal::SlotAllocator& tls)
-      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), dispatcher_(dispatcher),
-        stats_(generateStats(stat_prefix, scope)), tls_(tls.allocateSlot()) {
+                   ThreadLocal::SlotAllocator& tls, const LocalInfo::LocalInfo& local_info)
+      : cm_(cm), stat_prefix_(stat_prefix), scope_(scope), local_info_(local_info),
+        dispatcher_(dispatcher), stats_(generateStats(stat_prefix, scope)),
+        tls_(tls.allocateSlot()) {
 
     tls_->set([](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ActiveRouters>(dispatcher);
@@ -265,6 +268,7 @@ public:
   Upstream::ClusterManager& clusterManager() override { return cm_; }
   const std::string& statPrefix() const override { return stat_prefix_; }
   Stats::Scope& scope() override { return scope_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   absl::optional<std::reference_wrapper<ShadowRouterHandle>>
   submit(const std::string& cluster_name, MessageMetadataSharedPtr metadata,
@@ -282,6 +286,7 @@ private:
   Upstream::ClusterManager& cm_;
   const std::string stat_prefix_;
   Stats::Scope& scope_;
+  const LocalInfo::LocalInfo& local_info_;
   Event::Dispatcher& dispatcher_;
   ShadowWriterStats stats_;
   ThreadLocal::SlotPtr tls_;
