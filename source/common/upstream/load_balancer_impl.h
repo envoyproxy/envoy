@@ -50,6 +50,7 @@ public:
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
     return {};
   }
+
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
