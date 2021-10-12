@@ -129,23 +129,40 @@ TEST(IoSocketHandleImpl, ExplicitDoesNotSupportGetifaddrs) {
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
-TEST(IoSocketHandleImpl, InterfaceNameForLoopbackExplicitV6) {
+TEST(IoSocketHandleImpl, NullptrIfaddrs) {
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
-      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v6));
+      Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4));
 
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
+  EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
+      .WillOnce(
+          Invoke([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+            os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
+            return {0, 0};
+          }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .WillOnce(Invoke([&](struct ifaddrs** ifap) -> Api::SysCallIntResult {
+        ifaddrs* ifap_heap = new ifaddrs;
+        ifap_heap->ifa_addr = nullptr;
+        ifap_heap->ifa_next = nullptr;
+        *ifap = ifap_heap;
+        return {0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls, freeifaddrs(_)).WillOnce(Invoke([&](struct ifaddrs* ifp) -> void {
+    os_syscalls_singleton.freeifaddrs(ifp);
+  }));
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
-
-  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
-    EXPECT_TRUE(maybe_interface_name.has_value());
-    EXPECT_TRUE(absl::StrContains(maybe_interface_name.value(), "lo"));
-  } else {
-    EXPECT_FALSE(maybe_interface_name.has_value());
-  }
+  EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         testing::ValuesIn({Network::Address::IpVersion::v4,
+                                            Network::Address::IpVersion::v6}),
                          TestUtility::ipTestParamsToString);
 
 TEST_P(IoSocketHandleImplTest, InterfaceNameForLoopback) {
