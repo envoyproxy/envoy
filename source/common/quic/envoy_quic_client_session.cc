@@ -137,6 +137,7 @@ void EnvoyQuicClientSession::setHttp3Options(
                                       .connection_keepalive()
                                       .max_interval_seconds()
                                       .value();
+    // If the keepalive max_interval is configured to zero, disable the probe completely.
     if (max_interval == 0u) {
       disable_keepalive_ = true;
       return;
@@ -150,6 +151,7 @@ void EnvoyQuicClientSession::setHttp3Options(
 }
 
 bool EnvoyQuicClientSession::ShouldKeepConnectionAlive() const {
+  // Do not probe at all if keepalive is disabled via config.
   return !disable_keepalive_ && quic::QuicSpdyClientSession::ShouldKeepConnectionAlive();
 }
 

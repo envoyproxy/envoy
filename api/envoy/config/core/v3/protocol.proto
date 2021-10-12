@@ -41,7 +41,7 @@ message QuicKeepAliveSettings {
   google.protobuf.UInt32Value max_interval_seconds = 1
       [(validate.rules).message = {required: true}];
 
-  // The interval in seconds to send the first 6 keep-alive probing packets to prevent
+  // The interval in seconds to send the first few keep-alive probing packets to prevent
   // connection from hitting the idle timeout. Subsequent probes will be sent, each
   // one with an interval exponentially longer than previous one, till it reaches
   // :ref:`max_interval_seconds <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval_seconds>`. And the probes afterwards will always use :ref:`max_interval_seconds <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval_seconds>`.
@@ -84,16 +84,14 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
-  // QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
-  // itself doesn't timeout waiting for a probing response but it would elicit the peer to
-  // send something, i.e. ACK or PATH_RESPONSE, to push back connection idle timeout. Quic has a shorter idle
-  // timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive
-  // <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
-  // There is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
+  // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
+  // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
+  //
+  // Note that QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+  // itself doesn't timeout waiting for a probing response. Quic has a shorter idle timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
+  // And there is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
   // since a similar feature is built into QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before
   // sending a new request.
-  //
-  // If absent, use the default keepalive behavior which sends PINGs every 15s for a client connection and doesn't do anything for a server connection.
   QuicKeepAliveSettings connection_keepalive = 8;
 }
 
