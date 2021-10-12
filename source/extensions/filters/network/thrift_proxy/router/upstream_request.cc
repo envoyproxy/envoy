@@ -133,26 +133,26 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
-      parent_.incResponseReply(cluster);
+      parent_.incResponseReply(cluster, upstream_host_);
       if (callbacks.responseSuccess()) {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestSuccess);
-        parent_.incResponseReplySuccess(cluster);
+        parent_.incResponseReplySuccess(cluster, upstream_host_);
       } else {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestFailed);
-        parent_.incResponseReplyError(cluster);
+        parent_.incResponseReplyError(cluster, upstream_host_);
       }
       break;
 
     case MessageType::Exception:
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      parent_.incResponseException(cluster);
+      parent_.incResponseException(cluster, upstream_host_);
       break;
 
     default:
-      parent_.incResponseInvalidType(cluster);
+      parent_.incResponseInvalidType(cluster, upstream_host_);
       break;
     }
     onResponseComplete();
@@ -315,7 +315,8 @@ void UpstreamRequest::chargeResponseTiming() {
   const std::chrono::milliseconds response_time =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  parent_.recordResponseDuration(response_time.count(), Stats::Histogram::Unit::Milliseconds);
+  parent_.recordResponseDuration(upstream_host_, response_time.count(),
+                                 Stats::Histogram::Unit::Milliseconds);
 }
 
 } // namespace Router
