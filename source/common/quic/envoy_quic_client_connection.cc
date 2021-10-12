@@ -168,6 +168,8 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
     setConnectionSocket(std::move(probing_socket));
     return;
   }
+  // MigratePath should always succeed since the migration happens after path
+  // validation.
   ENVOY_CONN_LOG(error, "connection fails to migrate path after validation", *this);
 }
 
