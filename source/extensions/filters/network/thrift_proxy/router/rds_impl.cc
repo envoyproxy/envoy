@@ -40,14 +40,14 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
           admin) {}
 
 RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
-    const envoy::extensions::filters::network::thrift_proxy::v3::Rds& rds,
+    const envoy::extensions::filters::network::thrift_proxy::v3::Trds& trds,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  const uint64_t manager_identifier = MessageUtil::hash(rds);
+  const uint64_t manager_identifier = MessageUtil::hash(trds);
 
   auto existing_provider =
-      reuseDynamicProvider(manager_identifier, init_manager, rds.route_config_name());
+      reuseDynamicProvider(manager_identifier, init_manager, trds.route_config_name());
 
   if (!existing_provider) {
     // std::make_shared does not work for classes with private constructors. There are ways
@@ -56,8 +56,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfi
 
     RouteConfigUpdatePtr config_update(new RouteConfigUpdateReceiverImpl(factory_context, *this));
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
-        std::move(config_update), rds.config_source(), rds.route_config_name(), manager_identifier,
-        factory_context, stat_prefix, *this));
+        std::move(config_update), trds.config_source(), trds.route_config_name(),
+        manager_identifier, factory_context, stat_prefix, *this));
     RdsRouteConfigProviderImplSharedPtr new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
     insertDynamicProvider(manager_identifier, new_provider,

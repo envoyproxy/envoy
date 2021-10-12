@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.service.thrift_route.v3;
+package envoy.service.thrift.v3;
 
 import "envoy/service/discovery/v3/discovery.proto";
 
@@ -10,20 +10,20 @@ import "envoy/annotations/resource.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.service.thrift_route.v3";
-option java_outer_classname = "RdsProto";
+option java_package = "io.envoyproxy.envoy.service.thrift.v3";
+option java_outer_classname = "TrdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: THRIFT_RDS]
+// [#protodoc-title: TRDS]
 
 // The resource_names field in DiscoveryRequest specifies a route configuration.
 // This allows an Envoy configuration with multiple Thrift listeners (and
 // associated Thrift proxy filters) to use different route
 // configurations. Each listener will bind its Thrift proxy filter to
 // a route table via this identifier.
-service RouteDiscoveryService {
+service ThriftRouteDiscoveryService {
   option (envoy.annotations.resource).type =
       "envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration";
 
@@ -43,5 +43,5 @@ service RouteDiscoveryService {
 
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221 and protoxform to upgrade the file.
-message RdsDummy {
+message TrdsDummy {
 }

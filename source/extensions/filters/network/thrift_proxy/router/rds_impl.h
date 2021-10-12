@@ -29,7 +29,7 @@ public:
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const envoy::extensions::filters::network::thrift_proxy::v3::Rds& rds,
+      const envoy::extensions::filters::network::thrift_proxy::v3::Trds& trds,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) override;
 

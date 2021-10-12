@@ -96,7 +96,7 @@ public:
     server_factory_context_.thread_local_.shutdownThread();
   }
 
-  envoy::extensions::filters::network::thrift_proxy::v3::Rds rds_;
+  envoy::extensions::filters::network::thrift_proxy::v3::Trds rds_;
   RouteConfigProviderManagerImplPtr route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
@@ -298,7 +298,7 @@ routes:
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
   EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
-  envoy::extensions::filters::network::thrift_proxy::v3::Rds rds2;
+  envoy::extensions::filters::network::thrift_proxy::v3::Trds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =

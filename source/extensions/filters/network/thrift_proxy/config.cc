@@ -147,9 +147,9 @@ ConfigImpl::ConfigImpl(
     }
   }
 
-  if (config.has_rds()) {
+  if (config.has_trds()) {
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
-        config.rds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
+        config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
   } else {
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
         config.route_config(), context_.getServerFactoryContext());
