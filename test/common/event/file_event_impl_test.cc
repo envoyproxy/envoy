@@ -133,12 +133,10 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
         if (events & FileReadyType::Read) {
           read_event.ready();
           file_event->activate(FileReadyType::Write);
-          file_event->activate(FileReadyType::Closed);
         }
 
         if (events & FileReadyType::Write) {
           write_event.ready();
-          file_event->activate(FileReadyType::Closed);
         }
       },
       trigger, FileReadyType::Read | FileReadyType::Write);
@@ -155,10 +153,7 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(write_event, ready());
-  // Third loop iteration: handle close event scheduled while handling write.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  // Fourth loop iteration: poll returned no new real events.
+  // Third loop iteration: poll returned no new real events.
   EXPECT_CALL(prepare_watcher, ready());
 
   file_event->activate(FileReadyType::Read);
