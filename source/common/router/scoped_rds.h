@@ -74,9 +74,9 @@ public:
 
 private:
   const std::string name_;
+  const std::vector<ScopedRouteInfoConstSharedPtr> scopes_;
   ConfigConstSharedPtr config_;
   const envoy::config::core::v3::ConfigSource rds_config_source_;
-  std::vector<ScopedRouteInfoConstSharedPtr> scopes_;
 };
 
 /**

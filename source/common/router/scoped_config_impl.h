@@ -109,8 +109,14 @@ using ScopedRouteMap = std::map<std::string, ScopedRouteInfoConstSharedPtr>;
  */
 class ScopedConfigImpl : public ScopedConfig {
 public:
-  ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
+  explicit ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder)
       : scope_key_builder_(std::move(scope_key_builder)) {}
+
+  ScopedConfigImpl(ScopedRoutes::ScopeKeyBuilder&& scope_key_builder,
+                   const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos)
+      : scope_key_builder_(std::move(scope_key_builder)) {
+    addOrUpdateRoutingScopes(scoped_route_infos);
+  }
 
   void
   addOrUpdateRoutingScopes(const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos);

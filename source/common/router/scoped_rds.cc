@@ -79,20 +79,14 @@ ConfigProviderPtr create(
 
 } // namespace ScopedRoutesConfigProviderUtil
 
-InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
-    ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ScopedRoutesConfigProviderManager& config_provider_manager,
-    envoy::config::core::v3::ConfigSource rds_config_source,
-    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
-        scope_key_builder,
-    const OptionalHttpFilters& optional_http_filters)
-    : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
-                                                 ConfigProviderInstanceType::Inline,
-                                                 ConfigProvider::ApiType::Delta),
-      name_(std::move(name)),
-      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder))),
-      rds_config_source_(std::move(rds_config_source)) {
+namespace {
+
+std::vector<ScopedRouteInfoConstSharedPtr>
+makeScopedRouteInfos(ProtobufTypes::ConstMessagePtrVector&& config_protos,
+                     Server::Configuration::ServerFactoryContext& factory_context,
+                     ScopedRoutesConfigProviderManager& config_provider_manager,
+                     const OptionalHttpFilters& optional_http_filters) {
+  std::vector<ScopedRouteInfoConstSharedPtr> scopes;
   for (std::unique_ptr<const Protobuf::Message>& config_proto : config_protos) {
     auto scoped_route_config =
         MessageUtil::downcastAndValidate<const envoy::config::route::v3::ScopedRouteConfiguration&>(
@@ -108,12 +102,31 @@ InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
         config_provider_manager.routeConfigProviderManager().createStaticRouteConfigProvider(
             scoped_route_config.route_configuration(), optional_http_filters, factory_context,
             factory_context.messageValidationContext().staticValidationVisitor());
-    scopes_.push_back(std::make_shared<const ScopedRouteInfo>(scoped_route_config,
-                                                              route_config_provider->config()));
+    scopes.push_back(std::make_shared<const ScopedRouteInfo>(scoped_route_config,
+                                                             route_config_provider->config()));
   }
-  const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config_.get()))
-      ->addOrUpdateRoutingScopes(scopes_);
+
+  return scopes;
 }
+
+} // namespace
+
+InlineScopedRoutesConfigProvider::InlineScopedRoutesConfigProvider(
+    ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    ScopedRoutesConfigProviderManager& config_provider_manager,
+    envoy::config::core::v3::ConfigSource rds_config_source,
+    envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::ScopeKeyBuilder
+        scope_key_builder,
+    const OptionalHttpFilters& optional_http_filters)
+    : Envoy::Config::ImmutableConfigProviderBase(factory_context, config_provider_manager,
+                                                 ConfigProviderInstanceType::Inline,
+                                                 ConfigProvider::ApiType::Delta),
+      name_(std::move(name)),
+      scopes_(makeScopedRouteInfos(std::move(config_protos), factory_context,
+                                   config_provider_manager, optional_http_filters)),
+      config_(std::make_shared<ScopedConfigImpl>(std::move(scope_key_builder), scopes_)),
+      rds_config_source_(std::move(rds_config_source)) {}
 
 ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,
