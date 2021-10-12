@@ -15,7 +15,13 @@ namespace Common {
 namespace ExtAuthz {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
-void PrintTo(const ResponsePtr& ptr, std::ostream* os) { PrintTo(*ptr, os); }
+void PrintTo(const ResponsePtr& ptr, std::ostream* os) {
+  if (ptr != nullptr) {
+    PrintTo(*ptr, os);
+  } else {
+    (*os) << "null";
+  }
+}
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 void PrintTo(const Response& response, std::ostream* os) {
