@@ -9,6 +9,8 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
+* config: the log message for "gRPC config stream closed" now uses the most recent error message, and reports seconds instead of milliseconds for how long the most recent status has been received.
+
 Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
