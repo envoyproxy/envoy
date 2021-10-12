@@ -34,9 +34,10 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
 ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
                                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
                                    ProtocolType protocol_type)
-    : RequestOwner(parent.clusterManager(), parent.statPrefix(), parent.scope()), parent_(parent),
-      cluster_name_(cluster_name), metadata_(metadata->clone()), transport_type_(transport_type),
-      protocol_type_(protocol_type),
+    : RequestOwner(parent.clusterManager(), parent.statPrefix(), parent.scope(),
+                   parent.localInfo()),
+      parent_(parent), cluster_name_(cluster_name), metadata_(metadata->clone()),
+      transport_type_(transport_type), protocol_type_(protocol_type),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()) {
   response_decoder_ = std::make_unique<NullResponseDecoder>(*transport_, *protocol_);
