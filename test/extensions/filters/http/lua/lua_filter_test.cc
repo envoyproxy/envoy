@@ -1677,12 +1677,12 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandle) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// Test that the deprecated filter name works for metadata.
+// Test that the deprecated filter is disabled by default for metadata.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDeprecatedName)) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
-      request_handle:logTrace(request_handle:metadata():get("foo.bar")["prop"])
     end
   )EOF"};
 
@@ -1691,7 +1691,6 @@ TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDepr
       envoy.lua:
         foo.bar:
           name: foo
-          prop: bar
   )EOF"};
 
   InSequence s;
@@ -1700,21 +1699,7 @@ TEST_F(LuaHttpFilterTest, DEPRECATED_FEATURE_TEST(GetMetadataFromHandleUsingDepr
 
   // Logs deprecation warning the first time.
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_LOG_CONTAINS(
-      "warn",
-      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
-      filter_->decodeHeaders(request_headers, true));
-
-  // Doesn't log deprecation warning the second time.
-  setupMetadata(METADATA);
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo")));
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
-  EXPECT_LOG_NOT_CONTAINS(
-      "warn",
-      "Using deprecated http filter extension name 'envoy.lua' for 'envoy.filters.http.lua'",
-      filter_->decodeHeaders(request_headers, true));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("foo"))).Times(0);
 }
 
 // No available metadata on route.

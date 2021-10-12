@@ -191,7 +191,7 @@ public:
    */
   template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
-    ASSERT(Thread::MainThread::isMainThread());
+    ASSERT(Thread::MainThread::isMainOrTestThread());
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
@@ -300,7 +300,7 @@ public:
    * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid. And a flag to control return nullptr or throw an exception.
    * @param message proto that contains fields 'name' and 'typed_config'.
-   * @param is_optional an exception will be throw when the value is true and no factory found.
+   * @param is_optional an exception will be throw when the value is false and no factory found.
    * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory, class ProtoMessage>

@@ -2,14 +2,12 @@
 
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/common/stl_helpers.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
-
-// TODO(mattklein123): Move DNS family helpers to a smaller include.
-#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +18,7 @@ DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
     : main_thread_dispatcher_(context.mainThreadDispatcher()),
-      dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
+      dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
       tls_slot_(context.threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
@@ -230,7 +228,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
   auto& primary_host = getPrimaryHost(host);
-  ENVOY_LOG(debug, "host='{}' resolution timeout", host);
+  ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
@@ -282,7 +280,8 @@ void DnsCacheImpl::forceRefreshHosts() {
     if (primary_host.second->active_query_ == nullptr) {
       ASSERT(!primary_host.second->timeout_timer_->enabled());
       primary_host.second->refresh_timer_->enableTimer(std::chrono::milliseconds(0), nullptr);
-      ENVOY_LOG(debug, "force refreshing host='{}'", primary_host.first);
+      ENVOY_LOG_EVENT(debug, "force_refresh_host", "force refreshing host='{}'",
+                      primary_host.first);
     }
   }
 }

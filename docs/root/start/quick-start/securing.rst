@@ -12,7 +12,7 @@ Envoy also has support for transmitting and receiving generic ``TCP`` traffic wi
 
 Envoy also offers a number of other ``HTTP``-based protocols for authentication and authorization
 such as :ref:`JWT <arch_overview_jwt_authn>`, :ref:`RBAC <arch_overview_rbac>`
-and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3alpha/oauth.proto>`.
+and :ref:`OAuth <envoy_v3_api_file_envoy/extensions/filters/http/oauth2/v3/oauth.proto>`.
 
 .. warning::
 

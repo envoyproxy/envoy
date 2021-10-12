@@ -48,9 +48,9 @@ public:
 
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
-  bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase
@@ -80,16 +80,15 @@ protected:
   void onPendingFlushTimer() override;
   bool hasPendingData() override;
 
+  void
+  onStreamError(absl::optional<bool> should_close_connection,
+                quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD) override;
+
 private:
   QuicFilterManagerConnectionImpl* filterManagerConnection();
 
   // Deliver awaiting trailers if body has been delivered.
   void maybeDecodeTrailers();
-
-  // Either reset the stream or close the connection according to
-  // should_close_connection and configured http3 options.
-  void onStreamError(absl::optional<bool> should_close_connection,
-                     quic::QuicRstStreamErrorCode rst = quic::QUIC_BAD_APPLICATION_PAYLOAD);
 
   Http::RequestDecoder* request_decoder_{nullptr};
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction

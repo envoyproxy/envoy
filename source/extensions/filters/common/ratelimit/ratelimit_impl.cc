@@ -110,9 +110,11 @@ void GrpcClientImpl::onSuccess(
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
+void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string& msg,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::filter), debug,
+                      "rate limit fail, status={} msg={}", status, msg);
   callbacks_->complete(LimitStatus::Error, nullptr, nullptr, nullptr, EMPTY_STRING, nullptr);
   callbacks_ = nullptr;
 }

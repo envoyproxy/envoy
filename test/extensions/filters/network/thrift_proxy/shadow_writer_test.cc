@@ -147,6 +147,10 @@ public:
     MessageMetadataSharedPtr response_metadata = std::make_shared<MessageMetadata>();
     response_metadata->setMessageType(message_type);
     response_metadata->setSequenceId(1);
+    if (message_type == MessageType::Reply) {
+      const auto reply_type = success ? ReplyType::Success : ReplyType::Error;
+      response_metadata->setReplyType(reply_type);
+    }
 
     auto transport_ptr =
         NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
@@ -412,21 +416,13 @@ TEST_F(ShadowWriterTest, TestNullResponseDecoder) {
   EXPECT_TRUE(decoder_ptr->passthroughEnabled());
 
   metadata_->setMessageType(MessageType::Reply);
+  metadata_->setReplyType(ReplyType::Success);
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
+  EXPECT_TRUE(decoder_ptr->responseSuccess());
 
   Buffer::OwnedImpl buffer;
   decoder_ptr->upstreamData(buffer);
-
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageEnd());
-
-  // First reply field.
-  {
-    FieldType field_type;
-    int16_t field_id = 0;
-    EXPECT_EQ(FilterStatus::Continue, decoder_ptr->messageBegin(metadata_));
-    EXPECT_EQ(FilterStatus::Continue, decoder_ptr->fieldBegin("", field_type, field_id));
-    EXPECT_TRUE(decoder_ptr->responseSuccess());
-  }
 
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportBegin(nullptr));
   EXPECT_EQ(FilterStatus::Continue, decoder_ptr->transportEnd());

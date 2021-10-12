@@ -55,15 +55,12 @@ constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
-    "envoy.deprecated_features.allow_deprecated_extension_names",
     "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
-    "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests",
-    "envoy.reloadable_features.enable_compression_without_content_length_header",
     "envoy.reloadable_features.fix_added_trailers",
     "envoy.reloadable_features.grpc_bridge_stats_disabled",
     "envoy.reloadable_features.grpc_web_fix_non_proto_encoded_response_handling",
@@ -86,11 +83,10 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.preserve_downstream_scheme",
     "envoy.reloadable_features.remove_forked_chromium_url",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
-    "envoy.reloadable_features.return_502_for_upstream_protocol_errors",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.strip_port_from_connect",
     "envoy.reloadable_features.treat_host_like_authority",
-    "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure",
+    "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
     "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
@@ -114,8 +110,6 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // v2 is fatal-by-default.
-    "envoy.test_only.broken_in_production.enable_deprecated_v2_api",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.

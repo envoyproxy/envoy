@@ -5,14 +5,14 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/ext_proc/client.h"
 
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 namespace Envoy {
 namespace Extensions {
@@ -27,10 +27,13 @@ public:
                               const envoy::config::core::v3::GrpcService& grpc_service,
                               Stats::Scope& scope);
 
-  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks) override;
+  ExternalProcessorStreamPtr start(ExternalProcessorCallbacks& callbacks,
+                                   const StreamInfo::StreamInfo& stream_info) override;
 
 private:
-  Grpc::AsyncClientFactoryPtr factory_;
+  Grpc::AsyncClientManager& client_manager_;
+  const envoy::config::core::v3::GrpcService grpc_service_;
+  Stats::Scope& scope_;
 };
 
 class ExternalProcessorStreamImpl : public ExternalProcessorStream,
@@ -38,7 +41,8 @@ class ExternalProcessorStreamImpl : public ExternalProcessorStream,
                                     public Logger::Loggable<Logger::Id::filter> {
 public:
   ExternalProcessorStreamImpl(Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-                              ExternalProcessorCallbacks& callbacks);
+                              ExternalProcessorCallbacks& callbacks,
+                              const StreamInfo::StreamInfo& stream_info);
   void send(ProcessingRequest&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
   // actually closed it.
@@ -57,6 +61,7 @@ private:
   ExternalProcessorCallbacks& callbacks_;
   Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> client_;
   Grpc::AsyncStream<ProcessingRequest> stream_;
+  Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
 };
 
