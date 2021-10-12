@@ -577,7 +577,7 @@ public:
   MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
   ~MockUdpListenerReadFilter() override;
 
-  MOCK_METHOD(void, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onData, (UdpRecvData&));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {
