@@ -19,17 +19,20 @@ TEST(MainThreadVerificationTest, All) {
   // Before threading is on, we are in the test thread, not the main thread.
   EXPECT_FALSE(Thread::MainThread::isMainThread());
   EXPECT_TRUE(Thread::MainThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
   // After threading is off, assertion we are again in the test thread, not the main thread.
   EXPECT_FALSE(Thread::MainThread::isMainThread());
   EXPECT_TRUE(Thread::MainThread::isTestThread());
+  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
