@@ -27,7 +27,6 @@ public:
    * Resets the interval with a (potentially) new starting point.
    */
   virtual void reset(uint64_t base) PURE;
-
 };
 
 using BackOffStrategyPtr = std::unique_ptr<BackOffStrategy>;

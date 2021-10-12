@@ -23,7 +23,7 @@ TEST(ExponentialBackOffStrategyTest, JitteredBackOffBasicReset) {
   ON_CALL(random, random()).WillByDefault(Return(27));
 
   JitteredExponentialBackOffStrategy jittered_back_off(25, 30, random);
-  EXPECT_EQ(2, jittered_back_off.nextBackOffMs());  // 25 % 27
+  EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // 25 % 27
   EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
 
   jittered_back_off.reset();

@@ -82,7 +82,7 @@ public:
   MockUpdateCallbacks update_callbacks_;
   DnsCache::AddUpdateCallbacksHandlePtr update_callbacks_handle_;
   std::chrono::milliseconds configured_ttl_ = std::chrono::milliseconds(60000);
-  std::chrono::milliseconds dns_ttl_= std::chrono::milliseconds(6000);
+  std::chrono::milliseconds dns_ttl_ = std::chrono::milliseconds(6000);
 };
 
 MATCHER_P3(DnsHostInfoEquals, address, resolved_host, is_ip_address, "") {

@@ -17,8 +17,7 @@ namespace DynamicForwardProxy {
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()),
-      config_(config),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
       random_generator_(context.api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
@@ -363,7 +362,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (!resolution_time.has_value()) {
     resolution_time = main_thread_dispatcher_.timeSource().monotonicTime();
   }
-  std::chrono::seconds dns_ttl = std::chrono::duration_cast<std::chrono::seconds>(refresh_interval_);
+  std::chrono::seconds dns_ttl =
+      std::chrono::duration_cast<std::chrono::seconds>(refresh_interval_);
   if (new_address) {
     // Update the cache entry and staleness any time the ttl changes.
     if (!from_cache) {
@@ -385,7 +385,8 @@ void DnsCacheImpl::finishResolve(const std::string& host,
 
   // Kick off the refresh timer.
   if (status == Network::DnsResolver::ResolutionStatus::Success) {
-    primary_host_info->failure_backoff_strategy_->reset(std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
+    primary_host_info->failure_backoff_strategy_->reset(
+        std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
     primary_host_info->refresh_timer_->enableTimer(dns_ttl);
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
               dns_ttl.count() * 1000);
@@ -449,7 +450,7 @@ DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
       refresh_timer_(parent.main_thread_dispatcher_.createTimer(refresh_timer_cb)),
       timeout_timer_(parent.main_thread_dispatcher_.createTimer(timeout_timer_cb)),
       host_info_(std::make_shared<DnsHostInfoImpl>(parent.main_thread_dispatcher_.timeSource(),
-                                                     host_to_resolve, is_ip_address)),
+                                                   host_to_resolve, is_ip_address)),
       failure_backoff_strategy_(
           Config::Utility::prepareDnsRefreshStrategy<
               envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
