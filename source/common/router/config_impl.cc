@@ -1388,12 +1388,6 @@ VirtualHostImpl::VirtualHostImpl(
     hedge_policy_ = virtual_host.hedge_policy();
   }
 
-  constexpr absl::string_view feature_flag = "envoy.reloadable_features.experimental_matching_api";
-  if (virtual_host.has_matcher() && !Runtime::runtimeFeatureEnabled(feature_flag)) {
-    throw EnvoyException(fmt::format(
-        "Experimental matching API is not enabled: set `{}` to true to enable", feature_flag));
-  }
-
   if (virtual_host.has_matcher() && !virtual_host.routes().empty()) {
     throw EnvoyException("cannot set both matcher and routes on virtual host");
   }

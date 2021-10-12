@@ -1217,10 +1217,6 @@ virtual_hosts:
 
 // Validates basic usage of the match tree to resolve route actions.
 TEST_F(RouteMatcherTest, TestMatchTree) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -1298,51 +1294,8 @@ virtual_hosts:
   EXPECT_EQ(nullptr, config.route(headers, 0));
 }
 
-// Validates that we fail creating a route config with the match tree unless the runtime flag is
-// set.
-TEST_F(RouteMatcherTest, TestMatchTreeDisabledByDefault) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- name: www2
-  domains:
-  - lyft.com
-  matcher:
-    matcher_tree:
-      input:
-        name: request-headers
-        typed_config:
-          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-          header_name: :path
-      exact_match_map:
-        map:
-          "/new_endpoint/bar":
-            action:
-              name: route
-              typed_config:
-                "@type": type.googleapis.com/envoy.config.route.v3.Route
-                match:
-                  prefix: /
-                route:
-                  cluster: root_ww2
-                request_headers_to_add:
-                - header:
-                    key: x-route-header
-                    value: match_tree_2
-  )EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  factory_context_.cluster_manager_.initializeClusters(
-      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
-  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
-               EnvoyException);
-}
-
 // Validates that we fail creating a route config if an invalid data input is used.
 TEST_F(RouteMatcherTest, TestMatchInvalidInput) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -1384,10 +1337,6 @@ virtual_hosts:
 
 // Validates that we fail creating a route config if an invalid data input is used.
 TEST_F(RouteMatcherTest, TestMatchInvalidInputTwoMatchers) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.experimental_matching_api", "true"}});
-
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
