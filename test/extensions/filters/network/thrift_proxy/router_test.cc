@@ -163,6 +163,22 @@ public:
       ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
           .WillByDefault(Return(nullptr));
     }
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+    EXPECT_EQ(match.size(), 2);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
   }
 
   void startRequest(MessageType msg_type, std::string method = "method",
