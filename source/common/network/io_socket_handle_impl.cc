@@ -680,18 +680,13 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
 
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      Address::InstanceConstSharedPtr interface_address{};
-      try {
-        interface_address = Address::addressFromSockAddrOrThrow(
-            *addr,
-            (ifa->ifa_addr->sa_family == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-      } catch (const EnvoyException& e) {
-        ENVOY_LOG_MISC(warn, e.what());
-        // It is ok for the loop to continue if it found an invalid interface.
-        continue;
-      }
-      // The calling code above throws instead of returning a nullptr. Therefore, if execution gets
-      // here it can assume it has a non-null address.
+      Address::InstanceConstSharedPtr interface_address = Address::addressFromSockAddrOrThrow(
+          *addr,
+          (ifa->ifa_addr->sa_family == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
+
+      // Address::addressFromSockAddrOrThrow above only errors in the forms of assertions. The only
+      // reason it throws is for an unexpected sa_family; which the if statement guards for AF_INET
+      // or AF_INET6. Therefore, it is an error for the address obtained to be null.
       ASSERT(interface_address);
 
       // Compare address _without port_.
