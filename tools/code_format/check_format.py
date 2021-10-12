@@ -682,7 +682,8 @@ class FormatChecker:
             if "RealTimeSource" in line or \
               ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
               "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
-              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line):
+              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line) or \
+              " usleep(" in line or "::usleep(" in line:
                 report_error(
                     "Don't reference real-world time sources from production code; use injection")
         duration_arg = DURATION_VALUE_REGEX.search(line)
