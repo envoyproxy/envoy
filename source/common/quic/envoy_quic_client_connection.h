@@ -78,8 +78,12 @@ public:
   // Potentially trigger migration.
   void OnPathDegradingDetected() override;
 
+  // Called when port migration probing succeeds. Attempts to migrate this connection onto the new
+  // socket extracted from context.
   void onPathValidationSuccess(std::unique_ptr<quic::QuicPathValidationContext> context);
 
+  // Called when port migration probing fails. The probing socket from context will go out of scope
+  // and be destructed.
   void onPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
   void setMigratePortOnPathDegrading(bool migrate_port_on_path_degrading) {
@@ -87,6 +91,7 @@ public:
   }
 
 private:
+  // Holds all components needed for a QUIC connection probing/migration.
   class EnvoyQuicPathValidationContext : public quic::QuicPathValidationContext {
   public:
     EnvoyQuicPathValidationContext(quic::QuicSocketAddress& self_address,
@@ -109,6 +114,7 @@ private:
     Network::ConnectionSocketPtr socket_;
   };
 
+  // Receives notifications from the Quiche layer on path validation results.
   class EnvoyPathValidationResultDelegate : public quic::QuicPathValidator::ResultDelegate {
   public:
     explicit EnvoyPathValidationResultDelegate(EnvoyQuicClientConnection& connection);

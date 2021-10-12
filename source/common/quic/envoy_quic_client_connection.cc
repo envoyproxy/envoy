@@ -124,8 +124,9 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
     return;
   }
 
-  Network::Address::InstanceConstSharedPtr current_local_address =
+  const Network::Address::InstanceConstSharedPtr& current_local_address =
       connectionSocket()->connectionInfoProvider().localAddress();
+  // Creates an IP address with unset port. The port will be set when the new socket is created.
   Network::Address::InstanceConstSharedPtr new_local_address;
   if (current_local_address->ip()->version() == Network::Address::IpVersion::v4) {
     new_local_address = std::make_shared<Network::Address::Ipv4Instance>(
@@ -135,8 +136,11 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
         current_local_address->ip()->addressAsString());
   }
 
+  // TODO(renjietang): Make createConnectionSocket() take a const reference so that no casting is
+  // needed here.
   auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
       connectionSocket()->connectionInfoProvider().remoteAddress());
+  // The probing socket will have the same host but a different port.
   auto probing_socket = createConnectionSocket(remote_address, new_local_address, nullptr);
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
@@ -159,10 +163,12 @@ void EnvoyQuicClientConnection::onPathValidationSuccess(
   auto probing_socket = envoy_context->releaseSocket();
   if (MigratePath(envoy_context->self_address(), envoy_context->peer_address(),
                   envoy_context->releaseWriter(), true)) {
+    // probing_socket will be set as the new default socket. But old sockets are still able to
+    // receive packets.
     setConnectionSocket(std::move(probing_socket));
-  } else {
-    probing_socket.reset();
+    return;
   }
+  ENVOY_CONN_LOG(error, "connection fails to migrate path after validation", *this);
 }
 
 void EnvoyQuicClientConnection::onPathValidationFailure(
