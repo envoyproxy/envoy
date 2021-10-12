@@ -640,7 +640,7 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
   // Windows doesn't support empty environment variables.
   EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
 #else
-  auto envrionment_variable = DataSource::read(config, true, *api);
+  auto environment_variable = DataSource::read(config, true, *api);
   EXPECT_TRUE(environment_variable.empty());
 #endif
 
