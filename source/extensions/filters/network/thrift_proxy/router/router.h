@@ -140,20 +140,11 @@ public:
         upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
+        upstream_resp_decoding_error_(stat_name_set_->add("thrift.upstream_resp_decoding_error")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
         upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
         zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()) {}
-
-  /**
-   * Increment counter for received responses that are replies.
-   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
-   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
-   */
-  void incResponseReply(const Upstream::ClusterInfo& cluster,
-                        Upstream::HostDescriptionConstSharedPtr upstream_host) const {
-    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
-  }
 
   /**
    * Increment counter for request calls.
@@ -186,7 +177,10 @@ public:
    */
   void incResponseReplySuccess(const Upstream::ClusterInfo& cluster,
                                Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_success_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_success_.inc();
   }
 
   /**
@@ -196,7 +190,13 @@ public:
    */
   void incResponseReplyError(const Upstream::ClusterInfo& cluster,
                              Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_error_);
+    ASSERT(upstream_host != nullptr);
+    // Currently IDL exceptions always considered endpoint error but possible for an error
+    // to have semantics matching HTTP 4xx, rather than 5xx. rq_error classification chosen
+    // here to match outlier detecton external failure in upstream_request.cc.
+    upstream_host->stats().rq_error_.inc();
   }
 
   /**
@@ -207,6 +207,8 @@ public:
   void incResponseException(const Upstream::ClusterInfo& cluster,
                             Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_exception_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_error_.inc();
   }
 
   /**
@@ -217,6 +219,23 @@ public:
   void incResponseInvalidType(const Upstream::ClusterInfo& cluster,
                               Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_invalid_type_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Increment counter for decoding errors during responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void
+  incResponseDecodingError(const Upstream::ClusterInfo& cluster,
+                           Upstream::HostDescriptionConstSharedPtr upstream_host = nullptr) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_decoding_error_);
+    // May not have got a host from pool
+    if (upstream_host != nullptr) {
+      upstream_host->stats().rq_error_.inc();
+    }
   }
 
   /**
@@ -307,6 +326,7 @@ private:
   const Stats::StatName upstream_resp_reply_error_;
   const Stats::StatName upstream_resp_exception_;
   const Stats::StatName upstream_resp_invalid_type_;
+  const Stats::StatName upstream_resp_decoding_error_;
   const Stats::StatName upstream_rq_time_;
   const Stats::StatName upstream_rq_size_;
   const Stats::StatName upstream_resp_size_;
