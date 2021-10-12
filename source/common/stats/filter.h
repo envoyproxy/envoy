@@ -4,6 +4,8 @@
 
 #include "source/common/stats/symbol_table_impl.h"
 
+#include "absl/container/btree_set.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -27,7 +29,7 @@ public:
     const SymbolTable& symbol_table_;
   };
 
-  using OrderedSet = std::set<StatType*, CompareNames>;
+  using OrderedSet = absl::btree_set<StatType*, CompareNames>;
   using OrderedSetIter = typename OrderedSet::iterator;
 
   void setUsedOnly(bool used_only) { used_only_ = used_only; }

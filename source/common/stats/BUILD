@@ -43,6 +43,7 @@ envoy_cc_library(
         ":stats_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
+        "@com_google_absl//absl/container:btree",
     ],
 )
 
