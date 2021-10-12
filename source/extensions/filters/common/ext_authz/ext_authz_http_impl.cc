@@ -335,7 +335,8 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
     // authorization server. Then, remove the storage header from the authz server response headers
     // before we reuse them to construct an Ok/Denied authorization response below.
     const auto& storage_header_name = Headers::get().EnvoyAuthHeadersToRemove;
-    populateFromStorageHeader(message->headers(), storage_header_name, authz_response->headers_to_remove);
+    populateFromStorageHeader(message->headers(), storage_header_name,
+                              authz_response->headers_to_remove);
     message->headers().remove(storage_header_name);
   } else {
     authz_response->status = CheckStatus::Denied;
