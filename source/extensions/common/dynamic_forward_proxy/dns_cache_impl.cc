@@ -500,27 +500,27 @@ DnsCacheImpl::parseValue(absl::string_view value, absl::optional<MonotonicTime>&
   Network::Address::InstanceConstSharedPtr address;
   const auto parts = StringUtil::splitToken(value, "|");
   std::chrono::seconds ttl(0);
-  if (parts.size() == 3) {
-    address = Network::Utility::parseInternetAddressAndPortNoThrow(std::string(parts[0]));
-    if (address == nullptr) {
-      ENVOY_LOG(warn, "{} is not a valid address", parts[0]);
-    }
-    uint64_t ttl_int;
-    if (absl::SimpleAtoi(parts[1], &ttl_int) && ttl_int != 0) {
-      ttl = std::chrono::seconds(ttl_int);
-    } else {
-      ENVOY_LOG(warn, "{} is not a valid ttl", parts[1]);
-    }
-    uint64_t epoch_int;
-    if (absl::SimpleAtoi(parts[2], &epoch_int)) {
-      MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
-      const std::chrono::seconds seconds_since_epoch =
-          std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
-      resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
-                        (seconds_since_epoch - std::chrono::seconds(epoch_int));
-    }
-  } else {
+  if (parts.size() != 3) {
     ENVOY_LOG(warn, "Incorrect number of tokens in the cache line");
+    return {};
+  }
+  address = Network::Utility::parseInternetAddressAndPortNoThrow(std::string(parts[0]));
+  if (address == nullptr) {
+    ENVOY_LOG(warn, "{} is not a valid address", parts[0]);
+  }
+  uint64_t ttl_int;
+  if (absl::SimpleAtoi(parts[1], &ttl_int) && ttl_int != 0) {
+    ttl = std::chrono::seconds(ttl_int);
+  } else {
+    ENVOY_LOG(warn, "{} is not a valid ttl", parts[1]);
+  }
+  uint64_t epoch_int;
+  if (absl::SimpleAtoi(parts[2], &epoch_int)) {
+    MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
+    const std::chrono::seconds seconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+    resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
+                      (seconds_since_epoch - std::chrono::seconds(epoch_int));
   }
   if (address == nullptr || ttl == std::chrono::seconds(0) || !resolution_time.has_value()) {
     ENVOY_LOG(warn, "Unable to parse cache line '{}'", value);

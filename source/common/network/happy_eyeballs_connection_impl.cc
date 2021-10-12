@@ -14,7 +14,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
-  ENVOY_LOG(trace, "New happy eyecalls connection.");
+  ENVOY_LOG(trace, "New happy eyeballs connection.");
   connections_.push_back(createNextConnection());
 }
 
@@ -474,8 +474,7 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
   while (it != connections_.end()) {
     if (it->get() != &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
-      ClientConnectionPtr tmp((*it).release());
-      dispatcher_.deferredDelete(std::move(tmp));
+      dispatcher_.deferredDelete(std::move(*it));
       it = connections_.erase(it);
     } else {
       ++it;
@@ -543,8 +542,7 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
   for (auto it = connections_.begin(); it != connections_.end();) {
     if (it->get() == &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
-      ClientConnectionPtr tmp((*it).release());
-      dispatcher_.deferredDelete(std::move(tmp));
+      dispatcher_.deferredDelete(std::move(*it));
       it = connections_.erase(it);
     } else {
       ++it;

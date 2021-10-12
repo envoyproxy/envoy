@@ -34,7 +34,6 @@ generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t p
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_multiple_dns_addresses")) {
     return addresses;
   }
-  // TODO(alyssar, junr03) should order scope to 5 here or in the resolver?
   for (const auto& response : responses) {
     auto address = Network::Utility::getAddressWithPort(*(response.address_), port);
     if (address) {

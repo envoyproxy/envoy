@@ -109,6 +109,7 @@ private:
       absl::ReaderMutexLock lock{&resolve_lock_};
       return address_;
     }
+
     std::vector<Network::Address::InstanceConstSharedPtr> addressList() const override {
       std::vector<Network::Address::InstanceConstSharedPtr> ret;
       absl::ReaderMutexLock lock{&resolve_lock_};
@@ -192,12 +193,6 @@ private:
 
   void startResolve(const std::string& host, PrimaryHostInfo& host_info)
       ABSL_LOCKS_EXCLUDED(primary_hosts_lock_);
-
-  static std::vector<Network::Address::InstanceConstSharedPtr>
-  generateAddressList(const std::list<Network::DnsResponse>& response, uint32_t port);
-
-  bool listChanged(const std::vector<Network::Address::InstanceConstSharedPtr>& list1,
-                   const std::vector<Network::Address::InstanceConstSharedPtr>& list2);
 
   void finishResolve(const std::string& host, Network::DnsResolver::ResolutionStatus status,
                      std::list<Network::DnsResponse>&& response,

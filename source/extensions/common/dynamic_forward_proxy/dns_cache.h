@@ -26,7 +26,7 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
-   * Returns the host's currently resolved address. This address may change periodically due to
+   * Returns the host's currently resolved address. These addresses may change periodically due to
    * async re-resolution.
    */
   virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
