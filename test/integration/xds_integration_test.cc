@@ -566,7 +566,6 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, RuntimeForPerNetworkFilterChainStat)
   expectConnectionServed();
 
   codec_client_1->close();
-  test_server_->waitForGaugeDestroyed("http.hcm1.downstream_cx_active");
   codec_client_0->close();
   codec_client_default->close();
 
