@@ -228,7 +228,10 @@ if __name__ == '__main__':
     if not SLACK_BOT_TOKEN:
         print(
             'Missing SLACK_BOT_TOKEN: please export token from https://api.slack.com/apps/A023NPQQ33K/oauth?'
-            ' or disable actions via the instructions here: https://bit.ly/2YO6v1c')
+            ' or disable actions via the instructions here: '
+            'https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/'
+            'enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository')
+
         sys.exit(1)
 
     client = WebClient(token=SLACK_BOT_TOKEN)
