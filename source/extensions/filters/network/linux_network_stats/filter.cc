@@ -107,7 +107,7 @@ void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
 
 void Filter::recordHistograms(struct tcp_info& tcp_info) {
   if (tcp_info.tcpi_segs_out > 0) {
-    config_->stats_.cx_tx_percent_retransmitted_segments_.recordFloatValue(
+    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(
         static_cast<float>(tcp_info.tcpi_total_retrans) /
         static_cast<float>(tcp_info.tcpi_segs_out));
   }

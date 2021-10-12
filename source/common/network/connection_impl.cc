@@ -246,9 +246,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     delayed_close_timer_ = nullptr;
   }
 
-  for (Network::ConnectionCallbacks* callback : callbacks_) {
+  /*for (Network::ConnectionCallbacks* callback : callbacks_) {
     callback->onPreClose();
-  }
+    }*/
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
