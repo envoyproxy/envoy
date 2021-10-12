@@ -22,7 +22,7 @@ protected:
   void initialize() {
     test_address_ = Network::Utility::resolveUrl(absl::StrCat(
         "tcp://",
-        Network::Test::getLoopbackAddressString(TestEnvironment::getIpVersionsForTest()[0]),
+        Network::Test::getLoopbackAddressUrlString(TestEnvironment::getIpVersionsForTest()[0]),
         ":30"));
     Ssl::ClientContextSharedPtr context{new Ssl::MockClientContext()};
     EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _, _))
