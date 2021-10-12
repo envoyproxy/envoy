@@ -222,7 +222,7 @@ public:
   /**
    * Record a value for the request size histogram.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
-   * @param value uinty64_t size in bytes of the full request
+   * @param value uint64_t size in bytes of the full request
    */
   void recordUpstreamRequestSize(const Upstream::ClusterInfo& cluster, uint64_t value) const {
     recordClusterScopeHistogram(cluster, nullptr, upstream_rq_size_, Stats::Histogram::Unit::Bytes,
@@ -232,7 +232,7 @@ public:
   /**
    * Record a value for the response size histogram.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
-   * @param value uinty64_t size in bytes of the full response
+   * @param value uint64_t size in bytes of the full response
    */
   void recordUpstreamResponseSize(const Upstream::ClusterInfo& cluster, uint64_t value) const {
     recordClusterScopeHistogram(cluster, nullptr, upstream_resp_size_,
