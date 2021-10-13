@@ -8,7 +8,7 @@ Pod::Spec.new do |s|
     s.social_media_url = 'https://twitter.com/EnvoyProxy'
     s.license = { type: 'Apache-2.0', file: 'LICENSE' }
     s.platform = :ios, '11.0'
-    s.swift_version = '5.1'
+    s.swift_versions = ['5.5']
     s.libraries = 'resolv.9', 'c++'
     s.frameworks = 'SystemConfiguration', 'UIKit'
     s.source = { http: "https://github.com/lyft/envoy-mobile/releases/download/v#{s.version}/envoy_ios_cocoapods.zip" }

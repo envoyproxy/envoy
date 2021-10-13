@@ -56,7 +56,6 @@ iOS requirements
 ----------------
 
 - Xcode 13.0
-- Swift 5.x
 - Note: Requirements are listed in the :repo:`.bazelrc file <.bazelrc>` and CI scripts
 
 .. _android_aar:
