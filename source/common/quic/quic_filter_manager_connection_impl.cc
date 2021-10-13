@@ -14,7 +14,7 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
-      network_connection_(&connection), quic_ssl_info_(std::make_shared<QuicSslConnectionInfo>()),
+      network_connection_(&connection),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(dispatcher.timeSource(),

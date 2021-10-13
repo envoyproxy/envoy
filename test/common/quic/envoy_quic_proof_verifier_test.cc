@@ -274,9 +274,10 @@ ZCFbredVxDBZuoVsfrKPSQa407Jj1Q==
   std::unique_ptr<quic::CertificateView> cert_view =
       quic::CertificateView::ParseSingleCertificate(chain[0]);
   ASSERT(cert_view);
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
   EXPECT_EQ(quic::QUIC_FAILURE,
             verifier_->VerifyCertChain("lyft.com", 54321, chain, ocsp_response, cert_sct, nullptr,
-                                       &error_details, nullptr, nullptr, nullptr));
+                                       &error_details, &verify_details, nullptr, nullptr));
   EXPECT_EQ("X509_verify_cert: certificate verification error at depth 0: unsupported certificate "
             "purpose",
             error_details);

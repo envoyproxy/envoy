@@ -206,6 +206,7 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         "//source/extensions/transport_sockets/tls:connection_info_impl_base_lib",
+        "@com_github_google_quiche//:quic_core_session_lib",
     ],
 )
 

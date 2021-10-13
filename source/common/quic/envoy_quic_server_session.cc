@@ -23,6 +23,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
                                       send_buffer_limit),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
+  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
 }
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {
@@ -38,13 +39,11 @@ std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,
     quic::QuicCompressedCertsCache* compressed_certs_cache) {
-  auto crypto_stream = crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
+  return crypto_server_stream_factory_.createEnvoyQuicCryptoServerStream(
       crypto_config, compressed_certs_cache, this, stream_helper(),
       makeOptRefFromPtr(position_.has_value() ? &position_->filter_chain_.transportSocketFactory()
                                               : nullptr),
       dispatcher());
-  quic_ssl_info_->setSsl(crypto_stream->GetSsl());
-  return crypto_stream;
 }
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStreamId id) {

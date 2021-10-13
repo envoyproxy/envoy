@@ -19,7 +19,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                   crypto_config.get(), push_promise_index),
       host_name_(server_id.host()), crypto_config_(crypto_config),
       crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
-      scope_(scope) {}
+      scope_(scope) {
+  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
+}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -118,11 +120,9 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
-  auto crypto_stream = crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
+  return crypto_stream_factory_.createEnvoyQuicCryptoClientStream(
       server_id(), this, crypto_config()->proof_verifier()->CreateDefaultContext(), crypto_config(),
       this, /*has_application_state = */ version().UsesHttp3());
-  quic_ssl_info_->setSsl(crypto_stream->GetSsl());
-  return crypto_stream;
 }
 
 void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(
