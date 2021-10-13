@@ -39,6 +39,7 @@
 #include "absl/container/node_hash_set.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using namespace std::chrono_literals;
 
@@ -999,35 +1000,40 @@ insensitive_repeated_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
+
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
 // Empty `TypedStruct` can be trivially redacted.
-TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.test.Sensitive
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 value:
   sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.unknown.Message
 value:
@@ -1035,14 +1041,14 @@ value:
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
-  udpa::type::v1::TypedStruct expected = actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  TypeParam actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
