@@ -149,6 +149,8 @@ public:
     fields_map["version"] = val;
     val.set_string_value("devel");
     fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
     (*callbacks_.stream_info_.metadata_
           .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
         request_struct;
@@ -157,6 +159,7 @@ public:
     val.set_string_value("v3.0");
     fields_map = *request_struct.mutable_fields();
     fields_map["version"] = val;
+    fields_map.erase("xkey_in_request");
     Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
 
     if (route_entry_has_match) {
@@ -166,7 +169,7 @@ public:
     }
 
     auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
-    EXPECT_EQ(match.size(), 2);
+    EXPECT_EQ(match.size(), 3);
     auto it = match.begin();
 
     // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
@@ -177,16 +180,20 @@ public:
     EXPECT_EQ((*it)->value().value().string_value(), "devel");
     it++;
 
-    // `version` should be what came from the request, overriding the route entry.
+    // `version` should be what came from the request and override the route entry's.
     EXPECT_EQ((*it)->name(), "version");
     EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    // `xkey_in_request` was only set by the request
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
   }
 
   void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
     ProtobufWkt::Struct route_struct;
     ProtobufWkt::Value val;
 
-    // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *route_struct.mutable_fields();
     val.set_string_value("v3.1");
     fields_map["version"] = val;
@@ -789,39 +796,35 @@ TEST_F(ThriftRouterTest, NoCluster) {
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
-// Test for request metadata is not empty
+// Test the case where both dynamic metadata match criteria and route metadata match criteria is not empty.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequest) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
 
-  // Test case for router filter metadata is not empty
   verifyMetadataMatchCriteriaFromRequest(true);
 }
 
-// Test for request metadata is not empty
+// Test the case where route metadata match criteria is empty but with non-empty dynamic metadata match criteria.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
 
-  // Test case for router filter metadata is empty
   verifyMetadataMatchCriteriaFromRequest(false);
 }
 
-// Test for request metadata is empty
+// Test the case where dynamic metadata match criteria is empty but with non-empty route metadata match criteria.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRoute) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  // Test case for router filter metadata is not empty
   verifyMetadataMatchCriteriaFromRoute(true);
 }
 
-// Test for request metadata is empty
+// Test the case where both dynamic metadata match criteria and route metadata match criteria is empty.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
   initializeRouter();
   startRequest(MessageType::Call);
 
-  // Test case for router filter metadata is empty
   verifyMetadataMatchCriteriaFromRoute(false);
 }
 

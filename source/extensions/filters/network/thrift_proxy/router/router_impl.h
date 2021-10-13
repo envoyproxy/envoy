@@ -278,19 +278,19 @@ public:
     const Envoy::Router::MetadataMatchCriteria* route_criteria =
         (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
 
-    // Support request subset lb in thrift
+    // Support getting metadata match criteria from thrift request.
     const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
 
-    if (filter_it != request_metadata.end()) {
-      if (route_criteria != nullptr) {
-        metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
-      } else {
-        metadata_match_criteria_ =
-            std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
-      }
-    } else {
+    if (filter_it == request_metadata.end()) {
       return route_criteria;
+    }
+
+    if (route_criteria != nullptr) {
+      metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    } else {
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
     }
 
     return metadata_match_criteria_.get();
