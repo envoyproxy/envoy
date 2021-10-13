@@ -93,9 +93,11 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.wasm_cluster_name_envoy_grpc",
     "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
+    // Misplaced flags: please do not add flags to this section.
     "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
+    // End misplaced flags: please do not add flags in this section.
 };
 // clang-format on
 
