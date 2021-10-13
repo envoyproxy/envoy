@@ -258,13 +258,14 @@ public:
 
   /**
    * Check if header_value represents a valid value for HTTP content-length header.
-   * Return HeaderValidationResult and populate should_close_connection
-   * according to override_stream_error_on_invalid_http_message.
+   * Return HeaderValidationResult and populate content_length_output if the value is valid,
+   * otherwise populate should_close_connection according to
+   * override_stream_error_on_invalid_http_message.
    */
   static HeaderValidationResult
   validateContentLength(absl::string_view header_value,
                         bool override_stream_error_on_invalid_http_message,
-                        bool& should_close_connection);
+                        bool& should_close_connection, size_t& content_length_output);
 };
 
 } // namespace Http

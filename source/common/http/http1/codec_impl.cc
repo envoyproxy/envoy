@@ -189,9 +189,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // Also do not add content length for requests which should not have a
       // body, per https://tools.ietf.org/html/rfc7230#section-3.3.2
       if (!status || (*status >= 200 && *status != 204)) {
-        if (!bodiless_request ||
-            !Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
+        if (!bodiless_request) {
           encodeFormattedHeader(header_values.ContentLength.get(), "0", formatter);
         }
       }
@@ -1024,8 +1022,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   headers.setHost(absolute_url.hostAndPort());
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
-  if (!is_connect &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!is_connect) {
     headers.setScheme(absolute_url.scheme());
     if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
