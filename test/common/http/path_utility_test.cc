@@ -121,6 +121,18 @@ public:
   NormalizePathAction action_{NormalizePathAction::Continue};
 };
 
+TEST_F(PathTransformerTest, DefaultActionContinue) {
+  std::string path_transformation_config = R"EOF(
+      operations:
+      - merge_slashes: {}
+        normalize_path_action: DEFAULT
+)EOF";
+  setPathTransformer(path_transformation_config);
+  PathTransformer const& path_transformer = pathTransformer();
+  EXPECT_EQ("a/b/c", path_transformer.transform("a//b/c", action_).value());
+  EXPECT_EQ(action_, NormalizePathAction::Continue);
+}
+
 TEST_F(PathTransformerTest, MergeSlashes) {
   std::string path_transformation_config = R"EOF(
       operations:

@@ -127,7 +127,7 @@ PathTransformer::PathTransformer(
     normalize_path_actions_.push_back(NormalizePathAction::Continue);
     break;
   default:
-    ASSERT(false);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   if (should_normalize_path) {
     transformations_.emplace_back(PathTransformer::rfcNormalize);
