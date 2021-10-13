@@ -84,6 +84,12 @@ private:
                          Http::ResponseHeaderMap& response_headers,
                          Buffer::Instance& response, AdminStream&, bool used_only,
                          absl::optional<std::regex>& filter);
+  template<class StatType> Http::Code renderHtml(Stats::StatName after,
+                                                 uint32_t page_size,
+                                                 bool used_only,
+                                                 absl::optional<std::regex>& /*filter*/,
+                                                 Http::ResponseHeaderMap& response_headers,
+                                                 Buffer::Instance& response);
 };
 
 } // namespace Server

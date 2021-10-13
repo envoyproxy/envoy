@@ -6,6 +6,7 @@
 #include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/filter.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
 
@@ -148,22 +149,15 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 }
 
 Http::Code StatsHandler::statsAsHtml(const Http::Utility::QueryParams& params,
-                                     Http::ResponseHeaderMap& /*response_headers*/,
-                                     Buffer::Instance& response, AdminStream&, bool /*used_only*/,
-                                     absl::optional<std::regex>& /*filter*/) {
+                                     Http::ResponseHeaderMap& response_headers,
+                                     Buffer::Instance& response, AdminStream&, bool used_only,
+                                     absl::optional<std::regex>& filter) {
 
   Stats::StatNamePool pool(server_.stats().symbolTable());
   Stats::StatName after;
   Http::Utility::QueryParams::const_iterator after_iter = params.find("after");
   if (after_iter != params.end()) {
     after = pool.add(after_iter->second);
-  }
-
-  Http::Utility::QueryParams::const_iterator type_iter = params.find("type");
-  if (type_iter == params.end()) {
-    response.add("query-param 'type' not specified. Must be counters, gauges, text-readouts, "
-                 "or histograms,");
-    return Http::Code::BadRequest;
   }
 
   uint32_t page_size = 1000;
@@ -175,6 +169,46 @@ Http::Code StatsHandler::statsAsHtml(const Http::Utility::QueryParams& params,
     }
   }
 
+  Http::Utility::QueryParams::const_iterator type_iter = params.find("type");
+  absl::string_view type = "counters";
+  if (type_iter != params.end()) {
+    type = type_iter->second;
+  }
+
+  if (type == "counters") {
+    renderHtml<Stats::Counter>(after, page_size, used_only, filter, response_headers, response);
+  } else if (type == "gauges") {
+    renderHtml<Stats::Gauge>(after, page_size, used_only, filter, response_headers, response);
+  } else if (type == "text-readouts") {
+    renderHtml<Stats::TextReadout>(after, page_size, used_only, filter, response_headers, response);
+  } else if (type == "histograms") {
+    //renderHtml<Stats::Histogram>(after, page_size, used_only, filter, response_headers, response);
+  } else {
+    response.add("Invalid page &type= value");
+    return Http::Code::BadRequest;
+  }
+
+  return Http::Code::OK;
+}
+
+template<class StatType> Http::Code StatsHandler::renderHtml(
+    Stats::StatName after, uint32_t page_size, bool used_only,
+    absl::optional<std::regex>& /*filter*/,
+    Http::ResponseHeaderMap& /*response_headers*/,
+    Buffer::Instance& response) {
+
+  Stats::StatsFilter<StatType> filter(server_.stats());
+  filter.setUsedOnly(used_only);
+  std::vector<Stats::RefcountPtr<StatType>> stats;
+  stats = filter.getFilteredStatsAfter(page_size, after);
+  std::vector<std::string> out;
+  out.reserve(2 + stats.size());
+  out.push_back("<html><pre>\n");
+  for (const auto& stat : stats) {
+    out.push_back(absl::StrCat(stat->name(), ": ", stat->value(), "\n"));
+  }
+  out.push_back("</pre></html>\n");
+  response.add(absl::StrJoin(out, ""));
   return Http::Code::OK;
 }
 
