@@ -45,7 +45,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/kill_request:95.3" # Death tests don't report LCOV
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/wasm:95.8"
-"source/extensions/filters/listener:96.2"
+"source/extensions/filters/listener:95.9"
 "source/extensions/filters/listener/http_inspector:95.8"
 "source/extensions/filters/listener/original_dst:93.3"
 "source/extensions/filters/listener/tls_inspector:92.3"
