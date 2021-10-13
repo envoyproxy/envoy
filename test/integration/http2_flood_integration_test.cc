@@ -1499,23 +1499,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
-class Http2ManyStreamsTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
-      public Http2RawFrameIntegrationTest {
-protected:
-  Http2ManyStreamsTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.improved_stream_limit_handling",
-                                      useImprovedStreamLimitHandling() ? "true" : "false");
-  }
-
-  bool useImprovedStreamLimitHandling() const { return std::get<1>(GetParam()); }
-};
-
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsAndRuntimeFeature, Http2ManyStreamsTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
-
-TEST_P(Http2ManyStreamsTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
+TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
   const uint32_t num_requests = 80;
 
   envoy::config::core::v3::Http2ProtocolOptions config;
@@ -1555,8 +1539,7 @@ TEST_P(Http2ManyStreamsTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTe
   // The disconnect shouldn't trigger an outbound control frame flood.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
   // Verify that the upstream connections are still active.
-  EXPECT_EQ(useImprovedStreamLimitHandling() ? 2 : 1,
-            test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 }
 
 } // namespace Envoy

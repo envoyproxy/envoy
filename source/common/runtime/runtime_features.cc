@@ -51,12 +51,12 @@ uint64_t getInteger(absl::string_view feature, uint64_t default_value) {
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+// clang-format off
 constexpr const char* runtime_features[] = {
     // Enabled
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2",
-    "envoy.reloadable_features.add_and_validate_scheme_header",
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
@@ -68,14 +68,12 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
     "envoy.reloadable_features.hash_multiple_header_values",
     "envoy.reloadable_features.health_check.graceful_goaway_handling",
-    "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster",
     "envoy.reloadable_features.http2_consume_stream_refused_errors",
     "envoy.reloadable_features.http2_skip_encoding_empty_trailers",
     "envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
     "envoy.reloadable_features.http_reject_path_with_fragment",
     "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
-    "envoy.reloadable_features.improved_stream_limit_handling",
     "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
@@ -90,7 +88,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
-    "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild",
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
@@ -101,6 +98,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
 };
+// clang-format on
 
 // This is a section for officially sanctioned runtime features which are too
 // high risk to be enabled by default. Examples where we have opted to land
