@@ -10,6 +10,7 @@ Minor Behavior Changes
 *Changes that may cause incompatibilities for some users, but should not for most*
 
 * config: the log message for "gRPC config stream closed" now uses the most recent error message, and reports seconds instead of milliseconds for how long the most recent status has been received.
+* http: usage of the experimental matching API is no longer guarded behind a feature flag, as the corresponding flags have been marked as WIP.
 
 Bug Fixes
 ---------
