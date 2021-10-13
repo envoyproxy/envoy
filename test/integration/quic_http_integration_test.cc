@@ -510,7 +510,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   concurrency_ = 2;
   initialize();
-  client_quic_options_.mutable_num_timeout_to_trigger_port_migration()->set_value(0);
+  client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(0);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
   auto encoder_decoder =
