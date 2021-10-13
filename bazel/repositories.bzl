@@ -234,6 +234,7 @@ def envoy_dependencies(skip_targets = []):
     )
     external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
+    _com_github_fdio_vpp_vcl()
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -1101,6 +1102,13 @@ filegroup(
     external_http_archive(
         name = "kafka_python_client",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_github_fdio_vpp_vcl():
+    external_http_archive(
+        name = "com_github_fdio_vpp_vcl",
+        build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
 
 def _foreign_cc_dependencies():
