@@ -149,9 +149,6 @@ protected:
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
       bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
-      Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) override {
-        return {-1, SOCKET_ERROR_NOT_SUP};
-      }
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
 

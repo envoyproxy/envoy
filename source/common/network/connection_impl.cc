@@ -246,10 +246,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     delayed_close_timer_ = nullptr;
   }
 
-  /*for (Network::ConnectionCallbacks* callback : callbacks_) {
-    callback->onPreClose();
-    }*/
-
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
 
@@ -779,11 +775,6 @@ absl::string_view ConnectionImpl::transportFailureReason() const {
 absl::optional<std::chrono::milliseconds> ConnectionImpl::lastRoundTripTime() const {
   return socket_->lastRoundTripTime();
 };
-
-Api::SysCallIntResult ConnectionImpl::getSocketOption(int level, int optname, void* optval,
-                                                      socklen_t* optlen) {
-  return socket_->getSocketOption(level, optname, optval, optlen);
-}
 
 void ConnectionImpl::flushWriteBuffer() {
   if (state() == State::Open && write_buffer_->length() > 0) {

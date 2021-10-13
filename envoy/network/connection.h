@@ -60,16 +60,6 @@ public:
    * watermark to under its low watermark.
    */
   virtual void onBelowWriteBufferLowWatermark() PURE;
-
-  /**
-   * Called immediately before the underlying connection is closed. This happens before
-   * `onEvent(RemoveClose|LocalClose)` is called.
-   *
-   * This would be a cleaner API if this were another enum value in `ConnectionEvent`, but it is
-   * very likely that adding a new value at this point would introduce bugs in existing
-   * code/filters.
-   */
-  virtual void onPreClose() {}
 };
 
 /**
@@ -336,12 +326,6 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() const PURE;
-
-  /**
-   * Calls `getsockopt` on the underlying socket.
-   */
-  virtual Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                                socklen_t* optlen) PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

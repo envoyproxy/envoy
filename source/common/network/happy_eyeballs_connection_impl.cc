@@ -280,12 +280,6 @@ absl::optional<std::chrono::milliseconds> HappyEyeballsConnectionImpl::lastRound
   return connections_[0]->lastRoundTripTime();
 }
 
-Api::SysCallIntResult HappyEyeballsConnectionImpl::getSocketOption(int level, int optname,
-                                                                   void* optval,
-                                                                   socklen_t* optlen) {
-  return connections_[0]->getSocketOption(level, optname, optval, optlen);
-}
-
 void HappyEyeballsConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) {
   if (connect_finished_) {
     connections_[0]->addConnectionCallbacks(cb);

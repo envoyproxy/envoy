@@ -95,8 +95,6 @@ public:
   absl::string_view transportFailureReason() const override;
   bool startSecureTransport() override { return transport_socket_->startSecureTransport(); }
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
-  Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                        socklen_t* optlen) override;
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

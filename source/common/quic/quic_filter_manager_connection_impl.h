@@ -119,9 +119,6 @@ public:
   bool startSecureTransport() override { return false; }
   // TODO(#2557) Implement this.
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; }
-  Api::SysCallIntResult getSocketOption(int, int, void*, socklen_t*) override {
-    return {-1, SOCKET_ERROR_NOT_SUP};
-  }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

@@ -8,7 +8,7 @@
 #include </usr/include/linux/tcp.h>
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
 
-#include "source/extensions/filters/network/linux_network_stats/filter.h"
+#include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
@@ -18,12 +18,11 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace LinuxNetworkStats {
+namespace TransportSockets {
+namespace TcpStats {
 
-Config::Config(
-    const envoy::extensions::filters::network::linux_network_stats::v3::Config& config_proto,
-    Stats::Scope& scope)
+Config::Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config_proto,
+               Stats::Scope& scope)
     : stats_(generateStats(config_proto.stat_prefix(), scope)),
       update_period_(PROTOBUF_GET_OPTIONAL_MS(config_proto, update_period)) {}
 
@@ -33,42 +32,42 @@ LinuxNetworkStats Config::generateStats(const absl::string_view prefix, Stats::S
                                                    POOL_HISTOGRAM_PREFIX(scope, prefix))};
 }
 
-Filter::Filter(ConfigConstSharedPtr config) : config_(std::move(config)) {}
+TcpStatsSocket::TcpStatsSocket(ConfigConstSharedPtr config,
+                               Network::TransportSocketPtr inner_socket)
+    : PassthroughSocket(std::move(inner_socket)), config_(std::move(config)) {}
 
-Network::FilterStatus Filter::onNewConnection() {
+void TcpStatsSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
+  callbacks_ = &callbacks;
+  transport_socket_->setTransportSocketCallbacks(callbacks);
+}
+
+void TcpStatsSocket::onConnected() {
   if (config_->update_period_.has_value()) {
-    timer_ = read_callbacks_->connection().dispatcher().createTimer([this]() {
+    timer_ = callbacks_->connection().dispatcher().createTimer([this]() {
       auto tcp_info = querySocketInfo();
       updateCountersAndGauges(tcp_info);
       timer_->enableTimer(config_->update_period_.value());
     });
     timer_->enableTimer(config_->update_period_.value());
   }
-  return Network::FilterStatus::Continue;
+
+  transport_socket_->onConnected();
 }
 
-void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
-  read_callbacks_ = &callbacks;
-  read_callbacks_->connection().addConnectionCallbacks(*this);
-}
-
-Network::FilterStatus Filter::onData(Buffer::Instance&, bool) {
-  return Network::FilterStatus::Continue;
-}
-
-void Filter::onPreClose() {
+void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
   // Record final values.
   auto info = querySocketInfo();
   updateCountersAndGauges(info);
   recordHistograms(info);
+
+  transport_socket_->closeSocket(event);
 }
 
-struct tcp_info Filter::querySocketInfo() {
+struct tcp_info TcpStatsSocket::querySocketInfo() {
   struct tcp_info info;
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
-  const auto result =
-      read_callbacks_->connection().getSocketOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
+  const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
   if (result.return_value_ == 0) {
     ASSERT(optlen == sizeof(info));
   } else {
@@ -80,7 +79,7 @@ struct tcp_info Filter::querySocketInfo() {
   return info;
 }
 
-void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
+void TcpStatsSocket::updateCountersAndGauges(struct tcp_info& tcp_info) {
   ENVOY_LOG(info, "updateCountersAndGauges");
   auto update_counter = [](Stats::Counter& counter, uint64_t& last_value, uint64_t current_value) {
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
@@ -105,7 +104,7 @@ void Filter::updateCountersAndGauges(struct tcp_info& tcp_info) {
                tcp_info.tcpi_notsent_bytes);
 }
 
-void Filter::recordHistograms(struct tcp_info& tcp_info) {
+void TcpStatsSocket::recordHistograms(struct tcp_info& tcp_info) {
   if (tcp_info.tcpi_segs_out > 0) {
     config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(
         static_cast<float>(tcp_info.tcpi_total_retrans) /
@@ -117,8 +116,8 @@ void Filter::recordHistograms(struct tcp_info& tcp_info) {
   }
 }
 
-} // namespace LinuxNetworkStats
-} // namespace NetworkFilters
+} // namespace TcpStats
+} // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
 #endif // defined(__linux__)

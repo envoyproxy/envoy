@@ -85,7 +85,6 @@ public:
   MOCK_METHOD(absl::string_view, transportFailureReason, (), (const));                             \
   MOCK_METHOD(bool, startSecureTransport, ());                                                     \
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, lastRoundTripTime, (), (const));          \
-  MOCK_METHOD(Api::SysCallIntResult, getSocketOption, (int, int, void*, socklen_t*));              \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {

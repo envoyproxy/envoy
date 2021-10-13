@@ -67,8 +67,6 @@ public:
   void setBufferLimits(uint32_t limit) override;
   bool startSecureTransport() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override;
-  Api::SysCallIntResult getSocketOption(int level, int optname, void* optval,
-                                        socklen_t* optlen) override;
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() override;

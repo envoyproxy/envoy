@@ -2,7 +2,7 @@
 
 #if defined(__linux__)
 
-#include "envoy/extensions/filters/network/linux_network_stats/v3/linux_network_stats.pb.h"
+#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
@@ -11,14 +11,15 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 // Defined in /usr/include/linux/tcp.h.
 struct tcp_info;
 
 namespace Envoy {
 namespace Extensions {
-namespace NetworkFilters {
-namespace LinuxNetworkStats {
+namespace TransportSockets {
+namespace TcpStats {
 
 #define ALL_LINUX_NETWORK_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
   COUNTER(cx_tx_segments)                                                                          \
@@ -33,7 +34,7 @@ struct LinuxNetworkStats {
 
 class Config {
 public:
-  Config(const envoy::extensions::filters::network::linux_network_stats::v3::Config& config_proto,
+  Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config_proto,
          Stats::Scope& scope);
 
   LinuxNetworkStats stats_;
@@ -45,22 +46,15 @@ private:
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
-class Filter : public Network::ReadFilter,
-               public Network::ConnectionCallbacks,
-               Logger::Loggable<Logger::Id::filter> {
+class TcpStatsSocket : public TransportSockets::PassthroughSocket,
+                       Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(ConfigConstSharedPtr config);
+  TcpStatsSocket(ConfigConstSharedPtr config, Network::TransportSocketPtr inner_socket);
 
-  // Network::ReadFilter
-  Network::FilterStatus onNewConnection() override;
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
-  Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
-
-  // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent) override {}
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-  void onPreClose() override;
+  // Network::TransportSocket
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
+  void onConnected() override;
+  void closeSocket(Network::ConnectionEvent event) override;
 
 private:
   struct tcp_info querySocketInfo();
@@ -68,7 +62,7 @@ private:
   void recordHistograms(struct tcp_info& tcp_info);
 
   const ConfigConstSharedPtr config_;
-  Network::ReadFilterCallbacks* read_callbacks_{};
+  Network::TransportSocketCallbacks* callbacks_{};
   Event::TimerPtr timer_;
 
   uint64_t last_cx_tx_segments_{};
@@ -76,8 +70,8 @@ private:
   uint64_t last_cx_tx_unsent_bytes_{};
 };
 
-} // namespace LinuxNetworkStats
-} // namespace NetworkFilters
+} // namespace TcpStats
+} // namespace TransportSockets
 } // namespace Extensions
 } // namespace Envoy
 
