@@ -153,8 +153,10 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(write_event, ready());
-  // Third loop iteration: poll returned no new real events.
-  EXPECT_CALL(prepare_watcher, ready());
+  if constexpr (Event::PlatformDefaultTriggerType != Event::FileTriggerType::EmulatedEdge) {
+    // Third loop iteration: poll returned no new real events.
+    EXPECT_CALL(prepare_watcher, ready());
+  }
 
   file_event->activate(FileReadyType::Read);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
