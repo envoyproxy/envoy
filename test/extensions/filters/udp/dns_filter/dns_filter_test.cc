@@ -2141,6 +2141,16 @@ TEST_F(DnsFilterTest, DnsResolverOptionsSetFalse) {
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
 }
 
+// Verify downstream send and receive error handling.
+TEST_F(DnsFilterTest, SendReceiveErrorHandling) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  filter_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+  EXPECT_EQ(1, config_->stats().downstream_rx_errors_.value());
+}
+
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DeprecatedKnownSuffixes)) {
   InSequence s;
 
