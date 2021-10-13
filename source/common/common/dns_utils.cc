@@ -48,7 +48,8 @@ bool listChanged(const std::vector<Network::Address::InstanceConstSharedPtr>& li
   if (list1.size() != list2.size()) {
     return true;
   }
-  // TODO(alyssawilk) we shouldn't consider order to constitute a change here.
+  // Eventually we could rewrite this to not count a change to the order of
+  // addresses as a functional change.
   for (size_t i = 0; i < list1.size(); ++i) {
     if (*list1[i] != *list2[i]) {
       return true;
