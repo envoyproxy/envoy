@@ -59,7 +59,7 @@ message QuicProtocolOptions {
   // [#not-implemented-hide:] Hiding until timeout config is supported.
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
   // This defaults to 1. If sets to 0, port migration will not occur.
-  // Timeout here refers to QUIC's internal path degrading timeout mechanism, such as PTO.
+  // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   // Currently the value can only be 0 or 1.
   // TODO(renjietang): Plumb through quiche to make this config able to adjust the amount of timeouts needed to trigger port migration.
