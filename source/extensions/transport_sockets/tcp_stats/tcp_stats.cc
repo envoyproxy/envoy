@@ -46,7 +46,7 @@ void TcpStatsSocket::onConnected() {
   if (config_->update_period_.has_value()) {
     timer_ = callbacks_->connection().dispatcher().createTimer([this]() {
       auto tcp_info = querySocketInfo();
-      updateCountersAndGauges(tcp_info);
+      recordPeriodicStats(tcp_info);
       timer_->enableTimer(config_->update_period_.value());
     });
     timer_->enableTimer(config_->update_period_.value());
@@ -58,8 +58,8 @@ void TcpStatsSocket::onConnected() {
 void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
   // Record final values.
   auto info = querySocketInfo();
-  updateCountersAndGauges(info);
-  recordHistograms(info);
+  recordPeriodicStats(info);
+  recordConnectionCloseStats(info);
 
   transport_socket_->closeSocket(event);
 }
@@ -80,9 +80,8 @@ struct tcp_info TcpStatsSocket::querySocketInfo() {
   return info;
 }
 
-void TcpStatsSocket::updateCountersAndGauges(struct tcp_info& tcp_info) {
-  ENVOY_LOG(info, "updateCountersAndGauges");
-  auto update_counter = [](Stats::Counter& counter, uint64_t& last_value, uint64_t current_value) {
+void TcpStatsSocket::recordPeriodicStats(struct tcp_info& tcp_info) {
+  auto update_counter = [](Stats::Counter& counter, auto& last_value, auto current_value) {
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
     ASSERT(diff >= 0);
     if (diff > 0) {
@@ -91,21 +90,29 @@ void TcpStatsSocket::updateCountersAndGauges(struct tcp_info& tcp_info) {
     last_value = current_value;
   };
 
-  auto update_gauge = [](Stats::Gauge& gauge, uint64_t& last_value, uint64_t current_value) {
+  auto update_gauge = [](Stats::Gauge& gauge, auto& last_value, auto current_value) {
+    static_assert(sizeof(last_value) == sizeof(current_value));
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
     gauge.add(diff);
     last_value = current_value;
   };
 
   update_counter(config_->stats_.cx_tx_segments_, last_cx_tx_segments_, tcp_info.tcpi_segs_out);
+  update_counter(config_->stats_.cx_tx_data_segments_, last_cx_tx_data_segments_,
+                 tcp_info.tcpi_data_segs_out);
   update_counter(config_->stats_.cx_tx_retransmitted_segments_, last_cx_tx_retransmitted_segments_,
                  tcp_info.tcpi_total_retrans);
 
   update_gauge(config_->stats_.cx_tx_unsent_bytes_, last_cx_tx_unsent_bytes_,
                tcp_info.tcpi_notsent_bytes);
+  update_gauge(config_->stats_.cx_tx_unacked_segments_, last_cx_tx_unacked_segments_,
+               tcp_info.tcpi_unacked);
+
+  config_->stats_.cx_rtt_us_.recordValue(tcp_info.tcpi_rtt);
+  config_->stats_.cx_rttvar_us_.recordValue(tcp_info.tcpi_rttvar);
 }
 
-void TcpStatsSocket::recordHistograms(struct tcp_info& tcp_info) {
+void TcpStatsSocket::recordConnectionCloseStats(struct tcp_info& tcp_info) {
   if (tcp_info.tcpi_data_segs_out > 0) {
     // uint32 * uint32 cannot overflow a uint64, so this can safely be done as integer math instead
     // of floating point.
@@ -117,16 +124,11 @@ void TcpStatsSocket::recordHistograms(struct tcp_info& tcp_info) {
     ENVOY_CONN_LOG(trace, "Percent tcp retransmissions: {}", callbacks_->connection(),
                    static_cast<float>(percent) /
                        static_cast<float>(Stats::Histogram::PercentScale));
-    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(percent);
+    config_->stats_.cx_tx_percent_total_retransmitted_segments_.recordValue(percent);
   }
 
   if (tcp_info.tcpi_min_rtt != 0) {
     config_->stats_.cx_min_rtt_us_.recordValue(tcp_info.tcpi_min_rtt);
-  }
-
-  if (tcp_info.tcpi_rtt != 0) {
-    config_->stats_.cx_rtt_us_.recordValue(tcp_info.tcpi_rtt);
-    config_->stats_.cx_rttvar_.recordValue(tcp_info.tcpi_rttvar);
   }
   ENVOY_CONN_LOG(trace, "tcpi_min_rtt {}, tcpi_rtt {}, tcpi_rttvar {}", callbacks_->connection(),
                  tcp_info.tcpi_min_rtt, tcp_info.tcpi_rtt, tcp_info.tcpi_rttvar);

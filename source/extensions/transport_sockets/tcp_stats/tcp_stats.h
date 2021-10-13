@@ -23,11 +23,13 @@ namespace TcpStats {
 
 #define ALL_LINUX_NETWORK_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
   COUNTER(cx_tx_segments)                                                                          \
+  COUNTER(cx_tx_data_segments)                                                                     \
   COUNTER(cx_tx_retransmitted_segments)                                                            \
   GAUGE(cx_tx_unsent_bytes, Accumulate)                                                            \
-  HISTOGRAM(cx_tx_percent_retransmitted_segments, Percent)                                         \
+  GAUGE(cx_tx_unacked_segments, Accumulate)                                                        \
+  HISTOGRAM(cx_tx_percent_total_retransmitted_segments, Percent)                                   \
   HISTOGRAM(cx_rtt_us, Microseconds)                                                               \
-  HISTOGRAM(cx_rttvar, Unspecified)                                                                \
+  HISTOGRAM(cx_rttvar_us, Microseconds)                                                            \
   HISTOGRAM(cx_min_rtt_us, Microseconds)
 
 struct LinuxNetworkStats {
@@ -60,16 +62,18 @@ public:
 
 private:
   struct tcp_info querySocketInfo();
-  void updateCountersAndGauges(struct tcp_info& tcp_info);
-  void recordHistograms(struct tcp_info& tcp_info);
+  void recordPeriodicStats(struct tcp_info& tcp_info);
+  void recordConnectionCloseStats(struct tcp_info& tcp_info);
 
   const ConfigConstSharedPtr config_;
   Network::TransportSocketCallbacks* callbacks_{};
   Event::TimerPtr timer_;
 
-  uint64_t last_cx_tx_segments_{};
-  uint64_t last_cx_tx_retransmitted_segments_{};
-  uint64_t last_cx_tx_unsent_bytes_{};
+  uint32_t last_cx_tx_segments_{};
+  uint32_t last_cx_tx_data_segments_{};
+  uint32_t last_cx_tx_retransmitted_segments_{};
+  uint32_t last_cx_tx_unsent_bytes_{};
+  uint32_t last_cx_tx_unacked_segments_{};
 };
 
 } // namespace TcpStats

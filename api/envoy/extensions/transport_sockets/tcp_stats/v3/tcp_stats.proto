@@ -22,7 +22,7 @@ message Config {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
 
-  // Period to update counters and gauges. If unset, updates only happen when the
-  // connection is closed.
+  // Period to update stats. If unset, updates only happen when the connection is closed. Some stats
+  // are only updated when teh connection is closed.
   google.protobuf.Duration update_period = 2;
 }
