@@ -1872,29 +1872,6 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, TestRequestHeadersToAddLegacyHostHeader) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.treat_host_like_authority", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["*"]
-    request_headers_to_add:
-      - header:
-          key: "host"
-          value: vhost-www2
-        append: false
-)EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-
-  envoy::config::route::v3::RouteConfiguration route_config = parseRouteConfigurationFromYaml(yaml);
-
-  EXPECT_NO_THROW(TestConfigImpl config(route_config, factory_context_, true));
-}
-
 // Validate that we can't remove :-prefixed request headers.
 TEST_F(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
   for (const std::string& header :
