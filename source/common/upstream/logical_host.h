@@ -47,7 +47,8 @@ public:
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
     setAddressList(address_list);
-    // TODO(alyssawilk) consider the port magic for setAddressList too?
+    // Note that the health checker only gets the first address in the list and
+    // will not walk the full happy eyeballs list.
     setHealthCheckAddress(health_check_address);
   }
 
