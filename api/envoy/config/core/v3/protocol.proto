@@ -56,10 +56,14 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
-  // True by default. QUIC client connection will try migrating to a different port when network path is degrading.
-  // If set false, the connection performs no action on path degradation.
+  // [#not-implemented-hide:] Hiding until timeout config is supported.
+  // 1 by default. QUIC client connection will try migrating to a different port when network path is degrading.
+  // If set 0, the connection performs no action on path degradation.
   // This has no effect on server sessions.
-  google.protobuf.BoolValue migrate_port_on_path_degrading = 4;
+  // Currently the value can only be 0 or 1.
+  // TODO(renjietang): Plumb through quiche to make this config able to adjust the amount of timeouts needed to trigger port migration.
+  google.protobuf.UInt32Value migrate_port_after_timeout = 4
+      [(validate.rules).uint32 = {lte: 1 gte: 0}];
 }
 
 message UpstreamHttpProtocolOptions {
