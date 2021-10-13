@@ -134,7 +134,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 }
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
-TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
+TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
+  autonomous_upstream_ = true;
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
   host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
@@ -143,9 +144,13 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("301", response->headers().getStatusValue());
-  EXPECT_EQ("https://www.redirect.com/foo",
-            response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
+  if (downstream_protocol_ <= Http::CodecType::HTTP2) {
+    EXPECT_EQ("301", response->headers().getStatusValue());
+    EXPECT_EQ("https://www.redirect.com/foo",
+              response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
+  } else {
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
