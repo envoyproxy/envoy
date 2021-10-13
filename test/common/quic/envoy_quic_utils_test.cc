@@ -153,5 +153,11 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
 }
 
+TEST(EnvoyQuicUtilsTest, deduceSignatureAlgorithmFromNullPublicKey) {
+  std::string error;
+  EXPECT_EQ(0, deduceSignatureAlgorithmFromPublicKey(nullptr, &error));
+  EXPECT_EQ("Invalid leaf cert, bad public key", error);
+}
+
 } // namespace Quic
 } // namespace Envoy
