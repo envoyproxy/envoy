@@ -12,8 +12,8 @@ public:
   virtual ~HeaderEvaluator() = default;
   /**
    * Apply the header operations that are saved in the HeaderEvaluator. An example of the operation
-   * is to add a new header name `foo` to the target target header map and the header value is
-   * extracted from the `bar` field in the stream_info.
+   * is to add a new header name `foo` to the target header map and the header value is extracted
+   * from the `bar` field in the stream_info.
    *
    * @param headers the target header map to be mutated.
    * @param stream_info the source of values that can be used in the evaluation.

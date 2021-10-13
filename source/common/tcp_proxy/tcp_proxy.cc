@@ -1,5 +1,4 @@
 #include "source/common/tcp_proxy/tcp_proxy.h"
-#include "tcp_proxy.h"
 
 #include <cstdint>
 #include <memory>
