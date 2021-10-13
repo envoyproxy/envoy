@@ -27,6 +27,7 @@ Removed Config or Runtime
 * http: removed ``envoy.reloadable_features.add_and_validate_scheme_header`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.dont_add_content_length_for_bodiless_requests deprecation`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.improved_stream_limit_handling`` and legacy code paths.
+* http: removed ``envoy.reloadable_features.remove_forked_chromium_url`` and legacy code paths.
 * http: removed ``envoy.reloadable_features.return_502_for_upstream_protocol_errors``. Envoy will always return 502 code upon encountering upstream protocol error.
 * http: removed ``envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure`` and legacy code paths.
 * upstream: removed ``envoy.reloadable_features.upstream_host_weight_change_causes_rebuild`` and legacy code paths.
