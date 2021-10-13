@@ -26,6 +26,9 @@ public:
   bool closingWithIncompleteStream() const override { return false; }
   uint32_t numActiveStreams() const override { return active_streams_; }
   absl::optional<Http::Protocol> protocol() const override { return absl::nullopt; }
+  void onEvent(Network::ConnectionEvent event) override {
+    parent_.onConnectionEvent(*this, "", event);
+  }
 
   static void incrementActiveStreams(ActiveClient& client) {
     TestActiveClient* testClient = dynamic_cast<TestActiveClient*>(&client);

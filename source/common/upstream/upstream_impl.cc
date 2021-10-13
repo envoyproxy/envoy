@@ -1097,9 +1097,7 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 }
 
 } // namespace
@@ -1617,14 +1615,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
       if (existing_host->second->weight() != host->weight()) {
         existing_host->second->weight(host->weight());
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
-          // We do full host set rebuilds so that load balancers can do pre-computation of data
-          // structures based on host weight. This may become a performance problem in certain
-          // deployments so it is runtime feature guarded and may also need to be configurable
-          // and/or dynamic in the future.
-          hosts_changed = true;
-        }
+        // We do full host set rebuilds so that load balancers can do pre-computation of data
+        // structures based on host weight. This may become a performance problem in certain
+        // deployments so it is runtime feature guarded and may also need to be configurable
+        // and/or dynamic in the future.
+        hosts_changed = true;
       }
 
       hosts_changed |=
