@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.validate.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
@@ -23,6 +24,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_formatter.h"
 #include "source/common/router/header_parser.h"
@@ -189,7 +191,7 @@ class ConfigImpl;
 /**
  * Holds all routing configuration for an entire virtual host.
  */
-class VirtualHostImpl : public VirtualHost {
+class VirtualHostImpl : public VirtualHost, Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(
       const envoy::config::route::v3::VirtualHost& virtual_host,
@@ -281,6 +283,7 @@ private:
   absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
   absl::optional<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
 using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
@@ -1059,6 +1062,37 @@ public:
 
   bool supportsPathlessHeaders() const override { return true; }
 };
+
+// Contextual information used to construct the route actions for a match tree.
+struct RouteActionContext {
+  const VirtualHostImpl& vhost;
+  const OptionalHttpFilters& optional_http_filters;
+  Server::Configuration::ServerFactoryContext& factory_context;
+};
+
+// Action used with the matching tree to specify route to use for an incoming stream.
+class RouteMatchAction : public Matcher::ActionBase<envoy::config::route::v3::Route> {
+public:
+  explicit RouteMatchAction(RouteEntryImplBaseConstSharedPtr route) : route_(std::move(route)) {}
+
+  RouteEntryImplBaseConstSharedPtr route() const { return route_; }
+
+private:
+  const RouteEntryImplBaseConstSharedPtr route_;
+};
+
+// Registered factory for RouteMatchAction.
+class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
+public:
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  std::string name() const override { return "route"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::Route>();
+  }
+};
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
