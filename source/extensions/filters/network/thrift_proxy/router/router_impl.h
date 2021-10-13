@@ -5,10 +5,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/router/router.h"
-#include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -218,11 +215,10 @@ class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public RequestOwner,
                public ThriftFilters::DecoderFilter {
 public:
-  Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-         Stats::Scope& scope, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-         ShadowWriter& shadow_writer)
-      : RequestOwner(cluster_manager, stat_prefix, scope, local_info),
-        passthrough_supported_(false), runtime_(runtime), shadow_writer_(shadow_writer) {}
+  Router(Upstream::ClusterManager& cluster_manager, const RouterStats& stats,
+         Runtime::Loader& runtime, ShadowWriter& shadow_writer)
+      : RequestOwner(cluster_manager, stats), passthrough_supported_(false), runtime_(runtime),
+        shadow_writer_(shadow_writer) {}
 
   ~Router() override = default;
 
@@ -240,10 +236,6 @@ public:
   void resetDownstreamConnection() override { callbacks_->resetDownstreamConnection(); }
   void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) override {
     callbacks_->sendLocalReply(response, end_stream);
-  }
-  void recordResponseDuration(Upstream::HostDescriptionConstSharedPtr upstream_host, uint64_t value,
-                              Stats::Histogram::Unit unit) override {
-    recordClusterResponseDuration(*cluster_, upstream_host, value, unit);
   }
 
   // RequestOwner::ProtocolConverter
