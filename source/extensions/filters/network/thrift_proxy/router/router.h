@@ -195,7 +195,7 @@ public:
     ASSERT(upstream_host != nullptr);
     // Currently IDL exceptions always considered endpoint error but possible for an error
     // to have semantics matching HTTP 4xx, rather than 5xx. rq_error classification chosen
-    // here to match outlier detecton external failure in upstream_request.cc.
+    // here to match outlier detection external failure in upstream_request.cc.
     upstream_host->stats().rq_error_.inc();
   }
 
