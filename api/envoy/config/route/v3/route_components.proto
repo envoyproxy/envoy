@@ -17,6 +17,9 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
@@ -37,7 +40,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -87,7 +90,14 @@ message VirtualHost {
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
+  // Only one of this and `matcher` can be specified.
   repeated Route routes = 3;
+
+  // [#next-major-version: This should be included in a oneof with routes wrapped in a message.]
+  // The match tree to use when resolving route actions for incoming requests. Only one of this and `routes`
+  // can be specified.
+  xds.type.matcher.v3.Matcher matcher = 21
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 
   // Specifies the type of TLS enforcement the virtual host expects. If this option is not
   // specified, there is no TLS requirement for the virtual host.
