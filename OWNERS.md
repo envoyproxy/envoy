@@ -47,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Windows, low level networking.
 * Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
   * Scalability and performance.
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3, upstream connection management.
 
 # Senior extension maintainers
 
