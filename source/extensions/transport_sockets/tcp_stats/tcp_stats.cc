@@ -23,10 +23,11 @@ namespace TcpStats {
 
 Config::Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config_proto,
                Stats::Scope& scope)
-    : stats_(generateStats(config_proto.stat_prefix(), scope)),
+    : stats_(generateStats(scope)),
       update_period_(PROTOBUF_GET_OPTIONAL_MS(config_proto, update_period)) {}
 
-LinuxNetworkStats Config::generateStats(const absl::string_view prefix, Stats::Scope& scope) {
+LinuxNetworkStats Config::generateStats(Stats::Scope& scope) {
+  const std::string prefix("tcp_stats");
   return LinuxNetworkStats{ALL_LINUX_NETWORK_STATS(POOL_COUNTER_PREFIX(scope, prefix),
                                                    POOL_GAUGE_PREFIX(scope, prefix),
                                                    POOL_HISTOGRAM_PREFIX(scope, prefix))};
@@ -105,15 +106,30 @@ void TcpStatsSocket::updateCountersAndGauges(struct tcp_info& tcp_info) {
 }
 
 void TcpStatsSocket::recordHistograms(struct tcp_info& tcp_info) {
-  if (tcp_info.tcpi_segs_out > 0) {
-    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(
-        static_cast<float>(tcp_info.tcpi_total_retrans) /
-        static_cast<float>(tcp_info.tcpi_segs_out));
+  if (tcp_info.tcpi_data_segs_out > 0) {
+    // uint32 * uint32 cannot overflow a uint64, so this can safely be done as integer math instead
+    // of floating point.
+    static_assert((sizeof(tcp_info.tcpi_total_retrans) == sizeof(uint32_t)) &&
+                  (Stats::Histogram::PercentScale < UINT32_MAX));
+    const uint64_t percent =
+        (static_cast<uint64_t>(tcp_info.tcpi_total_retrans) * Stats::Histogram::PercentScale) /
+        static_cast<uint64_t>(tcp_info.tcpi_data_segs_out);
+    ENVOY_CONN_LOG(trace, "Percent tcp retransmissions: {}", callbacks_->connection(),
+                   static_cast<float>(percent) /
+                       static_cast<float>(Stats::Histogram::PercentScale));
+    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(percent);
   }
 
   if (tcp_info.tcpi_min_rtt != 0) {
     config_->stats_.cx_min_rtt_us_.recordValue(tcp_info.tcpi_min_rtt);
   }
+
+  if (tcp_info.tcpi_rtt != 0) {
+    config_->stats_.cx_rtt_us_.recordValue(tcp_info.tcpi_rtt);
+    config_->stats_.cx_rttvar_.recordValue(tcp_info.tcpi_rttvar);
+  }
+  ENVOY_CONN_LOG(trace, "tcpi_min_rtt {}, tcpi_rtt {}, tcpi_rttvar {}", callbacks_->connection(),
+                 tcp_info.tcpi_min_rtt, tcp_info.tcpi_rtt, tcp_info.tcpi_rttvar);
 }
 
 } // namespace TcpStats

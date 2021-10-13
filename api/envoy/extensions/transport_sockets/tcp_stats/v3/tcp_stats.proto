@@ -16,15 +16,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: TCP Stats Transport Socket wrapper]
 // [#extension: envoy.transport_sockets.tcp_stats]
 
-// Configuration for the TCP Stats transport socket wrapper, which wraps another transport socket for all communication, but emits stats about the underlying TCP connection.
+// Configuration for the TCP Stats transport socket wrapper, which wraps another transport socket for
+// all communication, but emits stats about the underlying TCP connection.
 message Config {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
 
-  // The prefix to use when emitting statistics.
-  string stat_prefix = 2 [(validate.rules).string = {min_len: 1}];
-
   // Period to update counters and gauges. If unset, updates only happen when the
   // connection is closed.
-  google.protobuf.Duration update_period = 3;
+  google.protobuf.Duration update_period = 2;
 }

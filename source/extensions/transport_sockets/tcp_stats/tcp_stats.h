@@ -26,6 +26,8 @@ namespace TcpStats {
   COUNTER(cx_tx_retransmitted_segments)                                                            \
   GAUGE(cx_tx_unsent_bytes, Accumulate)                                                            \
   HISTOGRAM(cx_tx_percent_retransmitted_segments, Percent)                                         \
+  HISTOGRAM(cx_rtt_us, Microseconds)                                                               \
+  HISTOGRAM(cx_rttvar, Unspecified)                                                                \
   HISTOGRAM(cx_min_rtt_us, Microseconds)
 
 struct LinuxNetworkStats {
@@ -41,13 +43,13 @@ public:
   const absl::optional<std::chrono::milliseconds> update_period_;
 
 private:
-  LinuxNetworkStats generateStats(const absl::string_view prefix, Stats::Scope& scope);
+  LinuxNetworkStats generateStats(Stats::Scope& scope);
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 class TcpStatsSocket : public TransportSockets::PassthroughSocket,
-                       Logger::Loggable<Logger::Id::filter> {
+                       Logger::Loggable<Logger::Id::connection> {
 public:
   TcpStatsSocket(ConfigConstSharedPtr config, Network::TransportSocketPtr inner_socket);
 
