@@ -94,14 +94,6 @@ public:
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  absl::optional<Upstream::SelectedPoolAndConnection>
-  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
-             std::vector<uint8_t>& /*hash_key*/) override {
-    return absl::nullopt;
-  }
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-    return {};
-  }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
@@ -590,15 +582,6 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
-  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-    return {};
-  }
-
-  absl::optional<Upstream::SelectedPoolAndConnection> selectPool(LoadBalancerContext*, const Host&,
-                                                                 std::vector<uint8_t>&) override {
-    return {};
-  }
-
   HostConstSharedPtr choose_host_once_host_{std::make_shared<NiceMock<MockHost>>()};
 };
 
@@ -608,6 +591,13 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   TestZoneAwareLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
+
+TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
+  EXPECT_FALSE(lb_.lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_.selectPool(nullptr, *mock_host, hash_key).has_value());
+}
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, CrossPriorityHostMapUpdate) {
   // Fake cross priority host map.
