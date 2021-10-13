@@ -24,9 +24,9 @@ namespace Envoy {
 namespace Grpc {
 namespace {
 
-class AsyncClientCacheTest : public testing::Test {
+class RawAsyncClientCacheTest : public testing::Test {
 public:
-  AsyncClientCacheTest()
+  RawAsyncClientCacheTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
@@ -42,17 +42,44 @@ public:
   AsyncClientManagerImpl::RawAsyncClientCache client_cache_;
 };
 
-TEST_F(AsyncClientCacheTest, CacheEviction) {
+TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
   waitForSeconds(10);
+  // Cache entry hasn't been evicted because it was created 10s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(10);
+  // Cache entry hasn't been evicted because it was accessed 10s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(80);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
+}
+
+TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
+  envoy::config::core::v3::GrpcService grpc_service;
+  RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
+  for (int i = 1; i <= 50; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    client_cache_.setCache(grpc_service, foo_client);
+  }
+  waitForSeconds(80);
+  for (int i = 51; i <= 100; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    client_cache_.setCache(grpc_service, foo_client);
+  }
+  waitForSeconds(30);
+  // Cache entries that have expired.
+  for (int i = 1; i <= 50; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    EXPECT_EQ(client_cache_.getCache(grpc_service).get(), nullptr);
+  }
+  // Cache entries that haven't expired.
+  for (int i = 51; i <= 100; i++) {
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
+    EXPECT_EQ(client_cache_.getCache(grpc_service).get(), foo_client.get());
+  }
 }
 
 class AsyncClientManagerImplTest : public testing::Test {

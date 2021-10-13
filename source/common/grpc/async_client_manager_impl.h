@@ -57,11 +57,11 @@ public:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) {
-      timer_ = dispatcher.createTimer([this] {
+      evict_idle_entries_timer_ = dispatcher.createTimer([this] {
         evictIdleEntries();
-        timer_->enableTimer(RefreshInterval);
+        evict_idle_entries_timer_->enableTimer(RefreshInterval);
       });
-      timer_->enableTimer(RefreshInterval);
+      evict_idle_entries_timer_->enableTimer(RefreshInterval);
     }
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
@@ -76,7 +76,7 @@ public:
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil> idle_keys_;
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil>
         active_keys_;
-    Envoy::Event::TimerPtr timer_;
+    Envoy::Event::TimerPtr evict_idle_entries_timer_;
     static constexpr std::chrono::milliseconds RefreshInterval{50000};
   };
 
