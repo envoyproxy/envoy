@@ -796,7 +796,8 @@ TEST_F(ThriftRouterTest, NoCluster) {
   EXPECT_EQ(1U, context_.scope().counterFromString("test.unknown_cluster").value());
 }
 
-// Test the case where both dynamic metadata match criteria and route metadata match criteria is not empty.
+// Test the case where both dynamic metadata match criteria
+// and route metadata match criteria is not empty.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequest) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
@@ -804,7 +805,8 @@ TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequest) {
   verifyMetadataMatchCriteriaFromRequest(true);
 }
 
-// Test the case where route metadata match criteria is empty but with non-empty dynamic metadata match criteria.
+// Test the case where route metadata match criteria is empty
+// but with non-empty dynamic metadata match criteria.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
   initializeRouter();
   initializeMetadata(MessageType::Call);
@@ -812,7 +814,8 @@ TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
   verifyMetadataMatchCriteriaFromRequest(false);
 }
 
-// Test the case where dynamic metadata match criteria is empty but with non-empty route metadata match criteria.
+// Test the case where dynamic metadata match criteria is empty
+// but with non-empty route metadata match criteria.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRoute) {
   initializeRouter();
   startRequest(MessageType::Call);
@@ -820,7 +823,8 @@ TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRoute) {
   verifyMetadataMatchCriteriaFromRoute(true);
 }
 
-// Test the case where both dynamic metadata match criteria and route metadata match criteria is empty.
+// Test the case where both dynamic metadata match criteria
+// and route metadata match criteria is empty.
 TEST_F(ThriftRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
   initializeRouter();
   startRequest(MessageType::Call);
