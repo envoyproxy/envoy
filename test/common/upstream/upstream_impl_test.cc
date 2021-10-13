@@ -3969,58 +3969,6 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
 }
 
-// Verifies that partitionHosts correctly splits hosts based on their health flags when
-// "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster" is disabled.
-TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster", "false"}});
-
-  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source)};
-
-  hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-  hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-  auto hosts_per_locality =
-      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
-
-  auto update_hosts_params =
-      HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
-
-  EXPECT_EQ(5, update_hosts_params.hosts->size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
-  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
-  EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
-  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts->get().size());
-  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
-
-  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
-
-  EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts_per_locality->get()[1][0]);
-
-  EXPECT_EQ(1, update_hosts_params.degraded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(0, update_hosts_params.degraded_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
-
-  EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
-}
-
 TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
   const std::string yaml = R"EOF(
   name: cluster1
