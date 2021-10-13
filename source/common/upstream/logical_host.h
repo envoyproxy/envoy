@@ -47,8 +47,9 @@ public:
     absl::WriterMutexLock lock(&address_lock_);
     setAddress(address);
     setAddressList(address_list);
-    // Note that the health checker only gets the first address in the list and
-    // will not walk the full happy eyeballs list.
+    // TODO: the health checker only gets the first address in the list and
+    // will not walk the full happy eyeballs list. We should eventually fix
+    // this.
     setHealthCheckAddress(health_check_address);
   }
 

@@ -14,13 +14,11 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
-  ENVOY_LOG(trace, "New happy eyeballs connection.");
+  ENVOY_LOG(trace, "New connection.");
   connections_.push_back(createNextConnection());
 }
 
-HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() {
-  ENVOY_LOG(trace, "Happy eyecalls connection torn down.");
-}
+HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() {}
 
 void HappyEyeballsConnectionImpl::connect() {
   ENVOY_BUG(!connect_finished_, "connection already connected");
@@ -419,7 +417,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
 }
 
 void HappyEyeballsConnectionImpl::tryAnotherConnection() {
-  ENVOY_LOG(trace, "Happy eyeballs trying another connection.");
+  ENVOY_LOG(trace, "Trying another connection.");
   connections_.push_back(createNextConnection());
   connections_.back()->connect();
   maybeScheduleNextAttempt();
@@ -436,7 +434,7 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
   if (event != ConnectionEvent::Connected) {
-    ENVOY_LOG(trace, "Happy eyeballs connection failed to connect");
+    ENVOY_LOG(trace, "Connection failed to connect");
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
     if (next_address_ < address_list_.size()) {
