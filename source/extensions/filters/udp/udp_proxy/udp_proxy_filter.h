@@ -70,6 +70,7 @@ public:
       : cluster_manager_(cluster_manager), time_source_(time_source), cluster_(config.cluster()),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
+        use_per_packet_load_balancing_(config.use_per_packet_load_balancing()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
         // Default prefer_gro to true for upstream client traffic.
         upstream_socket_config_(config.upstream_socket_config(), true) {
@@ -87,6 +88,7 @@ public:
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }
+  bool usingPerPacketLoadBalancing() const { return use_per_packet_load_balancing_; }
   const Udp::HashPolicy* hashPolicy() const { return hash_policy_.get(); }
   UdpProxyDownstreamStats& stats() const { return stats_; }
   TimeSource& timeSource() const { return time_source_; }
@@ -107,6 +109,7 @@ private:
   const std::string cluster_;
   const std::chrono::milliseconds session_timeout_;
   const bool use_original_src_ip_;
+  const bool use_per_packet_load_balancing_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;
   mutable UdpProxyDownstreamStats stats_;
   const Network::ResolvedUdpSocketConfig upstream_socket_config_;
@@ -244,27 +247,72 @@ private:
   class ClusterInfo {
   public:
     ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    ~ClusterInfo();
-    Network::FilterStatus onData(Network::UdpRecvData& data);
-    void removeSession(const ActiveSession* session);
+    virtual ~ClusterInfo() = default;
+    virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
+    virtual void removeSession(const ActiveSession* session) PURE;
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
     UdpProxyUpstreamStats cluster_stats_;
 
   private:
-    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                 const Upstream::HostConstSharedPtr& host);
+    virtual ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                         const Upstream::HostConstSharedPtr& host) PURE;
     static UdpProxyUpstreamStats generateStats(Stats::Scope& scope) {
       const auto final_prefix = "udp";
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
+  };
+
+  using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
+
+  /**
+   * Performs forwarding and replying data to one, selected at the beginning upstream host
+   * In case of not healthy upstream host, selects a new one
+   */
+  class StickySessionClusterInfo : public ClusterInfo {
+  public:
+    StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
+    ~StickySessionClusterInfo() override;
+    void onData(Network::UdpRecvData& data) override;
+    void removeSession(const ActiveSession* session) override;
+
+  private:
+    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                 const Upstream::HostConstSharedPtr& host) override;
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
                         HeterogeneousActiveSessionEqual>
         sessions_;
     absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+        host_to_sessions_;
+  };
+
+  /**
+   * On each data chunk selects another host using underlying load balancing method and communicates
+   * with that host
+   */
+  class PerPacketLoadBalancingClusterInfo : public ClusterInfo {
+  public:
+    PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
+                                      Upstream::ThreadLocalCluster& cluster);
+    ~PerPacketLoadBalancingClusterInfo() override;
+    void onData(Network::UdpRecvData& data) override;
+    void removeSession(const ActiveSession* session) override;
+
+  private:
+    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                 const Upstream::HostConstSharedPtr& host) override;
+    Upstream::HostConstSharedPtr getAnotherHealthyHost(UdpLoadBalancerContext& context,
+                                                       const Upstream::Host& current_host);
+    ActiveSession* findSession(const Upstream::Host& host,
+                               const Network::UdpRecvData::LocalPeerAddresses& addresses) const;
+
+    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
+    absl::flat_hash_map<const Upstream::Host*,
+                        absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
+                                            HeterogeneousActiveSessionEqual>>
         host_to_sessions_;
   };
 
@@ -283,7 +331,7 @@ private:
   // Right now we support a single cluster to route to. It is highly likely in the future that
   // we will support additional routing options either using filter chain matching, weighting,
   // etc.
-  absl::optional<ClusterInfo> cluster_info_;
+  absl::optional<ClusterInfoPtr> cluster_info_;
 };
 
 } // namespace UdpProxy
