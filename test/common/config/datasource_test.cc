@@ -601,7 +601,7 @@ TEST(DataSourceTest, WellKnownEnvironmentVariableTest) {
   EXPECT_EQ(config.environment_variable(), "PATH");
   Api::ApiPtr api = Api::createApiForTest();
   std::string path_data = DataSource::read(config, false, *api);
-  EXPECT_TRUE(path_data.size() > 0);
+  EXPECT_FALSE(path_data.empty());
 }
 
 TEST(DataSourceTest, MissingEnvironmentVariableTest) {
