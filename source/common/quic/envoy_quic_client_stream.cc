@@ -53,15 +53,19 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   local_end_stream_ = end_stream;
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   auto spdy_headers = envoyHeadersToSpdyHeaderBlock(headers);
-  if (headers.Method() && headers.Method()->value() == "CONNECT") {
-    // It is a bytestream connect and should have :path and :protocol set accordingly
-    // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
-    // if shifting codecs. For now, default to "/" - this can be made
-    // configurable if necessary.
-    // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
-    spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
-    if (!headers.Path()) {
-      spdy_headers[":path"] = "/";
+  if (headers.Method()) {
+    if (headers.Method()->value() == "CONNECT") {
+      // It is a bytestream connect and should have :path and :protocol set accordingly
+      // As HTTP/1.1 does not require a path for CONNECT, we may have to add one
+      // if shifting codecs. For now, default to "/" - this can be made
+      // configurable if necessary.
+      // https://tools.ietf.org/html/draft-kinnear-httpbis-http2-transport-02
+      spdy_headers[":protocol"] = Http::Headers::get().ProtocolValues.Bytestream;
+      if (!headers.Path()) {
+        spdy_headers[":path"] = "/";
+      }
+    } else if (headers.Method()->value() == "HEAD") {
+      sent_head_request_ = true;
     }
   }
   WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -190,6 +194,9 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   } else if (status != enumToInt(Http::Code::Continue)) {
     response_decoder_->decodeHeaders(std::move(headers),
                                      /*end_stream=*/fin);
+    if (status == enumToInt(Http::Code::NotModified)) {
+      got_304_response_ = true;
+    }
   }
 
   ConsumeHeaderList();
@@ -224,6 +231,11 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
     if (fin_read_and_no_trailers) {
       end_stream_decoded_ = true;
     }
+    updateReceivedContentBytes(buffer->length(), fin_read_and_no_trailers);
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
+      // A stream error has occurred, stop processing.
+      return;
+    }
     response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
   }
 
@@ -255,6 +267,11 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
   if (sequencer()->IsClosed() && !FinishedReadingTrailers()) {
     // Only decode trailers after finishing decoding body.
     end_stream_decoded_ = true;
+    updateReceivedContentBytes(0, true);
+    if (stream_error() != quic::QUIC_STREAM_NO_ERROR) {
+      // A stream error has occurred, stop processing.
+      return;
+    }
     quic::QuicRstStreamErrorCode transform_rst = quic::QUIC_STREAM_NO_ERROR;
     auto trailers = spdyHeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
         received_trailers(), filterManagerConnection()->maxIncomingHeadersCount(), *this, details_,

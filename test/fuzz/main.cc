@@ -56,7 +56,6 @@ INSTANTIATE_TEST_SUITE_P(CorpusExamples, FuzzerCorpusTest, testing::ValuesIn(tes
 
 int main(int argc, char** argv) {
   Envoy::TestEnvironment::initializeTestMain(argv[0]);
-  Envoy::Thread::TestThread test_thread;
 
   // Expected usage: <test path> <corpus paths..> [other gtest flags]
   RELEASE_ASSERT(argc >= 2, "");
