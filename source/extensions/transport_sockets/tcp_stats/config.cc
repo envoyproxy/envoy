@@ -16,9 +16,9 @@ public:
   TcpStatsSocketFactory(Server::Configuration::TransportSocketFactoryContext& context,
                         const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
                         Network::TransportSocketFactoryPtr&& inner_factory)
-      : inner_factory_(std::move(inner_factory)),
-        config_(std::make_shared<Config>(config, context.scope())) {
+      : inner_factory_(std::move(inner_factory)) {
 #if defined(__linux__)
+    config_ = std::make_shared<Config>(config, context.scope());
 #else
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
