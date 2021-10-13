@@ -47,9 +47,6 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStatsPager(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                               AdminStream&);
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -82,6 +79,11 @@ private:
                    const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                    bool used_only, const absl::optional<std::regex>& regex,
                    Buffer::Instance& response);
+
+  Http::Code statsAsHtml(const Http::Utility::QueryParams& query_params,
+                         Http::ResponseHeaderMap& response_headers,
+                         Buffer::Instance& response, AdminStream&, bool used_only,
+                         absl::optional<std::regex>& filter);
 };
 
 } // namespace Server

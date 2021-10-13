@@ -83,25 +83,13 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
-  if (format_value.has_value() && format_value.value() == "prometheus") {
-    return handlerPrometheusStats(url, response_headers, response, admin_stream);
-  }
-
-  if (format_value.value() == "html") {
-    /*
-    Stats::StatNamePool pool(server_.stats().symbolTable());
-    Stats::StatName after;
-    QueryParams::iterator after_iter = params.find("after");
-    if (after_iter != params.end()) {
-      after = pool.add(after_iter->second);
+  if (format_value.has_value()) {
+    if (format_value.value() == "prometheus") {
+      return handlerPrometheusStats(url, response_headers, response, admin_stream);
     }
-    if (type == params.end()) {
-      response.add(fmt::format("&type=(: \"{}\"\n", error.what()));
+    if (format_value.value() == "html") {
+      return statsAsHtml(params, response_headers, response, admin_stream, used_only, regex);
     }
-    QueryParams::iterator type_iter = params.find("type");
-    return handlerHtmlStats(url, response_headers, response, admin_stream, used_only,
-                            after, type);
-    */
   }
 
   std::map<std::string, uint64_t> all_stats;
@@ -156,6 +144,37 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
                                               server_.stats().histograms(), response, used_only,
                                               regex, server_.api().customStatNamespaces());
+  return Http::Code::OK;
+}
+
+Http::Code StatsHandler::statsAsHtml(const Http::Utility::QueryParams& params,
+                                     Http::ResponseHeaderMap& /*response_headers*/,
+                                     Buffer::Instance& response, AdminStream&, bool /*used_only*/,
+                                     absl::optional<std::regex>& /*filter*/) {
+
+  Stats::StatNamePool pool(server_.stats().symbolTable());
+  Stats::StatName after;
+  Http::Utility::QueryParams::const_iterator after_iter = params.find("after");
+  if (after_iter != params.end()) {
+    after = pool.add(after_iter->second);
+  }
+
+  Http::Utility::QueryParams::const_iterator type_iter = params.find("type");
+  if (type_iter == params.end()) {
+    response.add("query-param 'type' not specified. Must be counters, gauges, text-readouts, "
+                 "or histograms,");
+    return Http::Code::BadRequest;
+  }
+
+  uint32_t page_size = 1000;
+  Http::Utility::QueryParams::const_iterator page_size_iter = params.find("psize");
+  if (page_size_iter != params.end()) {
+    if (!absl::SimpleAtoi(page_size_iter->second, &page_size)) {
+      response.add("Invalid page size found after &psize=");
+      return Http::Code::BadRequest;
+    }
+  }
+
   return Http::Code::OK;
 }
 
