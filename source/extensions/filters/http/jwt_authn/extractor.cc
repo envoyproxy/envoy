@@ -33,7 +33,8 @@ public:
     if (issuer.empty()) {
       allow_all_ = true;
     } else {
-      specified_issuers_.insert(issuer);
+      std::string normalized_issuer(normalizeIssuer(issuer));
+      specified_issuers_.insert(normalized_issuer);
     }
   }
 
@@ -42,10 +43,24 @@ public:
     if (allow_all_) {
       return true;
     }
-    return specified_issuers_.find(jwt_issuer) != specified_issuers_.end();
+    std::string normalized_issuer(normalizeIssuer(jwt_issuer));
+    return specified_issuers_.find(normalized_issuer) != specified_issuers_.end();
   }
 
 private:
+  // Normalization: remove scheme "https://" or "http://" and remove trailing slash "/"
+  static absl::string_view normalizeIssuer(absl::string_view url) {
+    if (absl::StartsWith(url, "https://")) {
+      url.remove_prefix(8);
+    } else if (absl::StartsWith(url, "http://")) {
+      url.remove_prefix(7);
+    }
+    if (absl::EndsWith(url, "/")) {
+      url.remove_suffix(1);
+    }
+    return url;
+  }
+
   // If true, all issuers are ok
   bool allow_all_{false};
   // Only these specified issuers are allowed.

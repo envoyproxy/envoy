@@ -377,6 +377,54 @@ providers:
   EXPECT_FALSE(tokens[1]->isIssuerAllowed("abc"));
 }
 
+TEST_F(ExtractorTest, TestNormalizedIssuer) {
+  setUp(R"(
+providers:
+  provider1:
+    issuer: aaa.com
+    from_headers:
+      - name: jwt1
+  provider2:
+    issuer: aaa.com/
+    from_headers:
+      - name: jwt2
+  provider3:
+    issuer: http://aaa.com
+    from_headers:
+      - name: jwt3
+  provider4:
+    issuer: http://aaa.com/
+    from_headers:
+      - name: jwt4
+  provider5:
+    issuer: https://aaa.com
+    from_headers:
+      - name: jwt5
+  provider6:
+    issuer: https://aaa.com/
+    from_headers:
+      - name: jwt6
+)");
+
+  auto headers = TestRequestHeaderMapImpl{
+      {":path", "/path"}, {"jwt1", "token"}, {"jwt2", "token"}, {"jwt3", "token"},
+      {"jwt4", "token"},  {"jwt5", "token"}, {"jwt6", "token"},
+  };
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 6);
+
+  for (int i = 0; i < 6; ++i) {
+    EXPECT_EQ(tokens[i]->token(), "token");
+
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("aaa.com"));
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("aaa.com/"));
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("http://aaa.com"));
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("http://aaa.com/"));
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("https://aaa.com"));
+    EXPECT_TRUE(tokens[i]->isIssuerAllowed("https://aaa.com/"));
+  }
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
