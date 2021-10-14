@@ -9,7 +9,7 @@ import java.util.Map;
  * Class to assist with passing types from the JVM to native code. Currently supports
  * HTTP headers.
  */
-final class JniBridgeUtility {
+public final class JniBridgeUtility {
 
   private JniBridgeUtility() {}
 
