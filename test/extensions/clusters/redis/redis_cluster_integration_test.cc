@@ -626,6 +626,8 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   redis_client->close();
 }
 
+// Reuse the code in AdsIntegrationTest but have a new test name so
+// INSTANTIATE_TEST_SUITE_P works.
 using RedisAdsIntegrationTest = AdsIntegrationTest;
 
 // Validates that removing a redis cluster does not crash Envoy.
