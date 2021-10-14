@@ -66,11 +66,11 @@ void populateFromStorageHeader(const Http::HeaderMap& headers,
   }
 }
 
-void populateMatchedHeaders(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
-                            const MatcherSharedPtr& append_matchers,
-                            const MatcherSharedPtr& response_matchers,
-                            const MatcherSharedPtr& dynamic_metadata_matchers,
-                            ResponsePtr& response) {
+void populateFromMatchedHeaders(const Http::HeaderMap& headers, const MatcherSharedPtr& matchers,
+                                const MatcherSharedPtr& append_matchers,
+                                const MatcherSharedPtr& response_matchers,
+                                const MatcherSharedPtr& dynamic_metadata_matchers,
+                                ResponsePtr& response) {
   headers.iterate([&](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     // UpstreamHeaderMatcher
     if (matchers->matches(header.key().getStringView())) {
@@ -346,10 +346,10 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
   }
 
   // Given configured header matchers, populate the remaining authz_response fields.
-  populateMatchedHeaders(message->headers(), config_->upstreamHeaderMatchers(),
-                         config_->upstreamHeaderToAppendMatchers(),
-                         config_->clientHeaderOnSuccessMatchers(),
-                         config_->dynamicMetadataMatchers(), authz_response);
+  populateFromMatchedHeaders(message->headers(), config_->upstreamHeaderMatchers(),
+                             config_->upstreamHeaderToAppendMatchers(),
+                             config_->clientHeaderOnSuccessMatchers(),
+                             config_->dynamicMetadataMatchers(), authz_response);
   return authz_response;
 }
 

@@ -52,32 +52,24 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
     authz_response->status = CheckStatus::OK;
     if (response->has_ok_response()) {
       toAuthzResponseHeader(authz_response, response->ok_response().headers());
-      if (response->ok_response().headers_to_remove_size() > 0) {
-        for (const auto& header : response->ok_response().headers_to_remove()) {
-          authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
-        }
+      for (const auto& header : response->ok_response().headers_to_remove()) {
+        authz_response->headers_to_remove.push_back(Http::LowerCaseString(header));
       }
-      if (response->ok_response().query_parameters_to_set_size() > 0) {
-        for (const auto& query_parameter : response->ok_response().query_parameters_to_set()) {
-          authz_response->query_parameters_to_set.push_back(
-              std::pair(query_parameter.key(), query_parameter.value()));
-        }
+      for (const auto& query_parameter : response->ok_response().query_parameters_to_set()) {
+        authz_response->query_parameters_to_set.push_back(
+            std::pair(query_parameter.key(), query_parameter.value()));
       }
-      if (response->ok_response().query_parameters_to_remove_size() > 0) {
-        for (const auto& key : response->ok_response().query_parameters_to_remove()) {
-          authz_response->query_parameters_to_remove.push_back(key);
-        }
+      for (const auto& key : response->ok_response().query_parameters_to_remove()) {
+        authz_response->query_parameters_to_remove.push_back(key);
       }
       // These two vectors hold header overrides of encoded response headers.
-      if (response->ok_response().response_headers_to_add_size() > 0) {
-        for (const auto& header : response->ok_response().response_headers_to_add()) {
-          if (header.append().value()) {
-            authz_response->response_headers_to_add.emplace_back(
-                Http::LowerCaseString(header.header().key()), header.header().value());
-          } else {
-            authz_response->response_headers_to_set.emplace_back(
-                Http::LowerCaseString(header.header().key()), header.header().value());
-          }
+      for (const auto& header : response->ok_response().response_headers_to_add()) {
+        if (header.append().value()) {
+          authz_response->response_headers_to_add.emplace_back(
+              Http::LowerCaseString(header.header().key()), header.header().value());
+        } else {
+          authz_response->response_headers_to_set.emplace_back(
+              Http::LowerCaseString(header.header().key()), header.header().value());
         }
       }
     }
