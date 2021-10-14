@@ -101,7 +101,6 @@ rbe_autoconfig(
         # docker container fail tests on teardown (example: https://github.com/envoyproxy/envoy-mobile/runs/3443649963)
         "dockerAddCapabilities": "SYS_PTRACE",
     },
-    create_java_configs = False,
 )
 
 rbe_autoconfig(
