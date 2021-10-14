@@ -52,7 +52,8 @@ void populateFromStorageHeader(const Http::HeaderMap& headers,
   for (size_t i = 0; i < get_result.size(); ++i) {
     const Http::HeaderEntry* entry = get_result[i];
     if (entry == nullptr) {
-      continue;
+      // Header entries in the GetResult can't be null in practice, but we guard against it anyway.
+      continue; // GCOVR_EXCL_LINE
     }
 
     absl::string_view storage_header_value = entry->value().getStringView();
