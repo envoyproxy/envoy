@@ -415,10 +415,6 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
   }
 
   loadNewSnapshot();
-
-#ifdef ENVOY_ENABLE_QUIC
-  quiche::resetQuicheProtocolFlags();
-#endif
 }
 
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) {

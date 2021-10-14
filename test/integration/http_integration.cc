@@ -28,7 +28,6 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
-#include "source/common/quic/platform/quiche_flags_impl.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -320,10 +319,6 @@ void HttpIntegrationTest::useAccessLog(
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
 
 void HttpIntegrationTest::initialize() {
-#ifdef ENVOY_ENABLE_QUIC
-  quiche::resetQuicheProtocolFlags();
-#endif
-
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
