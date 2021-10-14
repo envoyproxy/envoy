@@ -18,7 +18,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
   connections_.push_back(createNextConnection());
 }
 
-HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() {}
+HappyEyeballsConnectionImpl::~HappyEyeballsConnectionImpl() = default;
 
 void HappyEyeballsConnectionImpl::connect() {
   ENVOY_BUG(!connect_finished_, "connection already connected");
