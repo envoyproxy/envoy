@@ -38,6 +38,8 @@ bool checkUseAppleApiForDnsLookups(
            std::string(AppleDnsResolver), true) != nullptr) &&
       Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups")) {
     makeDefaultAppleDnsResolverConfig(typed_dns_resolver_config);
+    ENVOY_LOG_MISC(debug, "create Apple DNS resolver type: {} in MacOS.",
+                   typed_dns_resolver_config.name());
     return true;
   }
   return false;
