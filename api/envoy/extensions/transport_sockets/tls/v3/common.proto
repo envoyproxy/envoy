@@ -415,7 +415,7 @@ message CertificateValidationContext {
 
   // This field is deprecated in favor of ref:`match_subject_alt_names_with_type
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names_with_type>`
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9 
+  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
