@@ -55,16 +55,12 @@ message DnsCacheConfig {
   config.cluster.v3.Cluster.DnsLookupFamily dns_lookup_family = 2
       [(validate.rules).enum = {defined_only: true}];
 
-  // The DNS refresh rate for currently cached DNS hosts. If not specified defaults to 60s.
-  //
-  // .. note:
-  //
-  //  The returned DNS TTL is not currently used to alter the refresh rate. This feature will be
-  //  added in a future change.
-  //
-  // .. note:
+  // The DNS refresh rate for unresolved DNS hosts. If not specified defaults to 60s.
   //
   // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
+  //
+  // Once a host has been resolved, the refresh rate will be the DNS TTL, capped
+  // at a minimum of 5s.
   google.protobuf.Duration dns_refresh_rate = 3
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
