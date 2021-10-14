@@ -9,8 +9,7 @@ Minor Behavior Changes
 ----------------------
 *Changes that may cause incompatibilities for some users, but should not for most*
 
-* listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place
-  update. This behavior can be disabled by turning off the runtime flag ``envoy.reloadable_features.per_network_filter_chain_factory_context`` at envoy boostrap.
+* listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update. 
 
 Bug Fixes
 ---------

@@ -103,14 +103,7 @@ Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.per_network_filter_chain_factory_context")) {
-    return *scope_;
-  } else {
-    return parent_context_.scope();
-  }
-}
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
@@ -144,14 +137,7 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.per_network_filter_chain_factory_context")) {
-    return *filter_chain_scope_;
-  } else {
-    return parent_context_.listenerScope();
-  }
-}
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
 bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();
