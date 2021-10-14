@@ -30,6 +30,12 @@ jobs:
             echo "Skipping tests."
             echo "::set-output name=run_tests::false"
           fi
+      - uses: actions/setup-java@v1
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        with:
+          java-version: '8'
+          java-package: jdk
+          architecture: x64
       - name: 'Run tests'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
