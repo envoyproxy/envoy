@@ -91,6 +91,69 @@ TEST(HttpUtility, parseQueryString) {
           "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
 }
 
+TEST(HttpUtility, stripQueryString) {
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1&y=2")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there&good=bye")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?")), "/foo/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?x=1")), "/foo/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?a=b")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?a=b&b=c")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
+}
+
+TEST(HttpUtility, replaceQueryString) {
+  // Replace with nothing
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a"), Utility::QueryParams()), "/a");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/"), Utility::QueryParams()), "/a/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/?y=5"), Utility::QueryParams()), "/a/");
+  // Replace with x=1
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a?x=0"), Utility::QueryParams({{"x", "1"}})),
+            "/a?x=1");
+  EXPECT_EQ(
+      Utility::replaceQueryString(HeaderString("/a/?x=0"), Utility::QueryParams({{"x", "1"}})),
+      "/a/?x=1");
+  // More replacements
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo"),
+                                        Utility::QueryParams({{"x", "1"}, {"z", "3"}})),
+            "/foo?x=1&z=3");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?z=2"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?y=9"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo?x=1&y=5");
+  // More path components
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo/bar?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=9&a=b"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo/bar?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=11&z=7"),
+                                        Utility::QueryParams({{"a", "b"}, {"x", "1"}, {"y", "5"}})),
+            "/foo/bar?a=b&x=1&y=5");
+}
+
 TEST(HttpUtility, getResponseStatus) {
   EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
   EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
