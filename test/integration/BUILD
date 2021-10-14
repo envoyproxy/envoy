@@ -367,7 +367,7 @@ envoy_cc_test(
     srcs = [
         "multiplexed_integration_test.cc",
     ],
-    shard_count = 8,
+    shard_count = 4,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
