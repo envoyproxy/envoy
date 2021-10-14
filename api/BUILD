@@ -67,6 +67,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
+        "//contrib/envoy/extensions/vcl/v3alpha:pkg",
         "//envoy/admin/v3:pkg",
         "//envoy/config/accesslog/v3:pkg",
         "//envoy/config/bootstrap/v3:pkg",
