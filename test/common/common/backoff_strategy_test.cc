@@ -23,11 +23,15 @@ TEST(ExponentialBackOffStrategyTest, JitteredBackOffBasicReset) {
   ON_CALL(random, random()).WillByDefault(Return(27));
 
   JitteredExponentialBackOffStrategy jittered_back_off(25, 30, random);
-  EXPECT_EQ(2, jittered_back_off.nextBackOffMs());
+  EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // 25 % 27
   EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
 
   jittered_back_off.reset();
   EXPECT_EQ(2, jittered_back_off.nextBackOffMs()); // Should start from start
+  EXPECT_EQ(27, jittered_back_off.nextBackOffMs());
+
+  jittered_back_off.reset(26);
+  EXPECT_EQ(1, jittered_back_off.nextBackOffMs()); // 26 % 27
 }
 
 TEST(ExponentialBackOffStrategyTest, JitteredBackOffDoesntOverflow) {
@@ -77,6 +81,9 @@ TEST(ExponentialBackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
   EXPECT_EQ(79, jittered_back_off.nextBackOffMs());
   EXPECT_EQ(99, jittered_back_off.nextBackOffMs()); // Should return Max here
   EXPECT_EQ(99, jittered_back_off.nextBackOffMs());
+
+  jittered_back_off.reset(4);
+  EXPECT_EQ(3, jittered_back_off.nextBackOffMs());
 }
 
 TEST(LowerBoundBackOffStrategyTest, JitteredBackOffWithLowRandomValue) {
@@ -102,6 +109,9 @@ TEST(FixedBackOffStrategyTest, FixedBackOffBasicReset) {
 
   fixed_back_off.reset();
   EXPECT_EQ(30, fixed_back_off.nextBackOffMs());
+
+  fixed_back_off.reset(20);
+  EXPECT_EQ(20, fixed_back_off.nextBackOffMs());
 }
 
 } // namespace Envoy

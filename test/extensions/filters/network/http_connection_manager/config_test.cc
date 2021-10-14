@@ -2171,6 +2171,38 @@ http_filters:
   config_discovery:
     config_source: { resource_api_version: V3, ads: {} }
     default_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
+      "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrlWithOldTypedStruct) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { resource_api_version: V3, ads: {} }
+    default_config:
       "@type": type.googleapis.com/udpa.type.v1.TypedStruct
       type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     type_urls:
