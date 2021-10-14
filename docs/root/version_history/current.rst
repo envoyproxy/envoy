@@ -42,6 +42,7 @@ New Features
 * thrift_proxy: add upstream response zone metrics in the form ``cluster.cluster_name.zone.local_zone.upstream_zone.thrift.upstream_resp_success``.
 * thrift_proxy: support subset lb when using request or route metadata.
 * vcl_socket_interface: added VCL socket interface extension for fd.io VPP integration to :ref:`contrib images <install_contrib>`. This can be enabled via :ref:`VCL <envoy_v3_api_msg_extensions.vcl.v3alpha.VclSocketInterface>` configuration.
+* thrift_proxy: support subset lb for request metadata filter.
 
 Deprecated
 ----------
