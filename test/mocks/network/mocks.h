@@ -578,6 +578,7 @@ public:
   ~MockUdpListenerReadFilter() override;
 
   MOCK_METHOD(Network::FilterStatus, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onReceiveError, (Api::IoError::IoErrorCode));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {
