@@ -1713,17 +1713,14 @@ RouteSpecificFilterConfigConstSharedPtr PerFilterConfigs::createRouteSpecificFil
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config);
   auto object = factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
   if (object == nullptr) {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.check_unsupported_typed_per_filter_config") &&
-        !is_optional) {
+    if (is_optional) {
+      ENVOY_LOG(debug,
+                "The filter {} doesn't support virtual host-specific configurations, and it is "
+                "optional, so ignore it.",
+                name);
+    } else {
       throw EnvoyException(
           fmt::format("The filter {} doesn't support virtual host-specific configurations", name));
-    } else {
-      ENVOY_LOG(warn,
-                "The filter {} doesn't support virtual host-specific configurations. Set runtime "
-                "config `envoy.reloadable_features.check_unsupported_typed_per_filter_config` as "
-                "true to reject any invalid virtual-host specific configuration.",
-                name);
     }
   }
   return object;
