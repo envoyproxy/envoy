@@ -59,6 +59,7 @@ struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
   void chargeResponseTiming();
 
   RequestOwner& parent_;
+  const RouterStats& stats_;
   Upstream::TcpPoolData& conn_pool_data_;
   MessageMetadataSharedPtr metadata_;
 
