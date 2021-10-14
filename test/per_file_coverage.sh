@@ -3,7 +3,7 @@
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
-"source/common:96.0" # Raise when QUIC coverage goes up
+"source/common:95.9" # Raise when QUIC coverage goes up
 "source/common/api:79.8"
 "source/common/api/posix:78.5"
 "source/common/common/posix:92.7"
@@ -14,7 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/http:96.3"
 "source/common/http/http2:96.4"
 "source/common/json:90.1"
-"source/common/matcher:94.2"
+"source/common/matcher:94.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
