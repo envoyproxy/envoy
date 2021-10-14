@@ -531,50 +531,6 @@ TEST_P(LdsInplaceUpdateHttpIntegrationTest, OverlappingFilterChainServesNewConne
   expectConnectionServed();
 }
 
-// Verify that the destroyed per network filter chain stat is accessible when the runtime disable
-// per network filter chain.
-TEST_P(LdsInplaceUpdateHttpIntegrationTest, RuntimeForPerNetworkFilterChainStat) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.per_network_filter_chain_factory_context", "false");
-  inplaceInitialize(/*add_default_filter_chain=*/true);
-
-  auto codec_client_1 = createHttpCodec("alpn1");
-  auto codec_client_0 = createHttpCodec("alpn0");
-  auto codec_client_default = createHttpCodec("alpndefault");
-
-  ConfigHelper new_config_helper(
-      version_, *api_, MessageUtil::getJsonStringFromMessageOrDie(config_helper_.bootstrap()));
-  new_config_helper.addConfigModifier(
-      [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-        listener->mutable_filter_chains()->RemoveLast();
-        listener->clear_default_filter_chain();
-      });
-
-  new_config_helper.setLds("1");
-  test_server_->waitForCounterGe("listener_manager.listener_in_place_updated", 1);
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 1);
-
-  test_server_->waitForGaugeGe("http.hcm0.downstream_cx_active", 1);
-  test_server_->waitForGaugeGe("http.hcm1.downstream_cx_active", 1);
-
-  expectResponseHeaderConnectionClose(*codec_client_1, true);
-  expectResponseHeaderConnectionClose(*codec_client_default, true);
-
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
-  expectResponseHeaderConnectionClose(*codec_client_0, false);
-  expectConnectionServed();
-
-  codec_client_1->close();
-  codec_client_0->close();
-  codec_client_default->close();
-
-  test_server_->waitForGaugeGe("listener_manager.total_filter_chains_draining", 0);
-  // This gauge that are created by the destroyed filter chain is still accessible when the runtime
-  // turns off per network filter chain stat scope.
-  test_server_->waitForGaugeEq("http.hcm1.downstream_cx_active", 0);
-}
-
 // Verify default filter chain update is filter chain only update.
 TEST_P(LdsInplaceUpdateHttpIntegrationTest, DefaultFilterChainUpdate) {}
 INSTANTIATE_TEST_SUITE_P(IpVersions, LdsInplaceUpdateHttpIntegrationTest,
