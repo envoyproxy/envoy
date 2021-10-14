@@ -70,8 +70,8 @@ static int unpack_extension_callback(nghttp2_session* /*session*/, void** payloa
 }
 
 // Nghttp2 callback function for sending data to peer.
-static ssize_t send_callback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len,
-                             int flags, void* user_data) {
+static ssize_t sendCallback(nghttp2_session* /*session*/, const uint8_t* buf, size_t len,
+                            int flags, void* user_data) {
   EXPECT_LE(0, flags);
 
   TestBuffer* buffer = (reinterpret_cast<UserData*>(user_data))->output_buffer;
@@ -95,7 +95,7 @@ public:
     // Sets callback functions.
     nghttp2_session_callbacks* callbacks;
     nghttp2_session_callbacks_new(&callbacks);
-    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
+    nghttp2_session_callbacks_set_send_callback(callbacks, sendCallback);
     nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(
         callbacks, on_extension_chunk_recv_callback);
     nghttp2_session_callbacks_set_unpack_extension_callback(callbacks, unpack_extension_callback);

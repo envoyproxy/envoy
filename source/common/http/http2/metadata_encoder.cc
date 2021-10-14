@@ -136,7 +136,7 @@ public:
   }
 
   std::pair<int64_t, bool> Pack(uint8_t* dest, size_t dest_len) override {
-    const size_t to_copy = std::min(dest_len, payload_.length());
+    const size_t to_copy = std::min(dest_len, static_cast<size_t>(payload_.length()));
     payload_.copyOut(0, to_copy, dest);
     payload_.drain(to_copy);
     return std::make_pair(static_cast<int64_t>(to_copy), payload_.length() == 0);
