@@ -56,7 +56,7 @@ public:
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
 
-  int64_t currentUnusedCapacity() const {
+  virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
         static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
 
@@ -148,6 +148,7 @@ public:
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
+  virtual bool quic() { return false; }
 
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
@@ -233,6 +234,9 @@ public:
 
   void decrClusterStreamCapacity(uint32_t delta) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
+  }
+  void incrClusterStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
   }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);

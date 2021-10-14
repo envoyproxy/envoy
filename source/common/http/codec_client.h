@@ -131,6 +131,8 @@ public:
   // Note this is the L4 stream info, not L7.
   const StreamInfo::StreamInfo& streamInfo() { return connection_->streamInfo(); }
 
+  const Network::ClientConnectionPtr& connection() { return connection_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.

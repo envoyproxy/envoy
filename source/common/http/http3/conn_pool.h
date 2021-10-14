@@ -23,6 +23,33 @@ class ActiveClient : public MultiplexedActiveClientBase {
 public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
+
+  void onMaxStreamsChanged(uint32_t num_streams);
+
+  RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
+    ASSERT(quiche_capacity_ != 0);
+    updateCapacity(quiche_capacity_ - 1);
+    return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
+  }
+
+  int64_t currentUnusedCapacity() const override {
+    return std::min<int64_t>(quiche_capacity_, effectiveConcurrentStreamLimit());
+  }
+
+  void updateCapacity(uint64_t new_quiche_capacity) {
+    uint64_t old_capacity = currentUnusedCapacity();
+    quiche_capacity_ = new_quiche_capacity;
+    uint64_t new_capacity = currentUnusedCapacity();
+
+    if (new_capacity < old_capacity) {
+      parent_.decrClusterStreamCapacity(old_capacity - new_capacity);
+    } else if (old_capacity < new_capacity) {
+      parent_.incrClusterStreamCapacity(new_capacity - old_capacity);
+    }
+  }
+
+  std::unique_ptr<Quic::ScopedStreamNotifier> notifier_;
+  uint64_t quiche_capacity_ = 100;
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
@@ -45,6 +72,7 @@ public:
                                              quic::QuicConfig& quic_config);
 
   Quic::PersistentQuicInfoImpl& quicInfo() { return *quic_info_; }
+  bool quic() override { return true; }
 
 private:
   // Store quic helpers which can be shared between connections and must live

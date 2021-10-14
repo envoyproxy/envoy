@@ -28,6 +28,19 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                            Upstream::Host::CreateConnectionData& data)
     : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
+  auto& connection = dynamic_cast<ActiveClient*>(this)->codec_client_->connection();
+  Quic::EnvoyQuicClientSession* session = const_cast<Quic::EnvoyQuicClientSession*>(
+      dynamic_cast<const Quic::EnvoyQuicClientSession*>(connection.get()));
+  ASSERT(session != nullptr);
+  notifier_ = std::make_unique<Quic::ScopedStreamNotifier>(
+      [this](int32_t s) -> void { onMaxStreamsChanged(s); }, *session);
+}
+
+void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
+  updateCapacity(num_streams);
+  if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+  }
 }
 
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
