@@ -244,7 +244,7 @@ public:
   }
 
   template <typename T>
-  uint32_t GetStreamReceiveWindowLimit(std::unique_ptr<T>& connection, int32_t stream_id) {
+  uint32_t getStreamReceiveWindowLimit(std::unique_ptr<T>& connection, int32_t stream_id) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetStreamReceiveWindowLimit(stream_id);
     } else {
@@ -254,7 +254,7 @@ public:
   }
 
   template <typename T>
-  uint32_t GetStreamReceiveWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
+  uint32_t getStreamReceiveWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetStreamReceiveWindowSize(stream_id);
     } else {
@@ -263,7 +263,7 @@ public:
   }
 
   template <typename T>
-  uint32_t GetStreamSendWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
+  uint32_t getStreamSendWindowSize(std::unique_ptr<T>& connection, int32_t stream_id) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetStreamSendWindowSize(stream_id);
     } else {
@@ -271,7 +271,7 @@ public:
     }
   }
 
-  template <typename T> uint32_t GetSendWindowSize(std::unique_ptr<T>& connection) {
+  template <typename T> uint32_t getSendWindowSize(std::unique_ptr<T>& connection) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetSendWindowSize();
     } else {
@@ -1448,7 +1448,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
   EXPECT_EQ(1, TestUtility::findGauge(server_stats_store_, "http2.streams_active")->value());
 
-  uint32_t initial_stream_window = GetStreamReceiveWindowLimit(client_, 1);
+  uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames. Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
@@ -1463,8 +1463,8 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
 
   // Verify that the window is full. The client will not send more data to the server for this
   // stream.
-  EXPECT_EQ(0, GetStreamReceiveWindowSize(server_, 1));
-  EXPECT_EQ(0, GetStreamSendWindowSize(client_, 1));
+  EXPECT_EQ(0, getStreamReceiveWindowSize(server_, 1));
+  EXPECT_EQ(0, getStreamSendWindowSize(client_, 1));
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
 
   // Now that the flow control window is full, further data causes the send buffer to back up.
@@ -1528,8 +1528,8 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
   // initial window minus the last 1 byte flush from the client to server.
-  EXPECT_EQ(initial_stream_window - 1, GetStreamReceiveWindowSize(server_, 1));
-  EXPECT_EQ(initial_stream_window - 1, GetStreamSendWindowSize(client_, 1));
+  EXPECT_EQ(initial_stream_window - 1, getStreamReceiveWindowSize(server_, 1));
+  EXPECT_EQ(initial_stream_window - 1, getStreamSendWindowSize(client_, 1));
 }
 
 // Set up the same asTestFlowControlInPendingSendData, but tears the stream down with an early reset
@@ -1550,8 +1550,8 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   // updates to the client.
   server_->getStream(1)->readDisable(true);
 
-  uint32_t initial_stream_window = GetStreamReceiveWindowLimit(client_, 1);
-  uint32_t initial_connection_window = GetSendWindowSize(client_);
+  uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
+  uint32_t initial_connection_window = getSendWindowSize(client_);
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames. Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
@@ -1564,10 +1564,10 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
 
   // Verify that the window is full. The client will not send more data to the server for this
   // stream.
-  EXPECT_EQ(0, GetStreamReceiveWindowSize(server_, 1));
-  EXPECT_EQ(0, GetStreamSendWindowSize(client_, 1));
+  EXPECT_EQ(0, getStreamReceiveWindowSize(server_, 1));
+  EXPECT_EQ(0, getStreamSendWindowSize(client_, 1));
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->unconsumed_bytes_);
-  EXPECT_GT(initial_connection_window, GetSendWindowSize(client_));
+  EXPECT_GT(initial_connection_window, getSendWindowSize(client_));
 
   EXPECT_CALL(server_stream_callbacks_,
               onResetStream(StreamResetReason::LocalRefusedStreamReset, _));
@@ -1589,7 +1589,7 @@ TEST_P(Http2CodecImplFlowControlTest, EarlyResetRestoresWindow) {
   response_encoder_->getStream().resetStream(StreamResetReason::LocalRefusedStreamReset);
 
   // Regression test that the window is consumed even if the stream is destroyed early.
-  EXPECT_EQ(initial_connection_window, GetSendWindowSize(client_));
+  EXPECT_EQ(initial_connection_window, getSendWindowSize(client_));
 }
 
 // Test the HTTP2 pending_recv_data_ buffer going over and under watermark limits.
@@ -1780,7 +1780,7 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   // updates to the client.
   server_->getStream(1)->readDisable(true);
 
-  uint32_t initial_stream_window = GetStreamReceiveWindowLimit(client_, 1);
+  uint32_t initial_stream_window = getStreamReceiveWindowLimit(client_, 1);
   // If this limit is changed, this test will fail due to the initial large writes being divided
   // into more than 4 frames. Fast fail here with this explanatory comment.
   ASSERT_EQ(65535, initial_stream_window);
@@ -3090,8 +3090,8 @@ public:
       for (auto& source : sources) {
         adapter()->SubmitMetadata(stream_id, 16 * 1024, std::move(source));
       }
-      adapter()->Send();
-      return true;
+      int result = adapter()->Send();
+      return result == 0;
     } else {
       encoder_old_.createPayload(metadata_map_vector);
       for (uint8_t flags : encoder_old_.payloadFrameFlagBytes()) {
