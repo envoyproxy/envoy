@@ -47,10 +47,10 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
-  waitForSeconds(10);
+  waitForSeconds(45);
   // Cache entry hasn't been evicted because it was created 10s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
-  waitForSeconds(10);
+  waitForSeconds(45);
   // Cache entry hasn't been evicted because it was accessed 10s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(80);

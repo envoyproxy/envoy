@@ -73,7 +73,9 @@ public:
     absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
                         MessageUtil>
         cache_;
+    // The keys of cache entries that haven't been accessed since last eviction.
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil> idle_keys_;
+    // The keys of cache entries that have been accessed since last eviction.
     absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil>
         active_keys_;
     Envoy::Event::TimerPtr evict_idle_entries_timer_;
