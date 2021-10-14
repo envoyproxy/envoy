@@ -152,7 +152,7 @@ TEST(ConfigTest, CreateFilterMissingConfig) {
 }
 
 TEST(ConfigTest, WrongCookieName) {
-const std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 config:
   token_endpoint:
     cluster: foo
@@ -190,7 +190,7 @@ config:
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(*proto_config, "stats", context),
-                            EnvoyException, "value does not match regex pattern");
+                          EnvoyException, "value does not match regex pattern");
 }
 
 } // namespace Oauth2
