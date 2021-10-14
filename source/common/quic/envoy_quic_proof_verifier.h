@@ -10,7 +10,7 @@ class CertVerifyResult : public quic::ProofVerifyDetails {
 public:
   explicit CertVerifyResult(bool is_valid) : is_valid_(is_valid) {}
 
-  ProofVerifyDetails* Clone() const { return new CertVerifyResult(is_valid_); }
+  ProofVerifyDetails* Clone() const override { return new CertVerifyResult(is_valid_); }
 
   bool isValid() const { return is_valid_; }
 

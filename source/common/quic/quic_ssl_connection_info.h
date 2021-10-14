@@ -20,8 +20,7 @@ namespace Quic {
 // access to the SSL object in QUIC crypto stream.
 class QuicSslConnectionInfo : public Extensions::TransportSockets::Tls::ConnectionInfoImplBase {
 public:
-  QuicSslConnectionInfo(quic::QuicSession& session)
-      : Extensions::TransportSockets::Tls::ConnectionInfoImplBase(), session_(session) {}
+  QuicSslConnectionInfo(quic::QuicSession& session) : session_(session) {}
 
   // Ssl::ConnectionInfo
   bool peerCertificateValidated() const override { return cert_validated_; };
