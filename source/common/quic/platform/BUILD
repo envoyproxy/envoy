@@ -45,6 +45,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
+        "//source/common/http:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "@com_github_google_quiche//:quic_core_flags_list_lib",
         "@com_github_google_quiche//:quic_core_protocol_flags_list_lib",

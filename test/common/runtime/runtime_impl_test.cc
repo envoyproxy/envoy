@@ -830,6 +830,14 @@ public:
     foo: whatevs
     bar: yar
   )EOF");
+
+#ifdef ENVOY_ENABLE_QUIC
+    {
+      auto* admin_layer = config.add_layers();
+      admin_layer->set_name("admin");
+      admin_layer->mutable_admin_layer();
+    }
+#endif
     for (const auto& layer_resource_name : layers_) {
       auto* layer = config.add_layers();
       layer->set_name(layer_resource_name);
@@ -858,7 +866,11 @@ public:
     loader_->startRtdsSubscriptions(rtds_init_callback_.AsStdFunction());
 
     // Validate that the layer name is set properly for dynamic layers.
+#ifdef ENVOY_ENABLE_QUIC
+    EXPECT_EQ(layers_[0], loader_->snapshot().getLayers()[2]->name());
+#else
     EXPECT_EQ(layers_[0], loader_->snapshot().getLayers()[1]->name());
+#endif
 
     EXPECT_EQ("whatevs", loader_->snapshot().get("foo").value().get());
     EXPECT_EQ("yar", loader_->snapshot().get("bar").value().get());
@@ -867,8 +879,13 @@ public:
     EXPECT_EQ(0, store_.counter("runtime.load_error").value());
     EXPECT_EQ(1, store_.counter("runtime.load_success").value());
     EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
     EXPECT_EQ(1 + layers_.size(),
               store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+    EXPECT_EQ(2 + layers_.size(),
+              store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
   }
 
   void addLayer(absl::string_view name) { layers_.emplace_back(name); }
@@ -909,7 +926,11 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeEmpty) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // > 1 length lists are rejected.
@@ -928,7 +949,11 @@ TEST_F(RtdsLoaderImplTest, UnexpectedSizeTooMany) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Validate behavior when the config fails delivery at the subscription level.
@@ -943,7 +968,11 @@ TEST_F(RtdsLoaderImplTest, FailureSubscription) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Unexpected runtime resource name.
@@ -968,7 +997,11 @@ TEST_F(RtdsLoaderImplTest, WrongResourceName) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(1, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Successful update.
@@ -991,7 +1024,11 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource
@@ -1007,7 +1044,11 @@ TEST_F(RtdsLoaderImplTest, OnConfigUpdateSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Delta style successful update.
@@ -1030,7 +1071,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource
@@ -1046,7 +1091,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Delta style add and removal successful update.
@@ -1069,7 +1118,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 
   doDeltaOnConfigRemovalVerifyNoThrow("some_resource");
 
@@ -1080,7 +1133,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalSuccess) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(2, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Delta style removal failed.
@@ -1104,7 +1161,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   *removed_resources.Add() = "some_wrong_resource_name";
@@ -1121,7 +1182,11 @@ TEST_F(RtdsLoaderImplTest, DeltaOnConfigUpdateWithRemovalFailure) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(2, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 // Updates with multiple RTDS layers.
@@ -1149,7 +1214,11 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(2, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: another_resource
@@ -1167,7 +1236,11 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
   EXPECT_EQ(0, store_.counter("runtime.load_error").value());
   EXPECT_EQ(3, store_.counter("runtime.load_success").value());
   EXPECT_EQ(3, store_.gauge("runtime.num_keys", Stats::Gauge::ImportMode::NeverImport).value());
+#ifndef ENVOY_ENABLE_QUIC
   EXPECT_EQ(3, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#else
+  EXPECT_EQ(4, store_.gauge("runtime.num_layers", Stats::Gauge::ImportMode::NeverImport).value());
+#endif
 }
 
 TEST_F(RtdsLoaderImplTest, BadConfigSource) {
@@ -1191,6 +1264,48 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
 
   EXPECT_THROW_WITH_MESSAGE(loader.initialize(cm_), EnvoyException, "bad config");
 }
+
+#ifdef ENVOY_ENABLE_QUIC
+TEST_F(RtdsLoaderImplTest, QuicheReloadableFlags) {
+  setup();
+
+  // Quiche flag implementation backed by runtime feature infrastructure uses
+  // LoaderSingleton alias.
+  Runtime::LoaderSingleton::initialize(loader_.get());
+
+  SetQuicReloadableFlag(spdy_testonly_default_false, true);
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+
+  // Test that Quiche flags can be overwritten via RTDS.
+  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_false: true
+      envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: false
+      envoy.reloadable_features.FLAGS_quic_reloadable_flag_spdy_testonly_default_false: false
+  )EOF");
+  EXPECT_CALL(rtds_init_callback_, Call());
+  doOnConfigUpdateVerifyNoThrow(runtime, 0);
+
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
+
+  // Test 2 behaviors:
+  // 1. Removing overwritten config will make the flag fallback to default value.
+  // 2. Quiche flags can be overwritten again.
+  runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
+    name: some_resource
+    layer:
+      envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_testonly_default_true: true
+  )EOF");
+  doOnConfigUpdateVerifyNoThrow(runtime, 0);
+
+  EXPECT_EQ(false, GetQuicReloadableFlag(quic_testonly_default_false));
+  EXPECT_EQ(true, GetQuicReloadableFlag(quic_testonly_default_true));
+  EXPECT_EQ(true, GetQuicReloadableFlag(spdy_testonly_default_false));
+}
+#endif
 
 } // namespace
 } // namespace Runtime

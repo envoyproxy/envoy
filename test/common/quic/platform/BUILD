@@ -16,6 +16,7 @@ envoy_cc_test(
     deps = [
         "//source/common/quic/platform:quiche_flags_impl_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:http2_test_tools_random",
     ],

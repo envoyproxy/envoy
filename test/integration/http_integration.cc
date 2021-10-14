@@ -24,11 +24,11 @@
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_connection_factory_impl.h"
+#include "source/common/quic/platform/quiche_flags_impl.h"
 #endif
 
 #include "source/extensions/transport_sockets/tls/context_config_impl.h"
@@ -320,10 +320,15 @@ void HttpIntegrationTest::useAccessLog(
 HttpIntegrationTest::~HttpIntegrationTest() { cleanupUpstreamAndDownstream(); }
 
 void HttpIntegrationTest::initialize() {
+#ifdef ENVOY_ENABLE_QUIC
+  quiche::resetQuicheProtocolFlags();
+#endif
+
   if (downstream_protocol_ != Http::CodecType::HTTP3) {
     return BaseIntegrationTest::initialize();
   }
 #ifdef ENVOY_ENABLE_QUIC
+
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(

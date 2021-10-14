@@ -10,6 +10,7 @@
 #include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 #include "quiche/http2/platform/api/http2_bug_tracker.h"
@@ -57,6 +58,14 @@ TEST(Http2PlatformTest, Http2Log) {
 TEST(Http2PlatformTest, Http2Macro) {
   EXPECT_DEBUG_DEATH(HTTP2_UNREACHABLE(), "");
   EXPECT_DEATH(HTTP2_DIE_IF_NULL(nullptr), "");
+}
+
+TEST(Http2PlatformTest, Http2Flags) {
+  Envoy::TestScopedRuntime scoped_runtime;
+
+  EXPECT_FALSE(GetHttp2ReloadableFlag(http2_testonly_default_false));
+  SetHttp2ReloadableFlag(http2_testonly_default_false, true);
+  EXPECT_TRUE(GetHttp2ReloadableFlag(http2_testonly_default_false));
 }
 
 } // namespace

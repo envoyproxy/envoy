@@ -10,6 +10,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -23,6 +24,8 @@ const std::string EnvoyQuicheReloadableFlagPrefix =
     "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
 const std::string EnvoyQuicheRestartFlagPrefix = "envoy.restart_features.FLAGS_quic_restart_flag_";
 const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+
+void resetQuicheProtocolFlags(void);
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) extern type FLAGS_##flag;
 #include "quiche/quic/core/quic_protocol_flags_list.h"
@@ -49,6 +52,5 @@ const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
 #define SetQuicheRestartFlagImpl(module, flag, value)                                              \
   ASSERT(Envoy::Thread::MainThread::isMainOrTestThread());                                         \
   Envoy::Runtime::LoaderSingleton::getExisting()->mergeValues(                                     \
-      {{absl::StrCat(quiche::EnvoyQuicheRestartFlagPrefix + #flag), BOOL_STR(value)}})
-
+      {{absl::StrCat(quiche::EnvoyQuicheRestartFlagPrefix, #flag), BOOL_STR(value)}})
 } // namespace quiche

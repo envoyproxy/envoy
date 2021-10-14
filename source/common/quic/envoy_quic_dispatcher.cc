@@ -8,6 +8,7 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -30,7 +31,10 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       connection_handler_(connection_handler), listener_config_(&listener_config),
       listener_stats_(listener_stats), per_worker_stats_(per_worker_stats), dispatcher_(dispatcher),
       listen_socket_(listen_socket), quic_stat_names_(quic_stat_names),
-      crypto_server_stream_factory_(crypto_server_stream_factory) {}
+      crypto_server_stream_factory_(crypto_server_stream_factory) {
+  ASSERT(GetQuicFlag(FLAGS_quic_buffered_data_threshold) ==
+         2 * ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE); // 512MB
+}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
                                              quic::QuicErrorCode error,
