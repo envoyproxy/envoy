@@ -2,7 +2,6 @@
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
 
@@ -17,6 +16,8 @@
 namespace Envoy {
 namespace Quic {
 
+// A wrapper of a QUIC session to be passed around as an indicator of ssl support and to provide
+// access to the SSL object in QUIC crypto stream.
 class QuicSslConnectionInfo : public Extensions::TransportSockets::Tls::ConnectionInfoImplBase {
 public:
   QuicSslConnectionInfo(quic::QuicSession& session)
@@ -26,8 +27,8 @@ public:
   bool peerCertificateValidated() const override { return cert_validated_; };
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
   SSL* ssl() const override {
-    ASSERT(session_.GetCryptoStream() != nullptr &&
-           session_.GetCryptoStream()->GetSsl() != nullptr);
+    ASSERT(session_.GetCryptoStream() != nullptr);
+    ASSERT(session_.GetCryptoStream()->GetSsl() != nullptr);
     return session_.GetCryptoStream()->GetSsl();
   }
 
