@@ -18,6 +18,7 @@ frozendict
 gitpython
 jinja2
 pep8-naming
+ply
 pygithub
 pyreadline
 pytest
