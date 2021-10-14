@@ -240,15 +240,15 @@ TEST_F(FilterTest, RequestRateLimitedXRateLimitHeaders) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("1", response_headers.get_("ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("ratelimit-remaining"));
-  EXPECT_EQ("1000", response_headers.get_("ratelimit-reset"));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_2_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("1", response_headers.get_("ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("ratelimit-remaining"));
-  EXPECT_EQ("1000", response_headers.get_("ratelimit-reset"));
+  EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("1000", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
@@ -454,9 +454,9 @@ TEST_F(DescriptorFilterTest, RouteDescriptorRequestRatelimitedXRateLimitHeaders)
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ("0", response_headers.get_("ratelimit-limit"));
-  EXPECT_EQ("0", response_headers.get_("ratelimit-remaining"));
-  EXPECT_EQ("60", response_headers.get_("ratelimit-reset"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-limit"));
+  EXPECT_EQ("0", response_headers.get_("x-ratelimit-remaining"));
+  EXPECT_EQ("60", response_headers.get_("x-ratelimit-reset"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enabled"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));

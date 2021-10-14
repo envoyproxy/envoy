@@ -171,9 +171,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       auto remaining = remainingTokens(descriptors.value());
       auto reset = remainingFillInterval(descriptors.value());
 
-      headers.addCopy(Http::LowerCaseString{"ratelimit-limit"}, limit);
-      headers.addCopy(Http::LowerCaseString{"ratelimit-remaining"}, remaining);
-      headers.addCopy(Http::LowerCaseString{"ratelimit-reset"}, reset);
+      headers.addCopy(Http::LowerCaseString{"x-ratelimit-limit"}, limit);
+      headers.addCopy(Http::LowerCaseString{"x-ratelimit-remaining"}, remaining);
+      headers.addCopy(Http::LowerCaseString{"x-ratelimit-reset"}, reset);
     }
   }
 
