@@ -9,6 +9,7 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -257,7 +258,7 @@ message SubjectAltNameMatcher {
   google.protobuf.Any typed_config = 1;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -414,8 +415,8 @@ message CertificateValidationContext {
 
   // This field is deprecated in favor of ref:`match_subject_alt_names_with_type
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names_with_type>`
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9 [deprecated = true];
-
+  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9 
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
 

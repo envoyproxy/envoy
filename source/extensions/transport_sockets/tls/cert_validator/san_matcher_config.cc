@@ -54,7 +54,7 @@ Envoy::Ssl ::SanMatcherPtr createBackwardsCompatibleSanMatcher(
   ASSERT(matcher.typed_config().Is<envoy::type::matcher::v3::StringMatcher>());
 
   envoy::type::matcher::v3::StringMatcher string_matcher;
-  matcher.typed_config().MessageUtil::unpackTo(&string_matcher);
+  MessageUtil::unpackTo(matcher.typed_config(), string_matcher);
   return Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(string_matcher)};
 }
 
