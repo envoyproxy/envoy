@@ -5,11 +5,6 @@
 #else
 #define UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT 1
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wignored-qualifiers"
-
 // QUICHE doesn't mark override at QuicBatchWriterBase::SupportsReleaseTime()
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -23,8 +18,6 @@
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
-
-#pragma GCC diagnostic pop
 
 #include "envoy/network/udp_packet_writer_handler.h"
 

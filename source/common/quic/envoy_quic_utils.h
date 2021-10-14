@@ -6,30 +6,18 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_types.h"
-#include "quiche/quic/core/quic_config.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
+#include "openssl/ssl.h"
 #include "quiche/quic/core/http/quic_header_list.h"
+#include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "source/common/http/header_utility.h"
-
-#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Quic {

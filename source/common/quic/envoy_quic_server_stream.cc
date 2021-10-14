@@ -7,8 +7,6 @@
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
 
 #include "quiche/quic/core/http/quic_header_list.h"
