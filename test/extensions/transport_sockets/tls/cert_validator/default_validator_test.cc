@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"
@@ -43,10 +44,25 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSTypeMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  subject_alt_name_matchers.clear();
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<UriSanMatcher>(matcher)});
+  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
@@ -55,9 +71,21 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("api.example.com");
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSTypeMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("api.example.com");
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -68,9 +96,22 @@ TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
       "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("foo.api.example.com");
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
+  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMultiLevelTypeMatch) {
+  // san_multiple_dns_cert matches *.example.com
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("foo.api.example.com");
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -96,10 +137,25 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher("spiffe://lyft.com/.*-team"));
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
   EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURITypeMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher("spiffe://lyft.com/.*-team"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<UriSanMatcher>(matcher)});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  subject_alt_name_matchers.clear();
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
+  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameNotMatched) {
@@ -115,9 +171,26 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(".*.foo.com"));
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      subject_alt_name_matchers;
-  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
+  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotTypeMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.foo.com"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<IpAddSanMatcher>(matcher)});
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<UriSanMatcher>(matcher)});
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<EmailSanMatcher>(matcher)});
   EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
@@ -134,17 +207,49 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   envoy::type::matcher::v3::StringMatcher matcher;
   matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> san_matchers;
-  san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> san_matchers;
+  san_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
   // Verify the certificate with correct SAN regex matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
             Envoy::Ssl::ClientValidationStatus::Validated);
   EXPECT_EQ(stats.fail_verify_san_.value(), 0);
 
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
-  std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
-      invalid_san_matchers;
-  invalid_san_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  std::vector<Envoy::Ssl::SanMatcherPtr> invalid_san_matchers;
+  invalid_san_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(matcher)});
+  // Verify the certificate with incorrect SAN exact matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
+                                                 invalid_san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Failed);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 1);
+}
+
+TEST(DefaultCertValidatorTest, TestCertificateVerificationWithTypedSANMatcher) {
+  Stats::TestUtil::TestStore test_store;
+  SslStats stats = generateSslStats(test_store);
+  // Create the default validator object.
+  auto default_validator =
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
+          /*CertificateValidationContextConfig=*/nullptr, stats,
+          Event::GlobalTimeSystem().timeSystem());
+
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(".*.example.com"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> san_matchers;
+  san_matchers.push_back(Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
+  // Verify the certificate with correct SAN regex matcher.
+  EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers),
+            Envoy::Ssl::ClientValidationStatus::Validated);
+  EXPECT_EQ(stats.fail_verify_san_.value(), 0);
+
+  matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> invalid_san_matchers;
+  invalid_san_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
                                                  invalid_san_matchers),

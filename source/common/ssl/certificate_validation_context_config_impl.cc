@@ -1,10 +1,12 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/extensions//transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
 
 namespace Envoy {
@@ -22,8 +24,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      subject_alt_name_matchers_(config.match_subject_alt_names().begin(),
-                                 config.match_subject_alt_names().end()),
+      subject_alt_name_matchers_(getSubjectAltNameMatchers(config)),
       verify_certificate_hash_list_(config.verify_certificate_hash().begin(),
                                     config.verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
@@ -36,6 +37,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                     config.custom_validator_config())
               : absl::nullopt),
       api_(api) {
+
   if (ca_cert_.empty() && custom_validator_config_ == absl::nullopt) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
@@ -49,6 +51,25 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       throw EnvoyException("Certificate validity period is always ignored without trusted CA");
     }
   }
+}
+
+std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
+    const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config) {
+  if (!config.match_subject_alt_names_with_type().empty() &&
+      !config.match_subject_alt_names().empty()) {
+    throw EnvoyException("SAN-based verification using both match_subject_alt_names_with_type and "
+                         "the deprecated match_subject_alt_names is not allowed");
+  }
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+      subject_alt_name_matchers(config.match_subject_alt_names_with_type().begin(),
+                                config.match_subject_alt_names_with_type().end());
+  for (auto& matcher : config.match_subject_alt_names()) {
+    subject_alt_name_matchers.emplace_back();
+    subject_alt_name_matchers.back().set_allocated_typed_config(new ProtobufWkt::Any());
+    subject_alt_name_matchers.back().mutable_typed_config()->PackFrom(matcher);
+  }
+  return subject_alt_name_matchers;
 }
 
 } // namespace Ssl

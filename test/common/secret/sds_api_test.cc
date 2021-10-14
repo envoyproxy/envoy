@@ -697,8 +697,11 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
   EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
-  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].exact());
-  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].exact());
+  envoy::type::matcher::v3::StringMatcher string_matcher;
+  cvc_config.subjectAltNameMatchers()[0].typed_config().UnpackTo(&string_matcher);
+  EXPECT_EQ("first san", string_matcher.exact());
+  cvc_config.subjectAltNameMatchers()[1].typed_config().UnpackTo(&string_matcher);
+  EXPECT_EQ("second san", string_matcher.exact());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());

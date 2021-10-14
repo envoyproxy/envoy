@@ -253,6 +253,10 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
+message SubjectAltNameMatcher {
+  google.protobuf.Any typed_config = 1;
+}
+
 // [#next-free-field: 14]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
@@ -396,15 +400,21 @@ message CertificateValidationContext {
   //
   // .. code-block:: yaml
   //
-  //  match_subject_alt_names:
-  //    exact: "api.example.com"
+  //  match_subject_alt_names_with_type:
+  //    typed_config:
+  //      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.common.DnsSanMatcher
+  //      exact: "api.example.com"
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
+  repeated SubjectAltNameMatcher match_subject_alt_names_with_type = 14;
+
+  // This field is deprecated in favor of ref:`match_subject_alt_names_with_type
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names_with_type>`
+  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9 [deprecated = true];
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
@@ -433,4 +443,24 @@ message CertificateValidationContext {
   // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
+}
+
+// Matcher for DNS type subject alternative name.
+message DnsSanMatcher {
+  type.matcher.v3.StringMatcher matcher = 1;
+}
+
+// Matcher for email type subject alternative name.
+message EmailSanMatcher {
+  type.matcher.v3.StringMatcher matcher = 1;
+}
+
+// Matcher for URI type subject alternative name.
+message UriSanMatcher {
+  type.matcher.v3.StringMatcher matcher = 1;
+}
+
+// Matcher for IP address type subject alternative name.
+message IpAddSanMatcher {
+  type.matcher.v3.StringMatcher matcher = 1;
 }
