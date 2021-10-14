@@ -1,17 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
 
 #include "quiche/quic/core/quic_session.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/extensions/transport_sockets/tls/connection_info_impl_base.h"
 
 namespace Envoy {
 namespace Quic {

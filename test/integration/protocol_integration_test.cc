@@ -149,6 +149,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
     EXPECT_EQ("https://www.redirect.com/foo",
               response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
   } else {
+    // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
+    // will be overridden to https by HCM.)
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
