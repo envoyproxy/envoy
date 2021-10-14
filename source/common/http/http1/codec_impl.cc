@@ -1022,8 +1022,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   headers.setHost(absolute_url.hostAndPort());
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
-  if (!is_connect &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!is_connect) {
     headers.setScheme(absolute_url.scheme());
     if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));

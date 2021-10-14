@@ -14,6 +14,30 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const ResponsePtr& ptr, std::ostream* os) {
+  if (ptr != nullptr) {
+    PrintTo(*ptr, os);
+  } else {
+    (*os) << "null";
+  }
+}
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const Response& response, std::ostream* os) {
+  (*os) << "\n{\n  check_status: " << int(response.status)
+        << "\n  headers_to_append: " << response.headers_to_append
+        << "\n  headers_to_set: " << response.headers_to_set
+        << "\n  headers_to_add: " << response.headers_to_add
+        << "\n  response_headers_to_add: " << response.response_headers_to_add
+        << "\n  response_headers_to_set: " << response.response_headers_to_set
+        << "\n  headers_to_remove: " << response.headers_to_remove
+        << "\n  query_parameters_to_set: " << response.query_parameters_to_set
+        << "\n  query_parameters_to_remove: " << response.query_parameters_to_remove
+        << "\n  body: " << response.body << "\n  status_code: " << int(response.status_code)
+        << "\n  dynamic_metadata: " << response.dynamic_metadata.DebugString() << "\n}\n";
+}
+
 CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response_status,
                                                envoy::type::v3::StatusCode http_status_code,
                                                const std::string& body,
