@@ -11,7 +11,6 @@ ALS
 AMZ
 APC
 API
-ARRAYSIZE
 ARN
 ASAN
 ASCII
@@ -367,6 +366,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -815,7 +815,6 @@ megamiss
 mem
 memcmp
 memcpy
-memset
 memoize
 mergeable
 messagename

@@ -276,8 +276,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    const bool skip_encoding_empty_trailers =
-        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    const bool skip_encoding_empty_trailers = trailers.empty();
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
       onLocalEndStream();
@@ -401,8 +400,7 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   ASSERT(local_end_stream_);
-  const bool skip_encoding_empty_trailers =
-      trailers.empty() && parent_.skip_encoding_empty_trailers_;
+  const bool skip_encoding_empty_trailers = trailers.empty();
   if (skip_encoding_empty_trailers) {
     ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
 
@@ -617,8 +615,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options),
-      skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
       dispatching_(false), raised_goaway_(false), random_(random_generator),
@@ -1516,8 +1512,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
      << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
      << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
-     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_)
-     << DUMP_MEMBER(skip_encoding_empty_trailers_) << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_) << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
 
   // Dump the protocol constraints

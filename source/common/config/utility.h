@@ -31,6 +31,7 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -329,11 +330,18 @@ public:
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
     static const std::string& typed_struct_type =
+        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+    static const std::string& legacy_typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
+      xds::type::v3::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // Not handling nested structs or typed structs in typed structs
+      return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
+    } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // Not handling nested structs or typed structs in typed structs
