@@ -622,12 +622,12 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
 }
 
 struct ScopedEnvironmentVariable {
-  ScopedEnvironmentVariable(const std::string& EnvVar, const std::string& Value)
-      : _EnvironmentVariable(EnvVar) {
-    TestEnvironment::setEnvVar(_EnvironmentVariable, Value, 1);
+  ScopedEnvironmentVariable(const std::string& environment_variable, const std::string& value)
+      : environment_variable_(environment_variable) {
+    TestEnvironment::setEnvVar(environment_variable_, value, 1);
   }
-  ~ScopedEnvironmentVariable() { TestEnvironment::unsetEnvVar(_EnvironmentVariable); }
-  std::string _EnvironmentVariable;
+  ~ScopedEnvironmentVariable() { TestEnvironment::unsetEnvVar(environment_variable_); }
+  const std::string environment_variable_;
 };
 
 TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
