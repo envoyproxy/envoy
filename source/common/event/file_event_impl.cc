@@ -57,7 +57,7 @@ void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
   ASSERT(base != nullptr);
   // TODO(antoniovicente) remove this once ConnectionImpl can
   // handle Read and Close events delivered together.
-  ASSERT(!(events & FileReadyType::Read && (events & FileReadyType::Closed)));
+  ASSERT(!((events & FileReadyType::Read) && (events & FileReadyType::Closed)));
   enabled_events_ = events;
   event_assign(
       &raw_event_, base, fd_,
