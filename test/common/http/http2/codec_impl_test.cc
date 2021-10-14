@@ -1135,7 +1135,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "max_headers_kb_: 60, max_headers_count_: 100, "
           "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
-          "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
+          "0, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));

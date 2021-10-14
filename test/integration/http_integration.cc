@@ -433,11 +433,15 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 void HttpIntegrationTest::sendRequestAndVerifyResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
     const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
-    const int backend_idx) {
+    const int backend_idx,
+    absl::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, backend_idx);
-  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200",
+                 (expected_response_headers.has_value()) ? *expected_response_headers
+                                                         : response_headers,
+                 std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());

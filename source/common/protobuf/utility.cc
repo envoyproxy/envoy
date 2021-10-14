@@ -644,9 +644,10 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
 }
 
 // To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
-bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type,
+                       bool ancestor_is_sensitive) {
   return redactOpaque(
-      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
@@ -664,7 +665,8 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 // Recursive helper method for MessageUtil::redact() below.
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
-      redactTypedStruct(message, ancestor_is_sensitive)) {
+      redactTypedStruct(message, "xds.type.v3.TypedStruct", ancestor_is_sensitive) ||
+      redactTypedStruct(message, "udpa.type.v1.TypedStruct", ancestor_is_sensitive)) {
     return;
   }
 
