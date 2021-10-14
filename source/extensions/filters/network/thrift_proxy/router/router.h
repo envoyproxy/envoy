@@ -139,6 +139,9 @@ public:
         upstream_resp_reply_success_(stat_name_set_->add("thrift.upstream_resp_success")),
         upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
+        upstream_resp_exception_local_(stat_name_set_->add("thrift.upstream_resp_exception_local")),
+        upstream_resp_exception_remote_(
+            stat_name_set_->add("thrift.upstream_resp_exception_remote")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
         upstream_resp_decoding_error_(stat_name_set_->add("thrift.upstream_resp_decoding_error")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
@@ -200,15 +203,26 @@ public:
   }
 
   /**
-   * Increment counter for received responses that are exceptions.
+   * Increment counter for received remote responses that are exceptions.
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
    * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
    */
-  void incResponseException(const Upstream::ClusterInfo& cluster,
-                            Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+  void incResponseRemoteException(const Upstream::ClusterInfo& cluster,
+                                  Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_exception_);
     ASSERT(upstream_host != nullptr);
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_remote_);
     upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Increment counter for responses that are local exceptions, without forwarding a request
+   * upstream.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incResponseLocalException(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
   }
 
   /**
@@ -325,6 +339,8 @@ private:
   const Stats::StatName upstream_resp_reply_success_;
   const Stats::StatName upstream_resp_reply_error_;
   const Stats::StatName upstream_resp_exception_;
+  const Stats::StatName upstream_resp_exception_local_;
+  const Stats::StatName upstream_resp_exception_remote_;
   const Stats::StatName upstream_resp_invalid_type_;
   const Stats::StatName upstream_resp_decoding_error_;
   const Stats::StatName upstream_rq_time_;
@@ -451,6 +467,9 @@ protected:
 
     if (cluster_->maintenanceMode()) {
       stats().named_.upstream_rq_maintenance_mode_.inc();
+      if (metadata->messageType() == MessageType::Call) {
+        stats().incResponseLocalException(*cluster_);
+      }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("maintenance mode for cluster '{}'", cluster_name)),
               absl::nullopt};
@@ -469,6 +488,9 @@ protected:
     auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, lb_context);
     if (!conn_pool_data) {
       stats().named_.no_healthy_upstream_.inc();
+      if (metadata->messageType() == MessageType::Call) {
+        stats().incResponseLocalException(*cluster_);
+      }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("no healthy upstream for '{}'", cluster_name)),
               absl::nullopt};

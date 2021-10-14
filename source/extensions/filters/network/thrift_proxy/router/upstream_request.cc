@@ -147,7 +147,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     case MessageType::Exception:
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      stats_.incResponseException(cluster, upstream_host_);
+      stats_.incResponseRemoteException(cluster, upstream_host_);
       break;
 
     default:
@@ -267,7 +267,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
-    stats_.incResponseDecodingError(parent_.cluster());
+    stats_.incResponseLocalException(parent_.cluster());
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            true);
@@ -287,7 +287,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
-    stats_.incResponseDecodingError(parent_.cluster(), upstream_host_);
+    stats_.incResponseLocalException(parent_.cluster());
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {

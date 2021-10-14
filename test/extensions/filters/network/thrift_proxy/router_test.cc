@@ -596,9 +596,12 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_decoding_error")
+                     .counterFromString("thrift.upstream_resp_exception_local")
                      .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.upstream_resp_exception")
+                     .value());
+  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
                      .rq_error_.value());
 }
 
@@ -616,9 +619,6 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 
-  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_decoding_error")
-                     .value());
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
                      .rq_error_.value());
 }
@@ -646,9 +646,12 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
       ConnectionPool::PoolFailureReason::Timeout);
 
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_decoding_error")
+                     .counterFromString("thrift.upstream_resp_exception_local")
                      .value());
-  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.upstream_resp_exception")
+                     .value());
+  EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
                      .rq_error_.value());
 }
 
@@ -672,7 +675,10 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
       ConnectionPool::PoolFailureReason::Overflow, true);
 
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_decoding_error")
+                     .counterFromString("thrift.upstream_resp_exception_local")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.upstream_resp_exception")
                      .value());
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
                      .rq_error_.value());
@@ -692,7 +698,7 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
       ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
-                     .counterFromString("thrift.upstream_resp_decoding_error")
+                     .counterFromString("thrift.upstream_resp_exception")
                      .value());
   EXPECT_EQ(0UL, context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.host_->stats_
                      .rq_error_.value());
@@ -1162,7 +1168,8 @@ TEST_F(ThriftRouterTest, PoolTimeoutUpstreamTimeMeasurement) {
   startRequest(MessageType::Call);
 
   dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(500));
-  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_decoding_error"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_exception"));
+  EXPECT_CALL(cluster_scope, counter("thrift.upstream_resp_exception_local"));
   EXPECT_CALL(cluster_scope,
               histogram("thrift.upstream_rq_time", Stats::Histogram::Unit::Milliseconds))
       .Times(0);
@@ -1326,6 +1333,9 @@ TEST_P(ThriftRouterFieldTypeTest, Exception) {
                      .value());
   EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
                      .counterFromString("thrift.upstream_resp_exception")
+                     .value());
+  EXPECT_EQ(1UL, context_.cluster_manager_.thread_local_cluster_.cluster_.info_->statsScope()
+                     .counterFromString("thrift.upstream_resp_exception_remote")
                      .value());
 }
 
