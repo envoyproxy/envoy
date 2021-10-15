@@ -685,7 +685,8 @@ class FormatChecker:
               "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line) or \
               " usleep(" in line or "::usleep(" in line:
                 report_error(
-                    "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)")
+                    "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
+                )
         duration_arg = DURATION_VALUE_REGEX.search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero

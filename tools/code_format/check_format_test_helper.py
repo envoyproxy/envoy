@@ -163,8 +163,7 @@ def run_checks():
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     real_time_inject_error = (
-        "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
-    )
+        "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)")
     errors += check_unfixable_error("real_time_source.cc", real_time_inject_error)
     errors += check_unfixable_error("real_time_system.cc", real_time_inject_error)
     errors += check_unfixable_error(
