@@ -6,6 +6,7 @@
 #include "source/common/common/stl_helpers.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 
@@ -20,7 +21,7 @@ DnsCacheImpl::DnsCacheImpl(
     : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
       random_generator_(context.api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
+      resolver_(selectDnsResolver(config, main_thread_dispatcher_, context)),
       tls_slot_(context.threadLocal()),
       scope_(context.scope().createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_(generateDnsCacheStats(*scope_)),
@@ -68,25 +69,12 @@ DnsCacheImpl::~DnsCacheImpl() {
 
 Network::DnsResolverSharedPtr DnsCacheImpl::selectDnsResolver(
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-    Event::Dispatcher& main_thread_dispatcher) {
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-  if (config.has_dns_resolution_config()) {
-    dns_resolver_options.CopyFrom(config.dns_resolution_config().dns_resolver_options());
-    if (!config.dns_resolution_config().resolvers().empty()) {
-      const auto& resolver_addrs = config.dns_resolution_config().resolvers();
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
-  } else {
-    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
-    // compatible utilize config.use_tcp_for_dns_lookups() if `config.dns_resolution_config`
-    // is not set.
-    dns_resolver_options.set_use_tcp_for_dns_lookups(config.use_tcp_for_dns_lookups());
-  }
-  return main_thread_dispatcher.createDnsResolver(resolvers, dns_resolver_options);
+    Event::Dispatcher& main_thread_dispatcher, Server::Configuration::FactoryContextBase& context) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
+  return dns_resolver_factory.createDnsResolver(main_thread_dispatcher, context.api(),
+                                                typed_dns_resolver_config);
 }
 
 DnsCacheStats DnsCacheImpl::generateDnsCacheStats(Stats::Scope& scope) {

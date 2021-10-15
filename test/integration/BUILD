@@ -760,6 +760,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -778,7 +779,10 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/extensions/network/dns_resolver/apple:config"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test_library(

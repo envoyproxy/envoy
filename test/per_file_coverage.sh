@@ -17,6 +17,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/json:90.1"
 "source/common/matcher:94.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
+"source/common/network/dns_resolver:90.8"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
 "source/common/router:96.5"
@@ -29,7 +30,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/upstream:96.2"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:92.6"
-"source/extensions/common:95.9"
+"source/extensions/common:95.8"
 "source/extensions/common/tap:94.2"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
@@ -57,7 +58,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/thrift_proxy/router:96.4"
 "source/extensions/filters/network/wasm:95.7"
 "source/extensions/filters/udp:96.4"
-"source/extensions/filters/udp/dns_filter:96.2"
+"source/extensions/filters/udp/dns_filter:96.1"
 "source/extensions/health_checkers:95.7"
 "source/extensions/health_checkers/redis:95.7"
 "source/extensions/io_socket:96.2"
@@ -81,7 +82,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/watchdog/profile_action:83.3"
 "source/server:93.5" # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
 "source/server/admin:95.3"
-"source/server/config_validation:76.7"
+"source/server/config_validation:74.8"
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
