@@ -1114,4 +1114,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2018-12-18",
         cpe = "N/A",
     ),
+    com_github_fdio_vpp_vcl = dict(
+        project_name = "VPP Comms Library",
+        project_desc = "FD.io Vector Packet Processor (VPP) Comms Library",
+        project_url = "https://fd.io/",
+        version = "596c45b22211c9af243b624dc037f58c0aa1c302",
+        sha256 = "e4c3fad7e1a6952e5c081cfe25f1f091d97fae8e75c5f03205def37d34c27741",
+        strip_prefix = "vpp-{version}",
+        urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
+        use_category = ["other"],
+        extensions = ["envoy.bootstrap.vcl"],
+        release_date = "2021-09-13",
+        cpe = "N/A",
+    ),
 )

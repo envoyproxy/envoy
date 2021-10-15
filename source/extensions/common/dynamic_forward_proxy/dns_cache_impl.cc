@@ -17,7 +17,8 @@ namespace DynamicForwardProxy {
 DnsCacheImpl::DnsCacheImpl(
     Server::Configuration::FactoryContextBase& context,
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()),
+    : main_thread_dispatcher_(context.mainThreadDispatcher()), config_(config),
+      random_generator_(context.api().randomGenerator()),
       dns_lookup_family_(DnsUtils::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(selectDnsResolver(config, main_thread_dispatcher_)),
       tls_slot_(context.threadLocal()),
@@ -27,10 +28,6 @@ DnsCacheImpl::DnsCacheImpl(
                         config.dns_cache_circuit_breaker()),
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
       timeout_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_query_timeout, 5000)),
-      failure_backoff_strategy_(
-          Config::Utility::prepareDnsRefreshStrategy<
-              envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
-              config, refresh_interval_.count(), context.api().randomGenerator())),
       file_system_(context.api().fileSystem()),
       validation_visitor_(context.messageValidationVisitor()),
       host_ttl_(PROTOBUF_GET_MS_OR_DEFAULT(config, host_ttl, 300000)),
@@ -245,8 +242,8 @@ void DnsCacheImpl::onReResolve(const std::string& host) {
   const std::chrono::steady_clock::duration now_duration =
       main_thread_dispatcher_.timeSource().monotonicTime().time_since_epoch();
   auto last_used_time = primary_host.host_info_->lastUsedTime();
-  ENVOY_LOG(debug, "host='{}' TTL check: now={} last_used={}", host, now_duration.count(),
-            last_used_time.count());
+  ENVOY_LOG(debug, "host='{}' TTL check: now={} last_used={} TTL {}", host, now_duration.count(),
+            last_used_time.count(), host_ttl_.count());
   if ((now_duration - last_used_time) > host_ttl_) {
     ENVOY_LOG(debug, "host='{}' TTL expired, removing", host);
     // If the host has no address then that means that the DnsCacheImpl has never
@@ -365,34 +362,36 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (!resolution_time.has_value()) {
     resolution_time = main_thread_dispatcher_.timeSource().monotonicTime();
   }
+  std::chrono::seconds dns_ttl =
+      std::chrono::duration_cast<std::chrono::seconds>(refresh_interval_);
   if (new_address) {
     // Update the cache entry and staleness any time the ttl changes.
     if (!from_cache) {
       addCacheEntry(host, new_address, response.front().ttl_);
     }
-    primary_host_info->host_info_->updateStale(resolution_time.value(), response.front().ttl_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
+      // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
+      dns_ttl = std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().ttl_);
+    }
+    primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
   }
 
   if (first_resolve) {
     primary_host_info->host_info_->setFirstResolveComplete();
   }
-  if (first_resolve || address_changed) {
-    // TODO(alyssawilk) only notify threads of stale results after a resolution
-    // timeout.
+  if (first_resolve || (address_changed && !primary_host_info->host_info_->isStale())) {
     notifyThreads(host, primary_host_info->host_info_);
   }
 
   // Kick off the refresh timer.
-  // TODO(mattklein123): Consider jitter here. It may not be necessary since the initial host
-  // is populated dynamically.
-  // TODO(alyssawilk) also consider TTL here.
   if (status == Network::DnsResolver::ResolutionStatus::Success) {
-    failure_backoff_strategy_->reset();
-    primary_host_info->refresh_timer_->enableTimer(refresh_interval_);
+    primary_host_info->failure_backoff_strategy_->reset(
+        std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl).count());
+    primary_host_info->refresh_timer_->enableTimer(dns_ttl);
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', refresh rate {} ms", host,
-              refresh_interval_.count());
+              dns_ttl.count() * 1000);
   } else {
-    const uint64_t refresh_interval = failure_backoff_strategy_->nextBackOffMs();
+    const uint64_t refresh_interval = primary_host_info->failure_backoff_strategy_->nextBackOffMs();
     primary_host_info->refresh_timer_->enableTimer(std::chrono::milliseconds(refresh_interval));
     ENVOY_LOG(debug, "DNS refresh rate reset for host '{}', (failure) refresh rate {} ms", host,
               refresh_interval);
@@ -451,7 +450,11 @@ DnsCacheImpl::PrimaryHostInfo::PrimaryHostInfo(DnsCacheImpl& parent,
       refresh_timer_(parent.main_thread_dispatcher_.createTimer(refresh_timer_cb)),
       timeout_timer_(parent.main_thread_dispatcher_.createTimer(timeout_timer_cb)),
       host_info_(std::make_shared<DnsHostInfoImpl>(parent.main_thread_dispatcher_.timeSource(),
-                                                   host_to_resolve, is_ip_address)) {
+                                                   host_to_resolve, is_ip_address)),
+      failure_backoff_strategy_(
+          Config::Utility::prepareDnsRefreshStrategy<
+              envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig>(
+              parent_.config_, parent_.refresh_interval_.count(), parent_.random_generator_)) {
   parent_.stats_.host_added_.inc();
   parent_.stats_.num_hosts_.inc();
 }
