@@ -242,9 +242,8 @@ public:
    * @param cluster Upstream::ClusterInfo& describing the upstream cluster
    * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
    */
-  void
-  incResponseDecodingError(const Upstream::ClusterInfo& cluster,
-                           Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+  void incResponseDecodingError(const Upstream::ClusterInfo& cluster,
+                                Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_decoding_error_);
     ASSERT(upstream_host != nullptr);
     upstream_host->stats().rq_error_.inc();
