@@ -33,13 +33,14 @@ BODY_TPL = """
 Package Name: ${dep}
 Current Version: ${metadata_version}@${release_date}
 Available Version: ${tag_name}@${created_at}
-Upstream link: https://github.com/${package_name}
+Upstream releases: https://github.com/${package_name}/releases
 """
 
 CLOSING_TPL = """
 New version is available for this package
 New Version: ${tag_name}@${created_at}
-Upstream Link: https://github.com/${full_name}
+Upstream releases: https://github.com/${full_name}/releases
+New Issue Link: https://github.com/${repo_location}/issues/${number}
 """
 
 
@@ -114,7 +115,6 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
         metadata_version = metadata_version[0:7]
     title = f'Newer release available `{dep}`: {latest_release.tag_name} (current: {metadata_version})'
     # search for old package opened issue and close them
-    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
     body = string.Template(BODY_TPL).substitute(
         dep=dep,
         metadata_version=metadata_version,
@@ -128,10 +128,12 @@ def create_issues(dep, package_repo, metadata_version, release_date, latest_rele
         return
     print('Creating issues...')
     try:
-        repo.create_issue(title, body=body, labels=LABELS)
+        issue_created = repo.create_issue(title, body=body, labels=LABELS)
+        latest_release.latest_issue_number = issue_created.number
     except github.GithubException as e:
         print(f'Unable to create issue, received error: {e}')
         raise
+    search_old_version_open_issue_exist(title, git, package_repo, latest_release)
 
 
 # checks if issue exist
@@ -178,7 +180,9 @@ def close_old_issue(git, issue_number, latest_release, package_repo):
             closing_comment.substitute(
                 tag_name=latest_release.tag_name,
                 created_at=latest_release.created_at,
-                full_name=package_repo.full_name))
+                full_name=package_repo.full_name,
+                repo_location=GITHUB_REPO_LOCATION,
+                number=latest_release.latest_issue_number))
         print(f'Closing this issue as new package is available')
         issue.edit(state='closed')
     except github.GithubException as e:

@@ -63,18 +63,27 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   // converting to Envoy headers.
   headers_block.AppendValueOrAddHeader("key", "value1");
   headers_block.AppendValueOrAddHeader("key", "value2");
+  headers_block.AppendValueOrAddHeader("key1", "value1");
+  headers_block.AppendValueOrAddHeader("key1", "");
+  headers_block.AppendValueOrAddHeader("key1", "value2");
   NiceMock<MockHeaderValidator> validator;
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   auto envoy_headers = spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
       headers_block, 100, validator, details, rst);
-  // Envoy header block is 1 header larger because QUICHE header block does coalescing.
-  EXPECT_EQ(headers_block.size() + 1u, envoy_headers->size());
+  // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
+  EXPECT_EQ(headers_block.size() + 3u, envoy_headers->size());
   EXPECT_EQ("www.google.com", envoy_headers->getHostValue());
   EXPECT_EQ("/index.hml", envoy_headers->getPathValue());
   EXPECT_EQ("https", envoy_headers->getSchemeValue());
   EXPECT_EQ("value1", envoy_headers->get(Http::LowerCaseString("key"))[0]->value().getStringView());
   EXPECT_EQ("value2", envoy_headers->get(Http::LowerCaseString("key"))[1]->value().getStringView());
+  EXPECT_EQ("value1",
+            envoy_headers->get(Http::LowerCaseString("key1"))[0]->value().getStringView());
+  EXPECT_EQ("", envoy_headers->get(Http::LowerCaseString("key1"))[1]->value().getStringView());
+  EXPECT_EQ("value2",
+            envoy_headers->get(Http::LowerCaseString("key1"))[2]->value().getStringView());
+
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
@@ -84,6 +93,9 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers.OnHeader(":scheme", "https");
   quic_headers.OnHeader("key", "value1");
   quic_headers.OnHeader("key", "value2");
+  quic_headers.OnHeader("key1", "value1");
+  quic_headers.OnHeader("key1", "");
+  quic_headers.OnHeader("key1", "value2");
   quic_headers.OnHeader("key-to-drop", "");
   quic_headers.OnHeaderBlockEnd(0, 0);
   EXPECT_CALL(validator, validateHeader(_, _))
@@ -151,6 +163,12 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   EXPECT_EQ(nullptr, spdyHeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 5, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
+
+TEST(EnvoyQuicUtilsTest, deduceSignatureAlgorithmFromNullPublicKey) {
+  std::string error;
+  EXPECT_EQ(0, deduceSignatureAlgorithmFromPublicKey(nullptr, &error));
+  EXPECT_EQ("Invalid leaf cert, bad public key", error);
 }
 
 } // namespace Quic
