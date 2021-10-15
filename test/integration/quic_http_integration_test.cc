@@ -236,6 +236,21 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
+TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponseDraft29) {
+  supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  // Send a complete request on the first connection.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
+}
+
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Make sure both connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
