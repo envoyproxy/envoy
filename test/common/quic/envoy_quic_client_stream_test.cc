@@ -55,8 +55,8 @@ public:
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
                       crypto_stream_factory_),
-        stream_id_(4u), stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
-                                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
@@ -89,7 +89,7 @@ public:
 
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket(delegate_);
+    quic_connection_->setUpConnectionSocket(*quic_connection_->connectionSocket(), delegate_);
     spdy_response_headers_[":status"] = "200";
 
     spdy_trailers_["key1"] = "value1";
@@ -136,7 +136,7 @@ protected:
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
