@@ -48,7 +48,7 @@ public:
 
   Api::Api& api() const override { return api_; }
 
-  bool onlyVerifyFinalCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return only_verify_leaf_cert_crl_; }
 
 private:
   const std::string ca_cert_;

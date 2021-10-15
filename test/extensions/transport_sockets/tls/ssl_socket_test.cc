@@ -4685,7 +4685,8 @@ TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
 
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, incomplete_server_ctx_yaml,
                                                 false, GetParam());
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {
