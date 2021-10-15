@@ -23,18 +23,10 @@ envoy_cc_library(
     name = "thread_local_overload_state",
     hdrs = ["thread_local_overload_state.h"],
     deps = [
-        ":proactive_resource_monitor",
+        "//envoy/server:proactive_resource_monitor_interface",
         "//envoy/event:scaled_range_timer_manager_interface",
         "//envoy/event:timer_interface",
         "//envoy/thread_local:thread_local_object",
         "//source/common/common:interval_value",
-    ],
-)
-
-envoy_cc_library(
-    name = "proactive_resource_monitor",
-    hdrs = ["proactive_resource_monitor.h"],
-    deps = [
-        "//envoy/stats:stats_interface",
     ],
 )

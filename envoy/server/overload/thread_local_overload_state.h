@@ -5,7 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/event/timer.h"
-#include "envoy/server/overload/proactive_resource_monitor.h"
+#include "envoy/server/proactive_resource_monitor.h"
 #include "envoy/thread_local/thread_local_object.h"
 
 #include "source/common/common/interval_value.h"
@@ -22,8 +22,6 @@ public:
   // Overload action to stop accepting new HTTP requests.
   const std::string GlobalDownstreamMaxConnections =
       "envoy.resource_monitors.global_downstream_max_connections";
-
-  std::set<std::string> proactive_resource_names_{GlobalDownstreamMaxConnections};
 
   absl::flat_hash_map<std::string, OverloadProactiveResourceName>
       proactive_action_name_to_resource_ = {

@@ -293,6 +293,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "proactive_resource_monitor_interface",
+    hdrs = ["proactive_resource_monitor.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "request_id_extension_config_interface",
     hdrs = ["request_id_extension_config.h"],
     deps = [
@@ -308,10 +316,10 @@ envoy_cc_library(
     deps = [
         ":options_interface",
         ":resource_monitor_interface",
+        ":proactive_resource_monitor_interface",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/protobuf:message_validator_interface",
-        "//envoy/server/overload:proactive_resource_monitor",
     ],
 )
 
