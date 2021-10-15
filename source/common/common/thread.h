@@ -240,9 +240,15 @@ public:
 // method is not available on the current platform we must skip the assertions.
 #ifdef NDEBUG
 
-#define ASSERT_IS_TEST_THREAD() do { } while (false)
-#define ASSERT_IS_MAIN_OR_TEST_THREAD()do { } while (false)
-#define ASSERT_IS_NOT_TEST_THREAD() do { } while (false)
+#define ASSERT_IS_TEST_THREAD()                                                                    \
+  do {                                                                                             \
+  } while (false)
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
+  do {                                                                                             \
+  } while (false)
+#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
+  do {                                                                                             \
+  } while (false)
 #define ASSERT_IS_NOT_TEST_OR_MAIN_THREAD() ASSERT(!MainThread::isMainThread()))
 
 #else
