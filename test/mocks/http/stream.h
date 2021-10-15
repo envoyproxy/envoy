@@ -38,6 +38,10 @@ public:
       callback->onBelowWriteBufferLowWatermark();
     }
   }
+
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 };
 
 } // namespace Http
