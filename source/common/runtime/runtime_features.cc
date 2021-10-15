@@ -121,7 +121,6 @@ constexpr const char* disabled_runtime_features[] = {
 };
 
 RuntimeFeatures::RuntimeFeatures() {
-#ifdef ENVOY_ENABLE_QUIC
 #define STRINGIFY(X) #X
 #define QUIC_FLAG(flag, value)                                                                     \
   if (value) {                                                                                     \
@@ -149,7 +148,6 @@ RuntimeFeatures::RuntimeFeatures() {
   QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
   QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
-#endif
 
   for (auto& feature : runtime_features) {
     if (disabled_features_.contains(feature)) {
