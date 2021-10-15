@@ -1,23 +1,12 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
+#include "source/common/quic/envoy_quic_client_connection.h"
+#include "source/common/quic/envoy_quic_client_stream.h"
+#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
+#include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_stat_names.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_session.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_client_stream.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
-#include "source/common/quic/quic_filter_manager_connection_impl.h"
-#include "source/common/quic/envoy_quic_crypto_stream_factory.h"
-#include "source/common/quic/quic_stat_names.h"
 
 namespace Envoy {
 namespace Quic {
