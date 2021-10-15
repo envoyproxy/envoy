@@ -310,6 +310,7 @@ envoy_cc_library(
         ":logical_host_lib",
         ":upstream_includes",
         "//envoy/upstream:cluster_factory_interface",
+        "//source/common/common:dns_utils_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/network:address_lib",

@@ -329,6 +329,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
                                ? Network::Utility::getAddressWithPort(*(response.front().address_),
                                                                       primary_host_info->port_)
                                : nullptr;
+  auto address_list = DnsUtils::generateAddressList(response, primary_host_info->port_);
 
   // Only the change the address if:
   // 1) The new address is valid &&
@@ -339,13 +340,6 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // resolution failure.
   bool address_changed = false;
   auto current_address = primary_host_info->host_info_->address();
-  if (new_address != nullptr && (current_address == nullptr || *current_address != *new_address)) {
-    ENVOY_LOG(debug, "host '{}' address has changed", host);
-    primary_host_info->host_info_->setAddress(new_address);
-    runAddUpdateCallbacks(host, primary_host_info->host_info_);
-    address_changed = true;
-    stats_.host_address_changed_.inc();
-  }
 
   if (!resolution_time.has_value()) {
     resolution_time = main_thread_dispatcher_.timeSource().monotonicTime();
@@ -355,13 +349,24 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (new_address) {
     // Update the cache entry and staleness any time the ttl changes.
     if (!from_cache) {
-      addCacheEntry(host, new_address, response.front().ttl_);
+      addCacheEntry(host, new_address, address_list, response.front().ttl_);
     }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
       // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
       dns_ttl = std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().ttl_);
     }
     primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
+  }
+
+  if (new_address != nullptr &&
+      (current_address == nullptr || *current_address != *new_address ||
+       DnsUtils::listChanged(address_list, primary_host_info->host_info_->addressList()))) {
+    ENVOY_LOG(debug, "host '{}' address has changed", host);
+    primary_host_info->host_info_->setAddresses(new_address, std::move(address_list));
+
+    runAddUpdateCallbacks(host, primary_host_info->host_info_);
+    address_changed = true;
+    stats_.host_address_changed_.inc();
   }
 
   if (first_resolve) {
@@ -452,17 +457,25 @@ DnsCacheImpl::PrimaryHostInfo::~PrimaryHostInfo() {
   parent_.stats_.num_hosts_.dec();
 }
 
-void DnsCacheImpl::addCacheEntry(const std::string& host,
-                                 const Network::Address::InstanceConstSharedPtr& address,
-                                 const std::chrono::seconds ttl) {
+void DnsCacheImpl::addCacheEntry(
+    const std::string& host, const Network::Address::InstanceConstSharedPtr& address,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
+    const std::chrono::seconds ttl) {
   if (!key_value_store_) {
     return;
   }
   MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
   uint64_t seconds_since_epoch =
       std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-  const std::string value =
-      absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+  std::string value;
+  if (address_list.empty()) {
+    value = absl::StrCat(address->asString(), "|", ttl.count(), "|", seconds_since_epoch);
+  } else {
+    for (auto& addr : address_list) {
+      value += absl::StrCat((value.empty() ? "" : "\n"), addr->asString(), "|", ttl.count(), "|",
+                            seconds_since_epoch);
+    }
+  }
   key_value_store_->addOrUpdate(host, value);
 }
 
@@ -471,6 +484,40 @@ void DnsCacheImpl::removeCacheEntry(const std::string& host) {
     return;
   }
   key_value_store_->remove(host);
+}
+
+absl::optional<Network::DnsResponse>
+DnsCacheImpl::parseValue(absl::string_view value, absl::optional<MonotonicTime>& resolution_time) {
+  Network::Address::InstanceConstSharedPtr address;
+  const auto parts = StringUtil::splitToken(value, "|");
+  std::chrono::seconds ttl(0);
+  if (parts.size() != 3) {
+    ENVOY_LOG(warn, "Incorrect number of tokens in the cache line");
+    return {};
+  }
+  address = Network::Utility::parseInternetAddressAndPortNoThrow(std::string(parts[0]));
+  if (address == nullptr) {
+    ENVOY_LOG(warn, "{} is not a valid address", parts[0]);
+  }
+  uint64_t ttl_int;
+  if (absl::SimpleAtoi(parts[1], &ttl_int) && ttl_int != 0) {
+    ttl = std::chrono::seconds(ttl_int);
+  } else {
+    ENVOY_LOG(warn, "{} is not a valid ttl", parts[1]);
+  }
+  uint64_t epoch_int;
+  if (absl::SimpleAtoi(parts[2], &epoch_int)) {
+    MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
+    const std::chrono::seconds seconds_since_epoch =
+        std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+    resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
+                      (seconds_since_epoch - std::chrono::seconds(epoch_int));
+  }
+  if (address == nullptr || ttl == std::chrono::seconds(0) || !resolution_time.has_value()) {
+    ENVOY_LOG(warn, "Unable to parse cache line '{}'", value);
+    return {};
+  }
+  return Network::DnsResponse(address, ttl);
 }
 
 void DnsCacheImpl::loadCacheEntries(
@@ -483,42 +530,23 @@ void DnsCacheImpl::loadCacheEntries(
   key_value_store_ = factory.createStore(config.key_value_config(), validation_visitor_,
                                          main_thread_dispatcher_, file_system_);
   KeyValueStore::ConstIterateCb load = [this](const std::string& key, const std::string& value) {
-    Network::Address::InstanceConstSharedPtr address;
-    const auto parts = StringUtil::splitToken(value, "|");
-    std::chrono::seconds ttl(0);
     absl::optional<MonotonicTime> resolution_time;
-    if (parts.size() == 3) {
-      address = Network::Utility::parseInternetAddressAndPortNoThrow(std::string(parts[0]));
-      if (address == nullptr) {
-        ENVOY_LOG(warn, "{} is not a valid address", parts[0]);
+    std::list<Network::DnsResponse> responses;
+    const auto addresses = StringUtil::splitToken(value, "\n");
+    for (absl::string_view address_line : addresses) {
+      absl::optional<Network::DnsResponse> response = parseValue(address_line, resolution_time);
+      if (!response.has_value()) {
+        return KeyValueStore::Iterate::Break;
       }
-      uint64_t ttl_int;
-      if (absl::SimpleAtoi(parts[1], &ttl_int) && ttl_int != 0) {
-        ttl = std::chrono::seconds(ttl_int);
-      } else {
-        ENVOY_LOG(warn, "{} is not a valid ttl", parts[1]);
-      }
-      uint64_t epoch_int;
-      if (absl::SimpleAtoi(parts[2], &epoch_int)) {
-        MonotonicTime now = main_thread_dispatcher_.timeSource().monotonicTime();
-        const std::chrono::seconds seconds_since_epoch =
-            std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
-        resolution_time = main_thread_dispatcher_.timeSource().monotonicTime() -
-                          (seconds_since_epoch - std::chrono::seconds(epoch_int));
-      }
-    } else {
-      ENVOY_LOG(warn, "Incorrect number of tokens in the cache line");
+      responses.emplace_back(response.value());
     }
-    if (address == nullptr || ttl == std::chrono::seconds(0) || !resolution_time.has_value()) {
-      ENVOY_LOG(warn, "Unable to parse cache line '{}'", value);
+    if (responses.empty()) {
       return KeyValueStore::Iterate::Break;
     }
-    stats_.cache_load_.inc();
-    std::list<Network::DnsResponse> response;
-    createHost(key, address->ip()->port());
-    response.emplace_back(Network::DnsResponse(address, ttl));
-    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(response),
+    createHost(key, responses.front().address_->ip()->port());
+    finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(responses),
                   resolution_time);
+    stats_.cache_load_.inc();
     return KeyValueStore::Iterate::Continue;
   };
   key_value_store_->iterate(load);
