@@ -29,7 +29,7 @@ public:
            OverloadProactiveResourceName::GlobalDownstreamMaxConnections}};
 };
 
-using OverloadProactiveResourceNames = ConstSingleton<OverloadProactiveResourceNameValues>;
+using OverloadProactiveResources = ConstSingleton<OverloadProactiveResourceNameValues>;
 
 /**
  * Tracks the state of an overload action. The state is a number between 0 and 1 that represents the
@@ -66,17 +66,17 @@ public:
   // Get a thread-local reference to the value for the given action key.
   virtual const OverloadActionState& getState(const std::string& action) PURE;
   /**
-   * Invokes corresponding resource monitor to allocate resource for given resource monitor in
-   * thread safe manner. Returns true if there is enough resource quota available and allocation has
-   * succeeded, false if allocation failed or resource is not registered.
+   * Invokes the corresponding resource monitor to allocate resource for given resource monitor in
+   * a thread safe manner. Returns true if there is enough resource quota available and allocation
+   * has succeeded, false if allocation failed or resource is not registered.
    * @param name of corresponding resource monitor.
    * @param increment to add to current resource usage value within monitor.
    */
   virtual bool tryAllocateResource(OverloadProactiveResourceName resource_name,
                                    int64_t increment) PURE;
   /**
-   * Invokes corresponding resource monitor to deallocate resource for given resource monitor in
-   * thread safe manner. Returns true if there is enough resource quota available and deallocation
+   * Invokes the corresponding resource monitor to deallocate resource for given resource monitor in
+   * a thread safe manner. Returns true if there is enough resource quota available and deallocation
    * has succeeded, false if deallocation failed or resource is not registered.
    * @param name of corresponding resource monitor.
    * @param decrement to subtract from current resource usage value within monitor.

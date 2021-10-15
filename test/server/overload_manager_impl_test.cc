@@ -116,10 +116,10 @@ public:
   }
 
   int64_t currentResourceUsage() const { return current_.load(); }
-  uint64_t maxResourceUsage() const { return max_; }
+  int64_t maxResourceUsage() const { return max_; }
 
 private:
-  uint64_t max_;
+  int64_t max_;
   std::atomic<int64_t> current_;
 };
 

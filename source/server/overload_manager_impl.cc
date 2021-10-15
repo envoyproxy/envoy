@@ -48,15 +48,11 @@ public:
                            int64_t increment) override {
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource != proactive_resources_->end()) {
-      if (proactive_resource->second.tryAllocateResource(increment)) {
-        return true;
-      } else {
-        return false;
-      }
+      return proactive_resource->second.tryAllocateResource(increment);
     } else {
       ENVOY_LOG_MISC(warn, " {Failed to allocate unknown proactive resource }");
-      // Resource monitor is not configured, pass through mode.
-      return true;
+      // Resource monitor is not configured.
+      return false;
     }
   }
 
@@ -325,11 +321,11 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     const auto& name = resource.name();
     // Check if it is a proactive resource.
     auto proactive_resource_it =
-        OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.find(name);
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.find(name);
     ENVOY_LOG(debug, "Evaluating resource {}", name);
     bool result = false;
     if (proactive_resource_it !=
-        OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.end()) {
+        OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
       ENVOY_LOG(debug, "Adding proactive resource monitor for {}", name);
       auto& factory =
           Config::Utility::getAndCheckFactory<Configuration::ProactiveResourceMonitorFactory>(
@@ -337,7 +333,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto config =
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
       auto monitor = factory.createProactiveResourceMonitor(*config, context);
-
       result =
           proactive_resources_
               ->try_emplace(proactive_resource_it->second, name, std::move(monitor), stats_scope)
@@ -349,7 +344,6 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
       auto config =
           Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
       auto monitor = factory.createResourceMonitor(*config, context);
-
       result = resources_.try_emplace(name, name, std::move(monitor), *this, stats_scope).second;
     }
     if (!result) {
@@ -388,11 +382,11 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     for (const auto& trigger : action.triggers()) {
       const std::string& resource = trigger.name();
       auto proactive_resource_it =
-          OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.find(resource);
+          OverloadProactiveResources::get().proactive_action_name_to_resource_.find(resource);
 
       if (resources_.find(resource) == resources_.end() &&
           proactive_resource_it ==
-              OverloadProactiveResourceNames::get().proactive_action_name_to_resource_.end()) {
+              OverloadProactiveResources::get().proactive_action_name_to_resource_.end()) {
         throw EnvoyException(
             fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
       }

@@ -73,7 +73,7 @@ public:
    * Create a particular proactive resource monitor implementation.
    * @param config const ProtoBuf::Message& supplies the config for the proactive resource monitor
    *        implementation.
-   * @param context ProactiveResourceMonitorFactoryContext& supplies the resource monitor's context.
+   * @param context ResourceMonitorFactoryContext& supplies the resource monitor's context.
    * @return ProactiveResourceMonitorPtr the resource monitor instance. Should not be nullptr.
    * @throw EnvoyException if the implementation is unable to produce an instance with
    *        the provided parameters.
