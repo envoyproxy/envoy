@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
@@ -84,6 +83,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.udp_listener_updates_filter_chain_in_place",
     "envoy.reloadable_features.udp_per_event_loop_read_limit",
     "envoy.reloadable_features.unquote_log_string_values",
+    "envoy.reloadable_features.use_dns_ttl",
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
