@@ -113,8 +113,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.improved_stream_limit_handling") &&
-      settings.maxConcurrentStreams().has_value() &&
+  if (settings.maxConcurrentStreams().has_value() &&
       settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
     int64_t old_unused_capacity = currentUnusedCapacity();
     // Given config limits old_unused_capacity should never exceed int32_t.

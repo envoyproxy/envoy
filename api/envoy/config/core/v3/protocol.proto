@@ -157,11 +157,10 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If there are any active streams,
-  // the drain sequence will kick-in, and the connection will be force-closed after the drain period.
-  // See :ref:`drain_timeout
+  // and if there are no active streams, the connection will be closed. If the connection is a
+  // downstream connection and there are any active streams, the drain sequence will kick-in,
+  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-  // Note: This feature is not yet implemented for the upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
   // The maximum number of headers. If unconfigured, the default

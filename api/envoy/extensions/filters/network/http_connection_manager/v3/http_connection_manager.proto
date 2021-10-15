@@ -911,7 +911,7 @@ message ScopedRoutes {
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  config.core.v3.ConfigSource rds_config_source = 3 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource rds_config_source = 3;
 
   oneof config_specifier {
     option (validate.required) = true;
