@@ -244,12 +244,10 @@ public:
    */
   void
   incResponseDecodingError(const Upstream::ClusterInfo& cluster,
-                           Upstream::HostDescriptionConstSharedPtr upstream_host = nullptr) const {
+                           Upstream::HostDescriptionConstSharedPtr upstream_host) const {
     incClusterScopeCounter(cluster, upstream_host, upstream_resp_decoding_error_);
-    // May not have got a host from pool
-    if (upstream_host != nullptr) {
-      upstream_host->stats().rq_error_.inc();
-    }
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_error_.inc();
   }
 
   /**
