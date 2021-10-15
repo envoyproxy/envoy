@@ -73,6 +73,25 @@ typed_config:
     BaseIntegrationTest::initialize();
   }
 
+  void setupMultiple() {
+    FakeUpstreamConfig::UdpConfig config;
+    config.max_rx_datagram_size_ = absl::nullopt;
+    setUdpFakeUpstream(config);
+
+    config_helper_.addListenerFilter(R"EOF(
+name: envoy.filters.udp_listener.passthrough
+)EOF");
+    config_helper_.addListenerFilter(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  cluster: cluster_0
+)EOF");
+
+    BaseIntegrationTest::initialize();
+  }
+
   void requestResponseWithListenerAddress(
       const Network::Address::Instance& listener_address, std::string request = "hello",
       std::string response = "world1",
@@ -286,6 +305,15 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   EXPECT_EQ("world1", response_datagram.buffer_->toString());
   client.recv(response_datagram);
   EXPECT_EQ("world2", response_datagram.buffer_->toString());
+}
+
+// Make sure the UDP proxy filter on the chain will work.
+TEST_P(UdpProxyIntegrationTest, MultipleFilters) {
+  setupMultiple();
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  requestResponseWithListenerAddress(*listener_address);
 }
 
 } // namespace

@@ -49,6 +49,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/integration:integration_lib",
+        "//test/integration/filters:udp_passthrough_filter_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

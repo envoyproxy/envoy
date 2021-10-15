@@ -618,3 +618,14 @@ envoy_cc_test_library(
         "@com_google_absl//absl/strings:str_format",
     ],
 )
+
+envoy_cc_test_library(
+    name = "udp_passthrough_filter_lib",
+    srcs = ["udp_passthrough_filter.cc"],
+    deps = [
+        ":common_lib",
+        "//envoy/network:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+    ],
+)
