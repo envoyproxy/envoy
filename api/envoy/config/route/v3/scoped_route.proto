@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package envoy.config.route.v3;
 
+import "envoy/config/route/v3/route.proto";
+
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -16,7 +19,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Specifies a routing scope, which associates a
 // :ref:`Key<envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration.Key>` to a
-// :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` (identified by its resource name).
+// :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration`.
+// The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` can be obtained dynamically
+// via RDS (:ref:`route_configuration_name<envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration_name>`)
+// or specified inline (:ref:`route_configuration<envoy_v3_api_field_config.route.v3.ScopedRouteConfiguration.route_configuration>`).
 //
 // The HTTP connection manager builds up a table consisting of these Key to
 // RouteConfiguration mappings, and looks up the RouteConfiguration to use per
@@ -73,6 +79,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // would result in the routing table defined by the `route-config1`
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
+// [#next-free-field: 6]
 message ScopedRouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.ScopedRouteConfiguration";
@@ -113,7 +120,12 @@ message ScopedRouteConfiguration {
   // The resource name to use for a :ref:`envoy_v3_api_msg_service.discovery.v3.DiscoveryRequest` to an
   // RDS server to fetch the :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated
   // with this scope.
-  string route_configuration_name = 2 [(validate.rules).string = {min_len: 1}];
+  string route_configuration_name = 2
+      [(udpa.annotations.field_migrate).oneof_promotion = "route_config"];
+
+  // The :ref:`envoy_v3_api_msg_config.route.v3.RouteConfiguration` associated with the scope.
+  RouteConfiguration route_configuration = 5
+      [(udpa.annotations.field_migrate).oneof_promotion = "route_config"];
 
   // The key to match against.
   Key key = 3 [(validate.rules).message = {required: true}];

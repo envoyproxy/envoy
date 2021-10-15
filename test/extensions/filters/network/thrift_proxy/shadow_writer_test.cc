@@ -39,8 +39,9 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    shadow_writer_ = std::make_shared<ShadowWriterImpl>(
-        cm_, "test", context_.scope(), dispatcher_, context_.threadLocal(), context_.localInfo());
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
+    shadow_writer_ =
+        std::make_shared<ShadowWriterImpl>(cm_, *stats_, dispatcher_, context_.threadLocal());
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName("ping");
     metadata_->setMessageType(MessageType::Call);
@@ -270,6 +271,7 @@ public:
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
   envoy::config::core::v3::Locality upstream_locality_;
+  std::shared_ptr<const RouterStats> stats_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_;
 };
 
