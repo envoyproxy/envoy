@@ -282,7 +282,7 @@ public:
    * @param store supplies the stats store.
    * @param name gauge name.
    * @param time_system the time system to use for waiting.
-   * @return AssertionSuccess() if the gauge was == to the value within the timeout, else
+   * @return AssertionSuccess() if the gauge is destroyed within a fixed timeout, else
    * AssertionFailure().
    */
   static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
