@@ -9,6 +9,7 @@
 #include "envoy/thread_local/thread_local_object.h"
 
 #include "source/common/common/interval_value.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Server {
