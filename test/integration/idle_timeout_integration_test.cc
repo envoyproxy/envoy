@@ -203,6 +203,36 @@ TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
+// Max connection duration reached after a connection is created.
+TEST_P(IdleTimeoutIntegrationTest, MaxConnectionDurationBasic) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options = protocol_options.mutable_common_http_protocol_options();
+    auto* max_connection_duration = http_protocol_options->mutable_max_connection_duration();
+    max_connection_duration->set_seconds(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  // Do not send any requests and validate that the max connection duration is reached.
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_max_duration_reached", 1);
+}
+
 // Per-stream idle timeout after having sent downstream headers.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   enable_per_stream_idle_timeout_ = true;
