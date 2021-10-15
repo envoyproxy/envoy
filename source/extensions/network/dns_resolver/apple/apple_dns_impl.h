@@ -16,6 +16,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/singleton/threadsafe_singleton.h"
+#include "envoy/registry/registry.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -137,6 +138,8 @@ private:
   Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
 };
+
+DECLARE_FACTORY(AppleDnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy
