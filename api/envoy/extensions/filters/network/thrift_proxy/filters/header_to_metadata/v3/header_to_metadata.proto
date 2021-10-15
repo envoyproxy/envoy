@@ -16,7 +16,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The configuration for transforming headers into metadata. This is useful
 // for matching load balancer subsets, logging, etc.
-// [#extension: envoy.filters.thrift.header_to_metadata]
 
 // [#next-free-field: 2]
 message HeaderToMetadata {
@@ -111,5 +110,4 @@ message HeaderToMetadata {
 
   // The list of rules to apply to requests.
   repeated Rule request_rules = 1 [(validate.rules).repeated = {min_items: 1}];
-
 }
