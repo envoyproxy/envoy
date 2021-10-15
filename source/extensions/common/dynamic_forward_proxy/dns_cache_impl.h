@@ -115,6 +115,9 @@ private:
     void updateStale(MonotonicTime resolution_time, std::chrono::seconds ttl) {
       stale_at_time_ = resolution_time + ttl;
     }
+    bool isStale() {
+      return time_source_.monotonicTime() > static_cast<MonotonicTime>(stale_at_time_);
+    }
 
     void setAddress(Network::Address::InstanceConstSharedPtr address) {
       absl::WriterMutexLock lock{&resolve_lock_};
@@ -160,6 +163,7 @@ private:
     const Event::TimerPtr refresh_timer_;
     const Event::TimerPtr timeout_timer_;
     const DnsHostInfoImplSharedPtr host_info_;
+    const BackOffStrategyPtr failure_backoff_strategy_;
     Network::ActiveDnsQuery* active_query_{};
   };
 
@@ -199,6 +203,8 @@ private:
   PrimaryHostInfo* createHost(const std::string& host, uint16_t default_port);
 
   Event::Dispatcher& main_thread_dispatcher_;
+  const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
+  Random::RandomGenerator& random_generator_;
   const Network::DnsLookupFamily dns_lookup_family_;
   const Network::DnsResolverSharedPtr resolver_;
   ThreadLocal::TypedSlot<ThreadLocalHostInfo> tls_slot_;
@@ -212,7 +218,6 @@ private:
   DnsCacheResourceManagerImpl resource_manager_;
   const std::chrono::milliseconds refresh_interval_;
   const std::chrono::milliseconds timeout_interval_;
-  const BackOffStrategyPtr failure_backoff_strategy_;
   Filesystem::Instance& file_system_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::chrono::milliseconds host_ttl_;
