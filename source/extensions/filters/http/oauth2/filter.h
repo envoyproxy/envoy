@@ -98,9 +98,8 @@ struct FilterStats {
  * Helper structure to hold custom cookie names.
  */
 struct CookieNames {
-  CookieNames(
-      const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Credentials::CookieNames&
-          cookie_names)
+  CookieNames(const envoy::extensions::filters::http::oauth2::v3::OAuth2Credentials::CookieNames&
+                  cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires()) {}
 
