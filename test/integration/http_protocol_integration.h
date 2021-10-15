@@ -58,6 +58,24 @@ public:
     setDownstreamProtocol(GetParam().downstream_protocol);
     setUpstreamProtocol(GetParam().upstream_protocol);
   }
+
+protected:
+  struct BytesCountExpectation {
+    BytesCountExpectation(int wire_bytes_sent, int wire_bytes_received, int header_bytes_sent,
+                          int header_bytes_received)
+        : wire_bytes_sent_{wire_bytes_sent}, wire_bytes_received_{wire_bytes_received},
+          header_bytes_sent_{header_bytes_sent}, header_bytes_received_{header_bytes_received} {}
+    int wire_bytes_sent_;
+    int wire_bytes_received_;
+    int header_bytes_sent_;
+    int header_bytes_received_;
+  };
+
+  void expectUpstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                          BytesCountExpectation h2_expectation, const int id = 0);
+
+  void expectDownstreamBytesSentAndReceived(BytesCountExpectation h1_expectation,
+                                            BytesCountExpectation h2_expectation, const int id = 0);
 };
 
 } // namespace Envoy

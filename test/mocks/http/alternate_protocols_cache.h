@@ -22,7 +22,8 @@ public:
   ~MockAlternateProtocolsCacheManager() override;
 
   MOCK_METHOD(AlternateProtocolsCacheSharedPtr, getCache,
-              (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config));
+              (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
+               Event::Dispatcher& dispatcher));
 };
 
 class MockAlternateProtocolsCacheManagerFactory : public AlternateProtocolsCacheManagerFactory {

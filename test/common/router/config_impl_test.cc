@@ -1215,6 +1215,168 @@ virtual_hosts:
       "virtual clusters must define 'headers'");
 }
 
+// Validates basic usage of the match tree to resolve route actions.
+TEST_F(RouteMatcherTest, TestMatchTree) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree
+          "/new_endpoint/bar":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree_2
+          "/new_endpoint/baz":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /something/else
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree_2
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/foo", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree", headers.get_("x-route-header"));
+  }
+
+  {
+    Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/bar", "GET");
+    const RouteEntry* route = config.route(headers, 0)->routeEntry();
+    route->finalizeRequestHeaders(headers, stream_info, true);
+    EXPECT_EQ("match_tree_2", headers.get_("x-route-header"));
+  }
+  Http::TestRequestHeaderMapImpl headers = genHeaders("lyft.com", "/new_endpoint/baz", "GET");
+  EXPECT_EQ(nullptr, config.route(headers, 0));
+}
+
+// Validates that we fail creating a route config if an invalid data input is used.
+TEST_F(RouteMatcherTest, TestMatchInvalidInput) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
+      "only match on request headers, saw "
+      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+}
+
+// Validates that we fail creating a route config if an invalid data input is used.
+TEST_F(RouteMatcherTest, TestMatchInvalidInputTwoMatchers) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - lyft.com
+  routes:
+    - match: { prefix: "/" }
+      route: { cluster: "regex" }
+  matcher:
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: root_ww2
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: match_tree
+  )EOF";
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  factory_context_.cluster_manager_.initializeClusters(
+      {"www2", "root_www2", "www2_staging", "instant-server"}, {});
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
+      "cannot set both matcher and routes on virtual host");
+}
+
 // Validates behavior of request_headers_to_add at router, vhost, and route levels.
 TEST_F(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   const std::string yaml = R"EOF(
@@ -1708,29 +1870,6 @@ virtual_hosts:
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context_, true),
                               EnvoyException, ":-prefixed or host headers may not be modified");
   }
-}
-
-TEST_F(RouteMatcherTest, TestRequestHeadersToAddLegacyHostHeader) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.treat_host_like_authority", "false"}});
-
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: www2
-    domains: ["*"]
-    request_headers_to_add:
-      - header:
-          key: "host"
-          value: vhost-www2
-        append: false
-)EOF";
-
-  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-
-  envoy::config::route::v3::RouteConfiguration route_config = parseRouteConfigurationFromYaml(yaml);
-
-  EXPECT_NO_THROW(TestConfigImpl config(route_config, factory_context_, true));
 }
 
 // Validate that we can't remove :-prefixed request headers.
@@ -5676,7 +5815,8 @@ virtual_hosts:
   EXPECT_EQ(opaque_config.find("name2")->second, "value2");
 }
 
-// Test that the deprecated name works for opaque configs.
+// Test that the deprecated name no longer works by default for opaque configs.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(TestOpaqueConfigUsingDeprecatedName)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -5696,13 +5836,8 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"ats"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true);
-
-  const std::multimap<std::string, std::string>& opaque_config =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->routeEntry()->opaqueConfig();
-
-  EXPECT_EQ(opaque_config.find("name1")->second, "value1");
-  EXPECT_EQ(opaque_config.find("name2")->second, "value2");
+  EXPECT_THROW(TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true),
+               EnvoyException);
 }
 
 class RoutePropertyTest : public testing::Test, public ConfigImplTestBase {};
@@ -7856,50 +7991,6 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
-}
-
-TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPerVirtualHost) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.check_unsupported_typed_per_filter_config", "false"}});
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-    typed_per_filter_config:
-      test.default.filter:
-        "@type": type.googleapis.com/google.protobuf.Struct
-        value:
-          seconds: 123
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml);
-}
-
-TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyPerRoute) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.check_unsupported_typed_per_filter_config", "false"}});
-  const std::string yaml = R"EOF(
-virtual_hosts:
-  - name: bar
-    domains: ["*"]
-    routes:
-      - match: { prefix: "/" }
-        route: { cluster: baz }
-        typed_per_filter_config:
-          test.default.filter:
-            "@type": type.googleapis.com/google.protobuf.Struct
-            value:
-              seconds: 123
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, DefaultFilterImplementationAnyWithCheckPerVirtualHost) {

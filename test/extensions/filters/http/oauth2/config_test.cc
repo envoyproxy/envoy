@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -139,7 +139,7 @@ TEST(ConfigTest, InvalidHmacSecret) {
 TEST(ConfigTest, CreateFilterMissingConfig) {
   OAuth2Config config;
 
-  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2 proto_config;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2 proto_config;
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(

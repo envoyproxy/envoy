@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/common/random_generator.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"

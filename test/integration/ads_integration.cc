@@ -60,6 +60,26 @@ AdsIntegrationTest::buildTlsClusterLoadAssignment(const std::string& name) {
       name, Network::Test::getLoopbackAddressString(ipVersion()), 8443);
 }
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+AdsIntegrationTest::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                       const std::string& collection_name) {
+  return ConfigHelper::buildClusterLoadAssignmentWithLeds(name, collection_name);
+}
+
+envoy::service::discovery::v3::Resource
+AdsIntegrationTest::buildLbEndpointResource(const std::string& lb_endpoint_resource_name,
+                                            const std::string& version) {
+  envoy::service::discovery::v3::Resource resource;
+  resource.set_name(lb_endpoint_resource_name);
+  resource.set_version(version);
+
+  envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
+      ConfigHelper::buildLbEndpoint(Network::Test::getLoopbackAddressString(ipVersion()),
+                                    fake_upstreams_[0]->localAddress()->ip()->port());
+  resource.mutable_resource()->PackFrom(lb_endpoint);
+  return resource;
+}
+
 envoy::config::listener::v3::Listener
 AdsIntegrationTest::buildListener(const std::string& name, const std::string& route_config,
                                   const std::string& stat_prefix) {

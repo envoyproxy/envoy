@@ -8,6 +8,8 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -155,11 +157,10 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If there are any active streams,
-  // the drain sequence will kick-in, and the connection will be force-closed after the drain period.
-  // See :ref:`drain_timeout
+  // and if there are no active streams, the connection will be closed. If the connection is a
+  // downstream connection and there are any active streams, the drain sequence will kick-in,
+  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-  // Note: This feature is not yet implemented for the upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
   // The maximum number of headers. If unconfigured, the default
@@ -508,8 +509,8 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
-  // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
-  bool allow_extended_connect = 5;
+  // Note that HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // A message to control transformations to the :scheme header

@@ -81,7 +81,7 @@ size_t ConnPoolMap<KEY_TYPE, POOL_TYPE>::size() const {
 }
 
 template <typename KEY_TYPE, typename POOL_TYPE>
-size_t ConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
+bool ConnPoolMap<KEY_TYPE, POOL_TYPE>::empty() const {
   return active_pools_.empty();
 }
 
