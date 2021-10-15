@@ -168,12 +168,22 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
-// Deprecated RAII object to declare the TestThread. This is no longer needed as
-// we figure this out automatically from the platform.
-//
-// TODO(jmarantz): Remove this declaration after Nov 15, 2021 to allow
-// references from other repositories to be cleaned up.
-struct TestThread {};
+// Context for determining whether we are in the test thread.
+class TestThread {
+public:
+  /**
+   * @return whether the current thread is the test thread.
+   *
+   * Note, on the Windows platform, this always returns true. On MacOS and
+   * Linux, system-dependent calls are used to detect the test-thread.
+   */
+  static bool isTestThread();
+
+  /**
+   * @return true if the platform supports determination of whether this is the test thread.
+   */
+  static bool checkIsSupported();
+};
 
 // RAII object to declare the MainThread. This should be declared in the thread
 // function or equivalent.
@@ -198,20 +208,12 @@ public:
    * test-thread. We need to allow for either one because we don't establish
    * the full threading model in all unit tests.
    */
-  static bool isMainOrTestThread() { return isMainThread() || isTestThread(); }
+  static bool isMainOrTestThread() { return isMainThread() || TestThread::isTestThread(); }
 
   /**
    * @return whether the current thread is the main thread.
    */
   static bool isMainThread();
-
-  /**
-   * @return whether the current thread is the test thread.
-   *
-   * Note, on the Windows platform, this always returns true. On MacOS and
-   * Linux, system-dependent calls are used to detect the test-thread.
-   */
-  static bool isTestThread();
 
   /**
    * @return whether a MainThread has been instantiated.
@@ -231,6 +233,32 @@ public:
 // TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
 // plane.
 #define TRY_NEEDS_AUDIT try
+
+// These convenience macros assert properties of the threading system, when
+// feasible. There is a platform-specific mechanism for determining whether the
+// current thread is from main(), which we call the "test thread", and if that
+// method is not available on the current platform we must skip the assertions.
+#ifdef NDEBUG
+
+#define ASSERT_IS_TEST_THREAD()
+#define ASSERT_IS_TEST_OR_MAIN_THREAD()
+#define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_OR_MAIN_THREAD() ASSERT(!MainThread::isMainThread()))
+
+#else
+
+#define ASSERT_IS_TEST_THREAD()                                                                    \
+  ASSERT(!Thread::TestThread::checkIsSupported() || Thread::TestThread::isTestThread())
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
+  ASSERT(!Thread::TestThread::checkIsSupported() || Thread::TestThread::isTestThread() ||          \
+         Thread::MainThread::isMainThread())
+#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
+  \ ASSERT(!Thread::TestThread::checkIsSupported() || !Thread::TestThread::isTestThread())
+#define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()                                                        \
+  ASSERT(!Thread::MainThread::isMainThread() &&                                                    \
+         (!Thread::TestThread::checkIsSupported() || !Thread::TestThread::isTestThread()))
+
+#endif
 
 } // namespace Thread
 } // namespace Envoy

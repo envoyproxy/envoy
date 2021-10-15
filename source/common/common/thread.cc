@@ -25,17 +25,6 @@ struct ThreadIds {
   // result in the correct result even without a lock.
   bool inMainThread() const { return std::this_thread::get_id() == main_thread_id_; }
 
-  bool inTestThread() const {
-    // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
-#ifdef __linux__
-    return getpid() == syscall(SYS_gettid);
-#elif defined(__APPLE__)
-    return pthread_main_np() != 0;
-#else
-    return true;
-#endif
-  }
-
   bool isMainThreadActive() const {
     absl::MutexLock lock(&mutex_);
     return main_thread_use_count_ != 0;
@@ -84,13 +73,35 @@ private:
 
 bool MainThread::isMainThread() { return ThreadIds::get().inMainThread(); }
 
-bool MainThread::isTestThread() { return ThreadIds::get().inTestThread(); }
-
 bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
 
 MainThread::MainThread() { ThreadIds::get().registerMainThread(); }
 
 MainThread::~MainThread() { ThreadIds::get().releaseMainThread(); }
+
+bool TestThread::isTestThread() {
+  // Keep this implementation consistent with checkIsSupported() below.
+  // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
+#ifdef __linux__
+  return getpid() == syscall(SYS_gettid);
+#elif defined(__APPLE__)
+  return pthread_main_np() != 0;
+#else
+  ASSERT(false, "call checkIsSupported() before calling isTestThread()");
+  return true;
+#endif
+}
+
+bool TestThread::checkIsSupported() {
+  // Keep this implementation consistent with isTestThread() above.
+#ifdef __linux__
+  return true;
+#elif defined(__APPLE__)
+  return true;
+#else
+  return false;
+#endif
+}
 
 } // namespace Thread
 } // namespace Envoy

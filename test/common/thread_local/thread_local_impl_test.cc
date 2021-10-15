@@ -18,21 +18,28 @@ namespace ThreadLocal {
 TEST(MainThreadVerificationTest, All) {
   // Before threading is on, we are in the test thread, not the main thread.
   EXPECT_FALSE(Thread::MainThread::isMainThread());
-  EXPECT_TRUE(Thread::MainThread::isTestThread());
-  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+  if (Thread::TestThread::checkIsSupported()) {
+    EXPECT_TRUE(Thread::TestThread::isTestThread());
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+  }
   {
     InstanceImpl tls;
     // Tls instance has been initialized.
     // Call to main thread verification should succeed in main thread.
     EXPECT_TRUE(Thread::MainThread::isMainThread());
-    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+    if (Thread::TestThread::checkIsSupported()) {
+      EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+      EXPECT_TRUE(Thread::TestThread::isTestThread());
+    }
     tls.shutdownGlobalThreading();
     tls.shutdownThread();
   }
   // After threading is off, assertion we are again in the test thread, not the main thread.
   EXPECT_FALSE(Thread::MainThread::isMainThread());
-  EXPECT_TRUE(Thread::MainThread::isTestThread());
-  EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+  if (Thread::TestThread::checkIsSupported()) {
+    EXPECT_TRUE(Thread::TestThread::isTestThread());
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+  }
 }
 
 class TestThreadLocalObject : public ThreadLocalObject {
@@ -307,6 +314,11 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
         // Verify that it is inside the worker thread.
         EXPECT_FALSE(Thread::MainThread::isMainThread());
+        // Verify that is is not in the test thread either.
+        if (Thread::TestThread::checkIsSupported()) {
+          EXPECT_FALSE(Thread::TestThread::isTestThread());
+          EXPECT_FALSE(Thread::MainThread::isMainOrTestThread());
+        }
       });
   thread->join();
 
