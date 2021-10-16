@@ -79,6 +79,7 @@ MainThread::MainThread() { ThreadIds::get().registerMainThread(); }
 
 MainThread::~MainThread() { ThreadIds::get().releaseMainThread(); }
 
+#if TEST_THREAD_SUPPORTED
 bool TestThread::isTestThread() {
   // Keep this implementation consistent with checkIsSupported() below.
   // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
@@ -86,22 +87,10 @@ bool TestThread::isTestThread() {
   return getpid() == syscall(SYS_gettid);
 #elif defined(__APPLE__)
   return pthread_main_np() != 0;
-#else
-  ASSERT(false, "call checkIsSupported() before calling isTestThread()");
-  return true;
 #endif
+  // Note: final #else fallback omitted intentionally.
 }
-
-bool TestThread::checkIsSupported() {
-  // Keep this implementation consistent with isTestThread() above.
-#ifdef __linux__
-  return true;
-#elif defined(__APPLE__)
-  return true;
-#else
-  return false;
 #endif
-}
 
 } // namespace Thread
 } // namespace Envoy

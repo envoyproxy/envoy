@@ -168,21 +168,28 @@ public:
   T* get(const MakeObject& make_object) { return BaseClass::get(0, make_object); }
 };
 
+// We use platform-specific functions to determine whether the current thread is
+// the "test thread". It is only valid to call isTestThread() on platforms where
+// these functions are available.
+#ifdef __linux__
+#define TEST_THREAD_SUPPORTED 1
+#elif defined(__APPLE__)
+#define TEST_THREAD_SUPPORTED 1
+#else
+#define TEST_THREAD_SUPPORTED 0
+#endif
+
 // Context for determining whether we are in the test thread.
 class TestThread {
 public:
+#if TEST_THREAD_SUPPORTED
   /**
    * @return whether the current thread is the test thread.
    *
-   * Note, on the Windows platform, this always returns true. On MacOS and
-   * Linux, system-dependent calls are used to detect the test-thread.
+   * This is only valid to call on
    */
   static bool isTestThread();
-
-  /**
-   * @return true if the platform supports determination of whether this is the test thread.
-   */
-  static bool checkIsSupported();
+#endif
 };
 
 // RAII object to declare the MainThread. This should be declared in the thread
@@ -201,6 +208,7 @@ public:
   MainThread();
   ~MainThread();
 
+#if TEST_THREAD_SUPPORTED
   /**
    * @return whether the current thread is the main thread or test thread.
    *
@@ -209,6 +217,7 @@ public:
    * the full threading model in all unit tests.
    */
   static bool isMainOrTestThread() { return isMainThread() || TestThread::isTestThread(); }
+#endif
 
   /**
    * @return whether the current thread is the main thread.
@@ -240,29 +249,25 @@ public:
 // method is not available on the current platform we must skip the assertions.
 #ifdef NDEBUG
 
-#define ASSERT_IS_TEST_THREAD()                                                                    \
-  do {                                                                                             \
-  } while (false)
-#define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
-  do {                                                                                             \
-  } while (false)
-#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
-  do {                                                                                             \
-  } while (false)
-#define ASSERT_IS_NOT_TEST_OR_MAIN_THREAD() ASSERT(!MainThread::isMainThread()))
+#define ASSERT_IS_TEST_THREAD()
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_OR_MAIN_THREAD()
 
-#else
+#elif TEST_THREAD_SUPPORTED
 
-#define ASSERT_IS_TEST_THREAD()                                                                    \
-  ASSERT(!Thread::TestThread::checkIsSupported() || Thread::TestThread::isTestThread())
+#define ASSERT_IS_TEST_THREAD() ASSERT(Thread::TestThread::isTestThread())
 #define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
-  ASSERT(!Thread::TestThread::checkIsSupported() || Thread::TestThread::isTestThread() ||          \
-         Thread::MainThread::isMainThread())
-#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
-  \ ASSERT(!Thread::TestThread::checkIsSupported() || !Thread::TestThread::isTestThread())
+  ASSERT(Thread::TestThread::isTestThread() || Thread::MainThread::isMainThread())
+#define ASSERT_IS_NOT_TEST_THREAD() ASSERT(!Thread::TestThread::isTestThread())
 #define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()                                                        \
-  ASSERT(!Thread::MainThread::isMainThread() &&                                                    \
-         (!Thread::TestThread::checkIsSupported() || !Thread::TestThread::isTestThread()))
+  ASSERT(!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()))
+
+#else // !TEST_THREAD_SUPPORTED -- test-thread checks are skipped
+
+#define ASSERT_IS_TEST_THREAD()
+#define ASSERT_IS_MAIN_OR_TEST_THREAD() #define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD() ASSERT(!Thread::MainThread::isMainThread())
 
 #endif
 
