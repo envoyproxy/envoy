@@ -7,6 +7,7 @@
 
 #include "library/common/extensions/filters/http/network_configuration/filter.pb.h"
 #include "library/common/network/configurator.h"
+#include "library/common/stream_info/extra_stream_info.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -23,16 +24,20 @@ public:
   NetworkConfigurationFilter(Network::ConfiguratorSharedPtr network_configurator,
                              bool enable_interface_binding)
       : network_configurator_(network_configurator),
-        enable_interface_binding_(enable_interface_binding), override_interface_(false) {}
+        extra_stream_info_(nullptr), // always set in setDecoderFilterCallbacks
+        enable_interface_binding_(enable_interface_binding) {}
 
   // Http::StreamDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
-                                          bool end_stream) override;
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override;
+  // Http::StreamFilterBase
+  Http::LocalErrorStatus onLocalReply(const LocalReplyData&) override;
 
 private:
   Network::ConfiguratorSharedPtr network_configurator_;
+  StreamInfo::ExtraStreamInfo* extra_stream_info_;
   bool enable_interface_binding_;
-  bool override_interface_;
 };
 
 } // namespace NetworkConfiguration

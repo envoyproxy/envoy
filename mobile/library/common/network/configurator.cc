@@ -67,33 +67,124 @@ SINGLETON_MANAGER_REGISTRATION(network_configurator);
 
 constexpr absl::string_view BaseDnsCache = "base_dns_cache";
 
-std::atomic<envoy_network_t> Configurator::preferred_network_{ENVOY_NET_GENERIC};
+// The number of faults allowed on a newly-established connection before switching socket mode.
+constexpr unsigned int InitialFaultThreshold = 1;
+// The number of faults allowed on a previously-successful connection (i.e. able to send and receive
+// L7 bytes) before switching socket mode.
+constexpr unsigned int MaxFaultThreshold = 3;
 
-envoy_network_t Configurator::setPreferredNetwork(envoy_network_t network) {
-  ENVOY_LOG_EVENT(debug, "network_configuration_network_change", std::to_string(network));
-  return preferred_network_.exchange(network);
+Configurator::NetworkState Configurator::network_state_{1, ENVOY_NET_GENERIC, MaxFaultThreshold,
+                                                        DefaultPreferredNetworkMode,
+                                                        Thread::MutexBasicLockable{}};
+
+envoy_netconf_t Configurator::setPreferredNetwork(envoy_network_t network) {
+  Thread::LockGuard lock{network_state_.mutex_};
+  ENVOY_LOG_EVENT(debug, "netconf_network_change", std::to_string(network));
+
+  network_state_.configuration_key_++;
+  network_state_.network_ = network;
+  network_state_.remaining_faults_ = 1;
+  network_state_.socket_mode_ = DefaultPreferredNetworkMode;
+
+  return network_state_.configuration_key_;
 }
 
-envoy_network_t Configurator::getPreferredNetwork() { return preferred_network_.load(); }
+envoy_network_t Configurator::getPreferredNetwork() {
+  Thread::LockGuard lock{network_state_.mutex_};
+  return network_state_.network_;
+}
 
-bool Configurator::overrideInterface(envoy_network_t) { return false; }
+envoy_socket_mode_t Configurator::getSocketMode() {
+  Thread::LockGuard lock{network_state_.mutex_};
+  return network_state_.socket_mode_;
+}
 
-void Configurator::refreshDns(envoy_network_t network) {
-  // refreshDns is intended to be queued on Envoy's event loop, whereas preferred_network_ is
-  // updated synchronously. In the event that multiple refreshes become queued on the event loop,
-  // this avoids triggering a refresh for a non-current network.
-  // Note this does NOT completely prevent parallel refreshes from being triggered in multiple
-  // flip-flop scenarios.
-  if (network != preferred_network_.load()) {
-    ENVOY_LOG_EVENT(debug, "network_configuration_dns_flipflop", std::to_string(network));
+envoy_netconf_t Configurator::getConfigurationKey() {
+  Thread::LockGuard lock{network_state_.mutex_};
+  return network_state_.configuration_key_;
+}
+
+// This call contains the main heuristic that will determine if the network configurator switches
+// socket modes: If the configuration_key isn't current, don't do anything. If there was no fault
+// (i.e. success) reset remaining_faults_ to MaxFaultTreshold. If there was a network fault,
+// decrement remaining_faults_.
+//   - At 0, increment configuration_key, reset remaining_faults_ to InitialFaultThreshold and
+//     toggle socket_mode_.
+void Configurator::reportNetworkUsage(envoy_netconf_t configuration_key, bool network_fault) {
+  ENVOY_LOG(debug, "reportNetworkUsage(configuration_key: {}, network_fault: {})",
+            configuration_key, network_fault);
+
+  if (!enable_interface_binding_) {
+    ENVOY_LOG(debug, "bailing due to interface binding being disabled");
     return;
   }
 
+  bool configuration_updated = false;
+  {
+    Thread::LockGuard lock{network_state_.mutex_};
+
+    // If the configuration_key isn't current, don't do anything.
+    if (configuration_key != network_state_.configuration_key_) {
+      ENVOY_LOG(debug, "bailing due to stale configuration key");
+      return;
+    }
+
+    if (!network_fault) {
+      // If there was no fault (i.e. success) reset remaining_faults_ to MaxFaultThreshold.
+      ENVOY_LOG(debug, "resetting fault threshold");
+      network_state_.remaining_faults_ = MaxFaultThreshold;
+    } else {
+      // If there was a network fault, decrement remaining_faults_.
+      ASSERT(network_state_.remaining_faults_ > 0);
+      network_state_.remaining_faults_--;
+      ENVOY_LOG(debug, "decrementing remaining faults; {} remaining",
+                network_state_.remaining_faults_);
+
+      // At 0, increment configuration_key, reset remaining_faults_ to InitialFaultThreshold and
+      // toggle socket_mode_.
+      if (network_state_.remaining_faults_ == 0) {
+        configuration_updated = true;
+        configuration_key = ++network_state_.configuration_key_;
+        network_state_.socket_mode_ = network_state_.socket_mode_ == DefaultPreferredNetworkMode
+                                          ? AlternateBoundInterfaceMode
+                                          : DefaultPreferredNetworkMode;
+        network_state_.remaining_faults_ = InitialFaultThreshold;
+        ENVOY_LOG_EVENT(debug, "netconf_mode_switch",
+                        network_state_.socket_mode_ == DefaultPreferredNetworkMode
+                            ? "DefaultPreferredNetworkMode"
+                            : "AlternateBoundInterfaceMode");
+      }
+    }
+  }
+
+  // If configuration state changed, refresh dns.
+  if (configuration_updated) {
+    refreshDns(configuration_key);
+  }
+}
+
+void Configurator::setInterfaceBindingEnabled(bool enabled) { enable_interface_binding_ = enabled; }
+
+void Configurator::refreshDns(envoy_netconf_t configuration_key) {
+  {
+    Thread::LockGuard lock{network_state_.mutex_};
+
+    // refreshDns must be queued on Envoy's event loop, whereas network_state_ is updated
+    // synchronously. In the event that multiple refreshes become queued on the event loop,
+    // this check avoids triggering a refresh for a non-current network.
+    // Note this does NOT completely prevent parallel refreshes from being triggered in multiple
+    // flip-flop scenarios.
+    if (configuration_key != network_state_.configuration_key_) {
+      ENVOY_LOG_EVENT(debug, "netconf_dns_flipflop", std::to_string(configuration_key));
+      return;
+    }
+  }
+
   if (auto dns_cache = dns_cache_manager_->lookUpCacheByName(BaseDnsCache)) {
-    ENVOY_LOG_EVENT(debug, "network_configuration_refresh_dns", std::to_string(network));
+    ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", std::to_string(configuration_key));
     dns_cache->forceRefreshHosts();
   } else {
-    ENVOY_LOG_EVENT(warn, "network_configuration_dns_cache_missing", BaseDnsCache);
+    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", BaseDnsCache);
   }
 }
 
@@ -106,10 +197,12 @@ std::vector<std::string> Configurator::enumerateV6Interfaces() {
 }
 
 Socket::OptionsSharedPtr Configurator::getUpstreamSocketOptions(envoy_network_t network,
-                                                                bool override_interface) {
-  if (override_interface && network != ENVOY_NET_GENERIC) {
+                                                                envoy_socket_mode_t socket_mode) {
+  if (enable_interface_binding_ && socket_mode == AlternateBoundInterfaceMode &&
+      network != ENVOY_NET_GENERIC) {
     return getAlternateInterfaceSocketOptions(network);
   }
+
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
@@ -145,6 +238,23 @@ Socket::OptionsSharedPtr Configurator::getAlternateInterfaceSocketOptions(envoy_
 #endif // IP_BOUND_IF
 
   return options;
+}
+
+envoy_netconf_t Configurator::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
+  envoy_netconf_t configuration_key;
+  envoy_network_t network;
+  envoy_socket_mode_t socket_mode;
+
+  {
+    Thread::LockGuard lock{network_state_.mutex_};
+    configuration_key = network_state_.configuration_key_;
+    network = network_state_.network_;
+    socket_mode = network_state_.socket_mode_;
+  }
+
+  auto new_options = getUpstreamSocketOptions(network, socket_mode);
+  options->insert(options->end(), new_options->begin(), new_options->end());
+  return configuration_key;
 }
 
 const std::string Configurator::getActiveAlternateInterface(envoy_network_t network,

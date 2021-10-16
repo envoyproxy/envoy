@@ -27,16 +27,98 @@ public:
   ConfiguratorSharedPtr configurator_;
 };
 
-TEST_F(ConfiguratorTest, RefreshDnsForCurrentNetworkTriggersDnsRefresh) {
+TEST_F(ConfiguratorTest, RefreshDnsForCurrentConfigurationTriggersDnsRefresh) {
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
-  Configurator::setPreferredNetwork(ENVOY_NET_WWAN);
-  configurator_->refreshDns(ENVOY_NET_WWAN);
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->refreshDns(configuration_key);
 }
 
-TEST_F(ConfiguratorTest, RefreshDnsForOtherNetworkDoesntTriggerDnsRefresh) {
+TEST_F(ConfiguratorTest, RefreshDnsForStaleConfigurationDoesntTriggerDnsRefresh) {
   EXPECT_CALL(*dns_cache_, forceRefreshHosts()).Times(0);
-  Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
-  configurator_->refreshDns(ENVOY_NET_WWAN);
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->refreshDns(configuration_key - 1);
+}
+
+TEST_F(ConfiguratorTest,
+       ReportNetworkUsageDoesntAlterNetworkConfigurationWhenBoundInterfacesAreDisabled) {
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->setInterfaceBindingEnabled(false);
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_EQ(configuration_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+}
+
+TEST_F(ConfiguratorTest, ReportNetworkUsageTriggersOverrideAfterFirstFaultAfterNetworkUpdate) {
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->setInterfaceBindingEnabled(true);
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_NE(configuration_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(AlternateBoundInterfaceMode, configurator_->getSocketMode());
+}
+
+TEST_F(ConfiguratorTest, ReportNetworkUsageDisablesOverrideAfterFirstFaultAfterOverride) {
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->setInterfaceBindingEnabled(true);
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_NE(configuration_key, configurator_->getConfigurationKey());
+  configuration_key = configurator_->getConfigurationKey();
+  EXPECT_EQ(AlternateBoundInterfaceMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_NE(configuration_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+}
+
+TEST_F(ConfiguratorTest, ReportNetworkUsageDisablesOverrideAfterThirdFaultAfterSuccess) {
+  envoy_netconf_t configuration_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  configurator_->setInterfaceBindingEnabled(true);
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, false /* network_fault */);
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_EQ(configuration_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+  configurator_->reportNetworkUsage(configuration_key, true /* network_fault */);
+
+  EXPECT_NE(configuration_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(AlternateBoundInterfaceMode, configurator_->getSocketMode());
+}
+
+TEST_F(ConfiguratorTest, ReportNetworkUsageDisregardsCallsWithStaleConfigurationKey) {
+  envoy_netconf_t stale_key = Configurator::setPreferredNetwork(ENVOY_NET_WLAN);
+  envoy_netconf_t current_key = Configurator::setPreferredNetwork(ENVOY_NET_WWAN);
+  EXPECT_NE(stale_key, current_key);
+
+  configurator_->setInterfaceBindingEnabled(true);
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(stale_key, true /* network_fault */);
+  configurator_->reportNetworkUsage(stale_key, true /* network_fault */);
+  configurator_->reportNetworkUsage(stale_key, true /* network_fault */);
+
+  EXPECT_EQ(current_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(DefaultPreferredNetworkMode, configurator_->getSocketMode());
+
+  configurator_->reportNetworkUsage(stale_key, false /* network_fault */);
+  configurator_->reportNetworkUsage(current_key, true /* network_fault */);
+
+  EXPECT_NE(current_key, configurator_->getConfigurationKey());
+  EXPECT_EQ(AlternateBoundInterfaceMode, configurator_->getSocketMode());
 }
 
 TEST_F(ConfiguratorTest, EnumerateInterfacesFiltersByFlags) {

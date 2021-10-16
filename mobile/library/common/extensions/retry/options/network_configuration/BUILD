@@ -22,6 +22,7 @@ envoy_cc_extension(
     deps = [
         ":predicate_cc_proto",
         "//library/common/network:configurator_lib",
+        "//library/common/stream_info:extra_stream_info_lib",
         "@envoy//envoy/upstream:retry_interface",
     ],
 )

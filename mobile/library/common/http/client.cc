@@ -14,6 +14,7 @@
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
 #include "library/common/network/configurator.h"
+#include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
 namespace Http {
