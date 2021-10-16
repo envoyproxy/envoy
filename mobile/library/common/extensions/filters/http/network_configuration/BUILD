@@ -23,6 +23,7 @@ envoy_cc_extension(
         ":filter_cc_proto",
         "//library/common/http:internal_headers_lib",
         "//library/common/network:configurator_lib",
+        "//library/common/stream_info:extra_stream_info_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/http:codes_interface",
         "@envoy//envoy/http:filter_interface",

@@ -88,14 +88,12 @@ envoy_status_t reset_stream(envoy_stream_t stream) {
 }
 
 envoy_status_t set_preferred_network(envoy_network_t network) {
-  envoy_network_t previous = Envoy::Network::Configurator::setPreferredNetwork(network);
-  if (previous != network && previous != ENVOY_NET_GENERIC) {
-    if (auto e = engine()) {
-      e->dispatcher().post([network]() -> void {
-        if (auto e = engine())
-          e->networkConfigurator().refreshDns(network);
-      });
-    }
+  envoy_netconf_t configuration_key = Envoy::Network::Configurator::setPreferredNetwork(network);
+  if (auto e = engine()) {
+    e->dispatcher().post([configuration_key]() -> void {
+      if (auto e = engine())
+        e->networkConfigurator().refreshDns(configuration_key);
+    });
   }
   return ENVOY_SUCCESS;
 }

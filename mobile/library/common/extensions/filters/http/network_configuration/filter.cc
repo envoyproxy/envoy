@@ -7,22 +7,53 @@ namespace Extensions {
 namespace HttpFilters {
 namespace NetworkConfiguration {
 
-Http::FilterHeadersStatus NetworkConfigurationFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  ENVOY_LOG(debug, "NetworkConfigurationFilter::decodeHeaders");
+void NetworkConfigurationFilter::setDecoderFilterCallbacks(
+    Http::StreamDecoderFilterCallbacks& callbacks) {
+  ENVOY_LOG(debug, "NetworkConfigurationFilter::setDecoderFilterCallbacks");
 
-  envoy_network_t network = network_configurator_->getPreferredNetwork();
-  ENVOY_LOG(debug, "current preferred network: {}", network);
+  auto new_extra_stream_info = std::make_unique<StreamInfo::ExtraStreamInfo>();
+  extra_stream_info_ = new_extra_stream_info.get();
 
-  if (enable_interface_binding_) {
-    override_interface_ = network_configurator_->overrideInterface(network);
-  }
-  ENVOY_LOG(debug, "will override interface: {}", override_interface_);
+  decoder_callbacks_ = &callbacks;
+  decoder_callbacks_->streamInfo().filterState()->setData(
+      StreamInfo::ExtraStreamInfo::key(), std::move(new_extra_stream_info),
+      StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Request);
 
-  auto connection_options =
-      network_configurator_->getUpstreamSocketOptions(network, override_interface_);
-  decoder_callbacks_->addUpstreamSocketOptions(connection_options);
+  auto options = std::make_shared<Network::Socket::Options>();
+  network_configurator_->setInterfaceBindingEnabled(enable_interface_binding_);
+  extra_stream_info_->configuration_key_ = network_configurator_->addUpstreamSocketOptions(options);
+  decoder_callbacks_->addUpstreamSocketOptions(options);
+}
+
+Http::FilterHeadersStatus NetworkConfigurationFilter::encodeHeaders(Http::ResponseHeaderMap&,
+                                                                    bool) {
+  ENVOY_LOG(debug, "NetworkConfigurationFilter::encodeHeaders");
+  // Report request status to network configurator, so that socket configuration may be adapted
+  // to current network conditions. Receiving headers from upstream always means some level of
+  // network transmission was successful, so we unconditionally set network_fault to false.
+  network_configurator_->reportNetworkUsage(extra_stream_info_->configuration_key_.value(),
+                                            false /* network_fault */);
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::LocalErrorStatus NetworkConfigurationFilter::onLocalReply(const LocalReplyData& reply) {
+  ENVOY_LOG(debug, "NetworkConfigurationFilter::onLocalReply");
+
+  bool success_status = static_cast<int>(reply.code_) < 400;
+  // Envoy uses local replies to report various local errors, including networking failures (which
+  // Envoy Mobile later surfaces as errors). As a proxy for the many different types of network
+  // errors, this code interprets any local error where a stream received no bytes from the upstream
+  // as a network fault. This status is passed to the configurator below when we report network
+  // usage, where it may be factored into future socket configuration.
+  bool network_fault = !success_status &&
+                       !decoder_callbacks_->streamInfo().firstUpstreamRxByteReceived().has_value();
+  // Report request status to network configurator, so that socket configuration may be adapted
+  // to current network conditions.
+  network_configurator_->reportNetworkUsage(extra_stream_info_->configuration_key_.value(),
+                                            network_fault);
+
+  return Http::LocalErrorStatus::ContinueAndResetStream;
 }
 
 } // namespace NetworkConfiguration
