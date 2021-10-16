@@ -229,13 +229,6 @@ public:
   static bool isMainThreadActive();
 };
 
-// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
-// base. This macros uses main thread assertion to make sure that exceptions aren't thrown from
-// worker thread.
-#define TRY_ASSERT_MAIN_THREAD                                                                     \
-  try {                                                                                            \
-    ASSERT(Thread::MainThread::isMainOrTestThread());
-
 #define END_TRY }
 
 // TODO(chaoqinli-1123): Remove this macros after we have removed all the exceptions from data
@@ -253,6 +246,11 @@ public:
 #define ASSERT_IS_NOT_TEST_THREAD()
 #define ASSERT_IS_NOT_TEST_OR_MAIN_THREAD()
 
+// To improve exception safety in data plane, we plan to forbid the use of raw try in the core code
+// base. This macros uses main thread assertion to make sure that exceptions aren't thrown from
+// worker thread.
+#define TRY_ASSERT_MAIN_THREAD try {
+
 #elif TEST_THREAD_SUPPORTED
 
 #define ASSERT_IS_TEST_THREAD() ASSERT(Thread::TestThread::isTestThread())
@@ -262,12 +260,17 @@ public:
 #define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()                                                        \
   ASSERT(!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()))
 
+#define TRY_ASSERT_MAIN_THREAD                                                                     \
+  try {                                                                                            \
+    ASSERT(Thread::MainThread::isMainOrTestThread());
+
 #else // !TEST_THREAD_SUPPORTED -- test-thread checks are skipped
 
 #define ASSERT_IS_TEST_THREAD()
 #define ASSERT_IS_MAIN_OR_TEST_THREAD()
 #define ASSERT_IS_NOT_TEST_THREAD()
 #define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD() ASSERT(!Thread::MainThread::isMainThread())
+#define TRY_ASSERT_MAIN_THREAD try {
 
 #endif
 
