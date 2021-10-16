@@ -13,11 +13,11 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_impl.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
@@ -358,7 +358,29 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
-  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, dns_resolver_options_);
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -370,6 +392,76 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   EXPECT_EQ(resolvers->next->udp_port, 54);
   EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
                "::1");
+  ares_free_data(resolvers);
+}
+
+TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4_a = Network::Utility::parseInternetAddressAndPort("1.2.3.4:80");
+  auto addr4_b = Network::Utility::parseInternetAddressAndPort("5.6.7.8:81");
+  char addr6str[INET6_ADDRSTRLEN];
+  auto addr6_a = Network::Utility::parseInternetAddressAndPort("[::2]:90");
+  auto addr6_b = Network::Utility::parseInternetAddressAndPort("[::3]:91");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4_a->ip()->addressAsString(), addr4_a->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  // copy addr4_a
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy addr4_b
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4_b->ip()->addressAsString(), addr4_b->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy addr6_a
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6_a->ip()->addressAsString(), addr6_a->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy addr6_b
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6_b->ip()->addressAsString(), addr6_b->ip()->port()),
+      dns_resolvers);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  // check v4
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_EQ(resolvers->udp_port, 80);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
+  EXPECT_EQ(resolvers->next->family, AF_INET);
+  EXPECT_EQ(resolvers->next->udp_port, 81);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->next->addr.addr4, addr4str, INET_ADDRSTRLEN),
+               "5.6.7.8");
+  // check v6
+  EXPECT_EQ(resolvers->next->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->next->udp_port, 90);
+  EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+               "::2");
+  EXPECT_EQ(resolvers->next->next->next->family, AF_INET6);
+  EXPECT_EQ(resolvers->next->next->next->udp_port, 91);
+  EXPECT_STREQ(
+      inet_ntop(AF_INET6, &resolvers->next->next->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
+      "::3");
+
   ares_free_data(resolvers);
 }
 
@@ -409,7 +501,25 @@ private:
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-  auto resolver = dispatcher_->createDnsResolver({test_instance}, dns_resolver_options_);
+
+  // Construct a typed_dns_resolver_config based on the IP address and port number.
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(test_instance->ip()->addressAsString(),
+                                     test_instance->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -424,15 +534,52 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
 TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::config::core::v3::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
-  auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, dns_resolver_options_),
-                            EnvoyException, "DNS resolver 'foo' is not an IP address");
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.add_resolvers()->MergeFrom(pipe_address);
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  EXPECT_THROW_WITH_MESSAGE(
+      {
+        Network::DnsResolverFactory& dns_resolver_factory =
+            createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+        auto resolver =
+            dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+      },
+      EnvoyException, "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   DnsImplTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
+
+  envoy::config::core::v3::TypedExtensionConfig getTypedDnsResolverConfig(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolver_inst,
+      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+    auto dns_resolvers = envoy::config::core::v3::Address();
+
+    // Setup the DNS resolver address. Could be either IPv4 or IPv6.
+    for (const auto& resolver : resolver_inst) {
+      if (resolver->ip() != nullptr) {
+        dns_resolvers.mutable_socket_address()->set_address(resolver->ip()->addressAsString());
+        dns_resolvers.mutable_socket_address()->set_port_value(resolver->ip()->port());
+        cares.add_resolvers()->MergeFrom(dns_resolvers);
+      }
+    }
+    // Copy over the dns_resolver_options_.
+    cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
+    // setup the typed config
+    typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+    typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+
+    return typed_dns_resolver_config;
+  }
 
   void SetUp() override {
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
@@ -441,14 +588,21 @@ public:
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
     listener_ = dispatcher_->createListener(socket_, *server_, true);
     updateDnsResolverOptions();
+
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+
     if (setResolverInConstructor()) {
-      resolver_ = dispatcher_->createDnsResolver({socket_->connectionInfoProvider().localAddress()},
-                                                 dns_resolver_options);
+      typed_dns_resolver_config = getTypedDnsResolverConfig(
+          {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
     } else {
-      resolver_ = dispatcher_->createDnsResolver({}, dns_resolver_options);
+      typed_dns_resolver_config = getTypedDnsResolverConfig({}, dns_resolver_options);
     }
+    Network::DnsResolverFactory& dns_resolver_factory =
+        createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    resolver_ =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));

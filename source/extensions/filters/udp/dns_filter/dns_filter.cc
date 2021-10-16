@@ -5,6 +5,7 @@
 
 #include "source/common/config/datasource.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
@@ -159,21 +160,15 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   forward_queries_ = config.has_client_config();
   if (forward_queries_) {
     const auto& client_config = config.client_config();
-    if (client_config.has_dns_resolution_config()) {
-      dns_resolver_options_.CopyFrom(client_config.dns_resolution_config().dns_resolver_options());
-      if (!client_config.dns_resolution_config().resolvers().empty()) {
-        const auto& resolver_addrs = client_config.dns_resolution_config().resolvers();
-        resolvers_.reserve(resolver_addrs.size());
-        for (const auto& resolver_addr : resolver_addrs) {
-          resolvers_.push_back(Network::Utility::protobufAddressToAddress(resolver_addr));
-        }
-      }
-    }
-
+    dns_resolver_factory_ =
+        &Network::createDnsResolverFactoryFromProto(client_config, typed_dns_resolver_config_);
     // Set additional resolving options from configuration
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
+  } else {
+    // In case client_config doesn't exist, create default DNS resolver factory and save it.
+    dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
   }
 }
 
@@ -255,8 +250,9 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
   };
 
   resolver_ = std::make_unique<DnsFilterResolver>(
-      resolver_callback_, config->resolvers(), config->resolverTimeout(), listener_.dispatcher(),
-      config->maxPendingLookups(), config->dnsResolverOptions());
+      resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
+      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory(),
+      config->api());
 }
 
 void DnsFilter::onData(Network::UdpRecvData& client_request) {

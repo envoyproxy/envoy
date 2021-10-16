@@ -1,4 +1,4 @@
-#include "source/common/network/apple_dns_impl.h"
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 
 #include <dns_sd.h>
 
@@ -10,10 +10,12 @@
 
 #include "envoy/common/platform.h"
 #include "envoy/event/file_event.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/utility.h"
 
 #include "absl/strings/str_join.h"
@@ -366,6 +368,25 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
+// apple DNS resolver factory
+class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
+public:
+  std::string name() const override { return std::string(AppleDnsResolver); }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::apple::v3::AppleDnsResolverConfig()};
+  }
+  DnsResolverSharedPtr
+  createDnsResolver(Event::Dispatcher& dispatcher, Api::Api& api,
+                    const envoy::config::core::v3::TypedExtensionConfig&) const override {
+    ASSERT(dispatcher.isThreadSafe());
+    return std::make_shared<Network::AppleDnsResolverImpl>(dispatcher, api.rootScope());
+  }
+};
+
+// Register the AppleDnsResolverFactory
+REGISTER_FACTORY(AppleDnsResolverFactoryImpl, DnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy
