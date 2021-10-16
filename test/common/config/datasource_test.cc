@@ -1,6 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
 #include "source/common/http/message_impl.h"
@@ -617,22 +618,16 @@ TEST(DataSourceTest, MissingEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "ThisVariableDoesntExist");
   Api::ApiPtr api = Api::createApiForTest();
-  EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
-  EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableDoesntExist");
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableDoesntExist");
 }
-
-struct ScopedEnvironmentVariable {
-  ScopedEnvironmentVariable(const std::string& environment_variable, const std::string& value)
-      : environment_variable_(environment_variable) {
-    TestEnvironment::setEnvVar(environment_variable_, value, 1);
-  }
-  ~ScopedEnvironmentVariable() { TestEnvironment::unsetEnvVar(environment_variable_); }
-  const std::string environment_variable_;
-};
 
 TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
   envoy::config::core::v3::DataSource config;
-  ScopedEnvironmentVariable test_variable("ThisVariableIsEmpty", "");
+  TestEnvironment::setEnvVar("ThisVariableIsEmpty", "", 1);
+  Envoy::Cleanup cleanup([]() { TestEnvironment::unsetEnvVar("ThisVariableIsEmpty"); });
 
   const std::string yaml = R"EOF(
     environment_variable:
@@ -644,11 +639,15 @@ TEST(DataSourceTest, EmptyEnvironmentVariableTest) {
             config.specifier_case());
   EXPECT_EQ(config.environment_variable(), "ThisVariableIsEmpty");
   Api::ApiPtr api = Api::createApiForTest();
-  EXPECT_THROW(DataSource::read(config, false, *api), EnvoyException);
 #ifdef WIN32
   // Windows doesn't support empty environment variables.
-  EXPECT_THROW(DataSource::read(config, true, *api), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableIsEmpty");
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, true, *api), EnvoyException,
+                            "Environment variable doesn't exist: ThisVariableIsEmpty");
 #else
+  EXPECT_THROW_WITH_MESSAGE(DataSource::read(config, false, *api), EnvoyException,
+                            "DataSource cannot be empty");
   const auto environment_variable = DataSource::read(config, true, *api);
   EXPECT_TRUE(environment_variable.empty());
 #endif
