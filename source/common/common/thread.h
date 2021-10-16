@@ -170,10 +170,9 @@ public:
 
 // We use platform-specific functions to determine whether the current thread is
 // the "test thread". It is only valid to call isTestThread() on platforms where
-// these functions are available.
-#ifdef __linux__
-#define TEST_THREAD_SUPPORTED 1
-#elif defined(__APPLE__)
+// these functions are available. Currently this is available only on windows
+// and linux.
+#if defined(__linux__) || defined(__APPLE__)
 #define TEST_THREAD_SUPPORTED 1
 #else
 #define TEST_THREAD_SUPPORTED 0
@@ -266,7 +265,8 @@ public:
 #else // !TEST_THREAD_SUPPORTED -- test-thread checks are skipped
 
 #define ASSERT_IS_TEST_THREAD()
-#define ASSERT_IS_MAIN_OR_TEST_THREAD() #define ASSERT_IS_NOT_TEST_THREAD()
+#define ASSERT_IS_MAIN_OR_TEST_THREAD()
+#define ASSERT_IS_NOT_TEST_THREAD()
 #define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD() ASSERT(!Thread::MainThread::isMainThread())
 
 #endif
