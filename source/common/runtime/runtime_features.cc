@@ -57,7 +57,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
-    "envoy.reloadable_features.check_unsupported_typed_per_filter_config",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
@@ -108,6 +107,8 @@ constexpr const char* runtime_features[] = {
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
+    // TODO(alyssawilk, junr03) flip (and add release notes + docs) these after Lyft tests
+    "envoy.reloadable_features.allow_multiple_dns_addresses",
     // TODO(asraa) flip to true in a separate PR to enable the new JSON by default.
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.

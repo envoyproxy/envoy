@@ -133,9 +133,6 @@ public:
                Network::Address::InstanceConstSharedPtr source_address,
                Network::TransportSocketPtr& transport_socket,
                const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
-              (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-               const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options));
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());

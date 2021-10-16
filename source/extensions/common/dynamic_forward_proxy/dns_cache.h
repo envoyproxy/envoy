@@ -26,6 +26,12 @@ public:
   virtual Network::Address::InstanceConstSharedPtr address() const PURE;
 
   /**
+   * Returns the host's currently resolved address. These addresses may change periodically due to
+   * async re-resolution.
+   */
+  virtual std::vector<Network::Address::InstanceConstSharedPtr> addressList() const PURE;
+
+  /**
    * Returns the host that was actually resolved via DNS. If port was originally specified it will
    * be stripped from this return value.
    */

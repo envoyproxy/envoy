@@ -225,7 +225,7 @@ public:
   /**
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -356,6 +356,11 @@ public:
    * @param the account to assign this stream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 /**
