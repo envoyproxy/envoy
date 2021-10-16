@@ -27,15 +27,15 @@ service ThriftRouteDiscoveryService {
   option (envoy.annotations.resource).type =
       "envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration";
 
-  rpc StreamRoutes(stream discovery.v3.DiscoveryRequest)
+  rpc StreamThriftRoutes(stream discovery.v3.DiscoveryRequest)
       returns (stream discovery.v3.DiscoveryResponse) {
   }
 
-  rpc DeltaRoutes(stream discovery.v3.DeltaDiscoveryRequest)
+  rpc DeltaThriftRoutes(stream discovery.v3.DeltaDiscoveryRequest)
       returns (stream discovery.v3.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchRoutes(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
+  rpc FetchThriftRoutes(discovery.v3.DiscoveryRequest) returns (discovery.v3.DiscoveryResponse) {
     option (google.api.http).post = "/v3/discovery:thrift_routes";
     option (google.api.http).body = "*";
   }
