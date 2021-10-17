@@ -48,7 +48,7 @@ TEST(TypeToEndpoint, Thrift) {
   envoy::service::thrift::v3::TrdsDummy _v3_trds_dummy;
 
   EXPECT_EQ(
-      "envoy.service.thrift.v3.ThriftRouteDiscoveryService.StreamRoutes",
+      "envoy.service.thrift.v3.ThriftRouteDiscoveryService.StreamThriftRoutes",
       sotwGrpcMethod(
           "type.googleapis.com/envoy.extensions.filters.network.thrift_proxy.v3.RouteConfiguration")
           .full_name());
