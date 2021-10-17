@@ -18,7 +18,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
