@@ -20,10 +20,12 @@ namespace {
 // call-sites for isMainThread(), which might be a bit of work, but will make
 // tests more hermetic.
 struct ThreadIds {
-  // We don't take the lock when testing the thread IDs, as they are atomic,
-  // and are cleared when being released. All possible thread orderings
-  // result in the correct result even without a lock.
-  bool inMainThread() const { return std::this_thread::get_id() == main_thread_id_; }
+  bool inMainThread() const {
+    // We don't take the lock when testing the thread IDs, as they are atomic,
+    // and are cleared when being released. All possible thread orderings
+    // result in the correct result even without a lock.
+    return std::this_thread::get_id() == main_thread_id_;
+  }
 
   bool isMainThreadActive() const {
     absl::MutexLock lock(&mutex_);
@@ -81,7 +83,7 @@ MainThread::~MainThread() { ThreadIds::get().releaseMainThread(); }
 
 #if TEST_THREAD_SUPPORTED
 bool TestThread::isTestThread() {
-  // Keep this implementation consistent with checkIsSupported() below.
+  // Keep this implementation consistent with TEST_THREAD_SUPPORTED, defined in thread.h.
   // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
 #ifdef __linux__
   return getpid() == syscall(SYS_gettid);
