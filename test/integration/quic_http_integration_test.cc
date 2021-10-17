@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/test_runtime.h"
@@ -30,7 +31,6 @@
 #include "source/common/quic/active_quic_listener.h"
 #include "source/common/quic/client_connection_factory_impl.h"
 #include "source/common/quic/envoy_quic_client_session.h"
-#include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -63,6 +63,88 @@ public:
   Http::StreamResetReason last_stream_reset_reason_{Http::StreamResetReason::LocalReset};
 };
 
+// This class enables testing on QUIC path validation
+class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
+public:
+  TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
+                                Network::Address::InstanceConstSharedPtr& initial_peer_address,
+                                quic::QuicConnectionHelperInterface& helper,
+                                quic::QuicAlarmFactory& alarm_factory,
+                                const quic::ParsedQuicVersionVector& supported_versions,
+                                Network::Address::InstanceConstSharedPtr local_addr,
+                                Event::Dispatcher& dispatcher,
+                                const Network::ConnectionSocket::OptionsSharedPtr& options,
+                                bool validation_failure_on_path_response)
+      : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
+                                  supported_versions, local_addr, dispatcher, options),
+        dispatcher_(dispatcher),
+        validation_failure_on_path_response_(validation_failure_on_path_response) {}
+
+  AssertionResult
+  waitForPathResponse(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    bool timer_fired = false;
+    if (!saw_path_response_) {
+      Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+        timer_fired = true;
+        dispatcher_.exit();
+      }));
+      timer->enableTimer(timeout);
+      waiting_for_path_response_ = true;
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+      if (timer_fired) {
+        return AssertionFailure() << "Timed out waiting for path response\n";
+      }
+    }
+    return AssertionSuccess();
+  }
+
+  bool OnPathResponseFrame(const quic::QuicPathResponseFrame& frame) override {
+    saw_path_response_ = true;
+    if (waiting_for_path_response_) {
+      dispatcher_.exit();
+    }
+    if (!validation_failure_on_path_response_) {
+      return EnvoyQuicClientConnection::OnPathResponseFrame(frame);
+    }
+    CancelPathValidation();
+    return connected();
+  }
+
+  AssertionResult
+  waitForHandshakeDone(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    bool timer_fired = false;
+    if (!saw_handshake_done_) {
+      Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
+        timer_fired = true;
+        dispatcher_.exit();
+      }));
+      timer->enableTimer(timeout);
+      waiting_for_handshake_done_ = true;
+      dispatcher_.run(Event::Dispatcher::RunType::Block);
+      if (timer_fired) {
+        return AssertionFailure() << "Timed out waiting for handshake done\n";
+      }
+    }
+    return AssertionSuccess();
+  }
+
+  bool OnHandshakeDoneFrame(const quic::QuicHandshakeDoneFrame& frame) override {
+    saw_handshake_done_ = true;
+    if (waiting_for_handshake_done_) {
+      dispatcher_.exit();
+    }
+    return EnvoyQuicClientConnection::OnHandshakeDoneFrame(frame);
+  }
+
+private:
+  Event::Dispatcher& dispatcher_;
+  bool saw_path_response_{false};
+  bool saw_handshake_done_{false};
+  bool waiting_for_path_response_{false};
+  bool waiting_for_handshake_done_{false};
+  bool validation_failure_on_path_response_{false};
+};
+
 // A test that sets up its own client connection with customized quic version and connection ID.
 class QuicHttpIntegrationTest : public HttpIntegrationTest,
                                 public testing::TestWithParam<Network::Address::IpVersion> {
@@ -71,7 +153,9 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP3, GetParam(),
                             ConfigHelper::quicHttpProxyConfig()),
         supported_versions_(quic::CurrentSupportedHttp3Versions()), conn_helper_(*dispatcher_),
-        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
+        alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {
+    SetQuicReloadableFlag(quic_remove_connection_migration_connection_option, true);
+  }
 
   ~QuicHttpIntegrationTest() override {
     cleanupUpstreamAndDownstream();
@@ -98,9 +182,10 @@ public:
     // supported by server, this connection will fail.
     // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
     // different version set on server side to test that.
-    auto connection = std::make_unique<EnvoyQuicClientConnection>(
+    auto connection = std::make_unique<TestEnvoyQuicClientConnection>(
         getNextConnectionId(), server_addr_, conn_helper_, alarm_factory_,
-        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
+        quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr,
+        validation_failure_on_path_response_);
     quic_connection_ = connection.get();
     ASSERT(quic_connection_persistent_info_ != nullptr);
     auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
@@ -119,11 +204,31 @@ public:
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
-    IntegrationCodecClientPtr codec =
-        HttpIntegrationTest::makeRawHttpConnection(std::move(conn), http2_options);
-    if (!codec->disconnected()) {
-      codec->setCodecClientCallbacks(client_codec_callback_);
+    std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
+    cluster->max_response_headers_count_ = 200;
+    if (http2_options.has_value()) {
+      cluster->http3_options_ = ConfigHelper::http2ToHttp3ProtocolOptions(
+          http2_options.value(), quic::kStreamReceiveWindowLimit);
     }
+    cluster->http3_options_.set_allow_extended_connect(true);
+    *cluster->http3_options_.mutable_quic_protocol_options() = client_quic_options_;
+    Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
+        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
+        timeSystem())};
+    // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
+    // in-connection version negotiation.
+    auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
+                                                          host_description, downstream_protocol_);
+    if (codec->disconnected()) {
+      // Connection may get closed during version negotiation or handshake.
+      // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
+      // INVALID_VERSION error to caller and let caller to use server advertised version list to
+      // create a new connection with mutually supported version and make client codec again.
+      ENVOY_LOG(error, "Fail to connect to server with error: {}",
+                codec->connection()->transportFailureReason());
+      return codec;
+    }
+    codec->setCodecClientCallbacks(client_codec_callback_);
     return codec;
   }
 
@@ -223,9 +328,11 @@ protected:
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
-  EnvoyQuicClientConnection* quic_connection_{nullptr};
+  envoy::config::core::v3::QuicProtocolOptions client_quic_options_;
+  TestEnvoyQuicClientConnection* quic_connection_{nullptr};
   std::list<quic::QuicConnectionId> designated_connection_ids_;
   Quic::QuicClientTransportSocketFactory* transport_socket_factory_{nullptr};
+  bool validation_failure_on_path_response_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicHttpIntegrationTest,
@@ -361,6 +468,120 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
       createConnectionSocket(server_addr_, local_addr, options));
   EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
+}
+
+TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
+  concurrency_ = 2;
+  initialize();
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto old_self_addr = quic_connection_->self_address();
+  quic_connection_->OnPathDegradingDetected();
+  ASSERT_TRUE(quic_connection_->waitForPathResponse());
+  auto self_addr = quic_connection_->self_address();
+  EXPECT_NE(old_self_addr, self_addr);
+
+  // Send the rest data.
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+}
+
+TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
+  concurrency_ = 2;
+  initialize();
+  client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(0);
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto old_self_addr = quic_connection_->self_address();
+  quic_connection_->OnPathDegradingDetected();
+  ASSERT_FALSE(quic_connection_->waitForPathResponse(std::chrono::milliseconds(2000)));
+  auto self_addr = quic_connection_->self_address();
+  EXPECT_EQ(old_self_addr, self_addr);
+
+  // Send the rest data.
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+}
+
+TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
+  concurrency_ = 2;
+  validation_failure_on_path_response_ = true;
+  initialize();
+  uint32_t old_port = lookupPort("http");
+  codec_client_ = makeHttpConnection(old_port);
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto old_self_addr = quic_connection_->self_address();
+  quic_connection_->OnPathDegradingDetected();
+  ASSERT_TRUE(quic_connection_->waitForPathResponse());
+  auto self_addr = quic_connection_->self_address();
+  // The path validation will fail and thus client self address will not change.
+  EXPECT_EQ(old_self_addr, self_addr);
+
+  // Send the rest data.
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
 }
 
 TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {

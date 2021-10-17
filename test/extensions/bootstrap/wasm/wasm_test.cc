@@ -56,7 +56,7 @@ public:
     auto config = plugin_->wasmConfig();
     config.allowedCapabilities() = allowed_capabilities_;
     config.environmentVariables() = envs_;
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_,
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_, *api_,
                                                              cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(

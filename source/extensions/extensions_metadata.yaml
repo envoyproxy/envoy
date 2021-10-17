@@ -704,6 +704,16 @@ envoy.key_value.file_based:
   - envoy.common.key_value
   security_posture: data_plane_agnostic
   status: alpha
+envoy.network.dns_resolver.cares:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.network.dns_resolver.apple:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
