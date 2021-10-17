@@ -9,6 +9,7 @@
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "absl/types/optional.h"
@@ -32,7 +33,8 @@ class SanMatcherFactory : public Config::TypedFactory {
 public:
   ~SanMatcherFactory() override = default;
 
-  virtual SanMatcherPtr createSanMatcher(const Protobuf::Message* config) PURE;
+  virtual SanMatcherPtr
+  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig* config) PURE;
 
   std::string category() const override { return "envoy.san_matchers"; }
 };

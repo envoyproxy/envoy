@@ -254,8 +254,23 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
+// String matcher for subject alternative names, to match both type and value of the SAN.
+message StringSanMatcher {
+  enum SanType {
+    EMAIL_ID = 0;
+    DNS_ID = 1;
+    URI_ID = 2;
+    IP_ADD = 3;
+  }
+  SanType san_type = 1 [(validate.rules).enum = {in: [0, 3]}];
+  type.matcher.v3.StringMatcher matcher = 2;
+}
+
 message SubjectAltNameMatcher {
-  google.protobuf.Any typed_config = 1;
+  oneof matcher {
+    StringSanMatcher string_matcher = 1;
+    config.core.v3.TypedExtensionConfig typed_config = 2;
+  }
 }
 
 // [#next-free-field: 15]
@@ -393,6 +408,8 @@ message CertificateValidationContext {
 
   // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matchers.
+  // The matching uses "any" semantics, that is to say, the SAN is verified if at least one matcher is
+  // matched.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`.
@@ -402,9 +419,10 @@ message CertificateValidationContext {
   // .. code-block:: yaml
   //
   //  match_subject_alt_names_with_type:
-  //    typed_config:
-  //      "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.common.DnsSanMatcher
-  //      exact: "api.example.com"
+  //    string_matcher:
+  //      san_type: DNS_ID
+  //      matcher:
+  //        exact: "api.example.com"
   //
   // .. attention::
   //
@@ -417,6 +435,7 @@ message CertificateValidationContext {
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names_with_type>`
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
 
@@ -444,24 +463,4 @@ message CertificateValidationContext {
   // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
-}
-
-// Matcher for DNS type subject alternative name.
-message DnsSanMatcher {
-  type.matcher.v3.StringMatcher matcher = 1;
-}
-
-// Matcher for email type subject alternative name.
-message EmailSanMatcher {
-  type.matcher.v3.StringMatcher matcher = 1;
-}
-
-// Matcher for URI type subject alternative name.
-message UriSanMatcher {
-  type.matcher.v3.StringMatcher matcher = 1;
-}
-
-// Matcher for IP address type subject alternative name.
-message IpAddSanMatcher {
-  type.matcher.v3.StringMatcher matcher = 1;
 }

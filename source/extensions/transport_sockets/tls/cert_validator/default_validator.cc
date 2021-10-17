@@ -148,14 +148,12 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        if (matcher.typed_config().Is<envoy::type::matcher::v3::StringMatcher>()) {
-          // Special handling for deprecated san matcher that does not check
-          // type.
-          subject_alt_name_matchers_.emplace_back(createBackwardsCompatibleSanMatcher(matcher));
+        if (matcher.has_string_matcher()) {
+          subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher.string_matcher()));
         } else {
           auto const factory =
-              Envoy::Config::Utility::getFactoryByType<Envoy::Ssl::SanMatcherFactory>(
-                  matcher.typed_config());
+              Envoy::Config::Utility::getAndCheckFactory<Envoy::Ssl::SanMatcherFactory>(
+                  matcher.typed_config(), true);
           if (factory != nullptr) {
             subject_alt_name_matchers_.emplace_back(
                 factory->createSanMatcher(&matcher.typed_config()));

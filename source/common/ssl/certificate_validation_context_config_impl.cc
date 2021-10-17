@@ -1,6 +1,7 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions//transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
@@ -64,10 +65,18 @@ CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
       subject_alt_name_matchers(config.match_subject_alt_names_with_type().begin(),
                                 config.match_subject_alt_names_with_type().end());
+  // Handle deprecated string type san matchers without san type specified, by
+  // creating backwards compatible san matcher configs.
   for (auto& matcher : config.match_subject_alt_names()) {
     subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_allocated_typed_config(new ProtobufWkt::Any());
-    subject_alt_name_matchers.back().mutable_typed_config()->PackFrom(matcher);
+    subject_alt_name_matchers.back().set_allocated_typed_config(
+        new ::envoy::config::core::v3::TypedExtensionConfig());
+    subject_alt_name_matchers.back().mutable_typed_config()->set_allocated_typed_config(
+        new ProtobufWkt::Any());
+    subject_alt_name_matchers.back().mutable_typed_config()->mutable_typed_config()->PackFrom(
+        matcher);
+    subject_alt_name_matchers.back().mutable_typed_config()->mutable_name()->assign(
+        "envoy.san_matchers.backward_compatible_san_matcher");
   }
   return subject_alt_name_matchers;
 }
