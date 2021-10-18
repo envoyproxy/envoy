@@ -115,8 +115,7 @@ message Cluster {
     // This has been deprecated in favor of using the :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
     // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
-    LOAD_BALANCING_POLICY_CONFIG = 7
-        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+    LOAD_BALANCING_POLICY_CONFIG = 7;
   }
 
   // When V4_ONLY is selected, the DNS resolver will only perform a lookup for
