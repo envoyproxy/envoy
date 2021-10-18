@@ -3533,6 +3533,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // stream error.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  EXPECT_EQ(1, 0);
 }
 
 class NoUdpGso : public Api::OsSysCallsImpl {

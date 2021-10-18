@@ -94,7 +94,7 @@ TEST_P(MultiplexedIntegrationTest, LargeFlowControlOnAndGiantBodyWithContentLeng
   config_helper_.setBufferLimits(128 * 1024,
                                  128 * 1024); // Set buffer limits upstream and downstream.
   testRouterRequestAndResponseWithBody(10 * 1024 * 1024, 10 * 1024 * 1024, false, true, nullptr,
-                                       TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
+                                       3 * TSAN_TIMEOUT_FACTOR * TestUtility::DefaultTimeout);
 }
 
 TEST_P(MultiplexedIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
@@ -1927,6 +1927,7 @@ TEST_P(MultiplexedIntegrationTest, InvalidTrailers) {
   autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
