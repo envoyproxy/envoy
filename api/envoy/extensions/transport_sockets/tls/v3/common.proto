@@ -262,13 +262,16 @@ message StringSanMatcher {
     URI_ID = 2;
     IP_ADD = 3;
   }
-  SanType san_type = 1 [(validate.rules).enum = {in: [0, 3]}];
+
+  SanType san_type = 1 [(validate.rules).enum.defined_only = true];
+
   type.matcher.v3.StringMatcher matcher = 2;
 }
 
 message SubjectAltNameMatcher {
   oneof matcher {
     StringSanMatcher string_matcher = 1;
+
     config.core.v3.TypedExtensionConfig typed_config = 2;
   }
 }
