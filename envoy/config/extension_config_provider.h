@@ -43,12 +43,12 @@ public:
    * Update the provider with a new configuration. This interface accepts proto rather than a
    * factory callback so that it can be generic over factory types. If instantiating the factory
    * throws, it should only do so on the main thread, before any changes are applied to workers.
-   * @param proto_config is the new configuration. It is expected that the configuration has already
-   * been validated.
+   * @param config is the new configuration. It is expected that the configuration has already been
+   * validated.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
    */
-  virtual void onConfigUpdate(const ProtobufWkt::Any& proto_config, const std::string& version_info,
+  virtual void onConfigUpdate(const Protobuf::Message& config, const std::string& version_info,
                               ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
