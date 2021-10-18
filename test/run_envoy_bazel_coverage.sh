@@ -64,7 +64,8 @@ else
 fi
 
 # Don't block coverage on flakes.
-BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2")
+# Output unusually long logs due to tracel logging.
+BAZEL_BUILD_OPTIONS+=("--flaky_test_attempts=2 --experimental_ui_max_stdouterr_bytes=5000000")
 
 bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
