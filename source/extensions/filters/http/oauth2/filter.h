@@ -95,6 +95,26 @@ struct FilterStats {
 };
 
 /**
+ * Helper structure to hold custom cookie names.
+ */
+struct CookieNames {
+  CookieNames(const envoy::extensions::filters::http::oauth2::v3::OAuth2Credentials::CookieNames&
+                  cookie_names)
+      : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
+                    cookie_names.oauth_expires()) {}
+
+  CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
+              const std::string& oauth_expires)
+      : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
+        oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
+        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {}
+
+  const std::string bearer_token_;
+  const std::string oauth_hmac_;
+  const std::string oauth_expires_;
+};
+
+/**
  * This class encapsulates all data needed for the filter to operate so that we don't pass around
  * raw protobufs and other arbitrary data.
  */
@@ -123,6 +143,7 @@ public:
   FilterStats& stats() { return stats_; }
   const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
   const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
+  const CookieNames& cookieNames() const { return cookie_names_; }
 
 private:
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -139,6 +160,7 @@ private:
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
   const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const CookieNames cookie_names_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -164,7 +186,8 @@ public:
 
 class OAuth2CookieValidator : public CookieValidator {
 public:
-  explicit OAuth2CookieValidator(TimeSource& time_source) : time_source_(time_source) {}
+  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names)
+      : time_source_(time_source), cookie_names_(cookie_names) {}
 
   const std::string& token() const override { return token_; }
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
@@ -179,6 +202,7 @@ private:
   std::vector<uint8_t> secret_;
   absl::string_view host_;
   TimeSource& time_source_;
+  const CookieNames cookie_names_;
 };
 
 /**
