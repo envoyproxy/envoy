@@ -6,10 +6,10 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
-#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "absl/types/optional.h"
