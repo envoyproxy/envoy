@@ -192,6 +192,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
+# DNS Resolver
+/*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
+/*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
