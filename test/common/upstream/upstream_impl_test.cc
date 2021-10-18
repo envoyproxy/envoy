@@ -2839,6 +2839,33 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
+TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options: {{}}
+      common_http_protocol_options:
+        max_connection_duration: {}
+  )EOF";
+
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
+}
+
 TEST_F(ClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name

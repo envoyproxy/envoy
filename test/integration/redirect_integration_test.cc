@@ -187,6 +187,70 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   EXPECT_THAT(waitForAccessLog(access_log_name_, 1), HasSubstr("200 via_upstream -\n"));
 }
 
+TEST_P(RedirectIntegrationTest, BasicInternalRedirectDownstreamBytesCount) {
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 63, 0, 31),
+                                       BytesCountExpectation(0, 42, 0, 42), 0);
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(140, 63, 121, 31),
+                                       BytesCountExpectation(77, 42, 77, 42), 1);
+}
+
+TEST_P(RedirectIntegrationTest, BasicInternalRedirectUpstreamBytesCount) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+  useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(195, 110, 164, 85),
+                                     BytesCountExpectation(137, 64, 137, 64), 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(244, 38, 219, 18),
+                                     BytesCountExpectation(85, 10, 85, 10), 1);
+}
+
 TEST_P(RedirectIntegrationTest, InternalRedirectStripsUriFragment) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(

@@ -248,9 +248,6 @@ message Bootstrap {
   // when :ref:`dns_resolvers <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups <envoy_v3_api_field_config.cluster.v3.Cluster.use_tcp_for_dns_lookups>` are
   // specified.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 20
@@ -260,23 +257,22 @@ message Bootstrap {
   // This may be overridden on a per-cluster basis in cds_config, when
   // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
   // is specified.
-  // *dns_resolution_config* will be deprecated once
-  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>'
-  // is fully supported.
-  core.v3.DnsResolutionConfig dns_resolution_config = 30;
+  // This field is deprecated in favor of
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`.
+  core.v3.DnsResolutionConfig dns_resolution_config = 30
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-  // :ref:'dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>'
-  // configuration eventually.
-  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>`
+  // configuration.
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // this configuration is optional.
-  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
+  // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 31;
 
   // Specifies optional bootstrap extensions to be instantiated at startup time.

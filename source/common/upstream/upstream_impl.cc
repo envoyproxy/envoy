@@ -921,6 +921,16 @@ ClusterInfoImpl::ClusterInfoImpl(
     idle_timeout_ = std::chrono::hours(1);
   }
 
+  if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
+    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.max_connection_duration()));
+    if (max_connection_duration_.value().count() == 0) {
+      max_connection_duration_ = absl::nullopt;
+    }
+  } else {
+    max_connection_duration_ = absl::nullopt;
+  }
+
   if (config.has_eds_cluster_config()) {
     if (config.type() != envoy::config::cluster::v3::Cluster::EDS) {
       throw EnvoyException("eds_cluster_config set in a non-EDS cluster");
