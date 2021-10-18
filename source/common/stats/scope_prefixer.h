@@ -60,6 +60,8 @@ public:
   bool iterate(const IterateFn<Histogram>& fn) const override { return iterHelper(fn); }
   bool iterate(const IterateFn<TextReadout>& fn) const override { return iterHelper(fn); }
 
+  StatName prefix() const override { return prefix_.statName(); }
+
 private:
   template <class StatType> bool iterHelper(const IterateFn<StatType>& fn) const {
     // We determine here what's in the scope by looking at name

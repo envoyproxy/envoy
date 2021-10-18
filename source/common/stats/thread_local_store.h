@@ -252,6 +252,8 @@ public:
 
   void forEachTextReadout(std::function<void(std::size_t)> f_size,
                           std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    std::function<void(const Scope&)> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -447,6 +449,8 @@ private:
     findStatLockHeld(StatName name,
                      StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
+    StatName prefix() const override { return prefix_.statName(); }
+
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
@@ -480,6 +484,8 @@ private:
     }
     return true;
   }
+
+  StatName prefix() const override { return StatName(); }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;
   void clearScopesFromCaches();

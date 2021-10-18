@@ -65,6 +65,9 @@ public:
 
   virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
                                   std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+
+  virtual void forEachScope(std::function<void(std::size_t)> f_size,
+                            std::function<void(const Scope&)> f_stat) const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;

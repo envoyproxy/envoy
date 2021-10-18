@@ -70,14 +70,12 @@ private:
 
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool used_only, const absl::optional<std::regex>& regex,
+                                 const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                                  bool pretty_print = false);
 
   void statsAsText(const std::map<std::string, uint64_t>& all_stats,
                    const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                   bool used_only, const absl::optional<std::regex>& regex,
+                   const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                    Buffer::Instance& response);
 
   Http::Code statsAsHtml(const Http::Utility::QueryParams& query_params,

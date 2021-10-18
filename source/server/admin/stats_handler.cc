@@ -93,37 +93,90 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     }
   }
 
+  if (params.find("scopes") != params.end()) {
+    Stats::StatNameHashSet prefixes;
+    server_.stats().forEachScope([](size_t) {}, [&prefixes](const Stats::Scope& scope) {
+      prefixes.insert(scope.prefix());
+    });
+    std::vector<std::string> names;
+    names.reserve(prefixes.size());
+    for (Stats::StatName prefix : prefixes) {
+      names.emplace_back(server_.stats().symbolTable().toString(prefix));
+    }
+    std::sort(names.begin(), names.end());
+    for (std::string& name : names) {
+      name = absl::StrCat("<a href='/stats?scope=", name, "'>", name, "</a>");
+    }
+    response.add(absl::StrJoin(names, "<br>\n"));
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+    return Http::Code::OK;
+  }
+
   std::map<std::string, uint64_t> all_stats;
-  for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (shouldShowMetric(*counter, used_only, regex)) {
-      all_stats.emplace(counter->name(), counter->value());
-    }
-  }
-
-  for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (shouldShowMetric(*gauge, used_only, regex)) {
-      ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      all_stats.emplace(gauge->name(), gauge->value());
-    }
-  }
-
   std::map<std::string, std::string> text_readouts;
-  for (const auto& text_readout : server_.stats().textReadouts()) {
-    if (shouldShowMetric(*text_readout, used_only, regex)) {
-      text_readouts.emplace(text_readout->name(), text_readout->value());
-    }
+  std::vector<Stats::HistogramSharedPtr> histograms;
+  auto append_stats_from_scope = [&all_stats, used_only, &regex, &text_readouts, &histograms]
+                                 (const Stats::Scope& scope) {
+    Stats::IterateFn<Stats::Counter> cfn =
+        [&all_stats, used_only, &regex](const Stats::CounterSharedPtr& counter) -> bool {
+          if (shouldShowMetric(*counter, used_only, regex)) {
+            all_stats.emplace(counter->name(), counter->value());
+          }
+          return true;
+        };
+    scope.iterate(cfn);
+
+    Stats::IterateFn<Stats::Gauge> gfn =
+        [&all_stats, used_only, &regex](const Stats::GaugeSharedPtr& gauge) -> bool {
+          if (shouldShowMetric(*gauge, used_only, regex)) {
+            ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+            all_stats.emplace(gauge->name(), gauge->value());
+          }
+          return true;
+        };
+    scope.iterate(gfn);
+
+    Stats::IterateFn<Stats::TextReadout> tfn =
+        [&text_readouts, used_only, &regex](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
+          if (shouldShowMetric(*text_readout, used_only, regex)) {
+            text_readouts.emplace(text_readout->name(), text_readout->value());
+          }
+          return true;
+        };
+    scope.iterate(tfn);
+
+    Stats::IterateFn<Stats::Histogram> hfn =
+        [&histograms, used_only, &regex](const Stats::HistogramSharedPtr& histogram) -> bool {
+          if (shouldShowMetric(*histogram, used_only, regex)) {
+            histograms.push_back(histogram);
+          }
+          return true;
+        };
+    scope.iterate(hfn);
+  };
+
+  Http::Utility::QueryParams::const_iterator scope_iter = params.find("scope");
+  if (scope_iter == params.end()) {
+    append_stats_from_scope(server_.stats());
+  } else {
+    Stats::StatNameManagedStorage scope_name(scope_iter->second, server_.stats().symbolTable());
+    server_.stats().forEachScope([](size_t) {}, [&scope_name, &append_stats_from_scope](
+        const Stats::Scope& scope) {
+      if (scope.prefix() == scope_name.statName()) {
+        append_stats_from_scope(scope);
+      }
+    });
   }
 
   if (!format_value.has_value()) {
     // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, server_.stats().histograms(), used_only, regex, response);
+    statsAsText(all_stats, text_readouts, histograms, response);
     return Http::Code::OK;
   }
 
   if (format_value.value() == "json") {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(
-        statsAsJson(all_stats, text_readouts, server_.stats().histograms(), used_only, regex));
+    response.add(statsAsJson(all_stats, text_readouts, histograms));
     return Http::Code::OK;
   }
 
@@ -234,8 +287,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
 
 void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
                                const std::map<std::string, std::string>& text_readouts,
-                               const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                               bool used_only, const absl::optional<std::regex>& regex,
+                               const std::vector<Stats::HistogramSharedPtr>& histograms,
                                Buffer::Instance& response) {
   // Display plain stats if format query param is not there.
   for (const auto& text_readout : text_readouts) {
@@ -245,23 +297,18 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   for (const auto& stat : all_stats) {
     response.add(fmt::format("{}: {}\n", stat.first, stat.second));
   }
-  std::map<std::string, std::string> all_histograms;
-  for (const Stats::ParentHistogramSharedPtr& histogram : histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
-      auto insert = all_histograms.emplace(histogram->name(), histogram->quantileSummary());
-      ASSERT(insert.second); // No duplicates expected.
+  for (const auto& histogram : histograms) {
+    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+    if (phist != nullptr) {
+      response.add(fmt::format("{}: {}\n", phist->name(), phist->quantileSummary()));
     }
-  }
-  for (const auto& histogram : all_histograms) {
-    response.add(fmt::format("{}: {}\n", histogram.first, histogram.second));
   }
 }
 
 std::string
 StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                           const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                          const bool used_only, const absl::optional<std::regex>& regex,
+                          const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                           const bool pretty_print) {
 
   ProtobufWkt::Struct document;
@@ -289,8 +336,9 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   std::vector<ProtobufWkt::Value> computed_quantile_array;
 
   bool found_used_histogram = false;
-  for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (shouldShowMetric(*histogram, used_only, regex)) {
+  for (const Stats::HistogramSharedPtr& histogram : all_histograms) {
+    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
+    if (phist != nullptr) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
@@ -309,11 +357,11 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
       (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
 
       std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
+      for (size_t i = 0; i < phist->intervalStatistics().supportedQuantiles().size(); ++i) {
         ProtobufWkt::Struct computed_quantile_value;
         auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
-        const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
+        const auto& interval = phist->intervalStatistics().computedQuantiles()[i];
+        const auto& cumulative = phist->cumulativeStatistics().computedQuantiles()[i];
         (*computed_quantile_value_fields)["interval"] =
             std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
         (*computed_quantile_value_fields)["cumulative"] =

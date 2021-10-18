@@ -249,6 +249,8 @@ public:
    *         was hit.
    */
   virtual bool iterate(const IterateFn<TextReadout>& fn) const PURE;
+
+  virtual StatName prefix() const PURE;
 };
 
 } // namespace Stats

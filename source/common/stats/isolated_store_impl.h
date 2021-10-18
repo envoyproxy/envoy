@@ -231,6 +231,15 @@ public:
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    std::function<void(const Scope&)> f_scope) const override {
+    f_size(1);
+    const Scope& scope = *this;
+    f_scope(scope);
+  }
+
+  Stats::StatName prefix() const override { return StatName(); }
+
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);
 

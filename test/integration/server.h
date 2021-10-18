@@ -296,6 +296,11 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    std::function<void(const Scope&)> f_scope) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachScope(f_size, f_scope);
+  }
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
