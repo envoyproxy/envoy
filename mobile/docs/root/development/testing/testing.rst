@@ -7,6 +7,7 @@ Testing
   :maxdepth: 2
 
   local_stats
+  custom_envoy
 
 Envoy Mobile strives to have a high standard of code quality and test coverage for the entire
 project.
