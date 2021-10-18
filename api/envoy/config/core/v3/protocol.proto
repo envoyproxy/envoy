@@ -28,18 +28,27 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
-//
+// Config for keepalive probes in a QUIC connection.
+// Note that QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+// itself doesn't timeout waiting for a probing response. Quic has a shorter idle timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
+// And there is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
+// since a similar feature is built into QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before
+// sending a new request.
 message QuicKeepAliveSettings {
   // The max interval in seconds for a connection to send keep-alive probing packets
-  // (with PING or PATH_RESPONSE).
+  // (with PING or PATH_RESPONSE). The value should be smaller than :ref:`connection idle_timeout
+  // <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>`
+  // to prevent idle timeout while not less than 1s to avoid throttling the connection or flooding the peer with probes.
   //
-  // If :ref:`initial_interval_seconds <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.initial_interval_seconds>` is zero, a client connection will use this value to
-  // start probing. In such case, the value should be smaller than
-  // :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to
-  // prevent idle timeout while not too small to throttle the connection or to flood the peer.
+  // If :ref:`initial_interval_seconds
+  // <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.initial_interval_seconds>` is absent or zero, a client connection will use this value to start probing.
+  //
   // If zero, disable keepalive probing.
-  google.protobuf.UInt32Value max_interval_seconds = 1
-      [(validate.rules).message = {required: true}];
+  // If absent, use the QUICHE default interval to probe.
+  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
 
   // The interval in seconds to send the first few keep-alive probing packets to prevent
   // connection from hitting the idle timeout. Subsequent probes will be sent, each
@@ -49,10 +58,12 @@ message QuicKeepAliveSettings {
   // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to
   // prevent idle timeout and smaller than max_interval to take effect.
   //
-  // If zero, disable keepalive probing for a server connection. For a client
-  // connection, if :ref:`max_interval_seconds <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval_seconds>` is also zero, do not keepalive, otherwise use max_interval to probe all the time.
-  google.protobuf.UInt32Value initial_interval_seconds = 2
-      [(validate.rules).message = {required: true}];
+  // If absent or zero, disable keepalive probing for a server connection. For a client
+  // connection, if :ref:`max_interval_seconds <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval_seconds>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
@@ -96,12 +107,6 @@ message QuicProtocolOptions {
 
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
-  //
-  // Note that QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
-  // itself doesn't timeout waiting for a probing response. Quic has a shorter idle timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
-  // And there is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
-  // since a similar feature is built into QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before
-  // sending a new request.
   QuicKeepAliveSettings connection_keepalive = 5;
 }
 

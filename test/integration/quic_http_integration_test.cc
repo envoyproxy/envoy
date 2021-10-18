@@ -672,11 +672,10 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
-  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval_seconds()->set_value(
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
       max_interval_sec);
-  client_quic_options_.mutable_connection_keepalive()
-      ->mutable_initial_interval_seconds()
-      ->set_value(initial_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -705,11 +704,10 @@ TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
   // Set connection idle network timeout to be a little larger than max interval.
   dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
       .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
-  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval_seconds()->set_value(
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
       max_interval_sec);
-  client_quic_options_.mutable_connection_keepalive()
-      ->mutable_initial_interval_seconds()
-      ->set_value(initial_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -728,8 +726,8 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
         auto* keepalive_options = hcm.mutable_http3_protocol_options()
                                       ->mutable_quic_protocol_options()
                                       ->mutable_connection_keepalive();
-        keepalive_options->mutable_initial_interval_seconds()->set_value(initial_interval_sec);
-        keepalive_options->mutable_max_interval_seconds()->set_value(max_interval_sec);
+        keepalive_options->mutable_initial_interval()->set_nanos(initial_interval_sec);
+        keepalive_options->mutable_max_interval()->set_seconds(max_interval_sec);
       });
   // Set connection idle network timeout to be a little larger than max interval.
   config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {

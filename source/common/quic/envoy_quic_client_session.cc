@@ -137,23 +137,20 @@ void EnvoyQuicClientSession::setHttp3Options(
           http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
-    const uint32_t initial_interval = http3_options_->quic_protocol_options()
-                                          .connection_keepalive()
-                                          .initial_interval_seconds()
-                                          .value();
-    const uint32_t max_interval = http3_options_->quic_protocol_options()
-                                      .connection_keepalive()
-                                      .max_interval_seconds()
-                                      .value();
+    const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(
+        http3_options_->quic_protocol_options().connection_keepalive(), initial_interval, 0);
+    const uint64_t max_interval =
+        PROTOBUF_GET_MS_OR_DEFAULT(http3_options_->quic_protocol_options().connection_keepalive(),
+                                   max_interval, quic::kPingTimeoutSecs);
     // If the keepalive max_interval is configured to zero, disable the probe completely.
     if (max_interval == 0u) {
       disable_keepalive_ = true;
       return;
     }
-    connection()->set_ping_timeout(quic::QuicTime::Delta::FromSeconds(max_interval));
+    connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
     if (max_interval > initial_interval && initial_interval > 0u) {
       connection()->set_initial_retransmittable_on_wire_timeout(
-          quic::QuicTime::Delta::FromSeconds(initial_interval));
+          quic::QuicTime::Delta::FromMilliseconds(initial_interval));
     }
   }
 }
