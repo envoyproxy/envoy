@@ -12,11 +12,16 @@ envoy_package()
 envoy_cc_test(
     name = "dns_cache_impl_test",
     srcs = ["dns_cache_impl_test.cc"],
+    args = [
+        # Force creation of c-ares DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -219,19 +219,6 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
-   * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
-   * dispatcher.
-   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
-   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
-   * @param dns_resolver_options supplies the aggregated area options flags needed for dns resolver
-   * init.
-   * @return Network::DnsResolverSharedPtr that is owned by the caller.
-   */
-  virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) PURE;
-
-  /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
    */
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;
