@@ -362,6 +362,20 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesReceived(1);
+    StreamInfoFormatter wire_bytes_received_format("UPSTREAM_WIRE_BYTES_RECEIVED");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", wire_bytes_received_format.format(request_headers, response_headers,
+                                                     response_trailers, stream_info, body));
+    EXPECT_THAT(wire_bytes_received_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
     StreamInfoFormatter protocol_format("PROTOCOL");
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
     EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -447,6 +461,20 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
                                             stream_info, body));
     EXPECT_THAT(bytes_sent_format.formatValue(request_headers, response_headers, response_trailers,
                                               stream_info, body),
+                ProtoEq(ValueUtil::numberValue(1.0)));
+  }
+
+  {
+    StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
+        std::make_shared<StreamInfo::BytesMeter>()};
+    upstream_bytes_meter->addWireBytesSent(1);
+    StreamInfoFormatter wire_bytes_sent_format("UPSTREAM_WIRE_BYTES_SENT");
+    EXPECT_CALL(stream_info, getUpstreamBytesMeter())
+        .WillRepeatedly(ReturnRef(upstream_bytes_meter));
+    EXPECT_EQ("1", wire_bytes_sent_format.format(request_headers, response_headers,
+                                                 response_trailers, stream_info, body));
+    EXPECT_THAT(wire_bytes_sent_format.formatValue(request_headers, response_headers,
+                                                   response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::numberValue(1.0)));
   }
 

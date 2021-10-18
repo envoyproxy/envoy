@@ -56,7 +56,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 9]
+// [#next-free-field: 6]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -84,6 +84,16 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
+  // [#not-implemented-hide:] Hiding until timeout config is supported.
+  // The number of timeouts that can occur before port migration is triggered for QUIC clients.
+  // This defaults to 1. If sets to 0, port migration will not occur.
+  // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
+  // This has no effect on server sessions.
+  // Currently the value can only be 0 or 1.
+  // TODO(renjietang): Plumb through quiche to make this config able to adjust the amount of timeouts needed to trigger port migration.
+  google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
+      [(validate.rules).uint32 = {lte: 1 gte: 0}];
+
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
   //
@@ -92,7 +102,7 @@ message QuicProtocolOptions {
   // And there is no need of :ref:`connection_idle_interval <envoy_v3_api_field_config.core.v3.KeepaliveSettings.connection_idle_interval>`
   // since a similar feature is built into QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before
   // sending a new request.
-  QuicKeepAliveSettings connection_keepalive = 8;
+  QuicKeepAliveSettings connection_keepalive = 5;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -195,11 +205,10 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // and if there are no active streams, the connection will be closed. If there are any active streams,
-  // the drain sequence will kick-in, and the connection will be force-closed after the drain period.
-  // See :ref:`drain_timeout
+  // and if there are no active streams, the connection will be closed. If the connection is a
+  // downstream connection and there are any active streams, the drain sequence will kick-in,
+  // and the connection will be force-closed after the drain period. See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-  // Note: This feature is not yet implemented for the upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
   // The maximum number of headers. If unconfigured, the default

@@ -266,7 +266,6 @@ UNOWNED_EXTENSIONS = {
 
 UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
-  "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
   "envoy.reloadable_features.upstream_http2_flood_checks",
   "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
@@ -531,7 +530,8 @@ class FormatChecker:
                 continue
             if "}" in line:
                 break
-
+            if "//" in line:
+                continue
             match = FLAG_REGEX.match(line)
             if not match:
                 error_messages.append("%s does not look like a reloadable flag" % line)

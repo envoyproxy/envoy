@@ -30,7 +30,9 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
 
 void EnvoyQuicClientSession::connect() {
-  dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)->setUpConnectionSocket(*this);
+  dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
+      ->setUpConnectionSocket(
+          *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
   // Start version negotiation and crypto handshake during which the connection may fail if server
   // doesn't support the one and only supported version.
   CryptoConnect();
@@ -127,8 +129,14 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
 void EnvoyQuicClientSession::setHttp3Options(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
   QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
-  if (http3_options_->has_quic_protocol_options() &&
-      http3_options_->quic_protocol_options().has_connection_keepalive()) {
+  if (!http3_options_->has_quic_protocol_options()) {
+    return;
+  }
+  static_cast<EnvoyQuicClientConnection*>(connection())
+      ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
+
+  if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
     const uint32_t initial_interval = http3_options_->quic_protocol_options()
                                           .connection_keepalive()
                                           .initial_interval_seconds()
