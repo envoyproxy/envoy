@@ -128,6 +128,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dnsresolvers
 guarddog
 GC
 GCC
