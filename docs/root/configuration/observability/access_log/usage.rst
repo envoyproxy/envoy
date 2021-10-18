@@ -241,6 +241,62 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+%UPSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_HEADER_BYTES_SENT%
+  HTTP
+    Number of header bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of header bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_HEADER_BYTES_SENT%
+  HTTP
+    Number of header bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of header bytes received from the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
   Renders a numeric value in typed JSON logs.
 
 %DURATION%

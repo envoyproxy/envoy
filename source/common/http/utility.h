@@ -6,6 +6,7 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -246,6 +247,20 @@ absl::string_view findQueryStringStart(const HeaderString& path);
  * @return std::string the path without query string.
  */
 std::string stripQueryString(const HeaderString& path);
+
+/**
+ * Replace the query string portion of a given path with a new one.
+ *
+ * e.g. replaceQueryString("/foo?key=1", {key:2}) -> "/foo?key=2"
+ *      replaceQueryString("/bar", {hello:there}) -> "/bar?hello=there"
+ *
+ * @param path the original path that may or may not contain an existing query string
+ * @param params the new params whose string representation should be formatted onto
+ *               the `path` above
+ * @return std::string the new path whose query string has been replaced by `params` and whose path
+ *         portion from `path` remains unchanged.
+ */
+std::string replaceQueryString(const HeaderString& path, const QueryParams& params);
 
 /**
  * Parse a particular value out of a cookie
@@ -588,6 +603,16 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
+
+/**
+ * It returns RetryPolicy defined in core api to route api.
+ * @param retry_policy core retry policy
+ * @param retry_on this specifies when retry should be invoked.
+ * @return route retry policy
+ */
+envoy::config::route::v3::RetryPolicy
+convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
+                              const std::string& retry_on);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

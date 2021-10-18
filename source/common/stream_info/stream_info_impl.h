@@ -283,6 +283,32 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  const BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
+  }
+
+  const BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
+  }
+
+  void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) override {
+    // Accumulate the byte measurement from previous upstream request during a retry.
+    upstream_bytes_meter->addWireBytesSent(upstream_bytes_meter_->wireBytesSent());
+    upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
+    upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
+    upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
+
+    upstream_bytes_meter_ = upstream_bytes_meter;
+  }
+
+  void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) override {
+    // Downstream bytes counter don't reset during a retry.
+    if (downstream_bytes_meter_ == nullptr) {
+      downstream_bytes_meter_ = downstream_bytes_meter;
+    }
+    ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -339,6 +365,9 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
+  // Default construct the object because upstream stream is not constructed in some cases.
+  BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
+  BytesMeterSharedPtr downstream_bytes_meter_;
 };
 
 } // namespace StreamInfo

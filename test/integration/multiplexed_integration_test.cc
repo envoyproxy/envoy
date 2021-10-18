@@ -29,7 +29,6 @@ using ::testing::MatchesRegex;
 
 namespace Envoy {
 
-// TODO(#2557) fix all the failures.
 #define EXCLUDE_DOWNSTREAM_HTTP3                                                                   \
   if (downstreamProtocol() == Http::CodecType::HTTP3) {                                            \
     return;                                                                                        \
@@ -906,8 +905,7 @@ TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Verify the case where there is an HTTP/2 codec/protocol error with an active stream.
 TEST_P(Http2IntegrationTest, CodecErrorAfterStreamStart) {
-  // TODO(#16757) Needs HTTP/3 "bad frame" equivalent.
-  EXCLUDE_DOWNSTREAM_HTTP3;
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -940,7 +938,7 @@ TEST_P(Http2IntegrationTest, Http2BadMagic) {
 }
 
 TEST_P(Http2IntegrationTest, BadFrame) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // Needs HTTP/3 "bad frame" equivalent.
+  EXCLUDE_DOWNSTREAM_HTTP3; // The HTTP/3 client has no "bad frame" equivalent.
 
   initialize();
   std::string response;
@@ -956,8 +954,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
 // Send client headers, a GoAway and then a body and ensure the full request and
 // response are received.
 TEST_P(Http2IntegrationTest, GoAway) {
-  EXCLUDE_DOWNSTREAM_HTTP3; // QuicHttpClientConnectionImpl::goAway NOT_REACHED_GCOVR_EXCL_LINE
-  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+  autonomous_upstream_ = true;
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1723,16 +1720,14 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   // This test uses an Http2Frame and not the encoder's encodeMetadata method,
   // because encodeMetadata fails when an empty metadata map is sent.
   beginSession();
-  FakeHttpConnectionPtr fake_upstream_connection;
-  FakeStreamPtr fake_upstream_request;
 
   const uint32_t client_stream_idx = 1;
   // Send request.
   const Http2Frame request =
       Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url");
   sendFrame(request);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection));
-  ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, fake_upstream_request));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send metadata frame with empty metadata map.
   const Http::MetadataMap empty_metadata_map;
@@ -1746,9 +1741,9 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   sendFrame(empty_data_frame);
 
   // Upstream sends a reply.
-  ASSERT_TRUE(fake_upstream_request->waitForEndStream(*dispatcher_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  fake_upstream_request->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(response_headers, true);
 
   // Make sure that a response from upstream is received by the client, and
   // close the connection.
@@ -1757,7 +1752,10 @@ TEST_P(Http2FrameIntegrationTest, DownstreamSendingEmptyMetadata) {
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, response.responseStatus());
   EXPECT_EQ(1, test_server_->counter("http2.metadata_empty_frames")->value());
 
-  // Cleanup.
+  // Cleanup. Closing upstream connection first to avoid a race between the
+  // client FIN and the connection closure (see comment in
+  // HttpIntegrationTest::cleanupUpstreamAndDownstream).
+  cleanupUpstreamAndDownstream();
   tcp_client_->close();
 }
 
@@ -1880,6 +1878,37 @@ TEST_P(Http2IntegrationTest, InvalidTrailers) {
   ASSERT_TRUE(response->waitForReset());
   // http2.invalid.header.field or http3.invalid_header_field
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
+}
+
+TEST_P(Http2IntegrationTest, InconsistentContentLength) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"content-length", "1025"}});
+
+  auto response = std::move(encoder_decoder.second);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 1024, false);
+  codec_client_->sendTrailers(*request_encoder_,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "value"}});
+
+  // Inconsistency in content-length header and the actually body length should be treated as a
+  // stream error.
+  ASSERT_TRUE(response->waitForReset());
+  // http3.inconsistent_content_length.
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("inconsistent_content_length"));
+  } else {
+    EXPECT_EQ(Http::StreamResetReason::ConnectionTermination, response->resetReason());
+    // http2.violation.of.messaging.rule
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("violation"));
+  }
 }
 
 } // namespace Envoy

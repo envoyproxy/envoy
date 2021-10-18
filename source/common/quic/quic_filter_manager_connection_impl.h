@@ -5,26 +5,16 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/network/connection_impl_base.h"
-#include "source/common/quic/quic_network_connection.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/quic_network_connection.h"
 #include "source/common/quic/send_buffer_monitor.h"
 #include "source/common/stream_info/stream_info_impl.h"
+
+#include "quiche/quic/core/quic_connection.h"
 
 namespace Envoy {
 
@@ -138,7 +128,7 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
     http3_options_ = http3_options;
   }
 
@@ -183,7 +173,7 @@ private:
   // filters are added, ConnectionManagerImpl should always be the last one.
   // Its onRead() is only called once to trigger ReadFilter::onNewConnection()
   // and the rest incoming data bypasses these filters.
-  Network::FilterManagerImpl filter_manager_;
+  std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;

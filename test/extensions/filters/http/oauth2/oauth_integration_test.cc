@@ -77,7 +77,7 @@ resources:
     config_helper_.prependFilter(TestEnvironment::substitute(R"EOF(
 name: oauth
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3alpha.OAuth2
+  "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
   config:
     token_endpoint:
       cluster: oauth

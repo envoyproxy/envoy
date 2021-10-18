@@ -27,18 +27,46 @@ class LibRdKafkaUtilsImpl : public LibRdKafkaUtils {
                                                     std::string& errstr) const override {
     return std::unique_ptr<RdKafka::Producer>(RdKafka::Producer::create(conf, errstr));
   }
+
+  // LibRdKafkaUtils
+  RdKafka::Headers* convertHeaders(
+      const std::vector<std::pair<absl::string_view, absl::string_view>>& headers) const override {
+    RdKafka::Headers* result = RdKafka::Headers::create();
+    for (const auto& header : headers) {
+      const RdKafka::Headers::Header librdkafka_header = {
+          std::string(header.first), header.second.data(), header.second.length()};
+      const auto ec = result->add(librdkafka_header);
+      // This should never happen ('add' in 1.7.0 does not return any other error codes).
+      if (RdKafka::ERR_NO_ERROR != ec) {
+        delete result;
+        return nullptr;
+      }
+    }
+    return result;
+  }
+
+  // LibRdKafkaUtils
+  void deleteHeaders(RdKafka::Headers* librdkafka_headers) const override {
+    delete librdkafka_headers;
+  }
+
+public:
+  static const LibRdKafkaUtils& getDefaultInstance() {
+    CONSTRUCT_ON_FIRST_USE(LibRdKafkaUtilsImpl);
+  }
 };
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
                                      const RawKafkaProducerConfig& configuration)
-    : RichKafkaProducer(dispatcher, thread_factory, configuration, LibRdKafkaUtilsImpl{}){};
+    : RichKafkaProducer(dispatcher, thread_factory, configuration,
+                        LibRdKafkaUtilsImpl::getDefaultInstance()){};
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
                                      const RawKafkaProducerConfig& configuration,
                                      const LibRdKafkaUtils& utils)
-    : dispatcher_{dispatcher} {
+    : dispatcher_{dispatcher}, utils_{utils} {
 
   // Create producer configuration object.
   std::unique_ptr<RdKafka::Conf> conf =
@@ -79,17 +107,29 @@ RichKafkaProducer::~RichKafkaProducer() {
 
 void RichKafkaProducer::markFinished() { poller_thread_active_ = false; }
 
-void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::string& topic,
-                             const int32_t partition, const absl::string_view key,
-                             const absl::string_view value) {
+void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const OutboundRecord& record) {
   {
-    void* value_data = const_cast<char*>(value.data()); // Needed for Kafka API.
+    void* value_data = const_cast<char*>(record.value_.data()); // Needed for Kafka API.
     // Data is a pointer into request internals, and it is going to be managed by
     // ProduceRequestHolder lifecycle. So we are not going to use any of librdkafka's memory
     // management.
     const int flags = 0;
-    const RdKafka::ErrorCode ec = producer_->produce(
-        topic, partition, flags, value_data, value.size(), key.data(), key.size(), 0, nullptr);
+    const int64_t timestamp = 0;
+
+    RdKafka::ErrorCode ec;
+    // librdkafka requires a raw pointer and deletes it on success.
+    RdKafka::Headers* librdkafka_headers = utils_.convertHeaders(record.headers_);
+    if (nullptr != librdkafka_headers) {
+      ec = producer_->produce(record.topic_, record.partition_, flags, value_data,
+                              record.value_.size(), record.key_.data(), record.key_.size(),
+                              timestamp, librdkafka_headers, nullptr);
+    } else {
+      // Headers could not be converted (this should never happen).
+      ENVOY_LOG(trace, "Header conversion failed while sending to [{}/{}]", record.topic_,
+                record.partition_);
+      ec = RdKafka::ERR_UNKNOWN;
+    }
+
     if (RdKafka::ERR_NO_ERROR == ec) {
       // We have succeeded with submitting data to producer, so we register a callback.
       unfinished_produce_requests_.push_back(origin);
@@ -97,7 +137,12 @@ void RichKafkaProducer::send(const ProduceFinishCbSharedPtr origin, const std::s
       // We could not submit data to producer.
       // Let's treat that as a normal failure (Envoy is a broker after all) and propagate
       // downstream.
-      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, topic, partition);
+      ENVOY_LOG(trace, "Produce failure: {}, while sending to [{}/{}]", ec, record.topic_,
+                record.partition_);
+      if (nullptr != librdkafka_headers) {
+        // Kafka headers need to be deleted manually if produce call fails.
+        utils_.deleteHeaders(librdkafka_headers);
+      }
       const DeliveryMemento memento = {value_data, ec, 0};
       origin->accept(memento);
     }

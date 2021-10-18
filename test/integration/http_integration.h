@@ -186,7 +186,9 @@ protected:
   void sendRequestAndVerifyResponse(const Http::TestRequestHeaderMapImpl& request_headers,
                                     const int request_size,
                                     const Http::TestResponseHeaderMapImpl& response_headers,
-                                    const int response_size, const int backend_idx);
+                                    const int response_size, const int backend_idx,
+                                    absl::optional<const Http::TestResponseHeaderMapImpl>
+                                        expected_response_headers = absl::nullopt);
 
   // Check for completion of upstream_request_, and a simple "200" response.
   void checkSimpleRequestSuccess(uint64_t expected_request_size, uint64_t expected_response_size,
@@ -245,6 +247,8 @@ protected:
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
                             bool with_multiple_1xx_headers = false);
+  void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
+                           uint32_t response1_bytes, uint32_t response2_bytes);
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();

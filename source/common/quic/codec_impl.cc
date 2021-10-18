@@ -71,6 +71,10 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
   session.set_max_inbound_header_list_size(max_request_headers_kb * 1024);
 }
 
+void QuicHttpClientConnectionImpl::goAway() {
+  quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
+}
+
 Http::RequestEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
   EnvoyQuicClientStream* stream =

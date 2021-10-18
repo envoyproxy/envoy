@@ -219,6 +219,24 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
+  }
+
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
+  }
+
+  void setUpstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& upstream_bytes_meter) override {
+    upstream_bytes_meter_ = upstream_bytes_meter;
+  }
+
+  void setDownstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& downstream_bytes_meter) override {
+    downstream_bytes_meter_ = downstream_bytes_meter;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -262,6 +280,10 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  Envoy::StreamInfo::BytesMeterSharedPtr upstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
+  Envoy::StreamInfo::BytesMeterSharedPtr downstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
 };
 
 } // namespace Envoy
