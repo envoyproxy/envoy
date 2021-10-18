@@ -53,7 +53,10 @@ genrule(
 
 # These options are only used to suppress errors in brought-in QUICHE tests.
 # Use #pragma GCC diagnostic ignored in integration code to suppress these errors.
-quiche_common_copts = []
+quiche_common_copts = [
+    # hpack_huffman_decoder.cc overloads operator<<.
+    "-Wno-unused-function",
+]
 
 quiche_copts = select({
     # Ignore unguarded #pragma GCC statements in QUICHE sources
