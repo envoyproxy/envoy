@@ -21,7 +21,7 @@ public:
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                absl::string_view details));
-  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
 
   void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);

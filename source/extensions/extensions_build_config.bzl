@@ -303,6 +303,16 @@ EXTENSIONS = {
     #
 
     "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
+
+    #
+    # DNS Resolver
+    #
+
+    # c-ares DNS resolver extension is recommended to be enabled to maintain the legacy DNS resolving behavior.
+    "envoy.network.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
+
+    # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
+    "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

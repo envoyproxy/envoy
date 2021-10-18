@@ -31,7 +31,9 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -101,7 +103,7 @@ Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
@@ -135,9 +137,7 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
-  return parent_context_.listenerScope();
-}
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
 bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();

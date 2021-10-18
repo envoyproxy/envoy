@@ -198,6 +198,8 @@ proto_library(
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
+        "//envoy/extensions/network/dns_resolver/apple/v3:pkg",
+        "//envoy/extensions/network/dns_resolver/cares/v3:pkg",
         "//envoy/extensions/network/socket_interface/v3:pkg",
         "//envoy/extensions/quic/crypto_stream/v3:pkg",
         "//envoy/extensions/quic/proof_source/v3:pkg",
