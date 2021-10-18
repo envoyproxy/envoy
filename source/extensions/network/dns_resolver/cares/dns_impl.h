@@ -7,6 +7,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
@@ -114,6 +115,8 @@ private:
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const absl::optional<std::string> resolvers_csv_;
 };
+
+DECLARE_FACTORY(CaresDnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy
