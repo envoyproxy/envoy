@@ -319,6 +319,25 @@ TEST_F(ProtobufUtilityTest, JsonExtensions) {
   }
 }
 
+// Verify that a config with a deprecated field can be loaded with runtime global override.
+TEST_F(ProtobufUtilityTest, DEPRECATED_FEATURE_TEST(LoadBinaryGlobalOverrideProtoFromFile)) {
+  const std::string bootstrap_yaml = R"EOF(
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      envoy.features.enable_all_deprecated_features: true
+watchdog: { miss_timeout: 1s })EOF";
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.yaml", bootstrap_yaml);
+
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+  TestUtility::loadFromFile(filename, proto_from_file, *api_);
+  TestUtility::validate(proto_from_file);
+  EXPECT_TRUE(proto_from_file.has_watchdog());
+  EXPECT_GT(runtime_deprecated_feature_use_.value(), 0);
+}
+
 // An unknown field (or with wrong type) in a message is rejected.
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   ProtobufWkt::Duration source_duration;
@@ -1568,8 +1587,6 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-<<<<<<< HEAD
-=======
 // Verify WIP accounting of the file based annotations. This test uses the strict validator to test
 // that code path.
 TEST_F(ProtobufUtilityTest, MessageInWipFile) {
@@ -1939,52 +1956,6 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnumGlobalOverride)) {
       checkForDeprecation(base));
 }
 
-// Verify that direct use of a hidden_envoy_deprecated field fails, but upgrade
-// succeeds
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(ManualDeprecatedFieldAddition)) {
-  // Create a base message and insert a deprecated field. When upgrading the
-  // deprecated field should be set as deprecated, and a warning should be logged
-  envoy::test::deprecation_test::Base base_should_warn =
-      TestUtility::parseYaml<envoy::test::deprecation_test::Base>(R"EOF(
-      not_deprecated: field1
-      is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  // Non-fatal checks for a deprecated field should log rather than throw an exception.
-  EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      checkForDeprecation(base_should_warn));
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
-
-  // Create an upgraded message and insert a deprecated field. This is a bypass
-  // of the upgrading procedure validation, and should fail
-  envoy::test::deprecation_test::UpgradedBase base_should_fail =
-      TestUtility::parseYaml<envoy::test::deprecation_test::UpgradedBase>(R"EOF(
-      not_deprecated: field1
-      hidden_envoy_deprecated_is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForUnexpectedFields(base_should_fail,
-                                            ProtobufMessage::getStrictValidationVisitor()),
-      ProtoValidationException,
-      "Illegal use of hidden_envoy_deprecated_ V2 field "
-      "'envoy.test.deprecation_test.UpgradedBase.hidden_envoy_deprecated_is_deprecated'");
-  // The config will be rejected, so the feature will not be used.
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
-}
-
->>>>>>> 9eeee36dc1f1bb962d43fb1e874586bd2ecae639
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};
 
 TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
