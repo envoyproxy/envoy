@@ -35,6 +35,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_impl_test",
     srcs = ["cluster_manager_impl_test.cc"],
+    args = [
+        # Force creation of c-ares DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
     external_deps = [
         "abseil_optional",
     ],
@@ -42,6 +46,7 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",

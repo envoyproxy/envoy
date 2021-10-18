@@ -119,7 +119,7 @@ public:
   bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
-  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
 
 private:
   bool shouldSendEndStream() {
