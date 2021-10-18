@@ -114,7 +114,7 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
         connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
     } else {
-      ENVOY_CONN_LOG(warn, "Connection is closed by {} during connecting.", *connection_,
+      ENVOY_CONN_LOG(debug, "Connection is closed by {} during connecting.", *connection_,
                      (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self"));
     }
     while (!active_requests_.empty()) {
