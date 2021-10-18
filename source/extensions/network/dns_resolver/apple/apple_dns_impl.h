@@ -10,13 +10,13 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
 #include "source/common/singleton/threadsafe_singleton.h"
-#include "envoy/registry/registry.h"
 
 #include "absl/container/node_hash_map.h"
 
