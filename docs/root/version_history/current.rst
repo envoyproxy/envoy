@@ -13,7 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
-* Listener: fix a crash when updating any listener that does not bind to port
+* listener: fix a crash when updating any listener that does not bind to port.
 
 Removed Config or Runtime
 -------------------------
