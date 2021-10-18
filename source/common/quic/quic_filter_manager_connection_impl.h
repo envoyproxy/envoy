@@ -128,7 +128,7 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
     http3_options_ = http3_options;
   }
 
