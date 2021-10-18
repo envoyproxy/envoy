@@ -189,7 +189,6 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
                                  quic::QuicVersionToString(version.transport_version)));
   }
-  return;
 }
 
 void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
