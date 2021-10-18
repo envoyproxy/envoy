@@ -133,7 +133,6 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
 
     switch (callbacks.responseMetadata()->messageType()) {
     case MessageType::Reply:
-      stats_.incResponseReply(cluster, upstream_host_);
       if (callbacks.responseSuccess()) {
         upstream_host_->outlierDetector().putResult(
             Upstream::Outlier::Result::ExtOriginRequestSuccess);
@@ -148,7 +147,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     case MessageType::Exception:
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::ExtOriginRequestFailed);
-      stats_.incResponseException(cluster, upstream_host_);
+      stats_.incResponseRemoteException(cluster, upstream_host_);
       break;
 
     default:
@@ -160,6 +159,7 @@ UpstreamRequest::handleRegularResponse(Buffer::Instance& data,
     // Note: invalid responses are not accounted in the response size histogram.
     ENVOY_LOG(debug, "upstream reset");
     upstream_host_->outlierDetector().putResult(Upstream::Outlier::Result::ExtOriginRequestFailed);
+    stats_.incResponseDecodingError(cluster, upstream_host_);
     resetStream();
   }
 
@@ -267,6 +267,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
+    stats_.incResponseLocalException(parent_.cluster());
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
                            true);
@@ -286,6 +287,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
       upstream_host_->outlierDetector().putResult(
           Upstream::Outlier::Result::LocalOriginConnectFailed);
     }
+    stats_.incResponseLocalException(parent_.cluster());
 
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
