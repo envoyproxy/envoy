@@ -1292,7 +1292,8 @@ TEST_F(RtdsLoaderImplTest, QuicheReloadableFlags) {
   EXPECT_EQ(false, GetQuicReloadableFlag(spdy_testonly_default_false));
 
   // Test 2 behaviors:
-  // 1. Removing overwritten config will make the flag fallback to default value.
+  // 1. Removing overwritten config will make the flag fallback to the value set by the
+  //    Quiche flag set/get API implementation, which is backed by admin layer.
   // 2. Quiche flags can be overwritten again.
   runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource

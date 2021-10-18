@@ -323,7 +323,6 @@ void HttpIntegrationTest::initialize() {
     return BaseIntegrationTest::initialize();
   }
 #ifdef ENVOY_ENABLE_QUIC
-
   // Needs to be instantiated before base class calls initialize() which starts a QUIC listener
   // according to the config.
   quic_transport_socket_factory_ = IntegrationUtil::createQuicUpstreamTransportSocketFactory(
