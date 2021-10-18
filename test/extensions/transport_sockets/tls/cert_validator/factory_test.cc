@@ -1,8 +1,8 @@
 #include <memory>
 
+#include "source/common/config/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
-#include "source/common/config/utility.h"
 
 #include "test/extensions/transport_sockets/tls/cert_validator/test_common.h"
 

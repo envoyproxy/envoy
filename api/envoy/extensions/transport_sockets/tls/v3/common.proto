@@ -263,7 +263,7 @@ message StringSanMatcher {
     IP_ADD = 3;
   }
 
-  SanType san_type = 1 [(validate.rules).enum.defined_only = true];
+  SanType san_type = 1 [(validate.rules).enum = {defined_only: true}];
 
   type.matcher.v3.StringMatcher matcher = 2;
 }
