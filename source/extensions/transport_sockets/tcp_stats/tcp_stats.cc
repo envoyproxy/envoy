@@ -26,11 +26,11 @@ Config::Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config
     : stats_(generateStats(scope)),
       update_period_(PROTOBUF_GET_OPTIONAL_MS(config_proto, update_period)) {}
 
-LinuxNetworkStats Config::generateStats(Stats::Scope& scope) {
+TcpStats Config::generateStats(Stats::Scope& scope) {
   const std::string prefix("tcp_stats");
-  return LinuxNetworkStats{ALL_LINUX_NETWORK_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                                   POOL_GAUGE_PREFIX(scope, prefix),
-                                                   POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  return TcpStats{ALL_TCP_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                POOL_GAUGE_PREFIX(scope, prefix),
+                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
 }
 
 TcpStatsSocket::TcpStatsSocket(ConfigConstSharedPtr config,
@@ -45,8 +45,7 @@ void TcpStatsSocket::setTransportSocketCallbacks(Network::TransportSocketCallbac
 void TcpStatsSocket::onConnected() {
   if (config_->update_period_.has_value()) {
     timer_ = callbacks_->connection().dispatcher().createTimer([this]() {
-      auto tcp_info = querySocketInfo();
-      recordPeriodicStats(tcp_info);
+      recordStats();
       timer_->enableTimer(config_->update_period_.value());
     });
     timer_->enableTimer(config_->update_period_.value());
@@ -57,30 +56,43 @@ void TcpStatsSocket::onConnected() {
 
 void TcpStatsSocket::closeSocket(Network::ConnectionEvent event) {
   // Record final values.
-  auto info = querySocketInfo();
-  recordPeriodicStats(info);
-  recordConnectionCloseStats(info);
+  recordStats();
+
+  // Ensure gauges are zero'd out at the end of a connection no matter what the OS told us.
+  if (last_cx_tx_unsent_bytes_ > 0) {
+    config_->stats_.cx_tx_unsent_bytes_.sub(last_cx_tx_unsent_bytes_);
+  }
+  if (last_cx_tx_unacked_segments_ > 0) {
+    config_->stats_.cx_tx_unacked_segments_.sub(last_cx_tx_unacked_segments_);
+  }
+
+  if (timer_ != nullptr) {
+    timer_->disableTimer();
+  }
 
   transport_socket_->closeSocket(event);
 }
 
-struct tcp_info TcpStatsSocket::querySocketInfo() {
+absl::optional<struct tcp_info> TcpStatsSocket::querySocketInfo() {
   struct tcp_info info;
   memset(&info, 0, sizeof(info));
   socklen_t optlen = sizeof(info);
   const auto result = callbacks_->ioHandle().getOption(IPPROTO_TCP, TCP_INFO, &info, &optlen);
-  if (result.return_value_ == 0) {
-    ASSERT(optlen == sizeof(info));
+  if ((result.return_value_ != 0) || (optlen < sizeof(info))) {
+    ENVOY_LOG(debug, "Failed getsockopt(IPPROTO_TCP, TCP_INFO): rc {} errno {} optlen {}",
+              result.return_value_, result.errno_, optlen);
+    return absl::nullopt;
   } else {
-    ENVOY_LOG(debug, "Failed TCP_INFO: {} {} {}", result.return_value_, result.errno_,
-              strerror(result.errno_));
-    // On error, ensure that all values are zero for predictable results.
-    memset(&info, 0, sizeof(info));
+    return info;
   }
-  return info;
 }
 
-void TcpStatsSocket::recordPeriodicStats(struct tcp_info& tcp_info) {
+void TcpStatsSocket::recordStats() {
+  absl::optional<struct tcp_info> tcp_info = querySocketInfo();
+  if (!tcp_info.has_value()) {
+    return;
+  }
+
   auto update_counter = [](Stats::Counter& counter, auto& last_value, auto current_value) {
     int64_t diff = static_cast<int64_t>(current_value) - static_cast<int64_t>(last_value);
     ASSERT(diff >= 0);
@@ -97,41 +109,45 @@ void TcpStatsSocket::recordPeriodicStats(struct tcp_info& tcp_info) {
     last_value = current_value;
   };
 
-  update_counter(config_->stats_.cx_tx_segments_, last_cx_tx_segments_, tcp_info.tcpi_segs_out);
+  // This is before the update to `cx_tx_data_segments_` and `cx_tx_retransmitted_segments_` because
+  // they use the same metrics, and `update_counter` will update `last_...`, so this needs to use
+  // those `last_...` values (and not update them) first.
+  //
+  // Don't record a value if the numerator is negative, or the denominator is zero or negative
+  // (prevent divide-by-zero).
+  if ((tcp_info->tcpi_data_segs_out > last_cx_tx_data_segments_) &&
+      (tcp_info->tcpi_total_retrans >= last_cx_tx_retransmitted_segments_)) {
+    // uint32 * uint32 cannot overflow a uint64, so this can safely be done as integer math
+    // instead of floating point.
+    static_assert((sizeof(tcp_info->tcpi_total_retrans) == sizeof(uint32_t)) &&
+                  (Stats::Histogram::PercentScale < UINT32_MAX));
+
+    const uint32_t data_segs_out_diff = tcp_info->tcpi_data_segs_out - last_cx_tx_data_segments_;
+    const uint32_t retransmitted_segs_diff =
+        tcp_info->tcpi_total_retrans - last_cx_tx_retransmitted_segments_;
+    const uint64_t percent_retransmissions =
+        (static_cast<uint64_t>(retransmitted_segs_diff) *
+         static_cast<uint64_t>(Stats::Histogram::PercentScale)) /
+        static_cast<uint64_t>(data_segs_out_diff);
+    config_->stats_.cx_tx_percent_retransmitted_segments_.recordValue(percent_retransmissions);
+  }
+
+  update_counter(config_->stats_.cx_tx_segments_, last_cx_tx_segments_, tcp_info->tcpi_segs_out);
+  update_counter(config_->stats_.cx_rx_segments_, last_cx_rx_segments_, tcp_info->tcpi_segs_in);
   update_counter(config_->stats_.cx_tx_data_segments_, last_cx_tx_data_segments_,
-                 tcp_info.tcpi_data_segs_out);
+                 tcp_info->tcpi_data_segs_out);
+  update_counter(config_->stats_.cx_rx_data_segments_, last_cx_rx_data_segments_,
+                 tcp_info->tcpi_data_segs_in);
   update_counter(config_->stats_.cx_tx_retransmitted_segments_, last_cx_tx_retransmitted_segments_,
-                 tcp_info.tcpi_total_retrans);
+                 tcp_info->tcpi_total_retrans);
 
   update_gauge(config_->stats_.cx_tx_unsent_bytes_, last_cx_tx_unsent_bytes_,
-               tcp_info.tcpi_notsent_bytes);
+               tcp_info->tcpi_notsent_bytes);
   update_gauge(config_->stats_.cx_tx_unacked_segments_, last_cx_tx_unacked_segments_,
-               tcp_info.tcpi_unacked);
+               tcp_info->tcpi_unacked);
 
-  config_->stats_.cx_rtt_us_.recordValue(tcp_info.tcpi_rtt);
-  config_->stats_.cx_rttvar_us_.recordValue(tcp_info.tcpi_rttvar);
-}
-
-void TcpStatsSocket::recordConnectionCloseStats(struct tcp_info& tcp_info) {
-  if (tcp_info.tcpi_data_segs_out > 0) {
-    // uint32 * uint32 cannot overflow a uint64, so this can safely be done as integer math instead
-    // of floating point.
-    static_assert((sizeof(tcp_info.tcpi_total_retrans) == sizeof(uint32_t)) &&
-                  (Stats::Histogram::PercentScale < UINT32_MAX));
-    const uint64_t percent =
-        (static_cast<uint64_t>(tcp_info.tcpi_total_retrans) * Stats::Histogram::PercentScale) /
-        static_cast<uint64_t>(tcp_info.tcpi_data_segs_out);
-    ENVOY_CONN_LOG(trace, "Percent tcp retransmissions: {}", callbacks_->connection(),
-                   static_cast<float>(percent) /
-                       static_cast<float>(Stats::Histogram::PercentScale));
-    config_->stats_.cx_tx_percent_total_retransmitted_segments_.recordValue(percent);
-  }
-
-  if (tcp_info.tcpi_min_rtt != 0) {
-    config_->stats_.cx_min_rtt_us_.recordValue(tcp_info.tcpi_min_rtt);
-  }
-  ENVOY_CONN_LOG(trace, "tcpi_min_rtt {}, tcpi_rtt {}, tcpi_rttvar {}", callbacks_->connection(),
-                 tcp_info.tcpi_min_rtt, tcp_info.tcpi_rtt, tcp_info.tcpi_rttvar);
+  config_->stats_.cx_rtt_us_.recordValue(tcp_info->tcpi_rtt);
+  config_->stats_.cx_rtt_variance_us_.recordValue(tcp_info->tcpi_rttvar);
 }
 
 } // namespace TcpStats

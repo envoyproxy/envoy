@@ -21,19 +21,20 @@ namespace Extensions {
 namespace TransportSockets {
 namespace TcpStats {
 
-#define ALL_LINUX_NETWORK_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+#define ALL_TCP_STATS(COUNTER, GAUGE, HISTOGRAM)                                                   \
   COUNTER(cx_tx_segments)                                                                          \
+  COUNTER(cx_rx_segments)                                                                          \
   COUNTER(cx_tx_data_segments)                                                                     \
+  COUNTER(cx_rx_data_segments)                                                                     \
   COUNTER(cx_tx_retransmitted_segments)                                                            \
   GAUGE(cx_tx_unsent_bytes, Accumulate)                                                            \
   GAUGE(cx_tx_unacked_segments, Accumulate)                                                        \
-  HISTOGRAM(cx_tx_percent_total_retransmitted_segments, Percent)                                   \
+  HISTOGRAM(cx_tx_percent_retransmitted_segments, Percent)                                         \
   HISTOGRAM(cx_rtt_us, Microseconds)                                                               \
-  HISTOGRAM(cx_rttvar_us, Microseconds)                                                            \
-  HISTOGRAM(cx_min_rtt_us, Microseconds)
+  HISTOGRAM(cx_rtt_variance_us, Microseconds)
 
-struct LinuxNetworkStats {
-  ALL_LINUX_NETWORK_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+struct TcpStats {
+  ALL_TCP_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class Config {
@@ -41,11 +42,11 @@ public:
   Config(const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config_proto,
          Stats::Scope& scope);
 
-  LinuxNetworkStats stats_;
+  TcpStats stats_;
   const absl::optional<std::chrono::milliseconds> update_period_;
 
 private:
-  LinuxNetworkStats generateStats(Stats::Scope& scope);
+  TcpStats generateStats(Stats::Scope& scope);
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
@@ -61,16 +62,17 @@ public:
   void closeSocket(Network::ConnectionEvent event) override;
 
 private:
-  struct tcp_info querySocketInfo();
-  void recordPeriodicStats(struct tcp_info& tcp_info);
-  void recordConnectionCloseStats(struct tcp_info& tcp_info);
+  absl::optional<struct tcp_info> querySocketInfo();
+  void recordStats();
 
   const ConfigConstSharedPtr config_;
   Network::TransportSocketCallbacks* callbacks_{};
   Event::TimerPtr timer_;
 
   uint32_t last_cx_tx_segments_{};
+  uint32_t last_cx_rx_segments_{};
   uint32_t last_cx_tx_data_segments_{};
+  uint32_t last_cx_rx_data_segments_{};
   uint32_t last_cx_tx_retransmitted_segments_{};
   uint32_t last_cx_tx_unsent_bytes_{};
   uint32_t last_cx_tx_unacked_segments_{};

@@ -168,6 +168,11 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
+Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
+                                                           const std::string& name) {
+  return findByName(store.histograms(), name);
+}
+
 AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout,

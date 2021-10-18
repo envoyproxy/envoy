@@ -28,8 +28,13 @@ public:
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
+#if defined(__linux__)
     return std::make_unique<TcpStatsSocket>(config_,
                                             inner_factory_->createTransportSocket(options));
+#else
+    UNREFERENCED_PARAMETER(options);
+    return nullptr;
+#endif
   }
 
   bool implementsSecureTransport() const override {
@@ -42,7 +47,9 @@ public:
 
 private:
   Network::TransportSocketFactoryPtr inner_factory_;
+#if defined(__linux__)
   ConfigConstSharedPtr config_;
+#endif
 };
 
 class TcpStatsConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
