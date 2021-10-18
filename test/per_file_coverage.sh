@@ -14,7 +14,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/http:96.5"
 "source/common/json:90.1"
 "source/common/matcher:94.2"
-"source/common/network:94.8" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl` do not always report LCOV
+"source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
 "source/common/secret:96.3"
