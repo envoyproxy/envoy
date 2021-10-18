@@ -21,8 +21,8 @@ MSYS_NT-*-x86_64)
 esac
 
 # Bazel magic.
-ROOT=$$(dirname $(rootpath wee8/BUILD.gn))/..
-pushd $$ROOT/wee8
+ROOT=$$(dirname $(rootpath BUILD.gn))
+pushd $$ROOT
 
 # Clean after previous build.
 rm -rf out/wee8
@@ -148,4 +148,4 @@ fi
 
 # Move compiled library to the expected destinations.
 popd
-mv $$ROOT/wee8/out/wee8/obj/libwee8.a $(execpath libwee8.a)
+mv $$ROOT/out/wee8/obj/libwee8.a $(execpath libwee8.a)
