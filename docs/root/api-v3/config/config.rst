@@ -12,6 +12,7 @@ Extensions
   rbac/rbac
   health_checker/health_checker
   transport_socket/transport_socket
+  dns_resolver/dns_resolver.rst
   resource_monitor/resource_monitor
   common/common
   compression/compression
@@ -32,3 +33,4 @@ Extensions
   quic/quic_extensions
   formatter/formatter
   contrib/contrib
+  rbac/matchers

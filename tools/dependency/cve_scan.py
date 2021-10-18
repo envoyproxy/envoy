@@ -75,6 +75,11 @@ IGNORES_CVES = set([
     'CVE-2021-22931',
     'CVE-2021-22939',
     'CVE-2021-22940',
+    # This cve only affects versions of kafka < 2.8.1, but scanner
+    # does not support version matching atm.
+    # Tracking issue to fix versioning:
+    #  https://github.com/envoyproxy/envoy/issues/18354
+    'CVE-2021-38153',
 ])
 
 # Subset of CVE fields that are useful below.

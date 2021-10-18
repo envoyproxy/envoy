@@ -21,7 +21,7 @@ class MockStream : public ExternalProcessorStream {
 public:
   MockStream();
   ~MockStream() override;
-  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3alpha::ProcessingRequest&&, bool));
+  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool));
   MOCK_METHOD(bool, close, ());
 };
 

@@ -219,7 +219,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
       return;
     }
 
-    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE);
+    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, /*retriable=*/false);
   });
 }
 
@@ -338,13 +338,14 @@ bool networkHealthCheckFailureType(envoy::data::core::v3::HealthCheckFailureType
 } // namespace
 
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
-    envoy::data::core::v3::HealthCheckFailureType type) {
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (!networkHealthCheckFailureType(type) || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
+    if ((!networkHealthCheckFailureType(type) && !retriable) ||
+        ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
@@ -385,8 +386,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
-    envoy::data::core::v3::HealthCheckFailureType type) {
-  HealthTransition changed_state = setUnhealthy(type);
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
+  HealthTransition changed_state = setUnhealthy(type, retriable);
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
     timeout_timer_->disableTimer();
@@ -401,7 +402,7 @@ HealthTransition
 HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
   if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
     host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
-    // Even though the health value of the host might have not changed, we set this to Changed to
+    // Even though the health value of the host might have not changed, we set this to Changed so
     // that the cluster can update its list of excluded hosts.
     return HealthTransition::Changed;
   }

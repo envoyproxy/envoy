@@ -108,6 +108,7 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/common/fault @rshriram @alyssawilk
 /*/extensions/filters/http/grpc_json_transcoder @qiwzhang @lizan
 /*/extensions/filters/http/router @alyssawilk @mattklein123 @snowp
+/*/extensions/filters/common/rbac/matchers @conqerAtapple @ggreenway @alyssawilk
 /*/extensions/filters/http/grpc_web @fengli79 @lizan
 /*/extensions/filters/http/grpc_stats @kyessenov @lizan
 /*/extensions/filters/common/original_src @klarose @snowp
@@ -191,6 +192,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
+# DNS Resolver
+/*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
+/*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -203,3 +207,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/sxg/ @cpapazian @rgs1 @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @rojkov @ipuustin
+/contrib/vcl/ @florincoras @rojkov

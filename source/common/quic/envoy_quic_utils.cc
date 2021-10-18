@@ -176,6 +176,10 @@ bssl::UniquePtr<X509> parseDERCertificate(const std::string& der_bytes,
 
 int deduceSignatureAlgorithmFromPublicKey(const EVP_PKEY* public_key, std::string* error_details) {
   int sign_alg = 0;
+  if (public_key == nullptr) {
+    *error_details = "Invalid leaf cert, bad public key";
+    return sign_alg;
+  }
   const int pkey_id = EVP_PKEY_id(public_key);
   switch (pkey_id) {
   case EVP_PKEY_EC: {

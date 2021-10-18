@@ -35,7 +35,7 @@ filter configuration snippet is permitted:
         dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
-``udpa.type.v1.TypedStruct`` should be used as a generic container. The type URL
+``xds.type.v3.TypedStruct`` should be used as a generic container. The type URL
 inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
@@ -44,7 +44,7 @@ follows:
 
   name: front-http-proxy
   typed_config:
-    "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+    "@type": type.googleapis.com/xds.type.v3.TypedStruct
     type_url: type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
     value:
       stat_prefix: ingress_http
@@ -62,7 +62,7 @@ follows:
       http_filters:
       - name: front-router
         typed_config:
-          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
           type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3Router
 
 .. _config_overview_extension_discovery:
