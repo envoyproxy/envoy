@@ -56,7 +56,7 @@ New Features
 
 Deprecated
 ----------
-* ratelimit: the :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.ratelimit.XRateLimitHeadersRFCVersion>` enum has been deprecated in favor of :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.common.ratelimit.v3.XRateLimitHeadersRFCVersion>`.
 * bootstrap: :ref:`dns_resolution_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dns_resolution_config>` is deprecated in favor of :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`.
 * cluster: :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>` is deprecated in favor of :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`.
 * dns_cache: :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>` is deprecated in favor of :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.typed_dns_resolver_config>`.
+* ratelimit: the :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.filters.http.ratelimit.v3.ratelimit.XRateLimitHeadersRFCVersion>` enum has been deprecated in favor of :ref:`XRateLimitHeadersRFCVersion <envoy_v3_api_enum_extensions.common.ratelimit.v3.XRateLimitHeadersRFCVersion>`.
