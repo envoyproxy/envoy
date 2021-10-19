@@ -405,8 +405,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      append_xfh_(route.route().append_x_forwarded_host()),
-      cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
+      append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
+      cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
