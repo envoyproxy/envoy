@@ -51,43 +51,63 @@ public:
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
   Http::Code handlerHtmlStats(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers,
-                              Buffer::Instance& response, AdminStream&,
-                              Stats::StatName after, Type type);
+                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                              AdminStream&, Stats::StatName after, Type type);
+  Http::Code handlerStatsScopes(absl::string_view path_and_query,
+                                Http::ResponseHeaderMap& response_headers,
+                                Buffer::Instance& response, AdminStream&);
   Http::Code handlerContention(absl::string_view path_and_query,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
 private:
-  template <class StatType>
-  static bool shouldShowMetric(const StatType& metric, const bool used_only,
-                               const absl::optional<std::regex>& regex) {
-    return ((!used_only || metric.used()) &&
-            (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
-  }
+  enum class Format {
+    Text,
+    Json,
+    Prometheus,
+    // Html,
+  };
+
+  struct Params {
+    Http::Code parse(absl::string_view url, Buffer::Instance& response);
+    template <class StatType> bool shouldShowMetric(const StatType& metric) const {
+      return ((!used_only_ || metric.used()) &&
+              (!filter_.has_value() || std::regex_search(metric.name(), filter_.value())));
+    }
+
+    bool used_only_{false};
+    bool pretty_{false};
+    Format format_{Format::Text};
+    absl::optional<std::regex> filter_;
+    absl::optional<std::string> scope_;
+  };
 
   friend class AdminStatsTest;
+
+  static Http::Code stats(const Params& parmams, Stats::Store& stats,
+                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+
+  static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
+                                    Stats::Store& stats,
+                                    Stats::CustomStatNamespaces& custom_namespaces);
 
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
                                  const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                                 bool pretty_print = false);
+                                 bool pretty_print);
 
-  void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                   const std::map<std::string, std::string>& text_readouts,
-                   const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                   Buffer::Instance& response);
+  static void statsAsText(const std::map<std::string, uint64_t>& all_stats,
+                          const std::map<std::string, std::string>& text_readouts,
+                          const std::vector<Stats::HistogramSharedPtr>& all_histograms,
+                          Buffer::Instance& response);
 
   Http::Code statsAsHtml(const Http::Utility::QueryParams& query_params,
-                         Http::ResponseHeaderMap& response_headers,
-                         Buffer::Instance& response, AdminStream&, bool used_only,
-                         absl::optional<std::regex>& filter);
-  template<class StatType> Http::Code renderHtml(Stats::StatName after,
-                                                 uint32_t page_size,
-                                                 bool used_only,
-                                                 absl::optional<std::regex>& /*filter*/,
-                                                 Http::ResponseHeaderMap& response_headers,
-                                                 Buffer::Instance& response);
+                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                         AdminStream&, bool used_only, absl::optional<std::regex>& filter);
+  template <class StatType>
+  Http::Code renderHtml(Stats::StatName after, uint32_t page_size, bool used_only,
+                        absl::optional<std::regex>& /*filter*/,
+                        Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 };
 
 } // namespace Server

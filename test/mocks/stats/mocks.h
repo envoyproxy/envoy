@@ -294,8 +294,7 @@ public:
               (std::function<void(std::size_t)>, std::function<void(Stats::TextReadout&)>),
               (const));
   MOCK_METHOD(void, forEachScope,
-              (std::function<void(std::size_t)>, std::function<void(const Scope&)>),
-              (const));
+              (std::function<void(std::size_t)>, std::function<void(const Scope&)>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

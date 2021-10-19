@@ -68,136 +68,175 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerStats(absl::string_view url,
-                                      Http::ResponseHeaderMap& response_headers,
-                                      Buffer::Instance& response, AdminStream& admin_stream) {
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-
+Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& response) {
   const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
-
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!Utility::filterParam(params, response, regex)) {
+  used_only_ = params.find("usedonly") != params.end();
+  pretty_ = params.find("pretty") != params.end();
+  if (!Utility::filterParam(params, response, filter_)) {
     return Http::Code::BadRequest;
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
-      return handlerPrometheusStats(url, response_headers, response, admin_stream);
-    }
-    if (format_value.value() == "html") {
-      return statsAsHtml(params, response_headers, response, admin_stream, used_only, regex);
+      format_ = Format::Prometheus;
+    } else if (format_value.value() == "json") {
+      format_ = Format::Json;
+    } else if (format_value.value() == "text") {
+      format_ = Format::Text;
+    } else {
+      response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
+      return Http::Code::NotFound;
     }
   }
 
-  if (params.find("scopes") != params.end()) {
-    Stats::StatNameHashSet prefixes;
-    server_.stats().forEachScope([](size_t) {}, [&prefixes](const Stats::Scope& scope) {
-      prefixes.insert(scope.prefix());
-    });
-    std::vector<std::string> names;
-    names.reserve(prefixes.size());
-    for (Stats::StatName prefix : prefixes) {
-      names.emplace_back(server_.stats().symbolTable().toString(prefix));
-    }
-    std::sort(names.begin(), names.end());
-    for (std::string& name : names) {
-      name = absl::StrCat("<a href='/stats?scope=", name, "'>", name, "</a>");
-    }
-    response.add(absl::StrJoin(names, "<br>\n"));
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+  Http::Utility::QueryParams::const_iterator scope_iter = params.find("scope");
+  if (scope_iter != params.end()) {
+    scope_ = scope_iter->second;
+  }
+
+  return Http::Code::OK;
+}
+
+Http::Code StatsHandler::handlerStats(absl::string_view url,
+                                      Http::ResponseHeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream&) {
+  Params params;
+  Http::Code code = params.parse(url, response);
+  if (code != Http::Code::OK) {
+    return code;
+  }
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  Stats::Store& store = server_.stats();
+  if (params.format_ == Format::Prometheus) {
+    PrometheusStatsFormatter::statsAsPrometheus(
+        store.counters(), store.gauges(), store.histograms(), response, params.used_only_,
+        params.filter_, server_.api().customStatNamespaces());
     return Http::Code::OK;
   }
 
-  std::map<std::string, uint64_t> all_stats;
+  // if (format_value.value() == "html") {
+  //     return statsAsHtml(params, response_headers, response, admin_stream, used_only, regex);
+  //  }
+
+  return stats(params, store, response_headers, response);
+}
+
+Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response) {
+  std::map<std::string, uint64_t> counters_and_gauges;
   std::map<std::string, std::string> text_readouts;
   std::vector<Stats::HistogramSharedPtr> histograms;
-  auto append_stats_from_scope = [&all_stats, used_only, &regex, &text_readouts, &histograms]
-                                 (const Stats::Scope& scope) {
+  auto append_stats_from_scope = [&counters_and_gauges, &text_readouts, &histograms,
+                                  &params](const Stats::Scope& scope) {
     Stats::IterateFn<Stats::Counter> cfn =
-        [&all_stats, used_only, &regex](const Stats::CounterSharedPtr& counter) -> bool {
-          if (shouldShowMetric(*counter, used_only, regex)) {
-            all_stats.emplace(counter->name(), counter->value());
-          }
-          return true;
-        };
+        [&counters_and_gauges, &params](const Stats::CounterSharedPtr& counter) -> bool {
+      if (params.shouldShowMetric(*counter)) {
+        counters_and_gauges.emplace(counter->name(), counter->value());
+      }
+      return true;
+    };
     scope.iterate(cfn);
 
-    Stats::IterateFn<Stats::Gauge> gfn =
-        [&all_stats, used_only, &regex](const Stats::GaugeSharedPtr& gauge) -> bool {
-          if (shouldShowMetric(*gauge, used_only, regex)) {
-            ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-            all_stats.emplace(gauge->name(), gauge->value());
-          }
-          return true;
-        };
+    Stats::IterateFn<Stats::Gauge> gfn = [&counters_and_gauges,
+                                          &params](const Stats::GaugeSharedPtr& gauge) -> bool {
+      if (params.shouldShowMetric(*gauge)) {
+        ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        counters_and_gauges.emplace(gauge->name(), gauge->value());
+      }
+      return true;
+    };
     scope.iterate(gfn);
 
     Stats::IterateFn<Stats::TextReadout> tfn =
-        [&text_readouts, used_only, &regex](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
-          if (shouldShowMetric(*text_readout, used_only, regex)) {
-            text_readouts.emplace(text_readout->name(), text_readout->value());
-          }
-          return true;
-        };
+        [&text_readouts, &params](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
+      if (params.shouldShowMetric(*text_readout)) {
+        text_readouts.emplace(text_readout->name(), text_readout->value());
+      }
+      return true;
+    };
     scope.iterate(tfn);
 
     Stats::IterateFn<Stats::Histogram> hfn =
-        [&histograms, used_only, &regex](const Stats::HistogramSharedPtr& histogram) -> bool {
-          if (shouldShowMetric(*histogram, used_only, regex)) {
-            histograms.push_back(histogram);
-          }
-          return true;
-        };
+        [&histograms, &params](const Stats::HistogramSharedPtr& histogram) -> bool {
+      if (params.shouldShowMetric(*histogram)) {
+        histograms.push_back(histogram);
+      }
+      return true;
+    };
     scope.iterate(hfn);
   };
 
-  Http::Utility::QueryParams::const_iterator scope_iter = params.find("scope");
-  if (scope_iter == params.end()) {
-    append_stats_from_scope(server_.stats());
+  if (params.scope_.has_value()) {
+    Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
+    stats.forEachScope([](size_t) {},
+                       [&scope_name, &append_stats_from_scope](const Stats::Scope& scope) {
+                         if (scope.prefix() == scope_name.statName()) {
+                           append_stats_from_scope(scope);
+                         }
+                       });
   } else {
-    Stats::StatNameManagedStorage scope_name(scope_iter->second, server_.stats().symbolTable());
-    server_.stats().forEachScope([](size_t) {}, [&scope_name, &append_stats_from_scope](
-        const Stats::Scope& scope) {
-      if (scope.prefix() == scope_name.statName()) {
-        append_stats_from_scope(scope);
-      }
-    });
+    append_stats_from_scope(stats);
   }
 
-  if (!format_value.has_value()) {
-    // Display plain stats if format query param is not there.
-    statsAsText(all_stats, text_readouts, histograms, response);
-    return Http::Code::OK;
-  }
+  std::sort(histograms.begin(), histograms.end(),
+            [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
+              return a->name() < b->name();
+            });
 
-  if (format_value.value() == "json") {
+  if (params.format_ == Format::Json) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(statsAsJson(all_stats, text_readouts, histograms));
+    response.add(statsAsJson(counters_and_gauges, text_readouts, histograms, params.pretty_));
     return Http::Code::OK;
   }
 
-  response.add("usage: /stats?format=json  or /stats?format=prometheus \n");
-  response.add("\n");
-  return Http::Code::NotFound;
+  // Display plain stats if format query param is not there.
+  statsAsText(counters_and_gauges, text_readouts, histograms, response);
+  return Http::Code::OK;
+}
+
+Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
+                                            Http::ResponseHeaderMap& response_headers,
+                                            Buffer::Instance& response, AdminStream&) {
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+
+  Stats::StatNameHashSet prefixes;
+  server_.stats().forEachScope(
+      [](size_t) {}, [&prefixes](const Stats::Scope& scope) { prefixes.insert(scope.prefix()); });
+  std::vector<std::string> names;
+  names.reserve(prefixes.size());
+  for (Stats::StatName prefix : prefixes) {
+    names.emplace_back(server_.stats().symbolTable().toString(prefix));
+  }
+  std::sort(names.begin(), names.end());
+  for (std::string& name : names) {
+    name = absl::StrCat("<a href='/stats?scope=", name, "'>", name, "</a>");
+  }
+  response.add(absl::StrJoin(names, "<br>\n"));
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+  return Http::Code::OK;
 }
 
 Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params =
-      Http::Utility::parseAndDecodeQueryString(path_and_query);
-  const bool used_only = params.find("usedonly") != params.end();
-  absl::optional<std::regex> regex;
-  if (!Utility::filterParam(params, response, regex)) {
-    return Http::Code::BadRequest;
+  Params params;
+  Http::Code code = params.parse(path_and_query, response);
+  if (code != Http::Code::OK) {
+    return code;
   }
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex, server_.api().customStatNamespaces());
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  Stats::Store& stats = server_.stats();
+  PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
+                                              response, params.used_only_, params.filter_,
+                                              server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
@@ -235,7 +274,8 @@ Http::Code StatsHandler::statsAsHtml(const Http::Utility::QueryParams& params,
   } else if (type == "text-readouts") {
     renderHtml<Stats::TextReadout>(after, page_size, used_only, filter, response_headers, response);
   } else if (type == "histograms") {
-    //renderHtml<Stats::Histogram>(after, page_size, used_only, filter, response_headers, response);
+    // renderHtml<Stats::Histogram>(after, page_size, used_only, filter, response_headers,
+    // response);
   } else {
     response.add("Invalid page &type= value");
     return Http::Code::BadRequest;
@@ -244,11 +284,11 @@ Http::Code StatsHandler::statsAsHtml(const Http::Utility::QueryParams& params,
   return Http::Code::OK;
 }
 
-template<class StatType> Http::Code StatsHandler::renderHtml(
-    Stats::StatName after, uint32_t page_size, bool used_only,
-    absl::optional<std::regex>& /*filter*/,
-    Http::ResponseHeaderMap& /*response_headers*/,
-    Buffer::Instance& response) {
+template <class StatType>
+Http::Code StatsHandler::renderHtml(Stats::StatName after, uint32_t page_size, bool used_only,
+                                    absl::optional<std::regex>& /*filter*/,
+                                    Http::ResponseHeaderMap& /*response_headers*/,
+                                    Buffer::Instance& response) {
 
   Stats::StatsFilter<StatType> filter(server_.stats());
   filter.setUsedOnly(used_only);
@@ -285,7 +325,7 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
   return Http::Code::OK;
 }
 
-void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
+void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& counters_and_gauges,
                                const std::map<std::string, std::string>& text_readouts,
                                const std::vector<Stats::HistogramSharedPtr>& histograms,
                                Buffer::Instance& response) {
@@ -294,7 +334,7 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
     response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
                              Html::Utility::sanitize(text_readout.second)));
   }
-  for (const auto& stat : all_stats) {
+  for (const auto& stat : counters_and_gauges) {
     response.add(fmt::format("{}: {}\n", stat.first, stat.second));
   }
   for (const auto& histogram : histograms) {
@@ -305,11 +345,10 @@ void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& all_stats,
   }
 }
 
-std::string
-StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                          const bool pretty_print) {
+std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,
+                                      const std::map<std::string, std::string>& text_readouts,
+                                      const std::vector<Stats::HistogramSharedPtr>& all_histograms,
+                                      const bool pretty_print) {
 
   ProtobufWkt::Struct document;
   std::vector<ProtobufWkt::Value> stats_array;
@@ -320,7 +359,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
     (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
     stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
-  for (const auto& stat : all_stats) {
+  for (const auto& stat : counters_and_gauges) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
@@ -383,6 +422,7 @@ StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   auto* document_fields = document.mutable_fields();
   (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
 
+  ENVOY_LOG_MISC(error, "pretty_print={}", pretty_print);
   return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }
 

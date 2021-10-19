@@ -210,6 +210,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
           {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
+          {"/stats/scopes", "Show scopes, allowing navigation to the stats in each scopes",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsScopes), false, false},
           {"/listeners", "print listener info",
            MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
           {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),

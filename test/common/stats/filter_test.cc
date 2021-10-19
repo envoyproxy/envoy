@@ -1,7 +1,6 @@
-#include "source/common/stats/filter.h"
-
 #include <string>
 
+#include "source/common/stats/filter.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "gtest/gtest.h"
@@ -21,7 +20,7 @@ constexpr uint32_t PageSize = 10;
 constexpr uint32_t NumFullPages = TotalStats / PageSize; // truncation expected
 constexpr uint32_t LastPageSize = TotalStats - PageSize * NumFullPages;
 
-}
+} // namespace
 
 class FilterTest : public testing::Test {
 protected:
@@ -40,7 +39,7 @@ TEST_F(FilterTest, Counters) {
   for (uint32_t i = FirstSuffix; i <= LastSuffix; ++i) {
     store_.counterFromString(absl::StrCat("c", i));
   }
-  store_.counterFromString("c20").inc();  // Make one used counter.
+  store_.counterFromString("c20").inc(); // Make one used counter.
   StatsFilter<Counter> counter_filter(store_);
 
   // Get the all the pages.
@@ -69,7 +68,7 @@ TEST_F(FilterTest, Gauges) {
   for (uint32_t i = FirstSuffix; i <= LastSuffix; ++i) {
     store_.gaugeFromString(absl::StrCat("g", i), Gauge::ImportMode::Accumulate);
   }
-  store_.gaugeFromString("g20", Gauge::ImportMode::Accumulate).inc();  // Make one used gauge.
+  store_.gaugeFromString("g20", Gauge::ImportMode::Accumulate).inc(); // Make one used gauge.
   StatsFilter<Gauge> gauge_filter(store_);
 
   // Get the all the pages.
@@ -98,14 +97,14 @@ TEST_F(FilterTest, TextReadouts) {
   for (uint32_t i = FirstSuffix; i <= LastSuffix; ++i) {
     store_.textReadoutFromString(absl::StrCat("t", i));
   }
-  store_.textReadoutFromString("t20").set("Hello!");  // Make one used text readout
+  store_.textReadoutFromString("t20").set("Hello!"); // Make one used text readout
   StatsFilter<TextReadout> text_readout_filter(store_);
 
   // Get the all the pages.
   StatName last;
   for (uint32_t page = 0; page < NumFullPages; ++page) {
-    std::vector<TextReadoutSharedPtr> text_readouts = text_readout_filter.getFilteredStatsAfter(
-        PageSize, last);
+    std::vector<TextReadoutSharedPtr> text_readouts =
+        text_readout_filter.getFilteredStatsAfter(PageSize, last);
     ASSERT_EQ(PageSize, text_readouts.size());
     for (uint32_t i = 0; i < PageSize; ++i) {
       EXPECT_EQ(getStatName("t", page, i), text_readouts[i]->name());
@@ -119,8 +118,8 @@ TEST_F(FilterTest, TextReadouts) {
   // Get the first page, including only used stats. There will be only one used stat.
   last = StatName();
   text_readout_filter.setUsedOnly(true);
-  std::vector<TextReadoutSharedPtr> text_readouts = text_readout_filter.getFilteredStatsAfter(
-      PageSize, last);
+  std::vector<TextReadoutSharedPtr> text_readouts =
+      text_readout_filter.getFilteredStatsAfter(PageSize, last);
   ASSERT_EQ(1, text_readouts.size());
   EXPECT_EQ("t20", text_readouts[0]->name());
 }

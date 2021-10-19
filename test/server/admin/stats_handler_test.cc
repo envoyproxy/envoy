@@ -25,13 +25,29 @@ public:
     store_->addSink(sink_);
   }
 
-  static std::string
-  statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
-                     std::map<std::string, std::string>& all_text_readouts,
-                     const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
-    return StatsHandler::statsAsJson(all_stats, all_text_readouts, all_histograms, used_only, regex,
-                                     true /*pretty_print*/);
+  Http::Code handlerStats(absl::string_view url, Buffer::Instance& response) {
+    // MockAdminStream admin_stream;
+    // NiceMock<Configuration::MockStatsConfig> stats_config;
+    // EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+    // MockInstance instance;
+    // EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+    // EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+    // StatsHandler handler(instance);
+    Http::TestResponseHeaderMapImpl response_headers;
+    StatsHandler::Params params;
+    Http::Code code = params.parse(url, response);
+    if (code != Http::Code::OK) {
+      return code;
+    }
+    return StatsHandler::stats(params, *store_, response_headers, response);
+  }
+
+  Http::Code statsAsJsonHandler(std::string& data, absl::string_view params = "") {
+    std::string url = absl::StrCat("/stats?format=json&pretty", params);
+    Buffer::OwnedImpl response;
+    Http::Code code = handlerStats(url, response);
+    data = response.toString();
+    return code;
   }
 
   void shutdownThreading() {
@@ -53,33 +69,18 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
-  const std::string url = "/stats?format=blergh";
-  Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-  MockInstance instance;
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-  StatsHandler handler(instance);
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handlerStats("/stats?format=blergh", data);
   EXPECT_EQ(Http::Code::NotFound, code);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
 }
 
 TEST_P(AdminStatsTest, HandlerStatsPlainText) {
-  const std::string url = "/stats";
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-  MockInstance instance;
+  InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-  StatsHandler handler(instance);
+
+  const std::string url = "/stats";
+  Buffer::OwnedImpl data;
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -101,7 +102,7 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  Http::Code code = handlerStats(url, data);
   EXPECT_EQ(Http::Code::OK, code);
   EXPECT_EQ("t: \"hello world\"\n"
             "c1: 10\n"
@@ -118,17 +119,9 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
 }
 
 TEST_P(AdminStatsTest, HandlerStatsJson) {
-  const std::string url = "/stats?format=json";
-  Http::TestResponseHeaderMapImpl response_headers;
-  Buffer::OwnedImpl data;
-  MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-  MockInstance instance;
+  InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
-  EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-  EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-  StatsHandler handler(instance);
+  const std::string url = "/stats?format=json";
 
   Stats::Counter& c1 = store_->counterFromString("c1");
   Stats::Counter& c2 = store_->counterFromString("c2");
@@ -146,8 +139,8 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
-  EXPECT_EQ(Http::Code::OK, code);
+  std::string json_out;
+  EXPECT_EQ(Http::Code::OK, statsAsJsonHandler(json_out));
 
   const std::string expected_json_old = R"EOF({
     "stats": [
@@ -229,7 +222,7 @@ TEST_P(AdminStatsTest, HandlerStatsJson) {
     ]
 })EOF";
 
-  EXPECT_THAT(expected_json_old, JsonStringEq(data.toString()));
+  EXPECT_THAT(expected_json_old, JsonStringEq(json_out));
 
   shutdownThreading();
 }
@@ -255,14 +248,8 @@ TEST_P(AdminStatsTest, StatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-
-  std::vector<Stats::ParentHistogramSharedPtr> histograms = store_->histograms();
-  std::sort(histograms.begin(), histograms.end(),
-            [](const Stats::ParentHistogramSharedPtr& a,
-               const Stats::ParentHistogramSharedPtr& b) -> bool { return a->name() < b->name(); });
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json = statsAsJsonHandler(all_stats, all_text_readouts, histograms, false);
+  std::string actual_json;
+  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json));
 
   const std::string expected_json = R"EOF({
     "stats": [
@@ -402,11 +389,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true);
+  std::string actual_json;
+  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&usedonly"));
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -502,12 +486,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
   h1.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), false,
-                         absl::optional<std::regex>{std::regex("[a-z]1")});
+  std::string actual_json;
+  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&filter=[a-z]1"));
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -613,12 +593,8 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   h3.recordValue(100);
 
   store_->mergeHistograms([]() -> void {});
-
-  std::map<std::string, uint64_t> all_stats;
-  std::map<std::string, std::string> all_text_readouts;
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, all_text_readouts, store_->histograms(), true,
-                         absl::optional<std::regex>{std::regex("h[12]")});
+  std::string actual_json;
+  ASSERT_EQ(Http::Code::OK, statsAsJsonHandler(actual_json, "&usedonly&filter=h[12]"));
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
