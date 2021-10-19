@@ -147,8 +147,8 @@ public:
             const DnsFilterEnvoyConfigSharedPtr& config);
 
   // Network::UdpListenerReadFilter callbacks
-  void onData(Network::UdpRecvData& client_request) override;
-  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::FilterStatus onData(Network::UdpRecvData& client_request) override;
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
   /**
    * @return bool true if the domain_name is a known domain for which we respond to queries

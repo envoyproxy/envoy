@@ -2271,6 +2271,16 @@ server_config:
   EXPECT_EQ(0, cares_.resolvers().size());
 }
 
+// Verify downstream send and receive error handling.
+TEST_F(DnsFilterTest, SendReceiveErrorHandling) {
+  InSequence s;
+
+  setup(forward_query_off_config);
+
+  filter_->onReceiveError(Api::IoError::IoErrorCode::UnknownError);
+  EXPECT_EQ(1, config_->stats().downstream_rx_errors_.value());
+}
+
 TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(DeprecatedKnownSuffixes)) {
   InSequence s;
 
