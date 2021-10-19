@@ -267,6 +267,12 @@ public:
                        std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
+   * Determine if the socket factory is set. Note that socket factory is set at constructor
+   * if this listener is in placed updated.
+   */
+  bool hasListenSocketFactory() { return socket_factory_ != nullptr; }
+
+  /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
   bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }

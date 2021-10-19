@@ -374,7 +374,10 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash)
-    : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
+    : parent_(parent), address_(origin.address_),
+      // The in place update listener takes over the original socket factory and no listen socket is
+      // cloned or closed.
+      socket_factory_(std::move(origin.socket_factory_)), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(

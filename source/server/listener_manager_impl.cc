@@ -438,19 +438,25 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
-    } else {
-      new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+    // The in place update listener has taken over the socket factory.
+    if (!new_listener->hasListenSocketFactory()) {
+      if (!(*existing_warming_listener)->hasCompatibleAddress(*new_listener)) {
+        setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      } else {
+        new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory().clone());
+      }
     }
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
-    if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
-      setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
-    } else {
-      new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+    // The in place update listener has taken over the socket factory.
+    if (!new_listener->hasListenSocketFactory()) {
+      if (!(*existing_active_listener)->hasCompatibleAddress(*new_listener)) {
+        setNewOrDrainingSocketFactory(name, config.address(), *new_listener);
+      } else {
+        new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory().clone());
+      }
     }
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
@@ -509,7 +515,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
   stopListener(*draining_it->listener_, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
-      if (listener.listener_->listenerTag() == listener_tag) {
+      if (listener.listener_->listenerTag() == listener_tag && listener.listener_->hasListenSocketFactory()) {
         listener.listener_->listenSocketFactory().closeAllSockets();
       }
     }
@@ -860,7 +866,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       stopListener(listener, [this, listener_tag]() {
         stats_.listener_stopped_.inc();
         for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
+          if (listener->listenerTag() == listener_tag && listener->hasListenSocketFactory()) {
             listener->listenSocketFactory().closeAllSockets();
           }
         }
@@ -978,7 +984,8 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
   auto existing_draining_listener = std::find_if(
       draining_listeners_.cbegin(), draining_listeners_.cend(),
       [&listener](const DrainingListener& draining_listener) {
-        return draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
+        return draining_listener.listener_->hasListenSocketFactory() &&
+               draining_listener.listener_->listenSocketFactory().getListenSocket(0)->isOpen() &&
                listener.hasCompatibleAddress(*draining_listener.listener_);
       });
 
