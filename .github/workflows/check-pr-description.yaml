@@ -26,6 +26,5 @@ jobs:
       env:
         GITHUB_PR_ID: ${{ github.context.payload.pull_request.id }}
         GITHUB_PR: ${{ github.context.payload.pull_request }}
-        GITHUB_PAYLOAD: ${{ github.context.payload }}
-        GITHUB_CONTEXT: ${{ github.context }}
+        GITHUB_CONTEXT: ${{ github.event }}
         GITHUB_REF_HEAD: ${{ github.head_ref }}
