@@ -238,6 +238,26 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
+// Measure the number of bytes sent and received for a stream.
+struct BytesMeter {
+  uint64_t wireBytesSent() const { return wire_bytes_sent_; }
+  uint64_t wireBytesReceived() const { return wire_bytes_received_; }
+  uint64_t headerBytesSent() const { return header_bytes_sent_; }
+  uint64_t headerBytesReceived() const { return header_bytes_received_; }
+  void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
+  void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
+  void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
+  void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
+private:
+  uint64_t header_bytes_sent_{};
+  uint64_t header_bytes_received_{};
+  uint64_t wire_bytes_sent_{};
+  uint64_t wire_bytes_received_{};
+};
+
+using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -290,13 +310,14 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& getRouteName() const PURE;
+
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
 
   /**
-   * @return the number of body bytes received in the request.
+   * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
 
@@ -604,6 +625,32 @@ public:
    * was never attempted upstream.
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
+
+  /**
+   * @return the bytes meter for upstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getUpstreamBytesMeter() const PURE;
+
+  /**
+   * @return the bytes meter for downstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getDownstreamBytesMeter() const PURE;
+
+  /**
+   * @param upstream_bytes_meter, the bytes meter for upstream http stream.
+   */
+  virtual void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) PURE;
+
+  /**
+   * @param downstream_bytes_meter, the bytes meter for downstream http stream.
+   */
+  virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
+
+  static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
+                                                  StreamInfo& upstream_info) {
+    downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
+    upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
+  }
 };
 
 } // namespace StreamInfo

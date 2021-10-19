@@ -39,6 +39,7 @@
 #include "absl/container/node_hash_set.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using namespace std::chrono_literals;
 
@@ -48,30 +49,17 @@ using testing::HasSubstr;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
-  RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
+  explicit RuntimeStatsHelper()
       : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
-                         Stats::Gauge::ImportMode::NeverImport)) {
-    if (allow_deprecated_v2_api) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
-          {"envoy.features.enable_all_deprecated_features", "true"},
-      });
-    }
-  }
+                         Stats::Gauge::ImportMode::NeverImport)) {}
 
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
 };
 
 class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
-// TODO(htuch): During/before the v2 removal, cleanup the various examples that explicitly refer to
-// v2 API protos and replace with upgrade examples not tie to the concrete API.
-class ProtobufV2ApiUtilityTest : public testing::Test, protected RuntimeStatsHelper {
-public:
-  ProtobufV2ApiUtilityTest() : RuntimeStatsHelper(true) {}
-};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -1012,35 +1000,40 @@ insensitive_repeated_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
+
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
 // Empty `TypedStruct` can be trivially redacted.
-TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.test.Sensitive
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 value:
   sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.unknown.Message
 value:
@@ -1048,14 +1041,14 @@ value:
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
-  udpa::type::v1::TypedStruct expected = actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  TypeParam actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
@@ -1367,7 +1360,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToWrongType) {
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;

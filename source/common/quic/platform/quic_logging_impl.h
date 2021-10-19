@@ -128,6 +128,7 @@
 #endif
 
 #define QUICHE_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+#define QUICHE_PREDICT_TRUE_IMPL(x) ABSL_PREDICT_TRUE(x)
 
 namespace quic {
 
