@@ -200,19 +200,44 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
     server_.flushStats();
   }
 
+  std::string preamble = R"(<html>
+  <head>
+    <script>
+      function visitScope(scope) {
+        var params = "";
+        if (document.getElementById("used").checked) {
+          params += "&usedonly";
+        }
+        var filter = document.getElementById("filter").value;
+        if (filter && filter.length > 0) {
+          params += "&filter=" + filter;
+        }
+        location.href = "/stats?scope=" + scope + params;
+      }
+    </script>
+  </head>
+  <body>
+    <label for="used">Used Only</label><input type="checkbox" id="used"><br>
+    <label for="filter">Filter (regex)</label><input type="text" id="filter"><br>
+)";
+
   Stats::StatNameHashSet prefixes;
   server_.stats().forEachScope(
       [](size_t) {}, [&prefixes](const Stats::Scope& scope) { prefixes.insert(scope.prefix()); });
-  std::vector<std::string> names;
+  std::vector<std::string> lines, names;
   names.reserve(prefixes.size());
+  lines.reserve(prefixes.size() + 2);
+  lines.push_back(preamble);
   for (Stats::StatName prefix : prefixes) {
     names.emplace_back(server_.stats().symbolTable().toString(prefix));
   }
   std::sort(names.begin(), names.end());
-  for (std::string& name : names) {
-    name = absl::StrCat("<a href='/stats?scope=", name, "'>", name, "</a>");
+  for (const std::string& name : names) {
+    lines.push_back(
+        absl::StrCat("    <a href='javascript:visitScope(\"", name, "\")'>", name, "</a><br>\n"));
   }
-  response.add(absl::StrJoin(names, "<br>\n"));
+  lines.push_back("  </body>\n</html>\n");
+  response.add(absl::StrJoin(lines, ""));
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
   return Http::Code::OK;
 }

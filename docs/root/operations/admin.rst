@@ -431,10 +431,19 @@ modify different aspects of the server:
   value represents the summary since the start of Envoy instance. "No recorded values" in the histogram
   output indicates that it has not been updated with a value. See :ref:`here <operations_stats>` for more information.
 
+  Warning: if there are a large number of clusters, say more than 10000, then this 
+  endpoint may disrupt server operation due to CPU and/or memory overhead. It also
+  may overwhelm a browser if one is being used to display the admin console.
+
   .. http:get:: /stats?usedonly
 
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
+
+  .. http:get:: /stats?scope=SCOPE_NAME
+
+  Restricts the stats displayed to include only those inside the specified scope. See also
+  ``/stats/scopes`` which can enumerate the available scopes as HTML links.
 
   .. http:get:: /stats?filter=regex
 
@@ -530,6 +539,14 @@ modify different aspects of the server:
   take a global symbol table lock. During startup this is acceptable,
   but in response to user requests on high core-count machines, this
   can cause performance issues due to mutex contention.
+
+  .. http:get:: /stats/scopes
+
+  Displays the stats scopes as HTML links. Clicking on the list shows
+  the stats within each scope. This interface is useful for deployments
+  with a large number of clusters, as visiting /stats may disrupt server
+  processing due to the large amount of processing time and locking of
+  the stats system, as well as a huge HTTP response.
 
   See :repo:`source/docs/stats.md` for more details.
 
