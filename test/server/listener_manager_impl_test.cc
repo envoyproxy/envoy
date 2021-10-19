@@ -357,22 +357,6 @@ address:
                           EnvoyException, "no filter chains specified");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig2UDPListenerFilters) {
-  const std::string yaml = R"EOF(
-address:
-  socket_address:
-    protocol: UDP
-    address: 127.0.0.1
-    port_value: 1234
-listener_filters:
-- name: envoy.filters.listener.tls_inspector
-- name: envoy.filters.listener.original_dst
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                          EnvoyException, "Only 1 UDP listener filter per listener supported");
-}
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
   const std::string yaml = R"EOF(
 address:

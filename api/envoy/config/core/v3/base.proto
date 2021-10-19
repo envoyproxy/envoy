@@ -372,7 +372,7 @@ message WatchedDirectory {
   string path = 1 [(validate.rules).string = {min_len: 1}];
 }
 
-// Data source consisting of either a file or an inline value.
+// Data source consisting of a file, an inline value, or an environment variable.
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
@@ -387,6 +387,9 @@ message DataSource {
 
     // String inlined in the configuration.
     string inline_string = 3;
+
+    // Environment variable data source.
+    string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
   }
 }
 

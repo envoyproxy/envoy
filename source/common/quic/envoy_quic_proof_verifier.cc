@@ -1,7 +1,7 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 
 #include "source/common/quic/envoy_quic_utils.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "quiche/quic/core/crypto/certificate_view.h"
 
@@ -60,8 +60,7 @@ bool EnvoyQuicProofVerifier::doVerifyCertChain(
   }
 
   for (const absl::string_view& config_san : cert_view->subject_alt_name_domains()) {
-    if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname,
-                                                                              config_san)) {
+    if (Extensions::TransportSockets::Tls::Utility::dnsNameMatch(hostname, config_san)) {
       return true;
     }
   }
