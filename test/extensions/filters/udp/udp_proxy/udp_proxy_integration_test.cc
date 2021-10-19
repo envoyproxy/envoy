@@ -138,8 +138,8 @@ name: test.udp_listener.reverse
 
   void requestResponseWithListenerAddress(
       const Network::Address::Instance& listener_address, std::string request = "hello",
-      std::string expectedRequest = "hello", std::string response = "world1",
-      std::string expectedResponse = "world1",
+      std::string expected_request = "hello", std::string response = "world1",
+      std::string expected_response = "world1",
       uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_, max_rx_datagram_size);
@@ -148,28 +148,28 @@ name: test.udp_listener.reverse
     // Wait for the upstream datagram.
     Network::UdpRecvData request_datagram;
     ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-    EXPECT_EQ(expectedRequest, request_datagram.buffer_->toString());
+    EXPECT_EQ(expected_request, request_datagram.buffer_->toString());
 
     // Respond from the upstream.
     fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ(expectedResponse, response_datagram.buffer_->toString());
+    EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(expectedRequest.size(),
+    EXPECT_EQ(expected_request.size(),
               test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-    EXPECT_EQ(expectedRequest.size(),
+    EXPECT_EQ(expected_request.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
-    EXPECT_EQ(expectedResponse.size(),
+    EXPECT_EQ(expected_response.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
     // The stat is incremented after the send so there is a race condition and we must wait for
     // the counter to be incremented.
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", expectedResponse.size());
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", expected_response.size());
     test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
 
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
