@@ -40,16 +40,28 @@ const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
       absl::StrCat(quiche::EnvoyQuicheReloadableFlagPrefix, #flag))
 
 #define SetQuicheReloadableFlagImpl(module, flag, value)                                           \
-  ASSERT(Envoy::Thread::MainThread::isMainOrTestThread());                                         \
-  Envoy::Runtime::LoaderSingleton::getExisting()->mergeValues(                                     \
-      {{absl::StrCat(quiche::EnvoyQuicheReloadableFlagPrefix, #flag), BOOL_STR(value)}})
+  do {                                                                                             \
+    ASSERT(Envoy::Thread::MainThread::isMainOrTestThread());                                       \
+    if (Envoy::Runtime::LoaderSingleton::getExisting())                                            \
+      Envoy::Runtime::LoaderSingleton::getExisting()->mergeValues(                                 \
+          {{absl::StrCat(quiche::EnvoyQuicheReloadableFlagPrefix, #flag), BOOL_STR(value)}});      \
+    else                                                                                           \
+      QUICHE_LOG(WARNING) << "Cannot set the reloadable flag " #flag " to " << value               \
+                          << ". Runtime singleton unavailable.";                                   \
+  } while (0)
 
 #define GetQuicheRestartFlagImpl(module, flag)                                                     \
   Envoy::Runtime::runtimeFeatureEnabled(absl::StrCat(quiche::EnvoyQuicheRestartFlagPrefix, #flag))
 
 #define SetQuicheRestartFlagImpl(module, flag, value)                                              \
-  ASSERT(Envoy::Thread::MainThread::isMainOrTestThread());                                         \
-  Envoy::Runtime::LoaderSingleton::getExisting()->mergeValues(                                     \
-      {{absl::StrCat(quiche::EnvoyQuicheRestartFlagPrefix, #flag), BOOL_STR(value)}})
+  do {                                                                                             \
+    ASSERT(Envoy::Thread::MainThread::isMainOrTestThread());                                       \
+    if (Envoy::Runtime::LoaderSingleton::getExisting())                                            \
+      Envoy::Runtime::LoaderSingleton::getExisting()->mergeValues(                                 \
+          {{absl::StrCat(quiche::EnvoyQuicheRestartFlagPrefix, #flag), BOOL_STR(value)}});         \
+    else                                                                                           \
+      QUICHE_LOG(WARNING) << "Cannot set the restart flag " #flag " to " << value                  \
+                          << ". Runtime singleton unavailable.";                                   \
+  } while (0)
 
 } // namespace quiche
