@@ -726,7 +726,7 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
         auto* keepalive_options = hcm.mutable_http3_protocol_options()
                                       ->mutable_quic_protocol_options()
                                       ->mutable_connection_keepalive();
-        keepalive_options->mutable_initial_interval()->set_nanos(initial_interval_sec);
+        keepalive_options->mutable_initial_interval()->set_seconds(initial_interval_sec);
         keepalive_options->mutable_max_interval()->set_seconds(max_interval_sec);
       });
   // Set connection idle network timeout to be a little larger than max interval.
