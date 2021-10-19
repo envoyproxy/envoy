@@ -89,14 +89,6 @@ private:
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                           Buffer::Instance& response);
-
-  Http::Code statsAsHtml(const Http::Utility::QueryParams& query_params,
-                         Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                         AdminStream&, bool used_only, absl::optional<std::regex>& filter);
-  template <class StatType>
-  Http::Code renderHtml(Stats::StatName after, uint32_t page_size, bool used_only,
-                        absl::optional<std::regex>& /*filter*/,
-                        Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 };
 
 } // namespace Server
