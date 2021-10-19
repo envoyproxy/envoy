@@ -151,6 +151,11 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
                                            "600", "string", cmd);
   TCLAP::SwitchArg enable_core_dump("", "enable-core-dump", "Enable core dumps", cmd, false);
 
+  TCLAP::MultiArg<std::string> stats_tag("", "stats-tag",
+                                         "Universal tags which will be added to all metrics. The "
+                                         "format is tag:value. It can be repeated",
+                                         false, "string", cmd);
+
   cmd.setExceptionHandling(false);
   TRY_ASSERT_MAIN_THREAD {
     cmd.parse(args);
@@ -282,6 +287,17 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   if (!disable_extensions.getValue().empty()) {
     disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ',');
   }
+
+  if (!stats_tag.getValue().empty()) {
+    for (const auto& cli_tag_pair : stats_tag.getValue()) {
+      std::vector<std::string> splitted_tag_pair = absl::StrSplit(cli_tag_pair, ':');
+      if (splitted_tag_pair.size() != 2) {
+        throw MalformedArgvException(
+            fmt::format("error: missformated stats-tag '{}'", cli_tag_pair));
+      }
+      stats_tags_.push_back({splitted_tag_pair[0], splitted_tag_pair[1]});
+    }
+  }
 }
 
 spdlog::level::level_enum OptionsImpl::parseAndValidateLogLevel(absl::string_view log_level) {
@@ -396,6 +412,9 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   }
   command_line_options->set_socket_path(socketPath());
   command_line_options->set_socket_mode(socketMode());
+  for (const auto& tag : statsTags()) {
+    command_line_options->add_stats_tag(fmt::format("{}:{}", tag.first, tag.second));
+  }
   return command_line_options;
 }
 

@@ -259,6 +259,11 @@ public:
    * @return the mode of socket file.
    */
   virtual mode_t socketMode() const PURE;
+
+  /**
+   * @return the stats tags provided by the cli. The caller is responsible to deduplicate them.
+   */
+  virtual const std::vector<std::pair<std::string, std::string>>& statsTags() const PURE;
 };
 
 } // namespace Server

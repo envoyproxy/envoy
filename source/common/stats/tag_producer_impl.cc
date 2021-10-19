@@ -11,10 +11,18 @@
 namespace Envoy {
 namespace Stats {
 
-TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config) {
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
+                                 const std::vector<std::pair<std::string, std::string>>& cli_tags) {
   // To check name conflict.
   reserveResources(config);
   absl::node_hash_set<std::string> names = addDefaultExtractors(config);
+
+  for (const auto& cli_tag : cli_tags) {
+    if (!names.emplace(cli_tag.first).second) {
+      throw EnvoyException(fmt::format("Tag name '{}' specified twice.", cli_tag.first));
+    }
+    default_tags_.emplace_back(Tag{cli_tag.first, cli_tag.second});
+  }
 
   for (const auto& tag_specifier : config.stats_tags()) {
     const std::string& name = tag_specifier.tag_name();
