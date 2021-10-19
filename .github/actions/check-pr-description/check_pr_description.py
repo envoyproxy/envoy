@@ -7,6 +7,7 @@ import sys
 
 import github
 
+
 def check_pr_description(id):
     git = github.Github()
     repo = git.get_repo('envoyproxy/envoy')
@@ -19,20 +20,22 @@ def check_pr_description(id):
         match = re.search('^\s*%s:\s*(.+)$' % field, pr.body, re.MULTILINE)
         if not match:
             print('Missing required field: %s' % field)
-            valid = False;
+            valid = False
         else:
-            print (match.group(1))
+            print(match.group(1))
 
     if not valid:
-        print('Invalid PR description. Please see %s for more information.' %
-              'https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md')
+        print(
+            'Invalid PR description. Please see %s for more information.'
+            % 'https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md')
         sys.exit(1)
+
 
 if __name__ == '__main__':
     GITHUB_PR_ID = os.getenv('GITHUB_PR_ID')
     if not GITHUB_PR_ID:
         print('GITHUB_PR_ID not set')
-        sys.exit(1);
+        sys.exit(1)
 
     try:
         id = int(GITHUB_PR_ID)
