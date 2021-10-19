@@ -298,27 +298,6 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
-                                        const absl::string_view pattern) {
-  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
-  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
-  if (lower_case_dns_name == lower_case_pattern) {
-    return true;
-  }
-
-  size_t pattern_len = lower_case_pattern.length();
-  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
-    if (lower_case_dns_name.length() > pattern_len - 1) {
-      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
-      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
-             lower_case_dns_name.substr(off, pattern_len - 1) ==
-                 lower_case_pattern.substr(1, pattern_len - 1);
-    }
-  }
-
-  return false;
-}
-
 bool DefaultCertValidator::verifySubjectAltName(
     const GENERAL_NAME* general_name,
     Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> const& matcher) {
@@ -327,7 +306,7 @@ bool DefaultCertValidator::verifySubjectAltName(
   return general_name->type == GEN_DNS &&
                  matcher.matcher().match_pattern_case() ==
                      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-             ? dnsNameMatch(matcher.matcher().exact(), absl::string_view(san))
+             ? Utility::dnsNameMatch(matcher.matcher().exact(), absl::string_view(san))
              : matcher.match(san);
 }
 
