@@ -24,4 +24,5 @@ jobs:
     - name: Check Description
       run: python ./.github/actions/check-pr-description/check_pr_description.py
       env:
-        GITHUB_PR_ID: $${{github.context.payload.pull_request.id}}
+        GITHUB_PR_ID: ${{ github.context.payload.pull_request.id }}
+        GITHUB_REF_HEAD: ${{ github.head_ref }}
