@@ -3,7 +3,10 @@
 
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
-namespace Envoy::Extensions::TransportSockets::TcpStats {
+namespace Envoy {
+namespace Extensions {
+namespace TransportSockets {
+namespace TcpStats {
 namespace {
 class TcpStatsSocketIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                       public BaseIntegrationTest {
@@ -47,7 +50,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, TcpStatsSocketIntegrationTest,
 TEST_P(TcpStatsSocketIntegrationTest, Basic) {
   initialize();
 
-  auto begin = std::chrono::steady_clock::now();
+  auto begin = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
   auto listener_port = lookupPort("listener_0");
   auto tcp_client = makeTcpConnection(listener_port);
@@ -61,7 +64,7 @@ TEST_P(TcpStatsSocketIntegrationTest, Basic) {
   tcp_client->close();
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
-  auto end = std::chrono::steady_clock::now();
+  auto end = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
   // Record the duration of the test to use as an upper bound on the round trip time measurement.
   std::chrono::microseconds test_duration_us =
@@ -115,5 +118,8 @@ TEST_P(TcpStatsSocketIntegrationTest, Basic) {
 }
 
 } // namespace
-} // namespace Envoy::Extensions::TransportSockets::TcpStats
+} // namespace TcpStats
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy
 #endif
