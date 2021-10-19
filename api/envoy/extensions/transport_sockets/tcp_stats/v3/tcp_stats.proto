@@ -18,12 +18,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the TCP Stats transport socket wrapper, which wraps another transport socket for
 // all communication, but emits stats about the underlying TCP connection.
+//
+// The stats are documented :ref:`here <config_listener_stats_tcp>` for listeners and
+// :ref:`here <config_cluster_manager_cluster_stats_tcp>` for clusters.
+//
+// This transport socket is currently only supported on Linux.
 message Config {
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 1 [(validate.rules).message = {required: true}];
 
   // Period to update stats while the connection is open. If unset, updates only happen when the
-  // connection is closed. Some stats are only updated when teh connection is closed. All stats are
-  // updated one final time when the connection is closed.
+  // connection is closed. Stats are always updated one final time when the connection is closed.
   google.protobuf.Duration update_period = 2;
 }
