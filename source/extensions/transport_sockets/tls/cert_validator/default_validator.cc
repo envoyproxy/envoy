@@ -289,7 +289,7 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (general_name->type == GEN_DNS ? dnsNameMatch(config_san, san.c_str())
+      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san.c_str())
                                         : config_san == san) {
         return true;
       }
