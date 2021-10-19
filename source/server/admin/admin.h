@@ -328,6 +328,8 @@ private:
       return socket_;
     }
     Network::ListenSocketFactoryPtr clone() const override { return nullptr; }
+    Network::ListenSocketFactoryPtr share() const override { return nullptr; }
+
     void closeAllSockets() override {}
     void doFinalPreWorkerInit() override {}
 

@@ -52,7 +52,10 @@ public:
   }
   Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
   Network::ListenSocketFactoryPtr clone() const override {
-    return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
+    return absl::WrapUnique(new ListenSocketFactoryImpl(*this, /*duplicate_socket=*/true));
+  }
+  Network::ListenSocketFactoryPtr share() const override {
+    return absl::WrapUnique(new ListenSocketFactoryImpl(*this, /*duplicate_socket=*/false));
   }
   void closeAllSockets() override {
     for (auto& socket : sockets_) {
@@ -62,7 +65,7 @@ public:
   void doFinalPreWorkerInit() override;
 
 private:
-  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
+  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone, bool do_duplicate);
 
   Network::SocketSharedPtr createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
                                                              Network::Socket::Type socket_type,

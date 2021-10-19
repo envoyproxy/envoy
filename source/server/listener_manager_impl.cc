@@ -515,7 +515,8 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
   stopListener(*draining_it->listener_, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
-      if (listener.listener_->listenerTag() == listener_tag && listener.listener_->hasListenSocketFactory()) {
+      if (listener.listener_->listenerTag() == listener_tag &&
+          listener.listener_->hasListenSocketFactory()) {
         listener.listener_->listenSocketFactory().closeAllSockets();
       }
     }

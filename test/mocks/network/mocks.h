@@ -384,6 +384,7 @@ public:
   MOCK_METHOD(Network::SocketSharedPtr, getListenSocket, (uint32_t));
   MOCK_METHOD(bool, reusePort, (), (const));
   MOCK_METHOD(Network::ListenSocketFactoryPtr, clone, (), (const));
+  MOCK_METHOD(Network::ListenSocketFactoryPtr, share, (), (const));
   MOCK_METHOD(void, closeAllSockets, ());
   MOCK_METHOD(void, doFinalPreWorkerInit, ());
 };

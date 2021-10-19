@@ -109,12 +109,17 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
   ASSERT(sockets_.size() == num_sockets);
 }
 
-ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone)
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                                                 bool do_duplicate)
     : factory_(factory_to_clone.factory_), local_address_(factory_to_clone.local_address_),
       socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
       listener_name_(factory_to_clone.listener_name_),
       tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
       bind_type_(factory_to_clone.bind_type_) {
+  if (!do_duplicate) {
+    sockets_ = factory_to_clone.sockets_;
+    return;
+  }
   for (auto& socket : factory_to_clone.sockets_) {
     // In the cloning case we always duplicate() the socket. This makes sure that during listener
     // update/drain we don't lose any incoming connections when using reuse_port. Specifically on
@@ -377,7 +382,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     : parent_(parent), address_(origin.address_),
       // The in place update listener takes over the original socket factory and no listen socket is
       // cloned or closed.
-      socket_factory_(std::move(origin.socket_factory_)), bind_to_port_(shouldBindToPort(config)),
+      socket_factory_(origin.socket_factory_->share()), bind_to_port_(shouldBindToPort(config)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(

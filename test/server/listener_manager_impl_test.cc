@@ -135,7 +135,8 @@ public:
     } else {
       new_socket = listener_factory_.socket_.get();
       EXPECT_CALL(*listener_factory_.socket_, duplicate())
-            .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(new NiceMock<Network::MockListenSocket>()))));
+          .WillOnce(Return(
+              ByMove(std::unique_ptr<Network::Socket>(new NiceMock<Network::MockListenSocket>()))));
       // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _));
@@ -156,7 +157,7 @@ public:
                     ListenerHandle* listener_handle, Network::MockListenSocket&) {
 
     EXPECT_CALL(*worker_, stopListener(_, _));
-//    EXPECT_CALL(socket, close());
+    //    EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
@@ -4740,9 +4741,7 @@ filter_chains:
   // Stop foo which should remove warming listener.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _));
-  // The old listener does not own listen socket factory.
-  // TODO(lambdai): Create a issue XXX. The warming listener should close the listen socket.
-  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0);
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo, onDestroy());
   manager_->stopListeners(ListenerManager::StopListenersType::InboundOnly);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
@@ -4805,7 +4804,7 @@ filter_chains:
   // Remove foo which should remove both warming and active.
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   EXPECT_CALL(*worker_, stopListener(_, _));
-  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0);
+  EXPECT_CALL(*listener_factory_.socket_, close());
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(_));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
@@ -5165,8 +5164,8 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
   auto new_listener_proto = listener_proto;
   new_listener_proto.mutable_filter_chains(0)->mutable_use_proxy_proto()->set_value(true);
 
-  auto duplicated_socket =
-      expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>());
+  auto duplicated_socket = expectUpdateToThenDrain(new_listener_proto, listener_foo,
+                                                   OptRef<Network::MockListenSocket>());
   expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5209,8 +5208,8 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest,
 
   auto new_listener_proto = listener_proto;
   new_listener_proto.set_traffic_direction(::envoy::config::core::v3::TrafficDirection::INBOUND);
-  auto duplicated_socket =
-      expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>());
+  auto duplicated_socket = expectUpdateToThenDrain(new_listener_proto, listener_foo,
+                                                   OptRef<Network::MockListenSocket>());
 
   expectRemove(new_listener_proto, listener_foo_update1, *duplicated_socket);
 

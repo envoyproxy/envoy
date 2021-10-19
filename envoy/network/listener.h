@@ -63,6 +63,12 @@ public:
   virtual ListenSocketFactoryPtr clone() const PURE;
 
   /**
+   * Clone this socket factory and share the underlying listen socket. Return nullptr if this is not
+   * supported.
+   */
+  virtual ListenSocketFactoryPtr share() const PURE;
+
+  /**
    * Close all sockets. This is used during draining scenarios.
    */
   virtual void closeAllSockets() PURE;
