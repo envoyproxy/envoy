@@ -18,6 +18,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
@@ -62,6 +63,22 @@ public:
               (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
+};
+
+class MockDnsResolverFactory : public DnsResolverFactory {
+public:
+  MockDnsResolverFactory() = default;
+  ~MockDnsResolverFactory() override = default;
+
+  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolver,
+              (Event::Dispatcher & dispatcher, Api::Api& api,
+               const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
+              (const, override));
+  std::string name() const override { return std::string(CaresDnsResolver); };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
+  }
 };
 
 class MockAddressResolver : public Address::Resolver {

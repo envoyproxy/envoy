@@ -14,6 +14,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
+  ENVOY_LOG(trace, "New connection.");
   connections_.push_back(createNextConnection());
 }
 
@@ -314,6 +315,7 @@ void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {
   }
 
   connect_finished_ = true;
+  ENVOY_LOG(trace, "Disabling next attempt timer.");
   next_attempt_timer_->disableTimer();
   for (size_t i = 0; i < connections_.size(); ++i) {
     connections_[i]->removeConnectionCallbacks(*callbacks_wrappers_[i]);
@@ -351,7 +353,7 @@ void HappyEyeballsConnectionImpl::hashKey(std::vector<uint8_t>& hash_key) const 
 
 void HappyEyeballsConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
   if (!connect_finished_) {
-    per_connection_state_.connection_stats_ = stats;
+    per_connection_state_.connection_stats_ = std::make_unique<ConnectionStats>(stats);
   }
   for (auto& connection : connections_) {
     connection->setConnectionStats(stats);
@@ -394,7 +396,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
   if (per_connection_state_.no_delay_.has_value()) {
     connection->noDelay(per_connection_state_.no_delay_.value());
   }
-  if (per_connection_state_.connection_stats_.has_value()) {
+  if (per_connection_state_.connection_stats_) {
     connection->setConnectionStats(*per_connection_state_.connection_stats_);
   }
   if (per_connection_state_.buffer_limits_.has_value()) {
@@ -415,6 +417,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
 }
 
 void HappyEyeballsConnectionImpl::tryAnotherConnection() {
+  ENVOY_LOG(trace, "Trying another connection.");
   connections_.push_back(createNextConnection());
   connections_.back()->connect();
   maybeScheduleNextAttempt();
@@ -424,15 +427,18 @@ void HappyEyeballsConnectionImpl::maybeScheduleNextAttempt() {
   if (next_address_ >= address_list_.size()) {
     return;
   }
+  ENVOY_LOG(trace, "Scheduling next attempt.");
   next_attempt_timer_->enableTimer(std::chrono::milliseconds(300));
 }
 
 void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
   if (event != ConnectionEvent::Connected) {
+    ENVOY_LOG(trace, "Connection failed to connect");
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
     if (next_address_ < address_list_.size()) {
+      ENVOY_LOG(trace, "Disabling next attempt timer.");
       next_attempt_timer_->disableTimer();
       tryAnotherConnection();
     }
@@ -454,8 +460,8 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
 void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
                                                        ConnectionCallbacksWrapper* wrapper) {
   connect_finished_ = true;
+  ENVOY_LOG(trace, "Disabling next attempt timer due to final connection.");
   next_attempt_timer_->disableTimer();
-
   // Remove the proxied connection callbacks from all connections.
   for (auto& w : callbacks_wrappers_) {
     w->connection().removeConnectionCallbacks(*w);
@@ -466,6 +472,7 @@ void HappyEyeballsConnectionImpl::setUpFinalConnection(ConnectionEvent event,
   while (it != connections_.end()) {
     if (it->get() != &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
+      dispatcher_.deferredDelete(std::move(*it));
       it = connections_.erase(it);
     } else {
       ++it;
@@ -533,6 +540,7 @@ void HappyEyeballsConnectionImpl::cleanupWrapperAndConnection(ConnectionCallback
   for (auto it = connections_.begin(); it != connections_.end();) {
     if (it->get() == &(wrapper->connection())) {
       (*it)->close(ConnectionCloseType::NoFlush);
+      dispatcher_.deferredDelete(std::move(*it));
       it = connections_.erase(it);
     } else {
       ++it;
