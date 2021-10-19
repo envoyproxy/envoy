@@ -136,12 +136,9 @@ void EnvoyQuicClientConnection::maybeMigratePort() {
         current_local_address->ip()->addressAsString());
   }
 
-  // TODO(renjietang): Make createConnectionSocket() take a const reference so that no casting is
-  // needed here.
-  auto remote_address = const_cast<Network::Address::InstanceConstSharedPtr&>(
-      connectionSocket()->connectionInfoProvider().remoteAddress());
   // The probing socket will have the same host but a different port.
-  auto probing_socket = createConnectionSocket(remote_address, new_local_address, nullptr);
+  auto probing_socket = createConnectionSocket(
+      connectionSocket()->connectionInfoProvider().remoteAddress(), new_local_address, nullptr);
   setUpConnectionSocket(*probing_socket, delegate_);
   auto writer = std::make_unique<EnvoyQuicPacketWriter>(
       std::make_unique<Network::UdpDefaultWriter>(probing_socket->ioHandle()));
