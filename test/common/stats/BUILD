@@ -31,15 +31,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "filter_test",
-    srcs = ["filter_test.cc"],
-    deps = [
-        "//source/common/stats:filter_lib",
-        "//source/common/stats:isolated_store_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "isolated_store_impl_test",
     srcs = ["isolated_store_impl_test.cc"],
     deps = [

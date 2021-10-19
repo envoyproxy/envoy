@@ -58,10 +58,7 @@ protected:
       : config_file_(TestEnvironment::temporaryFileSubstitute(
             "test/config/integration/google_com_proxy_port_0.yaml", TestEnvironment::ParamMap(),
             TestEnvironment::PortMap(), GetParam())),
-        argv_({"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), nullptr}) {
-    ENVOY_LOG_MISC(error, "Config file: {}",
-                   TestEnvironment::readFileToStringForTest(config_file_));
-  }
+        argv_({"envoy-static", "--use-dynamic-base-id", "-c", config_file_.c_str(), nullptr}) {}
 
   const char* const* argv() { return &argv_[0]; }
   int argc() { return argv_.size() - 1; }

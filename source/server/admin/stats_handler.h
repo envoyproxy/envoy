@@ -20,13 +20,6 @@ namespace Server {
 class StatsHandler : public HandlerContextBase {
 
 public:
-  enum class Type {
-    Counter,
-    Gauge,
-    Histogram,
-    TextResult,
-  };
-
   StatsHandler(Server::Instance& server);
 
   Http::Code handlerResetCounters(absl::string_view path_and_query,
@@ -50,9 +43,6 @@ public:
   Http::Code handlerPrometheusStats(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
-  Http::Code handlerHtmlStats(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                              AdminStream&, Stats::StatName after, Type type);
   Http::Code handlerStatsScopes(absl::string_view path_and_query,
                                 Http::ResponseHeaderMap& response_headers,
                                 Buffer::Instance& response, AdminStream&);
@@ -65,7 +55,6 @@ private:
     Text,
     Json,
     Prometheus,
-    // Html,
   };
 
   struct Params {

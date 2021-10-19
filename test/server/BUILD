@@ -508,7 +508,6 @@ envoy_cc_benchmark_binary(
     ],
     deps = [
         "//envoy/stats:stats_interface",
-        "//source/common/stats:filter_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:server_lib",
         "//test/test_common:simulated_time_system_lib",
