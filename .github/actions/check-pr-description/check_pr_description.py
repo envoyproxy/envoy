@@ -1,6 +1,5 @@
 """ Script for checking that PR descriptions contain required fieds."""
 
-import datetime
 import os
 import re
 import sys

@@ -7,6 +7,11 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
+  directory: "/.github/actions/check-pr-description"
+  schedule:
+    interval: "daily"
+
+- package-ecosystem: "pip"
   directory: "/configs"
   schedule:
     interval: "daily"
