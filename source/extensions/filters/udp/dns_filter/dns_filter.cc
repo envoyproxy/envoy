@@ -595,7 +595,7 @@ Network::FilterStatus DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_
   config_->stats().downstream_rx_errors_.inc();
   UNREFERENCED_PARAMETER(error_code);
 
-  return Network::FilterStatus::Continue;
+  return Network::FilterStatus::StopIteration;
 }
 
 } // namespace DnsFilter

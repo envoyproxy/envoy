@@ -52,7 +52,7 @@ Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
 Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
   config_->stats().downstream_sess_rx_errors_.inc();
 
-  return Network::FilterStatus::Continue;
+  return Network::FilterStatus::StopIteration;
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,

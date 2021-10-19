@@ -733,7 +733,7 @@ Network::FilterStatus FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
   absl::MutexLock lock(&lock_);
   received_datagrams_.emplace_back(std::move(data));
 
-  return Network::FilterStatus::Continue;
+  return Network::FilterStatus::StopIteration;
 }
 
 AssertionResult FakeUpstream::runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
