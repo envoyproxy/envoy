@@ -1,17 +1,8 @@
 #include "source/common/quic/envoy_quic_proof_source_base.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#endif
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "quiche/quic/core/quic_data_writer.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
