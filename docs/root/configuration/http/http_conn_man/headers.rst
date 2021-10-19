@@ -372,9 +372,11 @@ The *x-forwarded-host* header is a standard proxy header which indicates the ori
 requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
 the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header is modified.
 
-Envoy updates the *:authority* header and appends its original value to *x-forwarded-host* only if one of the
-:ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` options
-are used and :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>` is set.
+Envoy updates the *:authority* header if
+:ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`
+options are used and appends its original value to *x-forwarded-host* if
+:ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+is set.
 
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
