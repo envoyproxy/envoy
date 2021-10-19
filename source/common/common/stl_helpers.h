@@ -59,4 +59,10 @@ template <class T> std::ostream& operator<<(std::ostream& out, const std::vector
   return out;
 }
 
+// Overload std::operator<< to output a pair.
+template <class T1, class T2>
+std::ostream& operator<<(std::ostream& out, const std::pair<T1, T2>& v) {
+  out << "pair(" << v.first << ", " << v.second << ")";
+  return out;
+}
 } // namespace std

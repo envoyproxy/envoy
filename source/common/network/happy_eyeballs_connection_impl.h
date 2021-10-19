@@ -32,7 +32,8 @@ namespace Network {
  * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
  * either in the class or in the resolution code.
  */
-class HappyEyeballsConnectionImpl : public ClientConnection {
+class HappyEyeballsConnectionImpl : public ClientConnection,
+                                    Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
   HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
                               const std::vector<Address::InstanceConstSharedPtr>& address_list,
@@ -161,7 +162,7 @@ private:
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
     absl::optional<bool> enable_half_close_;
-    OptRef<const ConnectionStats> connection_stats_;
+    std::unique_ptr<ConnectionStats> connection_stats_;
     absl::optional<uint32_t> buffer_limits_;
     absl::optional<bool> start_secure_transport_;
     absl::optional<std::chrono::milliseconds> delayed_close_timeout_;

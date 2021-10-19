@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/router/router.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -105,20 +106,30 @@ using ConfigConstSharedPtr = std::shared_ptr<const Config>;
   COUNTER(route_missing)                                                                           \
   COUNTER(unknown_cluster)                                                                         \
   COUNTER(upstream_rq_maintenance_mode)                                                            \
-  COUNTER(no_healthy_upstream)
+  COUNTER(no_healthy_upstream)                                                                     \
+  COUNTER(shadow_request_submit_failure)
 
-struct RouterStats {
+/**
+ * Struct containing named stats for the router.
+ */
+struct RouterNamedStats {
   ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+
+  static RouterNamedStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return RouterNamedStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                                    POOL_GAUGE_PREFIX(scope, prefix),
+                                                    POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  }
 };
 
 /**
- * This interface is used by an upstream request to communicate its state.
+ * Stats for use in the router.
  */
-class RequestOwner : public ProtocolConverter, public Logger::Loggable<Logger::Id::thrift> {
+class RouterStats {
 public:
-  RequestOwner(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
-               Stats::Scope& scope)
-      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)),
+  RouterStats(const std::string& stat_prefix, Stats::Scope& scope,
+              const LocalInfo::LocalInfo& local_info)
+      : named_(RouterNamedStats::generateStats(stat_prefix, scope)),
         stat_name_set_(scope.symbolTable().makeSet("thrift_proxy")),
         symbol_table_(scope.symbolTable()),
         upstream_rq_call_(stat_name_set_->add("thrift.upstream_rq_call")),
@@ -128,10 +139,221 @@ public:
         upstream_resp_reply_success_(stat_name_set_->add("thrift.upstream_resp_success")),
         upstream_resp_reply_error_(stat_name_set_->add("thrift.upstream_resp_error")),
         upstream_resp_exception_(stat_name_set_->add("thrift.upstream_resp_exception")),
+        upstream_resp_exception_local_(stat_name_set_->add("thrift.upstream_resp_exception_local")),
+        upstream_resp_exception_remote_(
+            stat_name_set_->add("thrift.upstream_resp_exception_remote")),
         upstream_resp_invalid_type_(stat_name_set_->add("thrift.upstream_resp_invalid_type")),
+        upstream_resp_decoding_error_(stat_name_set_->add("thrift.upstream_resp_decoding_error")),
         upstream_rq_time_(stat_name_set_->add("thrift.upstream_rq_time")),
         upstream_rq_size_(stat_name_set_->add("thrift.upstream_rq_size")),
-        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")) {}
+        upstream_resp_size_(stat_name_set_->add("thrift.upstream_resp_size")),
+        zone_(stat_name_set_->add("zone")), local_zone_name_(local_info.zoneStatName()) {}
+
+  /**
+   * Increment counter for request calls.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incRequestCall(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_call_);
+  }
+
+  /**
+   * Increment counter for requests that are one way only.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incRequestOneWay(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_oneway_);
+  }
+
+  /**
+   * Increment counter for requests that are invalid.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incRequestInvalid(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_rq_invalid_type_);
+  }
+
+  /**
+   * Increment counter for received responses that are replies that are successful.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void incResponseReplySuccess(const Upstream::ClusterInfo& cluster,
+                               Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_success_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_success_.inc();
+  }
+
+  /**
+   * Increment counter for received responses that are replies that are an error.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void incResponseReplyError(const Upstream::ClusterInfo& cluster,
+                             Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_);
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_reply_error_);
+    ASSERT(upstream_host != nullptr);
+    // Currently IDL exceptions are always considered endpoint error but it's possible for an error
+    // to have semantics matching HTTP 4xx, rather than 5xx. rq_error classification chosen
+    // here to match outlier detection external failure in upstream_request.cc.
+    upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Increment counter for received remote responses that are exceptions.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void incResponseRemoteException(const Upstream::ClusterInfo& cluster,
+                                  Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_exception_);
+    ASSERT(upstream_host != nullptr);
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_remote_);
+    upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Increment counter for responses that are local exceptions, without forwarding a request
+   * upstream.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   */
+  void incResponseLocalException(const Upstream::ClusterInfo& cluster) const {
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_);
+    incClusterScopeCounter(cluster, nullptr, upstream_resp_exception_local_);
+  }
+
+  /**
+   * Increment counter for received responses that are invalid.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void incResponseInvalidType(const Upstream::ClusterInfo& cluster,
+                              Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_invalid_type_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Increment counter for decoding errors during responses.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   */
+  void incResponseDecodingError(const Upstream::ClusterInfo& cluster,
+                                Upstream::HostDescriptionConstSharedPtr upstream_host) const {
+    incClusterScopeCounter(cluster, upstream_host, upstream_resp_decoding_error_);
+    ASSERT(upstream_host != nullptr);
+    upstream_host->stats().rq_error_.inc();
+  }
+
+  /**
+   * Record a value for the request size histogram.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param value uint64_t size in bytes of the full request
+   */
+  void recordUpstreamRequestSize(const Upstream::ClusterInfo& cluster, uint64_t value) const {
+    recordClusterScopeHistogram(cluster, nullptr, upstream_rq_size_, Stats::Histogram::Unit::Bytes,
+                                value);
+  }
+
+  /**
+   * Record a value for the response size histogram.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param value uint64_t size in bytes of the full response
+   */
+  void recordUpstreamResponseSize(const Upstream::ClusterInfo& cluster, uint64_t value) const {
+    recordClusterScopeHistogram(cluster, nullptr, upstream_resp_size_,
+                                Stats::Histogram::Unit::Bytes, value);
+  }
+
+  /**
+   * Record a value for the response time duration histogram.
+   * @param cluster Upstream::ClusterInfo& describing the upstream cluster
+   * @param upstream_host Upstream::HostDescriptionConstSharedPtr describing the upstream host
+   * @param value uint64_t duration in milliseconds to receive the complete response
+   */
+  void recordUpstreamResponseTime(const Upstream::ClusterInfo& cluster,
+                                  Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                  uint64_t value) const {
+    recordClusterScopeHistogram(cluster, upstream_host, upstream_rq_time_,
+                                Stats::Histogram::Unit::Milliseconds, value);
+  }
+
+  const RouterNamedStats named_;
+
+private:
+  void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
+                              Upstream::HostDescriptionConstSharedPtr upstream_host,
+                              const Stats::StatName& stat_name) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({stat_name});
+    cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
+    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope().counterFromStatName(Stats::StatName(zone_stat_name_storage.get())).inc();
+    }
+  }
+
+  void recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
+                                   Upstream::HostDescriptionConstSharedPtr upstream_host,
+                                   const Stats::StatName& stat_name, Stats::Histogram::Unit unit,
+                                   uint64_t value) const {
+    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join({stat_name});
+    cluster.statsScope()
+        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
+        .recordValue(value);
+    const Stats::SymbolTable::StoragePtr zone_stat_name_storage =
+        upstreamZoneStatName(upstream_host, stat_name);
+    if (zone_stat_name_storage) {
+      cluster.statsScope()
+          .histogramFromStatName(Stats::StatName(zone_stat_name_storage.get()), unit)
+          .recordValue(value);
+    }
+  }
+
+  Stats::SymbolTable::StoragePtr
+  upstreamZoneStatName(Upstream::HostDescriptionConstSharedPtr upstream_host,
+                       const Stats::StatName& stat_name) const {
+    if (!upstream_host || local_zone_name_.empty()) {
+      return nullptr;
+    }
+    const auto& upstream_zone_name = upstream_host->localityZoneStatName();
+    if (upstream_zone_name.empty()) {
+      return nullptr;
+    }
+    return symbol_table_.join({zone_, local_zone_name_, upstream_zone_name, stat_name});
+  }
+
+  Stats::StatNameSetPtr stat_name_set_;
+  Stats::SymbolTable& symbol_table_;
+  const Stats::StatName upstream_rq_call_;
+  const Stats::StatName upstream_rq_oneway_;
+  const Stats::StatName upstream_rq_invalid_type_;
+  const Stats::StatName upstream_resp_reply_;
+  const Stats::StatName upstream_resp_reply_success_;
+  const Stats::StatName upstream_resp_reply_error_;
+  const Stats::StatName upstream_resp_exception_;
+  const Stats::StatName upstream_resp_exception_local_;
+  const Stats::StatName upstream_resp_exception_remote_;
+  const Stats::StatName upstream_resp_invalid_type_;
+  const Stats::StatName upstream_resp_decoding_error_;
+  const Stats::StatName upstream_rq_time_;
+  const Stats::StatName upstream_rq_size_;
+  const Stats::StatName upstream_resp_size_;
+  const Stats::StatName zone_;
+  const Stats::StatName local_zone_name_;
+};
+
+/**
+ * This interface is used by an upstream request to communicate its state.
+ */
+class RequestOwner : public ProtocolConverter, public Logger::Loggable<Logger::Id::thrift> {
+public:
+  RequestOwner(Upstream::ClusterManager& cluster_manager, const RouterStats& stats)
+      : cluster_manager_(cluster_manager), stats_(stats) {}
   ~RequestOwner() override = default;
 
   /**
@@ -182,14 +404,6 @@ public:
   virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
 
   /**
-   * Records the duration of the request.
-   *
-   * @param value uint64_t the value of the duration.
-   * @param unit Unit the unit of the duration.
-   */
-  virtual void recordResponseDuration(uint64_t value, Stats::Histogram::Unit unit) PURE;
-
-  /**
    * @return Upstream::ClusterManager& the cluster manager.
    */
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
@@ -200,92 +414,9 @@ public:
   const Upstream::ClusterInfo& cluster() const { return *cluster_; }
 
   /**
-   * Common stats.
+   * @return RouterStats the common router stats.
    */
-  RouterStats& stats() { return stats_; }
-
-  /**
-   * Increment counter for received responses that are replies.
-   */
-  void incResponseReply(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_});
-  }
-
-  /**
-   * Increment counter for request calls.
-   */
-  void incRequestCall(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_call_});
-  }
-
-  /**
-   * Increment counter for requests that are one way only.
-   */
-  void incRequestOneWay(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_oneway_});
-  }
-
-  /**
-   * Increment counter for requests that are invalid.
-   */
-  void incRequestInvalid(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_rq_invalid_type_});
-  }
-
-  /**
-   * Increment counter for received responses that are replies that are successful.
-   */
-  void incResponseReplySuccess(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_success_});
-  }
-
-  /**
-   * Increment counter for received responses that are replies that are an error.
-   */
-  void incResponseReplyError(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_reply_error_});
-  }
-
-  /**
-   * Increment counter for received responses that are exceptions.
-   */
-  void incResponseException(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_exception_});
-  }
-
-  /**
-   * Increment counter for received responses that are invalid.
-   */
-  void incResponseInvalidType(const Upstream::ClusterInfo& cluster) {
-    incClusterScopeCounter(cluster, {upstream_resp_invalid_type_});
-  }
-
-  /**
-   * Record a value for the request size histogram.
-   */
-  void recordUpstreamRequestSize(const Upstream::ClusterInfo& cluster, uint64_t value) {
-    recordClusterScopeHistogram(cluster, {upstream_rq_size_}, Stats::Histogram::Unit::Bytes, value);
-  }
-
-  /**
-   * Record a value for the response size histogram.
-   */
-  void recordUpstreamResponseSize(const Upstream::ClusterInfo& cluster, uint64_t value) {
-    recordClusterScopeHistogram(cluster, {upstream_resp_size_}, Stats::Histogram::Unit::Bytes,
-                                value);
-  }
-
-  /**
-   * Records the duration of the request for a given cluster.
-   *
-   * @param cluster ClusterInfo the cluster to record the duration for.
-   * @param value uint64_t the value of the duration.
-   * @param unit Unit the unit of the duration.
-   */
-  void recordClusterResponseDuration(const Upstream::ClusterInfo& cluster, uint64_t value,
-                                     Stats::Histogram::Unit unit) {
-    recordClusterScopeHistogram(cluster, {upstream_rq_time_}, unit, value);
-  }
+  const RouterStats& stats() { return stats_; }
 
 protected:
   struct UpstreamRequestInfo {
@@ -308,7 +439,7 @@ protected:
     Upstream::ThreadLocalCluster* cluster = clusterManager().getThreadLocalCluster(cluster_name);
     if (!cluster) {
       ENVOY_LOG(debug, "unknown cluster '{}'", cluster_name);
-      stats().unknown_cluster_.inc();
+      stats().named_.unknown_cluster_.inc();
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("unknown cluster '{}'", cluster_name)),
               absl::nullopt};
@@ -319,20 +450,23 @@ protected:
 
     switch (metadata->messageType()) {
     case MessageType::Call:
-      incRequestCall(*cluster_);
+      stats().incRequestCall(*cluster_);
       break;
 
     case MessageType::Oneway:
-      incRequestOneWay(*cluster_);
+      stats().incRequestOneWay(*cluster_);
       break;
 
     default:
-      incRequestInvalid(*cluster_);
+      stats().incRequestInvalid(*cluster_);
       break;
     }
 
     if (cluster_->maintenanceMode()) {
-      stats().upstream_rq_maintenance_mode_.inc();
+      stats().named_.upstream_rq_maintenance_mode_.inc();
+      if (metadata->messageType() == MessageType::Call) {
+        stats().incResponseLocalException(*cluster_);
+      }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("maintenance mode for cluster '{}'", cluster_name)),
               absl::nullopt};
@@ -350,7 +484,10 @@ protected:
 
     auto conn_pool_data = cluster->tcpConnPool(Upstream::ResourcePriority::Default, lb_context);
     if (!conn_pool_data) {
-      stats().no_healthy_upstream_.inc();
+      stats().named_.no_healthy_upstream_.inc();
+      if (metadata->messageType() == MessageType::Call) {
+        stats().incResponseLocalException(*cluster_);
+      }
       return {AppException(AppExceptionType::InternalError,
                            fmt::format("no healthy upstream for '{}'", cluster_name)),
               absl::nullopt};
@@ -368,42 +505,8 @@ protected:
   Upstream::ClusterInfoConstSharedPtr cluster_;
 
 private:
-  void incClusterScopeCounter(const Upstream::ClusterInfo& cluster,
-                              const Stats::StatNameVec& names) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster.statsScope().counterFromStatName(Stats::StatName(stat_name_storage.get())).inc();
-  }
-
-  void recordClusterScopeHistogram(const Upstream::ClusterInfo& cluster,
-                                   const Stats::StatNameVec& names, Stats::Histogram::Unit unit,
-                                   uint64_t value) const {
-    const Stats::SymbolTable::StoragePtr stat_name_storage = symbol_table_.join(names);
-    cluster.statsScope()
-        .histogramFromStatName(Stats::StatName(stat_name_storage.get()), unit)
-        .recordValue(value);
-  }
-
-  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
-    return RouterStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
-                                               POOL_GAUGE_PREFIX(scope, prefix),
-                                               POOL_HISTOGRAM_PREFIX(scope, prefix))};
-  }
-
   Upstream::ClusterManager& cluster_manager_;
-  RouterStats stats_;
-  Stats::StatNameSetPtr stat_name_set_;
-  Stats::SymbolTable& symbol_table_;
-  const Stats::StatName upstream_rq_call_;
-  const Stats::StatName upstream_rq_oneway_;
-  const Stats::StatName upstream_rq_invalid_type_;
-  const Stats::StatName upstream_resp_reply_;
-  const Stats::StatName upstream_resp_reply_success_;
-  const Stats::StatName upstream_resp_reply_error_;
-  const Stats::StatName upstream_resp_exception_;
-  const Stats::StatName upstream_resp_invalid_type_;
-  const Stats::StatName upstream_rq_time_;
-  const Stats::StatName upstream_rq_size_;
-  const Stats::StatName upstream_resp_size_;
+  const RouterStats& stats_;
 };
 
 /**
@@ -458,16 +561,6 @@ public:
    * @return Upstream::ClusterManager& the cluster manager.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return std::string& the stat prefix used by the router.
-   */
-  virtual const std::string& statPrefix() const PURE;
-
-  /**
-   * @return Stats::Scope& the Scope used by the router.
-   */
-  virtual Stats::Scope& scope() PURE;
 
   /**
    * @return Dispatcher& the dispatcher.

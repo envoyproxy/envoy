@@ -89,7 +89,7 @@ public:
   }
 
 protected:
-  Event::MockDispatcher dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::StrictMock<Event::MockTimer>* failover_timer_;
   MockTransportSocketFactory transport_socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
@@ -134,6 +134,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
   EXPECT_CALL(*next_connections_.back(), connect());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
@@ -686,8 +687,10 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats) {
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // setConnectionStats() should be applied to the newly created connection.
+  // Here, it is using stats latched by the happy eyeballs connection and so
+  // will be its own unique data structure.
   EXPECT_CALL(*next_connections_.back(), setConnectionStats(_))
-      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
+      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_NE(&s, &cs); }));
   timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
