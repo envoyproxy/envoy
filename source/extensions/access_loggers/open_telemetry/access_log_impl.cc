@@ -9,12 +9,12 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
+#include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -71,9 +71,9 @@ AccessLog::AccessLog(
   // Packing the body "AnyValue" to a "KeyValueList" only if it's not empty, otherwise the
   // formatter would fail to parse it.
   if (config.body().value_case() != ::opentelemetry::proto::common::v1::AnyValue::VALUE_NOT_SET) {
-    body_formatter_ = std::make_unique<Formatter::OpenTelemetryFormatter>(packBody(config.body()));
+    body_formatter_ = std::make_unique<OpenTelemetryFormatter>(packBody(config.body()));
   }
-  attributes_formatter_ = std::make_unique<Formatter::OpenTelemetryFormatter>(config.attributes());
+  attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes());
 }
 
 void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,

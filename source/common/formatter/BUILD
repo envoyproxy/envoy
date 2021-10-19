@@ -29,7 +29,6 @@ envoy_cc_library(
         "//source/common/runtime:runtime_features_lib",
         "//source/common/stream_info:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@opentelemetry_proto//:common_cc_proto",
     ],
 )
 

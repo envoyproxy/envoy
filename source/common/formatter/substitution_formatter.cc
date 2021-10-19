@@ -27,7 +27,6 @@
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
-#include "opentelemetry/proto/common/v1/common.pb.h"
 
 using Envoy::Config::Metadata;
 
@@ -149,131 +148,6 @@ std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_head
   const std::string log_line =
       MessageUtil::getJsonStringFromMessageOrDie(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
-}
-
-OpenTelemetryFormatter::OpenTelemetryFormatter(
-    const ::opentelemetry::proto::common::v1::KeyValueList& format_mapping)
-    : kv_list_output_format_(FormatBuilder().toFormatMapValue(format_mapping)) {}
-
-OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper
-OpenTelemetryFormatter::FormatBuilder::toFormatMapValue(
-    const ::opentelemetry::proto::common::v1::KeyValueList& kv_list_format) const {
-  auto output = std::make_unique<OpenTelemetryFormatMap>();
-  for (const auto& pair : kv_list_format.values()) {
-    switch (pair.value().value_case()) {
-    case ::opentelemetry::proto::common::v1::AnyValue::kStringValue:
-      output->emplace_back(pair.key(), toFormatStringValue(pair.value().string_value()));
-      break;
-
-    case ::opentelemetry::proto::common::v1::AnyValue::kKvlistValue:
-      output->emplace_back(pair.key(), toFormatMapValue(pair.value().kvlist_value()));
-      break;
-
-    case ::opentelemetry::proto::common::v1::AnyValue::kArrayValue:
-      output->emplace_back(pair.key(), toFormatListValue(pair.value().array_value()));
-      break;
-
-    default:
-      throw EnvoyException("Only string values, nested key value lists and array values are "
-                           "supported in OpenTelemetry access log format.");
-    }
-  }
-  return {std::move(output)};
-}
-
-OpenTelemetryFormatter::OpenTelemetryFormatListWrapper
-OpenTelemetryFormatter::FormatBuilder::toFormatListValue(
-    const ::opentelemetry::proto::common::v1::ArrayValue& list_value_format) const {
-  auto output = std::make_unique<OpenTelemetryFormatList>();
-  for (const auto& value : list_value_format.values()) {
-    switch (value.value_case()) {
-    case ::opentelemetry::proto::common::v1::AnyValue::kStringValue:
-      output->emplace_back(toFormatStringValue(value.string_value()));
-      break;
-
-    case ::opentelemetry::proto::common::v1::AnyValue::kKvlistValue:
-      output->emplace_back(toFormatMapValue(value.kvlist_value()));
-      break;
-
-    case ::opentelemetry::proto::common::v1::AnyValue::kArrayValue:
-      output->emplace_back(toFormatListValue(value.array_value()));
-      break;
-    default:
-      throw EnvoyException("Only string values, nested key value lists and array values are "
-                           "supported in OpenTelemetry access log format.");
-    }
-  }
-  return {std::move(output)};
-}
-
-std::vector<FormatterProviderPtr>
-OpenTelemetryFormatter::FormatBuilder::toFormatStringValue(const std::string& string_format) const {
-  return SubstitutionFormatParser::parse(string_format, {});
-}
-
-::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::providersCallback(
-    const std::vector<FormatterProviderPtr>& providers,
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-  ASSERT(!providers.empty());
-  ::opentelemetry::proto::common::v1::AnyValue output;
-  std::vector<std::string> bits(providers.size());
-  std::transform(providers.begin(), providers.end(), bits.begin(),
-                 [&](const FormatterProviderPtr& provider) {
-                   return provider
-                       ->format(request_headers, response_headers, response_trailers, stream_info,
-                                local_reply_body)
-                       .value_or(DefaultUnspecifiedValueString);
-                 });
-  output.set_string_value(absl::StrJoin(bits, ""));
-  return output;
-}
-
-::opentelemetry::proto::common::v1::AnyValue OpenTelemetryFormatter::openTelemetryFormatMapCallback(
-    const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map,
-    const OpenTelemetryFormatter::OpenTelemetryFormatMapVisitor& visitor) const {
-  ::opentelemetry::proto::common::v1::AnyValue output;
-  auto* kv_list = output.mutable_kvlist_value();
-  for (const auto& pair : *format_map.value_) {
-    ::opentelemetry::proto::common::v1::AnyValue value = absl::visit(visitor, pair.second);
-    auto* kv = kv_list->add_values();
-    kv->set_key(pair.first);
-    *kv->mutable_value() = value;
-  }
-  return output;
-}
-
-::opentelemetry::proto::common::v1::AnyValue
-OpenTelemetryFormatter::openTelemetryFormatListCallback(
-    const OpenTelemetryFormatter::OpenTelemetryFormatListWrapper& format_list,
-    const OpenTelemetryFormatter::OpenTelemetryFormatMapVisitor& visitor) const {
-  ::opentelemetry::proto::common::v1::AnyValue output;
-  auto* array_value = output.mutable_array_value();
-  for (const auto& val : *format_list.value_) {
-    ::opentelemetry::proto::common::v1::AnyValue value = absl::visit(visitor, val);
-    *array_value->add_values() = value;
-  }
-  return output;
-}
-
-::opentelemetry::proto::common::v1::KeyValueList OpenTelemetryFormatter::format(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-  OpenTelemetryFormatMapVisitor visitor{
-      [&](const std::vector<FormatterProviderPtr>& providers) {
-        return providersCallback(providers, request_headers, response_headers, response_trailers,
-                                 stream_info, local_reply_body);
-      },
-      [&, this](const OpenTelemetryFormatter::OpenTelemetryFormatMapWrapper& format_map) {
-        return openTelemetryFormatMapCallback(format_map, visitor);
-      },
-      [&, this](const OpenTelemetryFormatter::OpenTelemetryFormatListWrapper& format_list) {
-        return openTelemetryFormatListCallback(format_list, visitor);
-      },
-  };
-  return openTelemetryFormatMapCallback(kv_list_output_format_, visitor).kvlist_value();
 }
 
 StructFormatter::StructFormatter(const ProtobufWkt::Struct& format_mapping, bool preserve_types,

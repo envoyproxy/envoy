@@ -46,45 +46,6 @@ std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool type
   return std::make_unique<Envoy::Formatter::StructFormatter>(StructLogFormat, typed, false);
 }
 
-std::unique_ptr<Envoy::Formatter::OpenTelemetryFormatter> makeOpenTelemetryFormatter() {
-  ::opentelemetry::proto::common::v1::KeyValueList otel_log_format;
-  const std::string format_yaml = R"EOF(
-    values:
-      - key: "remote_address"
-        value:
-          string_value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-      - key: "start_time"
-        value:
-          string_value: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
-      - key: "method"
-        value:
-          string_value: '%REQ(:METHOD)%'
-      - key: "url"
-        value:
-          string_value: '%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
-      - key: "protocol"
-        value:
-          string_value: '%PROTOCOL%'
-      - key: "response_code"
-        value:
-          string_value: '%RESPONSE_CODE%'
-      - key: "bytes_sent"
-        value:
-          string_value: '%BYTES_SENT%'
-      - key: "duration"
-        value:
-          string_value: '%DURATION%'
-      - key: "referer"
-        value:
-          string_value: '%REQ(REFERER)%'
-      - key: "user-agent"
-        value:
-          string_value: '%REQ(USER-AGENT)%'
-  )EOF";
-  TestUtility::loadFromYaml(format_yaml, otel_log_format);
-  return std::make_unique<Envoy::Formatter::OpenTelemetryFormatter>(otel_log_format);
-}
-
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
   auto stream_info = std::make_unique<Envoy::TestStreamInfo>();
   stream_info->downstream_connection_info_provider_->setRemoteAddress(
@@ -160,27 +121,6 @@ static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_TypedStructAccessLogFormatter);
-
-// NOLINTNEXTLINE(readability-identifier-naming)
-static void BM_OpenTelemetryAccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
-  std::unique_ptr<Envoy::Formatter::OpenTelemetryFormatter> otel_formatter =
-      makeOpenTelemetryFormatter();
-
-  size_t output_bytes = 0;
-  Http::TestRequestHeaderMapImpl request_headers;
-  Http::TestResponseHeaderMapImpl response_headers;
-  Http::TestResponseTrailerMapImpl response_trailers;
-  std::string body;
-  for (auto _ : state) { // NOLINT: Silences warning about dead store
-    output_bytes +=
-        otel_formatter
-            ->format(request_headers, response_headers, response_trailers, *stream_info, body)
-            .ByteSize();
-  }
-  benchmark::DoNotOptimize(output_bytes);
-}
-BENCHMARK(BM_OpenTelemetryAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
