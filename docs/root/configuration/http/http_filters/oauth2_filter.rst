@@ -36,6 +36,12 @@ is set to true the filter will send over a
 cookie named ``BearerToken`` to the upstream. Additionally, the ``Authorization`` header will be populated
 with the same value.
 
+.. note::
+  By default, OAuth2 filter sets some cookies with the following names:
+  ``BearerToken``, ``OauthHMAC``, and ``OauthExpires``. These cookie names can be customized by
+  setting
+  :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>`.
+
 .. attention::
 
   The OAuth2 filter is currently under active development.

@@ -278,6 +278,17 @@ public:
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
 
   /**
+   * Wait for a gauge to be destroyed.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param time_system the time system to use for waiting.
+   * @return AssertionSuccess() if the gauge is destroyed within a fixed timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                               Event::TestTimeSystem& time_system);
+
+  /**
    * Wait for a histogram to have samples.
    * @param store supplies the stats store.
    * @param name histogram name.
@@ -314,7 +325,7 @@ public:
    */
   static std::list<Network::DnsResponse>
   makeDnsResponse(const std::list<std::string>& addresses,
-                  std::chrono::seconds = std::chrono::seconds(0));
+                  std::chrono::seconds = std::chrono::seconds(6));
 
   /**
    * List files in a given directory path
