@@ -1,7 +1,7 @@
 name: check-pr-description
 on:
   pull_request:
-    types: ['opened', 'edited', 'reopened', 'synchronize']
+    types: ['opened', 'edited', 'reopened']
 
 jobs:
   check-pr-description:
@@ -25,5 +25,3 @@ jobs:
       run: python ./.github/actions/check-pr-description/check_pr_description.py
       env:
         GITHUB_PR_ID: ${{ github.event.pull_request.number }}
-        GITHUB_CONTEXT: ${{ github.event.pull_request.id }}
-        GITHUB_REF_HEAD: ${{ github.head_ref }}
