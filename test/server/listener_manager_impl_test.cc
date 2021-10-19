@@ -127,7 +127,6 @@ public:
   expectUpdateToThenDrain(const envoy::config::listener::v3::Listener& new_listener_proto,
                           ListenerHandle* old_listener_handle,
                           OptRef<Network::MockListenSocket> socket) {
-    // ListenerComponentFactory::BindType bind_type = default_bind_type) {
     Network::MockListenSocket* new_socket;
     if (socket.has_value()) {
       EXPECT_CALL(socket.value().get(), duplicate()).Times(0);
@@ -137,7 +136,6 @@ public:
       EXPECT_CALL(*listener_factory_.socket_, duplicate())
           .WillOnce(Return(
               ByMove(std::unique_ptr<Network::Socket>(new NiceMock<Network::MockListenSocket>()))));
-      // EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
@@ -157,7 +155,6 @@ public:
                     ListenerHandle* listener_handle, Network::MockListenSocket&) {
 
     EXPECT_CALL(*worker_, stopListener(_, _));
-    //    EXPECT_CALL(socket, close());
     EXPECT_CALL(*listener_handle->drain_manager_, startDrainSequence(_));
     EXPECT_TRUE(manager_->removeListener(listener_proto.name()));
 
@@ -4924,9 +4921,7 @@ filter_chains:
   )EOF");
 
   ListenerHandle* listener_foo_update1 = expectListenerOverridden(true, listener_foo);
-  // auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
   EXPECT_CALL(*listener_factory_.socket_, duplicate()).Times(0);
-  // .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
   EXPECT_CALL(listener_foo_update1->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(listener_foo_update1_proto, "", true));
   EXPECT_EQ(1UL, manager_->listeners().size());
