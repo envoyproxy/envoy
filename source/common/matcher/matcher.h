@@ -25,12 +25,13 @@ namespace Matcher {
 
 template <class ProtoType> class ActionBase : public Action {
 public:
-  ActionBase() : type_name_(ProtoType().GetTypeName()) {}
+  absl::string_view typeUrl() const override { return staticTypeUrl(); }
 
-  absl::string_view typeUrl() const override { return type_name_; }
+  static absl::string_view staticTypeUrl() {
+    const static std::string typeUrl = ProtoType().GetTypeName();
 
-private:
-  const std::string type_name_;
+    return typeUrl;
+  }
 };
 
 struct MaybeMatchResult {
@@ -72,9 +73,9 @@ template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<
 template <class DataType, class ActionFactoryContext> class MatchTreeFactory {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
-                   Server::Configuration::ServerFactoryContext& server_factory_context,
+                   Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
-      : action_factory_context_(context), server_factory_context_(server_factory_context),
+      : action_factory_context_(context), server_factory_context_(factory_context),
         validation_visitor_(validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.

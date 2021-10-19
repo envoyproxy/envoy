@@ -478,6 +478,11 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
+  void waitForGaugeDestroyed(const std::string& name) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
+  }
+
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {

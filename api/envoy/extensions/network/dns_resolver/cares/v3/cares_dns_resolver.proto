@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.network.dns_resolver.cares.v3;
+
+import "envoy/config/core/v3/address.proto";
+import "envoy/config/core/v3/resolver.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
+option java_outer_classname = "CaresDnsResolverProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: c-ares DNS resolver]
+// [#extension: envoy.network.dns_resolver.cares]
+
+// Configuration for c-ares DNS resolver.
+message CaresDnsResolverConfig {
+  // A list of dns resolver addresses. If specified, the DNS client library will perform resolution
+  // via the underlying DNS resolvers. Otherwise, the default system resolvers
+  // (e.g., /etc/resolv.conf) will be used.
+  repeated config.core.v3.Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
+  config.core.v3.DnsResolverOptions dns_resolver_options = 2;
+}

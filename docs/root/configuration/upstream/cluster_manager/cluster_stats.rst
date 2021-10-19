@@ -42,6 +42,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
+  upstream_cx_max_duration_reached, Counter, Total connections closed due to max duration reached
   upstream_cx_connect_attempts_exceeded, Counter, Total consecutive connection failures exceeding configured connection attempts
   upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
   upstream_cx_connect_ms, Histogram, Connection establishment milliseconds

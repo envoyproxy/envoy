@@ -249,6 +249,20 @@ absl::string_view findQueryStringStart(const HeaderString& path);
 std::string stripQueryString(const HeaderString& path);
 
 /**
+ * Replace the query string portion of a given path with a new one.
+ *
+ * e.g. replaceQueryString("/foo?key=1", {key:2}) -> "/foo?key=2"
+ *      replaceQueryString("/bar", {hello:there}) -> "/bar?hello=there"
+ *
+ * @param path the original path that may or may not contain an existing query string
+ * @param params the new params whose string representation should be formatted onto
+ *               the `path` above
+ * @return std::string the new path whose query string has been replaced by `params` and whose path
+ *         portion from `path` remains unchanged.
+ */
+std::string replaceQueryString(const HeaderString& path, const QueryParams& params);
+
+/**
  * Parse a particular value out of a cookie
  * @param headers supplies the headers to get the cookie from.
  * @param key the key for the particular cookie value to return

@@ -212,7 +212,7 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
-  const StreamInfo::StreamInfo& streamInfo() const override {
+  StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
@@ -723,8 +723,12 @@ private:
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
 
     // Network::UdpListenerReadFilter
-    void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
-    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    Network::FilterStatus onData(Network::UdpRecvData& data) override {
+      return parent_.onRecvDatagram(data);
+    }
+    Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
 
   private:
     FakeUpstream& parent_;
@@ -810,7 +814,7 @@ private:
 
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  void onRecvDatagram(Network::UdpRecvData& data);
+  Network::FilterStatus onRecvDatagram(Network::UdpRecvData& data);
   AssertionResult
   runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);

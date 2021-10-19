@@ -128,6 +128,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dnsresolvers
 guarddog
 GC
 GCC
@@ -366,6 +367,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -481,6 +483,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -497,6 +500,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -1084,6 +1088,7 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
@@ -1301,3 +1306,4 @@ crlf
 ep
 suri
 transid
+routable

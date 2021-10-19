@@ -303,7 +303,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -410,7 +409,6 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -446,6 +444,10 @@ void UpstreamRequest::onPoolReady(
     parent_.callbacks()->streamInfo().setUpstreamConnectionId(
         info.downstreamAddressProvider().connectionID().value());
   }
+
+  stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
+                                                              stream_info_);
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

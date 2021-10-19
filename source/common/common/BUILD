@@ -90,6 +90,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//envoy/network:dns_interface",
+        "//source/common/network:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
