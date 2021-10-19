@@ -3,7 +3,6 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
-#include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
@@ -26,13 +25,6 @@ public:
   }
 
   Http::Code handlerStats(absl::string_view url, Buffer::Instance& response) {
-    // MockAdminStream admin_stream;
-    // NiceMock<Configuration::MockStatsConfig> stats_config;
-    // EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-    // MockInstance instance;
-    // EXPECT_CALL(instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-    // EXPECT_CALL(instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-    // StatsHandler handler(instance);
     Http::TestResponseHeaderMapImpl response_headers;
     StatsHandler::Params params;
     Http::Code code = params.parse(url, response);
