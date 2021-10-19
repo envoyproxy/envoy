@@ -6000,7 +6000,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
         EXPECT_EQ(host_address_, host->address());
       }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_.route->route_entry_, appendXfh()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, appendXfh()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
