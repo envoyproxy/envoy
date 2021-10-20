@@ -368,7 +368,7 @@ envoy_cc_test(
         "multiplexed_integration_test.cc",
         "multiplexed_integration_test.h",
     ],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
