@@ -1,8 +1,8 @@
 Pod::Spec.new do |s|
     s.name = 'EnvoyMobile'
-    s.version = '0.4.2.07282021'
-    s.author = 'Lyft, Inc.'
-    s.summary = 'Client networking libraries based on the Envoy project'
+    s.version = '0.4.3.20211020'
+    s.author = 'Envoy Mobile Project Authors'
+    s.summary = 'Multiplatform client HTTP/networking library built on the Envoy project's core networking layer'
     s.homepage = 'https://envoy-mobile.github.io'
     s.documentation_url = 'https://envoy-mobile.github.io/docs/envoy-mobile/latest/index.html'
     s.social_media_url = 'https://twitter.com/EnvoyProxy'
