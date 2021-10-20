@@ -44,7 +44,8 @@ public:
   OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
-  // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
+  // Default constructor; creates "reasonable" defaults, but desired values should be set
+  // explicitly.
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
@@ -163,9 +164,15 @@ public:
   static void disableExtensions(const std::vector<std::string>&);
   static std::string allowedLogLevels();
 
+  /**
+   * Parses and validates the provided log_level, returning the corresponding
+   * spdlog::level::level_enum.
+   * @throws MalformedArgvException if the provided string is not a valid spdlog string.
+   */
+  static spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
+
 private:
-  void logError(const std::string& error) const;
-  spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
+  static void logError(const std::string& error);
 
   uint64_t base_id_{0};
   bool use_dynamic_base_id_{false};

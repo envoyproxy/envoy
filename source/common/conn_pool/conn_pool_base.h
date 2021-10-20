@@ -38,12 +38,14 @@ public:
   void releaseResourcesBase();
 
   // Network::ConnectionCallbacks
-  void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
   // Called if the connection does not complete within the cluster's connectTimeout()
   void onConnectTimeout();
+
+  // Called if the maximum connection duration is reached.
+  void onConnectionDurationTimeout();
 
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
@@ -106,6 +108,7 @@ public:
   Stats::TimespanPtr conn_connect_ms_;
   Stats::TimespanPtr conn_length_;
   Event::TimerPtr connect_timer_;
+  Event::TimerPtr connection_duration_timer_;
   bool resources_released_{false};
   bool timed_out_{false};
 
@@ -166,8 +169,7 @@ public:
   void addIdleCallbackImpl(Instance::IdleCb cb);
   // Returns true if the pool is idle.
   bool isIdleImpl() const;
-  void startDrainImpl();
-  void drainConnectionsImpl();
+  void drainConnectionsImpl(DrainBehavior drain_behavior);
   const Upstream::HostConstSharedPtr& host() const { return host_; }
   // Called if this pool is likely to be picked soon, to determine if it's worth preconnecting.
   bool maybePreconnectImpl(float global_preconnect_ratio);
@@ -335,7 +337,7 @@ private:
 
   // Whether the connection pool is currently in the process of closing
   // all connections so that it can be gracefully deleted.
-  bool is_draining_{false};
+  bool is_draining_for_deletion_{false};
 
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};

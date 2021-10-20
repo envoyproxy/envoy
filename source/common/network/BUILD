@@ -109,46 +109,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "apple_dns_lib",
-    srcs = select({
-        "//bazel:apple": ["apple_dns_impl.cc"],
-        "//conditions:default": [],
-    }),
-    hdrs = select({
-        "//bazel:apple": ["apple_dns_impl.h"],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":address_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
-        "//envoy/event:timer_interface",
-        "//envoy/network:dns_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:linked_object",
-        "//source/common/singleton:threadsafe_singleton",
-    ],
-)
-
-envoy_cc_library(
-    name = "dns_lib",
-    srcs = ["dns_impl.cc"],
-    hdrs = ["dns_impl.h"],
-    external_deps = ["ares"],
-    deps = [
-        ":address_lib",
-        ":utility_lib",
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
-        "//envoy/network:dns_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:linked_object",
-    ],
-)
-
-envoy_cc_library(
     name = "filter_lib",
     hdrs = ["filter_impl.h"],
     deps = [
@@ -343,6 +303,7 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

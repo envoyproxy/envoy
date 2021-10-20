@@ -174,11 +174,11 @@ private:
       headers.removeContentLength();
       modifyContentEncoding(headers);
 
-      ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     } else {
       direction_config.stats().not_decompressed_.inc();
-      ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do not decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     }
 

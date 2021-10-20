@@ -272,7 +272,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )
 
@@ -539,6 +539,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "factory_context_base_impl_lib",
+    hdrs = ["factory_context_base_impl.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],
@@ -580,6 +588,7 @@ envoy_cc_library(
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",

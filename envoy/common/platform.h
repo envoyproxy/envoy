@@ -150,6 +150,7 @@ struct msghdr {
 #define SOCKET_ERROR_ADDR_IN_USE WSAEADDRINUSE
 #define SOCKET_ERROR_BADF WSAEBADF
 #define SOCKET_ERROR_CONNRESET WSAECONNRESET
+#define SOCKET_ERROR_NETUNREACH WSAENETUNREACH
 
 #define HANDLE_ERROR_PERM ERROR_ACCESS_DENIED
 #define HANDLE_ERROR_INVALID ERROR_INVALID_HANDLE
@@ -259,6 +260,7 @@ typedef int signal_t;           // NOLINT(modernize-use-using)
 #define SOCKET_ERROR_ADDR_IN_USE EADDRINUSE
 #define SOCKET_ERROR_BADF EBADF
 #define SOCKET_ERROR_CONNRESET ECONNRESET
+#define SOCKET_ERROR_NETUNREACH ENETUNREACH
 
 // Mapping POSIX file errors to common error names
 #define HANDLE_ERROR_PERM EACCES
@@ -300,6 +302,14 @@ struct mmsghdr {
 #ifdef __ANDROID_API__
 #if __ANDROID_API__ < 24
 #undef SUPPORTS_GETIFADDRS
+#endif // __ANDROID_API__ < 24
+#endif // ifdef __ANDROID_API__
+
+// TODO: Remove once bazel supports NDKs > 21
+#define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ < 24
+#undef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #endif // __ANDROID_API__ < 24
 #endif // ifdef __ANDROID_API__
 

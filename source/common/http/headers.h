@@ -183,6 +183,8 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{absl::StrCat(prefix(), "-upstream-service-time")};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{
       absl::StrCat(prefix(), "-upstream-healthchecked-cluster")};
+  const LowerCaseString EnvoyUpstreamStreamDurationMs{
+      absl::StrCat(prefix(), "-upstream-stream-duration-ms")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};

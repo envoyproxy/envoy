@@ -28,6 +28,7 @@ namespace Logger {
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
@@ -37,6 +38,7 @@ namespace Logger {
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
+  FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
@@ -45,6 +47,7 @@ namespace Logger {
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
   FUNCTION(grpc)                                                                                   \
+  FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \
   FUNCTION(health_checker)                                                                         \
   FUNCTION(http)                                                                                   \
@@ -331,9 +334,10 @@ template <Id id> class Loggable {
 protected:
   /**
    * Do not use this directly, use macros defined below.
+   * See source/docs/logging.md for more details.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& __log_do_not_use_read_comment() {
+  static spdlog::logger& __log_do_not_use_read_comment() { // NOLINT(readability-identifier-naming)
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
@@ -466,12 +470,16 @@ public:
 
 #define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
   do {                                                                                             \
-    ENVOY_LOG(LEVEL, ##__VA_ARGS__);                                                               \
+    ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
     if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
       ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
                                                               ##__VA_ARGS__);                      \
     }                                                                                              \
   } while (0)
+
+#define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, "[C{}] " FORMAT, (CONNECTION).id(), \
+                            ##__VA_ARGS__);
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \

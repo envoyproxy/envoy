@@ -70,9 +70,14 @@ public:
   void pauseListening() override;
   void resumeListening() override;
   void shutdownListener() override;
+  void updateListenerConfig(Network::ListenerConfig& config) override;
+  void onFilterChainDraining(
+      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
 
 private:
   friend class ActiveQuicListenerPeer;
+
+  void closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain);
 
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;

@@ -37,7 +37,10 @@ public:
 
   // Dispatcher
   const std::string& name() override { return name_; }
-  TimeSource& timeSource() override { return time_system_; }
+  TimeSource& timeSource() override { return *time_system_; }
+  GlobalTimeSystem& globalTimeSystem() {
+    return *(dynamic_cast<GlobalTimeSystem*>(time_system_.get()));
+  }
   Network::ServerConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket,
@@ -130,9 +133,6 @@ public:
                Network::Address::InstanceConstSharedPtr source_address,
                Network::TransportSocketPtr& transport_socket,
                const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_METHOD(Network::DnsResolverSharedPtr, createDnsResolver,
-              (const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-               const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options));
   MOCK_METHOD(FileEvent*, createFileEvent_,
               (os_fd_t fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
@@ -162,7 +162,7 @@ public:
   MOCK_METHOD(void, updateApproximateMonotonicTime, ());
   MOCK_METHOD(void, shutdown, ());
 
-  GlobalTimeSystem time_system_;
+  std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};

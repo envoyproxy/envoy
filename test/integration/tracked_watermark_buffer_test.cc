@@ -22,7 +22,7 @@ namespace {
 
 class TrackedWatermarkBufferTest : public testing::Test {
 public:
-  TrackedWatermarkBufferFactory factory_;
+  TrackedWatermarkBufferFactory factory_{absl::bit_width(4096u)};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 

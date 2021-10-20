@@ -17,7 +17,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
@@ -94,7 +93,6 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
-  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -315,7 +313,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
       registerPort(*port_it, listen_addr->ip()->port());
     }
   }
-  const auto admin_addr = test_server_->server().admin().socket().addressProvider().localAddress();
+  const auto admin_addr =
+      test_server_->server().admin().socket().connectionInfoProvider().localAddress();
   if (admin_addr->type() == Network::Address::Type::Ip) {
     registerPort("admin", admin_addr->ip()->port());
   }
@@ -331,10 +330,12 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
 void BaseIntegrationTest::createGeneratedApiTestServer(
     const std::string& bootstrap_path, const std::vector<std::string>& port_names,
     Server::FieldValidationConfig validator_config, bool allow_lds_rejection) {
+
   test_server_ = IntegrationTestServer::create(
-      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_, deterministic_,
-      timeSystem(), *api_, defer_listener_finalization_, process_object_, validator_config,
-      concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_, use_real_stats_);
+      bootstrap_path, version_, on_server_ready_function_, on_server_init_function_,
+      deterministic_value_, timeSystem(), *api_, defer_listener_finalization_, process_object_,
+      validator_config, concurrency_, drain_time_, drain_strategy_, proxy_buffer_factory_,
+      use_real_stats_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0 &&
       !defer_listener_finalization_) {
 
@@ -485,13 +486,14 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
                                        expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
-                                        expected_error_substring);
+                                        expected_error_substring, expect_node);
   }
 }
 
@@ -571,16 +573,33 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   return AssertionFailure() << "Timeout waiting for port availability";
 }
 
+envoy::service::discovery::v3::DeltaDiscoveryResponse
+BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
+    const std::string& type_url,
+    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+    const std::vector<std::string>& removed) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info("system_version_info_this_is_a_test");
+  response.set_type_url(type_url);
+  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
+  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+  static int next_nonce_counter = 0;
+  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+  return response;
+}
+
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    bool expect_node) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.
-  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+  if (expect_node &&
+      (!request.has_node() || request.node().id().empty() || request.node().cluster().empty())) {
     return AssertionFailure() << "Weird node field";
   }
   last_node_.CopyFrom(request.node());

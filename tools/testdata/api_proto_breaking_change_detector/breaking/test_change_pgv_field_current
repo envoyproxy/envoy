@@ -1,6 +1,0 @@
-syntax = "proto3";
-package test.protos.breaking;
-
-message SampleMessage {
-    string useremail = 1 [(validate.rules).string.email = true];
-}

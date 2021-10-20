@@ -423,7 +423,7 @@ tracing:
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: zipkin
-      collector_endpoint: "/api/v1/spans"
+      collector_endpoint: "/api/v2/spans"
       collector_endpoint_version: HTTP_JSON
 http_filters:
 - name: envoy.filters.http.router
@@ -441,7 +441,7 @@ http_filters:
   inlined_tracing_config.set_name("zipkin");
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
   zipkin_config.set_collector_cluster("zipkin");
-  zipkin_config.set_collector_endpoint("/api/v1/spans");
+  zipkin_config.set_collector_endpoint("/api/v2/spans");
   zipkin_config.set_collector_endpoint_version(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
   inlined_tracing_config.mutable_typed_config()->PackFrom(zipkin_config);
 
@@ -1707,11 +1707,12 @@ http2_protocol_options:
       R"(inconsistent HTTP/2 custom SETTINGS parameter\(s\) detected; identifiers = \{0x0a\})");
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.http_connection_manager";
 
-  ASSERT_NE(
+  ASSERT_EQ(
       nullptr,
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
           deprecated_name));
@@ -2152,6 +2153,38 @@ http_filters:
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrl) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: foo
+  config_discovery:
+    config_source: { resource_api_version: V3, ads: {} }
+    default_config:
+      "@type": type.googleapis.com/xds.type.v3.TypedStruct
+      type_url: type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    type_urls:
+    - type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+- name: envoy.filters.http.router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "Error: filter config has type URL envoy.extensions.filters.http.router.v3.Router but "
+      "expect envoy.extensions.filters.http.health_check.v3.HealthCheck.");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DynamicFilterDefaultRequireTypeUrlWithOldTypedStruct) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
 stat_prefix: router

@@ -22,7 +22,8 @@ Cluster::Cluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : Upstream::BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
-                                       added_via_api, factory_context.dispatcher().timeSource()),
+                                       added_via_api,
+                                       factory_context.mainThreadDispatcher().timeSource()),
       dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(config.dns_cache_config())),
       update_callbacks_handle_(dns_cache_->addUpdateCallbacks(*this)), local_info_(local_info) {}
@@ -77,7 +78,8 @@ void Cluster::addOrUpdateHost(
       ASSERT(host_map_it->second.shared_host_info_->address() !=
              host_map_it->second.logical_host_->address());
       ENVOY_LOG(debug, "updating dfproxy cluster host address '{}'", host);
-      host_map_it->second.logical_host_->setNewAddress(host_info->address(), dummy_lb_endpoint_);
+      host_map_it->second.logical_host_->setNewAddresses(
+          host_info->address(), host_info->addressList(), dummy_lb_endpoint_);
       return;
     }
 
@@ -87,8 +89,8 @@ void Cluster::addOrUpdateHost(
                         .try_emplace(host, host_info,
                                      std::make_shared<Upstream::LogicalHost>(
                                          info(), std::string{host}, host_info->address(),
-                                         dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr,
-                                         time_source_))
+                                         host_info->addressList(), dummy_locality_lb_endpoint_,
+                                         dummy_lb_endpoint_, nullptr, time_source_))
                         .first->second.logical_host_;
   }
 
@@ -177,8 +179,7 @@ ClusterFactory::createClusterWithConfig(
     Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.tls(), context.api(),
-      context.runtime(), context.stats(), context.messageValidationVisitor());
+      context);
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {
     // This sets defaults which will only apply if using old style http config.

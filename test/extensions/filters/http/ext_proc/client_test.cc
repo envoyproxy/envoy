@@ -6,12 +6,13 @@
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using testing::Invoke;
 using testing::Unused;
@@ -32,23 +33,16 @@ protected:
     auto grpc = service.mutable_envoy_grpc();
     grpc->set_cluster_name("test");
 
-    EXPECT_CALL(client_manager_, factoryForGrpcService(_, _, _))
+    EXPECT_CALL(client_manager_, getOrCreateRawAsyncClient(_, _, _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doFactory));
 
     client_ = std::make_unique<ExternalProcessorClientImpl>(client_manager_, service, stats_store_);
   }
 
-  Grpc::AsyncClientFactoryPtr doFactory(Unused, Unused, Unused) {
-    auto factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-    EXPECT_CALL(*factory, createUncachedRawAsyncClient())
-        .WillOnce(Invoke(this, &ExtProcStreamTest::doCreate));
-    return factory;
-  }
-
-  Grpc::RawAsyncClientPtr doCreate() {
-    auto async_client = std::make_unique<Grpc::MockAsyncClient>();
+  Grpc::RawAsyncClientSharedPtr doFactory(Unused, Unused, Unused, Unused) {
+    auto async_client = std::make_shared<Grpc::MockAsyncClient>();
     EXPECT_CALL(*async_client,
-                startRaw("envoy.service.ext_proc.v3alpha.ExternalProcessor", "Process", _, _))
+                startRaw("envoy.service.ext_proc.v3.ExternalProcessor", "Process", _, _))
         .WillOnce(Invoke(this, &ExtProcStreamTest::doStartRaw));
     return async_client;
   }
@@ -76,35 +70,38 @@ protected:
   Grpc::MockAsyncClientManager client_manager_;
   Grpc::MockAsyncStream stream_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   testing::NiceMock<Stats::MockStore> stats_store_;
 };
 
 TEST_F(ExtProcStreamTest, OpenCloseStream) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendToStream) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   // Send something and ensure that we get it. Doesn't really matter what.
   EXPECT_CALL(stream_, sendMessageRaw_(_, false));
   ProcessingRequest req;
   stream->send(std::move(req), false);
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, SendAndClose) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   EXPECT_CALL(stream_, sendMessageRaw_(_, true));
   ProcessingRequest req;
   stream->send(std::move(req), true);
 }
 
 TEST_F(ExtProcStreamTest, ReceiveFromStream) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   // Send something and ensure that we get it. Doesn't really matter what.
   ProcessingResponse resp;
@@ -129,11 +126,12 @@ TEST_F(ExtProcStreamTest, ReceiveFromStream) {
   stream_callbacks_->onReceiveTrailingMetadata(std::move(empty_response_trailers));
 
   EXPECT_CALL(stream_, closeStream());
+  EXPECT_CALL(stream_, resetStream());
   stream->close();
 }
 
 TEST_F(ExtProcStreamTest, StreamClosed) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);
@@ -146,7 +144,7 @@ TEST_F(ExtProcStreamTest, StreamClosed) {
 }
 
 TEST_F(ExtProcStreamTest, StreamError) {
-  auto stream = client_->start(*this);
+  auto stream = client_->start(*this, stream_info_);
   ASSERT_NE(stream_callbacks_, nullptr);
   EXPECT_FALSE(last_response_);
   EXPECT_FALSE(grpc_closed_);

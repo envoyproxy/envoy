@@ -47,8 +47,6 @@ private:
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
- * TODO(soulxu): Since there are more than address information inside the provider, this will be
- * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
 class ConnectionInfoProvider {
 public:
@@ -161,11 +159,11 @@ public:
   enum class Type { Stream, Datagram };
 
   /**
-   * @return the address provider backing this socket.
+   * @return the connection info provider backing this socket.
    */
-  virtual ConnectionInfoSetter& addressProvider() PURE;
-  virtual const ConnectionInfoProvider& addressProvider() const PURE;
-  virtual ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual ConnectionInfoSetter& connectionInfoProvider() PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection

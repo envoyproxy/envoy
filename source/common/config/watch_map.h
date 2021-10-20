@@ -82,6 +82,10 @@ public:
   // UntypedConfigUpdateCallbacks.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
+
+  void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
+                      const std::string& version_info) override;
+
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,

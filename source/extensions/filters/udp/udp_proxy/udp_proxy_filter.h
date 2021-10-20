@@ -154,8 +154,8 @@ public:
                  const UdpProxyFilterConfigSharedPtr& config);
 
   // Network::UdpListenerReadFilter
-  void onData(Network::UdpRecvData& data) override;
-  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::FilterStatus onData(Network::UdpRecvData& data) override;
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
 private:
   class ClusterInfo;
@@ -259,7 +259,7 @@ private:
   public:
     ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
     ~ClusterInfo();
-    void onData(Network::UdpRecvData& data);
+    Network::FilterStatus onData(Network::UdpRecvData& data);
     void removeSession(const ActiveSession* session);
 
     UdpProxyFilter& filter_;

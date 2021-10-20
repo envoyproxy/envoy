@@ -1,12 +1,27 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_contrib_package",
+)
+load(
+    "//bazel:envoy_internal.bzl",
+    "envoy_external_dep_path",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
+
+envoy_cc_test(
+    name = "config_unit_test",
+    srcs = ["config_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:config_lib",
+        "//test/mocks/server:factory_context_mocks",
+    ],
+)
 
 envoy_cc_test(
     name = "filter_unit_test",
@@ -28,6 +43,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "abstract_command_unit_test",
+    srcs = ["abstract_command_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:abstract_command_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "upstream_kafka_facade_unit_test",
     srcs = ["upstream_kafka_facade_unit_test.cc"],
     tags = ["skip_on_windows"],
@@ -39,10 +63,32 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "abstract_command_unit_test",
-    srcs = ["abstract_command_unit_test.cc"],
+    name = "upstream_kafka_client_impl_unit_test",
+    srcs = ["upstream_kafka_client_impl_unit_test.cc"],
     tags = ["skip_on_windows"],
     deps = [
-        "//contrib/kafka/filters/network/source/mesh:abstract_command_lib",
+        ":kafka_mocks_lib",
+        "//contrib/kafka/filters/network/source/mesh:upstream_kafka_client_impl_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "kafka_mocks_lib",
+    srcs = [],
+    hdrs = ["kafka_mocks.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        envoy_external_dep_path("librdkafka"),
+    ],
+)
+
+envoy_cc_test(
+    name = "upstream_config_unit_test",
+    srcs = ["upstream_config_unit_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//contrib/kafka/filters/network/source/mesh:upstream_config_lib",
     ],
 )

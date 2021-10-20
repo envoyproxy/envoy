@@ -35,22 +35,25 @@ const ReplacementMap& emptySpaceReplacement() {
 } // namespace
 
 struct StreamInfoImpl : public StreamInfo {
-  StreamInfoImpl(TimeSource& time_source,
-                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
-                 FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
-      : StreamInfoImpl(absl::nullopt, time_source, downstream_address_provider,
+  StreamInfoImpl(
+      TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain)
+      : StreamInfoImpl(absl::nullopt, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(life_span)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider)
-      : StreamInfoImpl(protocol, time_source, downstream_address_provider,
+  StreamInfoImpl(
+      Http::Protocol protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider)
+      : StreamInfoImpl(protocol, time_source, downstream_connection_info_provider,
                        std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
-                 FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
+  StreamInfoImpl(
+      Http::Protocol protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr parent_filter_state, FilterState::LifeSpan life_span)
       : StreamInfoImpl(
-            protocol, time_source, downstream_address_provider,
+            protocol, time_source, downstream_connection_info_provider,
             std::make_shared<FilterStateImpl>(
                 FilterStateImpl::LazyCreateAncestor(std::move(parent_filter_state), life_span),
                 FilterState::LifeSpan::FilterChain)) {}
@@ -198,7 +201,7 @@ struct StreamInfoImpl : public StreamInfo {
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
 
   const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
-    return *downstream_address_provider_;
+    return *downstream_connection_info_provider_;
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -280,6 +283,32 @@ struct StreamInfoImpl : public StreamInfo {
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  const BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
+  }
+
+  const BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
+  }
+
+  void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) override {
+    // Accumulate the byte measurement from previous upstream request during a retry.
+    upstream_bytes_meter->addWireBytesSent(upstream_bytes_meter_->wireBytesSent());
+    upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
+    upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
+    upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
+
+    upstream_bytes_meter_ = upstream_bytes_meter;
+  }
+
+  void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) override {
+    // Downstream bytes counter don't reset during a retry.
+    if (downstream_bytes_meter_ == nullptr) {
+      downstream_bytes_meter_ = downstream_bytes_meter;
+    }
+    ASSERT(downstream_bytes_meter_.get() == downstream_bytes_meter.get());
+  }
+
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -311,21 +340,22 @@ private:
         std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr));
   }
 
-  StreamInfoImpl(absl::optional<Http::Protocol> protocol, TimeSource& time_source,
-                 const Network::ConnectionInfoProviderSharedPtr& downstream_address_provider,
-                 FilterStateSharedPtr filter_state)
+  StreamInfoImpl(
+      absl::optional<Http::Protocol> protocol, TimeSource& time_source,
+      const Network::ConnectionInfoProviderSharedPtr& downstream_connection_info_provider,
+      FilterStateSharedPtr filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::move(filter_state)),
-        downstream_address_provider_(downstream_address_provider != nullptr
-                                         ? downstream_address_provider
-                                         : emptyDownstreamAddressProvider()),
+        downstream_connection_info_provider_(downstream_connection_info_provider != nullptr
+                                                 ? downstream_connection_info_provider
+                                                 : emptyDownstreamAddressProvider()),
         trace_reason_(Tracing::Reason::NotTraceable) {}
 
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  const Network::ConnectionInfoProviderSharedPtr downstream_address_provider_;
+  const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
@@ -335,6 +365,9 @@ private:
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;
+  // Default construct the object because upstream stream is not constructed in some cases.
+  BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
+  BytesMeterSharedPtr downstream_bytes_meter_;
 };
 
 } // namespace StreamInfo

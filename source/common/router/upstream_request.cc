@@ -80,6 +80,10 @@ UpstreamRequest::~UpstreamRequest() {
     // Allows for testing.
     per_try_timeout_->disableTimer();
   }
+  if (per_try_idle_timeout_ != nullptr) {
+    // Allows for testing.
+    per_try_idle_timeout_->disableTimer();
+  }
   if (max_stream_duration_timer_ != nullptr) {
     max_stream_duration_timer_->disableTimer();
   }
@@ -136,6 +140,7 @@ void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& head
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
   // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
@@ -177,6 +182,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 void UpstreamRequest::decodeData(Buffer::Instance& data, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  resetPerTryIdleTimer();
   maybeEndDecode(end_stream);
   stream_info_.addBytesReceived(data.length());
   parent_.onUpstreamData(data, *this, end_stream);
@@ -195,7 +201,7 @@ void UpstreamRequest::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
 void UpstreamRequest::dumpState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
   os << spaces << "UpstreamRequest " << this << "\n";
-  const auto addressProvider = connection().addressProviderSharedPtr();
+  const auto addressProvider = connection().connectionInfoProviderSharedPtr();
   const Http::RequestHeaderMap* request_headers = parent_.downstreamHeaders();
   DUMP_DETAILS(addressProvider);
   DUMP_DETAILS(request_headers);
@@ -297,7 +303,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -331,6 +336,12 @@ void UpstreamRequest::resetStream() {
   }
 }
 
+void UpstreamRequest::resetPerTryIdleTimer() {
+  if (per_try_idle_timeout_ != nullptr) {
+    per_try_idle_timeout_->enableTimer(parent_.timeout().per_try_idle_timeout_);
+  }
+}
+
 void UpstreamRequest::setupPerTryTimeout() {
   ASSERT(!per_try_timeout_);
   if (parent_.timeout().per_try_timeout_.count() > 0) {
@@ -338,6 +349,19 @@ void UpstreamRequest::setupPerTryTimeout() {
         parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryTimeout(); });
     per_try_timeout_->enableTimer(parent_.timeout().per_try_timeout_);
   }
+
+  ASSERT(!per_try_idle_timeout_);
+  if (parent_.timeout().per_try_idle_timeout_.count() > 0) {
+    per_try_idle_timeout_ =
+        parent_.callbacks()->dispatcher().createTimer([this]() -> void { onPerTryIdleTimeout(); });
+    resetPerTryIdleTimer();
+  }
+}
+
+void UpstreamRequest::onPerTryIdleTimeout() {
+  ENVOY_STREAM_LOG(debug, "upstream per try idle timeout", *parent_.callbacks());
+  stream_info_.setResponseFlag(StreamInfo::ResponseFlag::StreamIdleTimeout);
+  parent_.onPerTryIdleTimeout(*this);
 }
 
 void UpstreamRequest::onPerTryTimeout() {
@@ -369,12 +393,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
-      reset_reason = Http::StreamResetReason::ConnectionFailure;
-    } else {
-      reset_reason = Http::StreamResetReason::LocalReset;
-    }
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
@@ -390,7 +409,6 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -427,6 +445,10 @@ void UpstreamRequest::onPoolReady(
         info.downstreamAddressProvider().connectionID().value());
   }
 
+  stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
+                                                              stream_info_);
+
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();
   } else {
@@ -457,14 +479,18 @@ void UpstreamRequest::onPoolReady(
     paused_for_connect_ = true;
   }
 
-  if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
-    const auto max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+  absl::optional<std::chrono::milliseconds> max_stream_duration;
+  if (parent_.dynamicMaxStreamDuration().has_value()) {
+    max_stream_duration = parent_.dynamicMaxStreamDuration().value();
+  } else if (upstream_host_->cluster().commonHttpProtocolOptions().has_max_stream_duration()) {
+    max_stream_duration = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
         upstream_host_->cluster().commonHttpProtocolOptions().max_stream_duration()));
-    if (max_stream_duration.count()) {
-      max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
-          [this]() -> void { onStreamMaxDurationReached(); });
-      max_stream_duration_timer_->enableTimer(max_stream_duration);
-    }
+  }
+
+  if (max_stream_duration.has_value() && max_stream_duration->count()) {
+    max_stream_duration_timer_ = parent_.callbacks()->dispatcher().createTimer(
+        [this]() -> void { onStreamMaxDurationReached(); });
+    max_stream_duration_timer_->enableTimer(*max_stream_duration);
   }
 
   const Http::Status status =

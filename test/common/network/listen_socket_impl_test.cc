@@ -35,16 +35,15 @@ TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
 
 template <Network::Socket::Type Type>
 class ListenSocketImplTest : public testing::TestWithParam<Address::IpVersion> {
+  using ListenSocketType = NetworkListenSocket<NetworkSocketTrait<Type>>;
+
 protected:
   ListenSocketImplTest() : version_(GetParam()) {}
   const Address::IpVersion version_;
 
   template <typename... Args>
-  std::unique_ptr<ListenSocketImpl> createListenSocketPtr(Args&&... args) {
-    using NetworkSocketTraitType = NetworkSocketTrait<Type>;
-
-    return std::make_unique<NetworkListenSocket<NetworkSocketTraitType>>(
-        std::forward<Args>(args)...);
+  std::unique_ptr<ListenSocketType> createListenSocketPtr(Args&&... args) {
+    return std::make_unique<ListenSocketType>(std::forward<Args>(args)...);
   }
 
   void testBindSpecificPort() {
@@ -76,7 +75,7 @@ protected:
       EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options->emplace_back(std::move(option));
-      std::unique_ptr<ListenSocketImpl> socket1;
+      std::unique_ptr<ListenSocketType> socket1;
       try {
         socket1 = createListenSocketPtr(addr, options, true);
       } catch (SocketBindException& e) {
@@ -99,9 +98,9 @@ protected:
         EXPECT_EQ(0, socket1->listen(0).return_value_);
       }
 
-      EXPECT_EQ(addr->ip()->port(), socket1->addressProvider().localAddress()->ip()->port());
+      EXPECT_EQ(addr->ip()->port(), socket1->connectionInfoProvider().localAddress()->ip()->port());
       EXPECT_EQ(addr->ip()->addressAsString(),
-                socket1->addressProvider().localAddress()->ip()->addressAsString());
+                socket1->connectionInfoProvider().localAddress()->ip()->addressAsString());
       EXPECT_EQ(Type, socket1->socketType());
 
       auto option2 = std::make_unique<MockSocketOption>();
@@ -122,7 +121,7 @@ protected:
       Network::IoHandlePtr io_handle =
           std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
-      EXPECT_EQ(socket3->addressProvider().localAddress()->asString(), addr->asString());
+      EXPECT_EQ(socket3->connectionInfoProvider().localAddress()->asString(), addr->asString());
 
       // Test successful.
       return;
@@ -132,12 +131,25 @@ protected:
   void testBindPortZero() {
     auto loopback = Network::Test::getCanonicalLoopbackAddress(version_);
     auto socket = createListenSocketPtr(loopback, nullptr, true);
-    EXPECT_EQ(Address::Type::Ip, socket->addressProvider().localAddress()->type());
-    EXPECT_EQ(version_, socket->addressProvider().localAddress()->ip()->version());
+    EXPECT_EQ(Address::Type::Ip, socket->connectionInfoProvider().localAddress()->type());
+    EXPECT_EQ(version_, socket->connectionInfoProvider().localAddress()->ip()->version());
     EXPECT_EQ(loopback->ip()->addressAsString(),
-              socket->addressProvider().localAddress()->ip()->addressAsString());
-    EXPECT_GT(socket->addressProvider().localAddress()->ip()->port(), 0U);
+              socket->connectionInfoProvider().localAddress()->ip()->addressAsString());
+    EXPECT_GT(socket->connectionInfoProvider().localAddress()->ip()->port(), 0U);
     EXPECT_EQ(Type, socket->socketType());
+  }
+
+  // Verify that a listen sockets that do not bind to port can be duplicated and closed.
+  void testNotBindToPort() {
+    auto local_address = version_ == Address::IpVersion::v4 ? Utility::getIpv6AnyAddress()
+                                                            : Utility::getIpv4AnyAddress();
+    auto socket = NetworkListenSocket<NetworkSocketTrait<Type>>(local_address, nullptr,
+                                                                /*bind_to_port=*/false);
+    auto dup_socket = socket.duplicate();
+    EXPECT_FALSE(socket.isOpen());
+    EXPECT_FALSE(dup_socket->isOpen());
+    socket.close();
+    dup_socket->close();
   }
 };
 
@@ -162,8 +174,22 @@ class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
       : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+
+  TestListenSocket(Address::IpVersion ip_version)
+      : ListenSocketImpl(/*io_handle=*/nullptr, ip_version == Address::IpVersion::v4
+                                                    ? Utility::getIpv4AnyAddress()
+                                                    : Utility::getIpv6AnyAddress()) {}
   Socket::Type socketType() const override { return Socket::Type::Stream; }
+
+  bool isOpen() const override { return ListenSocketImpl::isOpen(); }
+  void close() override { ListenSocketImpl::close(); }
 };
+
+TEST_P(ListenSocketImplTestTcp, NonIoHandleListenSocket) {
+  TestListenSocket sock(version_);
+  EXPECT_FALSE(sock.isOpen());
+  sock.close();
+}
 
 TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
   std::string address_str = "10.1.2.3";
@@ -175,9 +201,9 @@ TEST_P(ListenSocketImplTestTcp, SetLocalAddress) {
 
   TestListenSocket socket(Utility::getIpv4AnyAddress());
 
-  socket.addressProvider().setLocalAddress(address);
+  socket.connectionInfoProvider().setLocalAddress(address);
 
-  EXPECT_EQ(socket.addressProvider().localAddress(), address);
+  EXPECT_EQ(socket.connectionInfoProvider().localAddress(), address);
 }
 
 TEST_P(ListenSocketImplTestTcp, CheckIpVersionWithNullLocalAddress) {
@@ -227,6 +253,10 @@ TEST_P(ListenSocketImplTestUdp, BindSpecificPort) { testBindSpecificPort(); }
 TEST_P(ListenSocketImplTestTcp, BindPortZero) { testBindPortZero(); }
 
 TEST_P(ListenSocketImplTestUdp, BindPortZero) { testBindPortZero(); }
+
+TEST_P(ListenSocketImplTestTcp, NotBindToPortAccess) { testNotBindToPort(); }
+
+TEST_P(ListenSocketImplTestUdp, NotBindToPortAccess) { testNotBindToPort(); }
 
 } // namespace
 } // namespace Network

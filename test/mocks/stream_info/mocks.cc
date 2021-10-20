@@ -18,7 +18,7 @@ namespace StreamInfo {
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
       filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)),
-      downstream_address_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
+      downstream_connection_info_provider_(std::make_shared<Network::ConnectionInfoSetterImpl>(
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.2"),
           std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"))) {
   ON_CALL(*this, setResponseFlag(_)).WillByDefault(Invoke([this](ResponseFlag response_flag) {
@@ -63,7 +63,7 @@ MockStreamInfo::MockStreamInfo()
           }));
   ON_CALL(*this, upstreamLocalAddress()).WillByDefault(ReturnRef(upstream_local_address_));
   ON_CALL(*this, downstreamAddressProvider())
-      .WillByDefault(ReturnPointee(downstream_address_provider_));
+      .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
   ON_CALL(*this, setUpstreamSslConnection(_))
       .WillByDefault(Invoke(
           [this](const auto& connection_info) { upstream_connection_info_ = connection_info; }));
@@ -130,6 +130,16 @@ MockStreamInfo::MockStreamInfo()
     attempt_count_ = attempt_count;
   }));
   ON_CALL(*this, attemptCount()).WillByDefault(Invoke([this]() { return attempt_count_; }));
+  ON_CALL(*this, getUpstreamBytesMeter()).WillByDefault(ReturnPointee(&upstream_bytes_meter_));
+  ON_CALL(*this, getDownstreamBytesMeter()).WillByDefault(ReturnPointee(&downstream_bytes_meter_));
+  ON_CALL(*this, setUpstreamBytesMeter(_))
+      .WillByDefault(Invoke([this](const BytesMeterSharedPtr& upstream_bytes_meter) {
+        upstream_bytes_meter_ = upstream_bytes_meter;
+      }));
+  ON_CALL(*this, setDownstreamBytesMeter(_))
+      .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
+        downstream_bytes_meter_ = downstream_bytes_meter;
+      }));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

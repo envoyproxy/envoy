@@ -146,6 +146,7 @@ class UntypedConfigUpdateCallbacks {
 public:
   virtual ~UntypedConfigUpdateCallbacks() = default;
 
+  // TODO (dmitri-d) remove this method when legacy sotw mux has been removed.
   /**
    * Called when a state-of-the-world configuration update is received. (State-of-the-world is
    * everything other than delta gRPC - filesystem, HTTP, non-delta gRPC).
@@ -156,6 +157,17 @@ public:
    *        requests.
    */
   virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                              const std::string& version_info) PURE;
+
+  /**
+   * Called when a non-delta gRPC configuration update is received.
+   * @param resources vector of fetched resources corresponding to the configuration update.
+   * @param version_info supplies the version information as supplied by the xDS discovery response.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void onConfigUpdate(const std::vector<DecodedResourcePtr>& resources,
                               const std::string& version_info) PURE;
 
   /**

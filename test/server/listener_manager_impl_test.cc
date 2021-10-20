@@ -297,7 +297,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
         port_value: 1234
       }
     }
-    filter_chains: {}
   )EOF";
   envoy::config::listener::v3::Listener listener_proto;
   EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
@@ -358,22 +357,6 @@ address:
                           EnvoyException, "no filter chains specified");
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, BadListenerConfig2UDPListenerFilters) {
-  const std::string yaml = R"EOF(
-address:
-  socket_address:
-    protocol: UDP
-    address: 127.0.0.1
-    port_value: 1234
-listener_filters:
-- name: envoy.filters.listener.tls_inspector
-- name: envoy.filters.listener.original_dst
-  )EOF";
-
-  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
-                          EnvoyException, "Only 1 UDP listener filter per listener supported");
-}
-
 TEST_F(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
   const std::string yaml = R"EOF(
 address:
@@ -389,6 +372,22 @@ filter_chains:
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
                           EnvoyException, "foo: Cannot find field");
 }
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, BadConnectionLessUdpConfigWithFilterChain) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    protocol: UDP
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                          EnvoyException,
+                          "1 filter chain\\(s\\) specified for connection-less UDP listener");
+}
+
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
@@ -1516,7 +1515,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
@@ -1576,7 +1575,7 @@ filter_chains:
 
   Network::Address::InstanceConstSharedPtr local_address(
       new Network::Address::Ipv4Instance("127.0.0.1", 1234));
-  listener_factory_.socket_->address_provider_->setLocalAddress(local_address);
+  listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
@@ -4026,8 +4025,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4123,8 +4122,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("127.0.0.2:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("127.0.0.2:2345", socket.connectionInfoProvider().localAddress()->asString());
 #endif
 }
 
@@ -4204,8 +4203,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       }));
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-  EXPECT_TRUE(socket.addressProvider().localAddressRestored());
-  EXPECT_EQ("[1::2]:2345", socket.addressProvider().localAddress()->asString());
+  EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
+  EXPECT_EQ("[1::2]:2345", socket.connectionInfoProvider().localAddress()->asString());
 }
 
 // Validate that when neither transparent nor freebind is not set in the
@@ -5102,9 +5101,9 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
 
-// This case also verifies that listeners that share port but do not share socket type (TCP vs. UDP)
+// This case verifies that listeners that share port but do not share socket type (TCP vs. UDP)
 // do not share a listener.
-TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAnyListenerIsNotTcp) {
+TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDifferentSocketType) {
   EXPECT_CALL(*worker_, start(_, _));
   manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
 
@@ -5117,12 +5116,15 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfAn
   auto new_listener_proto = listener_proto;
   new_listener_proto.mutable_address()->mutable_socket_address()->set_protocol(
       envoy::config::core::v3::SocketAddress_Protocol::SocketAddress_Protocol_UDP);
+  EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
+  EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
+  EXPECT_CALL(listener_factory_, createDrainManager_(_));
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener_proto, "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': 1 filter chain(s) specified "
+                            "for connection-less UDP listener.");
 
-  ListenerHandle* listener_foo_update1 = expectListenerCreate(false, true);
-  expectUpdateToThenDrain(new_listener_proto, listener_foo, OptRef<Network::MockListenSocket>(),
-                          ListenerComponentFactory::BindType::ReusePort);
-  expectRemove(new_listener_proto, listener_foo_update1, *listener_factory_.socket_);
-
+  expectRemove(new_listener_proto, listener_foo, *listener_factory_.socket_);
   EXPECT_EQ(0UL, manager_->listeners().size());
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
 }
@@ -5204,8 +5206,6 @@ address:
     address: 127.0.0.1
     protocol: UDP
     port_value: 1234
-filter_chains:
-  filters: []
     )EOF");
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());

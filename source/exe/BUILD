@@ -22,6 +22,10 @@ alias(
 
 envoy_cc_binary(
     name = "envoy-static",
+    features = select({
+        "//bazel:windows_opt_build": ["generate_pdb_file"],
+        "//conditions:default": [],
+    }),
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
