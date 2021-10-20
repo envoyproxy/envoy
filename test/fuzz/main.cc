@@ -14,6 +14,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/environment.h"

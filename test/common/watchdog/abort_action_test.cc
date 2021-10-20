@@ -6,7 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
 #include "source/common/watchdog/abort_action.h"
 #include "source/common/watchdog/abort_action_config.h"
@@ -21,7 +21,7 @@ namespace Envoy {
 namespace Watchdog {
 namespace {
 
-using AbortActionConfig = envoy::watchdog::v3alpha::AbortActionConfig;
+using AbortActionConfig = envoy::watchdog::v3::AbortActionConfig;
 
 class AbortActionTest : public testing::Test {
 protected:

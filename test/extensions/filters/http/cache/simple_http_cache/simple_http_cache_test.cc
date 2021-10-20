@@ -19,9 +19,9 @@ namespace {
 
 const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;
@@ -272,9 +272,9 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
 
 TEST(Registration, GetFactory) {
   HttpCacheFactory* factory = Registry::FactoryRegistry<HttpCacheFactory>::getFactoryByType(
-      "envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig");
+      "envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig");
   ASSERT_NE(factory, nullptr);
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
   EXPECT_EQ(factory->getCache(config).cacheInfo().name_, "envoy.extensions.http.cache.simple");
 }
