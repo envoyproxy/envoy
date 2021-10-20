@@ -2207,7 +2207,7 @@ server_config:
 }
 
 // test typed_dns_resolver_config exits which overrides dns_resolution_config.
-TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigExist)) {
+TEST_F(DnsFilterTest, DEPRECATED_FEATURE_TEST(TypedDnsResolverConfigOverrideDnsResolutionConfig)) {
   const std::string typed_dns_resolver_config_exist = R"EOF(
 stat_prefix: "my_prefix"
 client_config:
@@ -2220,6 +2220,46 @@ client_config:
     - socket_address:
         address: "1.1.1.1"
         port_value: 53
+  typed_dns_resolver_config:
+    name: envoy.network.dns_resolver.cares
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+      resolvers:
+      - socket_address:
+          address: "1.2.3.4"
+          port_value: 80
+      dns_resolver_options:
+        use_tcp_for_dns_lookups: true
+        no_default_search_domain: true
+  max_pending_lookups: 256
+server_config:
+  external_dns_table:
+    filename: {}
+)EOF";
+
+  InSequence s;
+
+  std::string temp_path =
+      TestEnvironment::writeStringToFileForTest("dns_table.yaml", max_records_table_yaml);
+  std::string config_to_use = fmt::format(typed_dns_resolver_config_exist, temp_path);
+  setup(config_to_use);
+
+  EXPECT_EQ(true, dns_resolver_options_.use_tcp_for_dns_lookups());
+  EXPECT_EQ(true, dns_resolver_options_.no_default_search_domain());
+
+  // address matches
+  auto resolvers = envoy::config::core::v3::Address();
+  resolvers.mutable_socket_address()->set_address("1.2.3.4");
+  resolvers.mutable_socket_address()->set_port_value(80);
+  EXPECT_EQ(true, TestUtility::protoEqual(cares_.resolvers(0), resolvers));
+}
+
+// test typed_dns_resolver_config exits.
+TEST_F(DnsFilterTest, TypedDnsResolverConfigExist) {
+  const std::string typed_dns_resolver_config_exist = R"EOF(
+stat_prefix: "my_prefix"
+client_config:
+  resolver_timeout: 1s
   typed_dns_resolver_config:
     name: envoy.network.dns_resolver.cares
     typed_config:
