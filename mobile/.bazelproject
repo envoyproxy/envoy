@@ -1,0 +1,4 @@
+# Uncomment the examples you'd like to use!
+import examples/kotlin/hello_world/.bazelproject
+
+android_sdk_platform: android-31
