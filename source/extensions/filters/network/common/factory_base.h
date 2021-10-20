@@ -12,8 +12,8 @@ namespace NetworkFilters {
 namespace Common {
 
 /**
- * Common base class for downstream network filter factory registrations. Removes a substantial
- * amount of boilerplate.
+ * Common base class for network filter factory registrations. Removes a substantial amount of
+ * boilerplate.
  */
 template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
 class FactoryBase : public Server::Configuration::NamedNetworkFilterConfigFactory {
@@ -73,57 +73,6 @@ private:
 
   const std::string name_;
   const bool is_terminal_filter_;
-};
-
-/**
- * Common base class for upstream network filter factory registrations. Removes a substantial
- * amount of boilerplate.
- */
-template <class ConfigProto, class ProtocolOptionsProto = ConfigProto>
-class UpstreamFactoryBase : public Server::Configuration::NamedUpstreamNetworkFilterConfigFactory {
-public:
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message& proto_config,
-                               Server::Configuration::CommonFactoryContext& context) override {
-    return createFilterFactoryFromProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                                 proto_config, context.messageValidationVisitor()),
-                                             context);
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ConfigProto>();
-  }
-
-  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
-    return std::make_unique<ProtocolOptionsProto>();
-  }
-
-  Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsConfig(
-      const Protobuf::Message& proto_config,
-      Server::Configuration::ProtocolOptionsFactoryContext& factory_context) override {
-    return createProtocolOptionsTyped(MessageUtil::downcastAndValidate<const ProtocolOptionsProto&>(
-                                          proto_config, factory_context.messageValidationVisitor()),
-                                      factory_context);
-  }
-
-  std::string name() const override { return name_; }
-
-protected:
-  UpstreamFactoryBase(const std::string& name) : name_(name) {}
-
-private:
-  virtual Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
-                                    Server::Configuration::CommonFactoryContext& context) PURE;
-
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsTyped(const ProtocolOptionsProto&,
-                             Server::Configuration::ProtocolOptionsFactoryContext&) {
-    ExceptionUtil::throwEnvoyException(
-        fmt::format("filter {} does not support protocol options", name_));
-  }
-
-  const std::string name_;
 };
 
 } // namespace Common
