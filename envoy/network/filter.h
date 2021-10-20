@@ -444,15 +444,17 @@ public:
   /**
    * Called when a new data packet is received on a UDP listener.
    * @param data supplies the read data which may be modified.
+   * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual void onData(UdpRecvData& data) PURE;
+  virtual FilterStatus onData(UdpRecvData& data) PURE;
 
   /**
    * Called when there is an error event in the receive data path.
    *
    * @param error_code supplies the received error on the listener.
+   * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
+  virtual FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
 
 protected:
   /**
