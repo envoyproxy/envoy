@@ -487,7 +487,8 @@ TEST_P(AdsIntegrationTest, CdsEdsReplacementWarming) {
       {buildTlsCluster("cluster_0")}, {}, "2");
   // Inconsistent SotW and delta behaviors for warming, see
   // https://github.com/envoyproxy/envoy/issues/11477#issuecomment-657855029.
-  if (sotw_or_delta_ != Grpc::SotwOrDelta::Delta) {
+  // TODO (dmitri-d) this should be remove when legacy mux implementations have been removed.
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
                                         {"cluster_0"}, {}, {}));
   }
@@ -634,7 +635,8 @@ TEST_P(AdsIntegrationTest, CdsPausedDuringWarming) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 
   // CDS is resumed and EDS response was acknowledged.
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
+  // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Sotw) {
     // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
     // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
     // ACK goes out, they're both acknowledging version 3.
@@ -716,7 +718,8 @@ TEST_P(AdsIntegrationTest, RemoveWarmingCluster) {
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 
   // CDS is resumed and EDS response was acknowledged.
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Delta) {
+  // TODO (dmitri-d) remove the conditional when legacy mux implementations are removed.
+  if (sotw_or_delta_ != Grpc::SotwOrDelta::Sotw) {
     // Envoy will ACK both Cluster messages. Since they arrived while CDS was paused, they aren't
     // sent until CDS is unpaused. Since version 3 has already arrived by the time the version 2
     // ACK goes out, they're both acknowledging version 3.
@@ -1008,9 +1011,16 @@ class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                            ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+      : HttpIntegrationTest(
+            Http::CodecType::HTTP2, ipVersion(),
+            ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                               (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                           ? "GRPC"
+                                           : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1048,9 +1058,16 @@ class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                            ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+      : HttpIntegrationTest(
+            Http::CodecType::HTTP2, ipVersion(),
+            ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                               (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                           ? "GRPC"
+                                           : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1188,7 +1205,8 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
   envoy::service::discovery::v3::DiscoveryRequest sotw_request;
   envoy::service::discovery::v3::DeltaDiscoveryRequest delta_request;
   const envoy::config::core::v3::Node* node = nullptr;
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, sotw_request));
     EXPECT_TRUE(sotw_request.has_node());
     node = &sotw_request.node();
@@ -1233,9 +1251,16 @@ class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParam
                                           public HttpIntegrationTest {
 public:
   AdsClusterFromFileIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                            ConfigHelper::adsBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+      : HttpIntegrationTest(
+            Http::CodecType::HTTP2, ipVersion(),
+            ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                               (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                           ? "GRPC"
+                                           : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     create_xds_upstream_ = true;
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
@@ -1497,7 +1522,7 @@ public:
       lds_config->mutable_api_config_source()->set_transport_api_version(
           envoy::config::core::v3::V3);
       auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-      ads_config->set_set_node_on_first_message_only(true);
+      ads_config->set_set_node_on_first_message_only(false);
     });
     AdsIntegrationTest::initialize();
   }
@@ -1509,7 +1534,7 @@ INSTANTIATE_TEST_SUITE_P(
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      // Only delta xDS is supported for XdsTp
-                     testing::Values(Grpc::SotwOrDelta::Delta)));
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();
