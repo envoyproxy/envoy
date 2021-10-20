@@ -28,7 +28,7 @@ public:
       : heap_alloc_(symbol_table_), store_(heap_alloc_),
         api_(Api::createApiForTest(store_, time_system_)) {
     store_.setTagProducer(
-        std::make_unique<Stats::TagProducerImpl>(Stats::TagProducerImpl(stats_config_, {})));
+        std::make_unique<Stats::TagProducerImpl>(Stats::TagProducerImpl(stats_config_)));
 
     Stats::TestUtil::forEachSampleStat(1000, true, [this](absl::string_view name) {
       stat_names_.push_back(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table_));

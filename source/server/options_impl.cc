@@ -293,9 +293,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       std::vector<std::string> splitted_tag_pair = absl::StrSplit(cli_tag_pair, ':');
       if (splitted_tag_pair.size() != 2) {
         throw MalformedArgvException(
-            fmt::format("error: missformated stats-tag '{}'", cli_tag_pair));
+            fmt::format("error: misformated stats-tag '{}'", cli_tag_pair));
       }
-      stats_tags_.push_back({splitted_tag_pair[0], splitted_tag_pair[1]});
+      stats_tags_.emplace_back(std::make_pair(splitted_tag_pair[0], splitted_tag_pair[1]));
     }
   }
 }

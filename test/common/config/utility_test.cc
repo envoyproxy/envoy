@@ -112,8 +112,8 @@ TEST(UtilityTest, createTagProducerWithDefaultTgs) {
   ASSERT(producer != nullptr);
   std::vector<Stats::Tag> tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
-  ASSERT_EQ(extracted_name, "http.rq_total");
-  ASSERT_EQ(tags.size(), 2);
+  EXPECT_EQ(extracted_name, "http.rq_total");
+  EXPECT_EQ(tags.size(), 2);
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {

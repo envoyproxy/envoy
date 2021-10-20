@@ -11,6 +11,9 @@
 namespace Envoy {
 namespace Stats {
 
+TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config)
+    : TagProducerImpl(config, {}) {}
+
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v3::StatsConfig& config,
                                  const std::vector<std::pair<std::string, std::string>>& cli_tags) {
   // To check name conflict.
