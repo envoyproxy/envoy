@@ -217,7 +217,7 @@ protected:
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
-    ::usleep(1000);
+    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
 #endif
   }
 

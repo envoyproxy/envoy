@@ -14,7 +14,8 @@ public:
   }
 
   void bidirectionalStreaming(uint32_t bytes);
-  void manySimultaneousRequests(uint32_t request_bytes, uint32_t response_bytes);
+  void manySimultaneousRequests(uint32_t request_bytes, uint32_t max_response_bytes,
+                                uint32_t num_streams = 50);
 
   bool use_alpn_{false};
 

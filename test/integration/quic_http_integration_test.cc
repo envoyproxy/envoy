@@ -371,6 +371,8 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   EXPECT_TRUE(static_cast<quic::QuicCryptoClientStream*>(
                   quic::test::QuicSessionPeer::GetMutableCryptoStream(quic_session))
                   ->EarlyDataAccepted());
+  EXPECT_NE(quic_session->ssl(), nullptr);
+  EXPECT_TRUE(quic_session->ssl()->peerCertificateValidated());
   // Close the second connection.
   codec_client_->close();
   if (GetParam() == Network::Address::IpVersion::v4) {

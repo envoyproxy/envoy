@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
 #include "quic_filter_manager_connection_impl.h"
@@ -20,7 +21,9 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                   crypto_config.get(), push_promise_index),
       host_name_(server_id.host()), crypto_config_(crypto_config),
       crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
-      scope_(scope) {}
+      scope_(scope) {
+  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
+}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -158,6 +161,13 @@ void EnvoyQuicClientSession::setHttp3Options(
 bool EnvoyQuicClientSession::ShouldKeepConnectionAlive() const {
   // Do not probe at all if keepalive is disabled via config.
   return !disable_keepalive_ && quic::QuicSpdyClientSession::ShouldKeepConnectionAlive();
+}
+
+void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(
+    const quic::ProofVerifyDetails& verify_details) {
+  if (static_cast<const CertVerifyResult&>(verify_details).isValid()) {
+    quic_ssl_info_->onCertValidated();
+  }
 }
 
 } // namespace Quic
