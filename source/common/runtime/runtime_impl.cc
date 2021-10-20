@@ -45,6 +45,7 @@ void countDeprecatedFeatureUseInternal(const RuntimeStats& stats) {
 // TODO(12923): Document the Quiche reloadable flag setup.
 #ifdef ENVOY_ENABLE_QUIC
 void refreshQuicheReloadableFlags(const Snapshot::EntryMap& flag_map) {
+  std::cerr << "============== refreshQuicheReloadableFlags\n";
   absl::flat_hash_map<std::string, bool> quiche_flags_override;
   for (const auto& it : flag_map) {
     if (absl::StartsWith(it.first, quiche::EnvoyQuicheReloadableFlagPrefix) &&
