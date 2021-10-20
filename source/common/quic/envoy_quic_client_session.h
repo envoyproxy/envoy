@@ -73,10 +73,6 @@ public:
   // QuicFilterManagerConnectionImpl
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
 
-  bool QuicheShouldCreateOutgoingBidirectionalStream() {
-    return quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream();
-  }
-
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
 
