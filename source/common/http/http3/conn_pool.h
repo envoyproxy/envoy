@@ -22,16 +22,7 @@ namespace Http3 {
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-               Upstream::Host::CreateConnectionData& data)
-      : MultiplexedActiveClientBase(parent,
-                                    parent.host()
-                                        ->cluster()
-                                        .http3Options()
-                                        .quic_protocol_options()
-                                        .max_concurrent_streams()
-                                        .value(),
-                                    parent.host()->cluster().stats().upstream_cx_http3_total_,
-                                    data) {}
+               Upstream::Host::CreateConnectionData& data);
 };
 
 // Http3 subclass of FixedHttpConnPoolImpl which exists to store quic data.
