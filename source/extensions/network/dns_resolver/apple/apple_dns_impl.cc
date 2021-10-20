@@ -370,7 +370,7 @@ AppleDnsResolverImpl::PendingResolution::buildDnsResponse(const struct sockaddr*
 }
 
 // apple DNS resolver factory
-class AppleDnsResolverFactoryImpl : public DnsResolverFactory {
+class AppleDnsResolverFactory : public DnsResolverFactory {
 public:
   std::string name() const override { return std::string(AppleDnsResolver); }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -386,7 +386,7 @@ public:
 };
 
 // Register the AppleDnsResolverFactory
-REGISTER_FACTORY(AppleDnsResolverFactoryImpl, DnsResolverFactory);
+REGISTER_FACTORY(AppleDnsResolverFactory, DnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy
