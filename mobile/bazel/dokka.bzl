@@ -28,6 +28,7 @@ def _sources_javadocs_impl(ctx):
         unzip $sources_jar -d $sources_dir > /dev/null
 
         $java \
+            --add-opens java.base/java.util=ALL-UNNAMED \
             -jar $dokka_cli_jar \
             -pluginsClasspath $plugin_classpath \
             -moduleName "Envoy Mobile" \

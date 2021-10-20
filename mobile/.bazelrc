@@ -16,7 +16,8 @@ build --spawn_strategy=local
 build --verbose_failures
 build --workspace_status_command=envoy/bazel/get_workspace_status
 build --xcode_version=13.0
-build --javabase=@bazel_tools//tools/jdk:jdk
+build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
 # https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
@@ -84,8 +85,6 @@ build:release-android --compilation_mode=opt
 
 # Instrument Envoy Mobile's C++ code for coverage
 build:coverage --instrumentation_filter="//library/common[/:]"
-build:coverage --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
-build:coverage --javabase=@bazel_tools//tools/jdk:remote_jdk11
 
 #############################################################################
 # Experimental EngFlow Remote Execution Configs

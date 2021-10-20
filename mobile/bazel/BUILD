@@ -37,6 +37,11 @@ alias(
     actual = "@bazel_tools//tools/jdk:jni",
 )
 
+alias(
+    name = "jni_header",
+    actual = "@bazel_tools//tools/jdk:jni_header",
+)
+
 # autoformat requires that there be no @bazel_tools references outside of //bazel,
 # so we alias all of the relevant platforms for determining wheel packaging here
 alias(
