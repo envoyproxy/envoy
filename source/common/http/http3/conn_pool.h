@@ -24,19 +24,32 @@ public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
 
+  // Update quiche_capacity_ when a MAX_STREAMS frame arrives.
   void onMaxStreamsChanged(uint32_t num_streams);
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
+    // Each time a quic stream is allocated the quic capacity needs to get
+    // decremented.  See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
   }
 
+  // Overload the default capacity calculations to return the quic capacity
+  // (modified by any stream limits in Envoy config)
   int64_t currentUnusedCapacity() const override {
     return std::min<int64_t>(quiche_capacity_, effectiveConcurrentStreamLimit());
   }
 
   void updateCapacity(uint64_t new_quiche_capacity) {
+    // Each time we update the capacity make sure to reflect the update in the
+    // connection pool.
+    //
+    // Due to interplay between the max number of concurrent streams Envoy will
+    // allow and the max number of streams per connection this is not as simple
+    // as just updating based on the delta between quiche_capacity_ and
+    // new_quiche_capacity, so we use the delta between the actual calculated
+    // capacity before and after the update.
     uint64_t old_capacity = currentUnusedCapacity();
     quiche_capacity_ = new_quiche_capacity;
     uint64_t new_capacity = currentUnusedCapacity();
@@ -49,6 +62,17 @@ public:
   }
 
   std::unique_ptr<Quic::ScopedStreamNotifier> notifier_;
+  // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
+  // streams, QUIC has a fixed number of streams available which is updated via
+  // the MAX_STREAMS frame.
+  //
+  // As such each time we create a new stream for QUIC, the capacity goes down
+  // by one, but unlike the other two codecs it is _not_ restored on stream
+  // closure.
+  //
+  // We track the QUIC capacity here, and overload currentUnusedCapacity so the
+  // connection pool can accurately keep track of when it is safe to create new
+  // streams.
   uint64_t quiche_capacity_ = 100;
 };
 
