@@ -3,6 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quic_ssl_connection_info.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -117,8 +119,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  return nullptr;
+  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {

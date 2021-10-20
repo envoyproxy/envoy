@@ -56,8 +56,6 @@ genrule(
 quiche_common_copts = [
     # hpack_huffman_decoder.cc overloads operator<<.
     "-Wno-unused-function",
-    # quic_inlined_frame.h uses offsetof() to optimize memory usage in frames.
-    "-Wno-invalid-offsetof",
 ]
 
 quiche_copts = select({
