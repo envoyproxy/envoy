@@ -2273,9 +2273,7 @@ server_config:
   std::string config_to_use = fmt::format(no_dns_config_exist, temp_path);
   setup(config_to_use);
 
-  // `true` here means use_tcp_for_dns_lookups is set true
   EXPECT_EQ(false, dns_resolver_options_.use_tcp_for_dns_lookups());
-  // `true` here means no_default_search_domain is set true
   EXPECT_EQ(false, dns_resolver_options_.no_default_search_domain());
 
   // No address
