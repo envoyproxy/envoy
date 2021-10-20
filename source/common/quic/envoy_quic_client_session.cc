@@ -10,7 +10,8 @@ namespace test {
 // TODO(alyssawilk) add the necessary accessors to quiche and remove this.
 class QuicSessionPeer {
 public:
-  static quic::QuicStreamIdManager& getStream(Envoy::Quic::EnvoyQuicClientSession* session) {
+  static quic::QuicStreamIdManager&
+  getStreamIdManager(Envoy::Quic::EnvoyQuicClientSession* session) {
     return session->ietf_streamid_manager_.bidirectional_stream_id_manager_;
   }
 };
@@ -20,14 +21,6 @@ public:
 
 namespace Envoy {
 namespace Quic {
-
-ScopedStreamNotifier::ScopedStreamNotifier(std::function<void(uint32_t)> notify,
-                                           EnvoyQuicClientSession& session)
-    : on_can_create_streams_(notify), session_(session) {
-  session.setNotifier(*this);
-}
-
-ScopedStreamNotifier::~ScopedStreamNotifier() { session_.clearNotifier(); }
 
 EnvoyQuicClientSession::EnvoyQuicClientSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
@@ -109,11 +102,12 @@ void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
   }
 }
 
-void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool) {
-  if (notifier_.has_value()) {
-    quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStream(this);
+void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
+  if (http_connection_callbacks_ && !unidirectional) {
+    quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
+    ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
     uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
-    notifier_->notify(streams_available);
+    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
   }
 }
 

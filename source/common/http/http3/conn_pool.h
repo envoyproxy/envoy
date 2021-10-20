@@ -24,8 +24,8 @@ public:
   ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                Upstream::Host::CreateConnectionData& data);
 
-  // Update quiche_capacity_ when a MAX_STREAMS frame arrives.
-  void onMaxStreamsChanged(uint32_t num_streams);
+  // Http::ConnectionCallbacks
+  void onMaxStreamsChanged(uint32_t num_streams) override;
 
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
@@ -61,7 +61,6 @@ public:
     }
   }
 
-  std::unique_ptr<Quic::ScopedStreamNotifier> notifier_;
   // Unlike HTTP/2 and HTTP/1, rather than having a cap on the number of active
   // streams, QUIC has a fixed number of streams available which is updated via
   // the MAX_STREAMS frame.
@@ -96,7 +95,9 @@ public:
                                              quic::QuicConfig& quic_config);
 
   Quic::PersistentQuicInfoImpl& quicInfo() { return *quic_info_; }
-  bool quic() override { return true; }
+  // For HTTP/3 the base connection pool does not track stream capacity, rather
+  // the HTTP3 active client does.
+  bool trackStreamCapacity() override { return false; }
 
 private:
   // Store quic helpers which can be shared between connections and must live

@@ -189,7 +189,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
 
   // Decrement the capacity, as there's one less stream available for serving.
   // For HTTP/3, the capacity is updated in newStreamEncoder.
-  if (!quic()) {
+  if (trackStreamCapacity()) {
     state_.decrConnectingAndConnectedStreamCapacity(1);
   }
   // Track the new active stream.
@@ -220,9 +220,9 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // increment as no capacity is freed up.
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
-  if (!quic() && (client.remaining_streams_ >
-                      client.concurrent_stream_limit_ - client.numActiveStreams() - 1 ||
-                  had_negative_capacity)) {
+  if (trackStreamCapacity() && (client.remaining_streams_ > client.concurrent_stream_limit_ -
+                                                                client.numActiveStreams() - 1 ||
+                                had_negative_capacity)) {
     state_.incrConnectingAndConnectedStreamCapacity(1);
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {

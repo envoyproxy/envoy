@@ -394,6 +394,13 @@ public:
    * @param ReceivedSettings the settings received from the peer.
    */
   virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
+
+  /**
+   * Fires when the MAX_STREAMS frame is received from the peer.
+   * This may occur multiple times across the lifetime of an HTTP/3 connection.
+   * @param num_streams the number of streams now allowed to be opened.
+   */
+  virtual void onMaxStreamsChanged(uint32_t num_streams) { UNREFERENCED_PARAMETER(num_streams); }
 };
 
 /**

@@ -13,16 +13,6 @@ namespace Quic {
 
 class EnvoyQuicClientSession;
 
-struct ScopedStreamNotifier {
-  ScopedStreamNotifier(std::function<void(uint32_t)> notify, EnvoyQuicClientSession& session);
-  ~ScopedStreamNotifier();
-
-  void notify(uint32_t streams_available) { on_can_create_streams_(streams_available); }
-
-  std::function<void(uint32_t)> on_can_create_streams_;
-  EnvoyQuicClientSession& session_;
-};
-
 // Act as a Network::ClientConnection to ClientCodec.
 // TODO(danzh) This class doesn't need to inherit Network::FilterManager
 // interface but need all other Network::Connection implementation in
@@ -90,10 +80,6 @@ public:
   // Notify any registered connection pool when new streams are available.
   void OnCanCreateNewOutgoingStream(bool) override;
 
-  void setNotifier(ScopedStreamNotifier& notifier) { notifier_ = notifier; }
-
-  void clearNotifier() { notifier_.reset(); }
-
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
 protected:
@@ -125,7 +111,6 @@ private:
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
-  OptRef<ScopedStreamNotifier> notifier_;
 };
 
 } // namespace Quic
