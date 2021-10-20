@@ -740,7 +740,7 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(warn, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
+  ENVOY_LOG(debug, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
             address_->asString());
 }
 
