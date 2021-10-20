@@ -1,6 +1,7 @@
 #if defined(__linux__)
-#include </usr/include/linux/tcp.h>
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
+
+#include </usr/include/linux/tcp.h>
 
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 

@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/network:transport_socket_mocks",
         "//test/mocks/server:transport_socket_factory_context_mocks",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tcp_stats/v3:pkg_cc_proto",
     ],
 )
 
@@ -37,7 +37,6 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tcp_stats:config",
         "//test/integration:http_integration_lib",
         "//test/integration:integration_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tcp_stats/v3:pkg_cc_proto",
     ],
 )

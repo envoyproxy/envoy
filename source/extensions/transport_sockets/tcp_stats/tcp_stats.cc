@@ -2,13 +2,14 @@
 
 // `struct tcp_info` is defined in two places: /usr/include/netinet/tcp.h (included from
 // envoy/common/platform.h) and /usr/include/linux/tcp.h. The former version is older and doesn't
-// contain all the fields needed.  Including both headers results in a compilation error due to the
+// contain all the fields needed. Including both headers results in a compilation error due to the
 // duplicate (and different) definitions of `struct tcp_info`. To work around this, define
 // `DO_NOT_INCLUDE_NETINET_TCP_H` to prevent inclusion of the wrong version.
-#include </usr/include/linux/tcp.h>
 #define DO_NOT_INCLUDE_NETINET_TCP_H 1
 
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
+
+#include </usr/include/linux/tcp.h>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"

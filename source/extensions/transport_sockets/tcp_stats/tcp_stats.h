@@ -2,9 +2,8 @@
 
 #if defined(__linux__)
 
-#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
-
 #include "envoy/event/timer.h"
+#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"

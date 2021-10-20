@@ -1,7 +1,7 @@
 #if defined(__linux__)
-#include "test/integration/integration.h"
-
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
+
+#include "test/integration/integration.h"
 
 namespace Envoy {
 namespace Extensions {
