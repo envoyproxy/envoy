@@ -232,6 +232,8 @@ private:
     }
     void setFlushTimeout(std::chrono::milliseconds) override {}
 
+    const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level = 0) const override;
 
@@ -269,6 +271,7 @@ private:
     bool explicit_flow_control_ = false;
     // Latest intel data retrieved from the StreamInfo.
     envoy_stream_intel stream_intel_;
+    StreamInfo::BytesMeterSharedPtr bytes_meter_;
   };
 
   using DirectStreamSharedPtr = std::shared_ptr<DirectStream>;
