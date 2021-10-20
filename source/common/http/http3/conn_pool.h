@@ -30,7 +30,7 @@ public:
   RequestEncoder& newStreamEncoder(ResponseDecoder& response_decoder) override {
     ASSERT(quiche_capacity_ != 0);
     // Each time a quic stream is allocated the quic capacity needs to get
-    // decremented.  See comments by quiche_capacity_.
+    // decremented. See comments by quiche_capacity_.
     updateCapacity(quiche_capacity_ - 1);
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
   }
