@@ -22,14 +22,9 @@ namespace Tls {
 
 template <int general_name_type> class StringSanMatcher : public Envoy::Ssl::SanMatcher {
 public:
-  bool match(const GENERAL_NAMES* general_names) const override {
-    for (const GENERAL_NAME* general_name : general_names) {
-      if (general_name->type == general_name_type &&
-          DefaultCertValidator::verifySubjectAltName(general_name, matcher_)) {
-        return true;
-      }
-    }
-    return false;
+  bool match(const GENERAL_NAME* general_name) const override {
+    return general_name->type == general_name_type &&
+           DefaultCertValidator::verifySubjectAltName(general_name, matcher_);
   }
 
   ~StringSanMatcher() override = default;
@@ -48,7 +43,7 @@ using IpAddSanMatcher = StringSanMatcher<GEN_IPADD>;
 class BackwardsCompatibleSanMatcher : public Envoy::Ssl::SanMatcher {
 
 public:
-  bool match(const GENERAL_NAMES* general_names) const override;
+  bool match(const GENERAL_NAME* general_name) const override;
 
   ~BackwardsCompatibleSanMatcher() override = default;
 

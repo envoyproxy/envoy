@@ -22,13 +22,8 @@ Envoy::Ssl::SanMatcherPtr BackwardsCompatibleSanMatcherFactory::createSanMatcher
   return Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(string_matcher)};
 }
 
-bool BackwardsCompatibleSanMatcher::match(const GENERAL_NAMES* general_names) const {
-  for (const GENERAL_NAME* general_name : general_names) {
-    if (DefaultCertValidator::verifySubjectAltName(general_name, matcher_)) {
-      return true;
-    }
-  }
-  return false;
+bool BackwardsCompatibleSanMatcher::match(const GENERAL_NAME* general_name) const {
+  return DefaultCertValidator::verifySubjectAltName(general_name, matcher_);
 }
 
 Envoy::Ssl::SanMatcherPtr createStringSanMatcher(

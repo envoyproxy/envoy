@@ -23,7 +23,7 @@ namespace Ssl {
  */
 class SanMatcher {
 public:
-  virtual bool match(GENERAL_NAMES const*) const PURE;
+  virtual bool match(GENERAL_NAME const*) const PURE;
   virtual ~SanMatcher() = default;
 };
 

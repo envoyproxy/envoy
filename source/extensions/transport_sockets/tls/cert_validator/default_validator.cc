@@ -318,8 +318,10 @@ bool DefaultCertValidator::matchSubjectAltName(
     return false;
   }
   for (auto& config_san_matcher : subject_alt_name_matchers) {
-    if (config_san_matcher->match(san_names.get())) {
-      return true;
+    for (const GENERAL_NAME* general_name : san_names.get()) {
+      if (config_san_matcher->match(general_name)) {
+        return true;
+      }
     }
   }
   return false;

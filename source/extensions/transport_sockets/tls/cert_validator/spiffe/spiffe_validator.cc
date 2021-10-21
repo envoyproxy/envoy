@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/registry/registry.h"
@@ -11,6 +12,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -37,7 +39,21 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
-      subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
+      if (matcher.has_string_matcher() &&
+          matcher.string_matcher().san_type() ==
+              envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI_ID) {
+        // Only match against URI SAN since SPIFFE specification does not restrict values in other
+        // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher.string_matcher()));
+      } else {
+        auto const factory =
+            Envoy::Config::Utility::getAndCheckFactory<Envoy::Ssl::SanMatcherFactory>(
+                matcher.typed_config(), true);
+        if (factory != nullptr) {
+          subject_alt_name_matchers_.emplace_back(
+              factory->createSanMatcher(&matcher.typed_config()));
+        }
+      }
     }
   }
 
@@ -228,9 +244,8 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
   for (const GENERAL_NAME* general_name : san_names.get()) {
     if (general_name->type == GEN_URI) {
-      const std::string san = Utility::generalNameAsString(general_name);
       for (const auto& config_san_matcher : subject_alt_name_matchers_) {
-        if (config_san_matcher.match(san)) {
+        if (config_san_matcher->match(general_name)) {
           return true;
         }
       }
