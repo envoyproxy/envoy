@@ -6,9 +6,9 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/pure.h"
-#include "envoy/stats/tag.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/tag.h"
 
 #include "absl/types/optional.h"
 #include "spdlog/spdlog.h"
