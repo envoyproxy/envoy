@@ -13,6 +13,7 @@
 #include "source/common/common/logger.h"
 
 #include "absl/strings/string_view.h"
+#include "quiche/common/quiche_linked_hash_map.h"
 
 namespace Envoy {
 namespace Http {
@@ -22,8 +23,14 @@ namespace Http {
 class AlternateProtocolsCacheImpl : public AlternateProtocolsCache,
                                     Logger::Loggable<Logger::Id::alternate_protocols_cache> {
 public:
-  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store);
+  AlternateProtocolsCacheImpl(TimeSource& time_source, std::unique_ptr<KeyValueStore>&& store,
+                              size_t max_entries);
   ~AlternateProtocolsCacheImpl() override;
+
+  // Converts an Origin to a string which can be parsed by stringToOrigin.
+  static std::string originToString(const AlternateProtocolsCache::Origin& origin);
+  // Converts a string from originToString back to structured format.
+  static absl::optional<AlternateProtocolsCache::Origin> stringToOrigin(const std::string& str);
 
   // Convert an AlternateProtocol vector to a string to cache to the key value
   // store. Note that in order to determine the lifetime of entries, this
@@ -48,15 +55,27 @@ public:
   size_t size() const override;
 
 private:
+  void setAlternativesImpl(const Origin& origin, std::vector<AlternateProtocol>& protocols);
   // Time source used to check expiration of entries.
   TimeSource& time_source_;
 
-  // Map from hostname to list of alternate protocols.
-  // TODO(RyanTheOptimist): Add a limit to the size of this map and evict based on usage.
-  std::map<Origin, std::vector<AlternateProtocol>> protocols_;
+  struct OriginHash {
+    size_t operator()(const Origin& origin) const {
+      // Multiply the hashes by the magic number 37 to spread the bits around.
+      size_t hash = std::hash<std::string>()(origin.scheme_) +
+                    37 * (std::hash<std::string>()(origin.hostname_) +
+                          37 * std::hash<uint32_t>()(origin.port_));
+      return hash;
+    }
+  };
+
+  // Map from origin to list of alternate protocols.
+  quiche::QuicheLinkedHashMap<Origin, std::vector<AlternateProtocol>, OriginHash> protocols_;
 
   // The key value store, if flushing to persistent storage.
   std::unique_ptr<KeyValueStore> key_value_store_;
+
+  const size_t max_entries_;
 };
 
 } // namespace Http

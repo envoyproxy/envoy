@@ -21,5 +21,6 @@ Release Notes:
 Platform Specific Features:
 [Optional Runtime guard:]
 [Optional Fixes #Issue]
+[Optional Fixes commit #PR or SHA]
 [Optional Deprecated:]
 [Optional [API Considerations](https://github.com/envoyproxy/envoy/blob/main/api/review_checklist.md):]

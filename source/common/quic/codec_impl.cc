@@ -72,20 +72,13 @@ QuicHttpClientConnectionImpl::QuicHttpClientConnectionImpl(
 }
 
 void QuicHttpClientConnectionImpl::goAway() {
-// TODO(alyssawilk) remove these guards once QUICHE has been updated to remove
-// the perspective check.
-#if defined(NDEBUG)
   quic_client_session_.SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "client goaway");
-#endif
 }
 
 Http::RequestEncoder&
 QuicHttpClientConnectionImpl::newStream(Http::ResponseDecoder& response_decoder) {
   EnvoyQuicClientStream* stream =
       quicStreamToEnvoyClientStream(quic_client_session_.CreateOutgoingBidirectionalStream());
-  // TODO(danzh) handle stream creation failure gracefully. This can happen when
-  // there are already 100 open streams. In such case, caller should hold back
-  // the stream creation till an existing stream is closed.
   ASSERT(stream != nullptr, "Fail to create QUIC stream.");
   stream->setResponseDecoder(response_decoder);
   if (quic_client_session_.aboveHighWatermark()) {

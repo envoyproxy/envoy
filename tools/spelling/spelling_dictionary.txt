@@ -31,6 +31,7 @@ CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -128,6 +129,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -366,6 +369,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -481,6 +485,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -497,6 +502,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -852,6 +858,7 @@ namespaced
 namespaces
 namespacing
 nan
+nanos
 natively
 ndk
 netblock
@@ -1083,6 +1090,7 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
@@ -1293,3 +1301,11 @@ zlib
 OBQ
 SemVer
 SCM
+SCTP
+CRLF
+clen
+crlf
+ep
+suri
+transid
+routable

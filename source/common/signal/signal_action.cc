@@ -82,13 +82,11 @@ void SignalAction::installSigHandlers() {
 }
 
 void SignalAction::removeSigHandlers() {
-#if defined(__APPLE__)
-  // ss_flags contains SS_DISABLE, but Darwin still checks the size, contrary to the man page
-  if (previous_altstack_.ss_size < MINSIGSTKSZ) {
-    previous_altstack_.ss_size = MINSIGSTKSZ;
-  }
-#endif
+// sigaltstack and backtrace() are incompatible on Apple platforms
+// https://reviews.llvm.org/D28265
+#if !defined(__APPLE__)
   RELEASE_ASSERT(sigaltstack(&previous_altstack_, nullptr) == 0, "");
+#endif
 
   int hidx = 0;
   for (const auto& sig : FATAL_SIGS) {

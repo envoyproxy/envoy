@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.sip_proxy.v3alpha;
+
+import "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/route.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.v3alpha";
+option java_outer_classname = "SipProxyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Sip Proxy]
+// [#extension: envoy.filters.network.sip_proxy]
+
+message SipProxy {
+  message SipSettings {
+    // transaction timeout timer [Timer B] unit is milliseconds, default value 64*T1.
+    //
+    // Session Initiation Protocol (SIP) timer summary
+    //
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer   | Default value           | Section  | Meaning                                                                      |
+    // +=========+=========================+==========+==============================================================================+
+    // | T1      | 500 ms                  | 17.1.1.1 | Round-trip time (RTT) estimate                                               |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | T2      | 4 sec                   | 17.1.2.2 | Maximum re-transmission interval for non-INVITE requests and INVITE responses|
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | T4      | 5 sec                   | 17.1.2.2 | Maximum duration that a message can remain in the network                    |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer A | initially T1            | 17.1.1.2 | INVITE request re-transmission interval, for UDP only                        |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer B | 64*T1                   | 17.1.1.2 | INVITE transaction timeout timer                                             |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer D | > 32 sec. for UDP       | 17.1.1.2 | Wait time for response re-transmissions                                      |
+    // |         | 0 sec. for TCP and SCTP |          |                                                                              |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer E | initially T1            | 17.1.2.2 | Non-INVITE request re-transmission interval, UDP only                        |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer F | 64*T1                   | 17.1.2.2 | Non-INVITE transaction timeout timer                                         |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer G | initially T1            | 17.2.1   | INVITE response re-transmission interval                                     |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer H | 64*T1                   | 17.2.1   | Wait time for ACK receipt                                                    |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer I | T4 for UDP              | 17.2.1   | Wait time for ACK re-transmissions                                           |
+    // |         | 0 sec. for TCP and SCTP |          |                                                                              |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer J | 64*T1 for UDP           | 17.2.2   | Wait time for re-transmissions of non-INVITE requests                        |
+    // |         | 0 sec. for TCP and SCTP |          |                                                                              |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    // | Timer K | T4 for UDP              | 17.1.2.2 | Wait time for response re-transmissions                                      |
+    // |         | 0 sec. for TCP and SCTP |          |                                                                              |
+    // +---------+-------------------------+----------+------------------------------------------------------------------------------+
+    google.protobuf.Duration transaction_timeout = 1;
+
+    // own domain name
+    string own_domain = 2;
+
+    // points to domain match with own_domain
+    string domain_match_parameter_name = 3;
+  }
+
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The route table for the connection manager is static and is specified in this property.
+  RouteConfiguration route_config = 2;
+
+  // A list of individual Sip filters that make up the filter chain for requests made to the
+  // Sip proxy. Order matters as the filters are processed sequentially. For backwards
+  // compatibility, if no sip_filters are specified, a default Sip router filter
+  // (`envoy.filters.sip.router`) is used.
+  // [#extension-category: envoy.sip_proxy.filters]
+  repeated SipFilter sip_filters = 3;
+
+  SipSettings settings = 4;
+}
+
+// SipFilter configures a Sip filter.
+message SipFilter {
+  // The name of the filter to instantiate. The name must match a supported
+  // filter. The built-in filters are:
+  //
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Filter specific configuration which depends on the filter being instantiated. See the supported
+  // filters for further documentation.
+  oneof config_type {
+    google.protobuf.Any typed_config = 3;
+  }
+}
+
+// SipProtocolOptions specifies Sip upstream protocol options. This object is used in
+// :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// keyed by the name `envoy.filters.network.sip_proxy`.
+message SipProtocolOptions {
+  // All sip messages in one dialog should go to the same endpoint.
+  bool session_affinity = 1;
+
+  // The Register with Authorization header should go to the same endpoint which send out the 401 Unauthorized.
+  bool registration_affinity = 2;
+}
