@@ -56,6 +56,8 @@ std::string HistogramStatisticsImpl::bucketSummary() const {
  * Clears the old computed values and refreshes it with values computed from passed histogram.
  */
 void HistogramStatisticsImpl::refresh(const histogram_t* new_histogram_ptr) {
+  // Convert to double once to avoid needing to cast it on every use. Use a double
+  // to ensure the compiler doesn't try to convert the expression to integer math.
   constexpr double percent_scale = Histogram::PercentScale;
 
   std::fill(computed_quantiles_.begin(), computed_quantiles_.end(), 0.0);

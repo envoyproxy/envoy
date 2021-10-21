@@ -60,6 +60,8 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  // quic::ProofHandler
+  void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {

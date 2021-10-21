@@ -36,7 +36,7 @@ private:
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
-class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
+class HistogramStatisticsImpl final : public HistogramStatistics, NonCopyable {
 public:
   HistogramStatisticsImpl();
 
