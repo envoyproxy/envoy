@@ -10,6 +10,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/extensions/common/ratelimit/ratelimit_headers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -171,9 +172,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
       auto remaining = remainingTokens(descriptors.value());
       auto reset = remainingFillInterval(descriptors.value());
 
-      headers.addCopy(Http::LowerCaseString{"x-ratelimit-limit"}, limit);
-      headers.addCopy(Http::LowerCaseString{"x-ratelimit-remaining"}, remaining);
-      headers.addCopy(Http::LowerCaseString{"x-ratelimit-reset"}, reset);
+      headers.addCopy(Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, limit);
+      headers.addCopy(Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining, remaining);
+      headers.addCopy(Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset, reset);
     }
   }
 

@@ -1,28 +1,11 @@
 #pragma once
 
-#include "envoy/http/header_map.h"
-
-#include "source/common/singleton/const_singleton.h"
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
-
-class XRateLimitHeaderValues {
-public:
-  const Http::LowerCaseString XRateLimitLimit{"x-ratelimit-limit"};
-  const Http::LowerCaseString XRateLimitRemaining{"x-ratelimit-remaining"};
-  const Http::LowerCaseString XRateLimitReset{"x-ratelimit-reset"};
-
-  struct {
-    const std::string Window{"w"};
-    const std::string Name{"name"};
-  } QuotaPolicyKeys;
-};
-using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;
-
 class XRateLimitHeaderUtils {
 public:
   static Http::ResponseHeaderMapPtr

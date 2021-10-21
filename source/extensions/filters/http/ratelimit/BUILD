@@ -37,6 +37,7 @@ envoy_cc_library(
     hdrs = ["ratelimit_headers.h"],
     deps = [
         "//source/common/http:header_map_lib",
+        "//source/extensions/common/ratelimit:ratelimit_headers_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
     ],
 )
