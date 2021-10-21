@@ -51,9 +51,15 @@ message DnsFilterConfig {
   // in a client context. This message will contain the timeouts, retry,
   // and forwarding configuration for Envoy to make DNS requests to other
   // resolvers
+  //
+  // [#next-free-field: 6]
   message ClientContextConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig";
+
+    reserved 2;
+
+    reserved "upstream_resolvers";
 
     // Sets the maximum time we will wait for the upstream query to complete
     // We allow 5s for the upstream resolution to complete, so the minimum
@@ -62,7 +68,7 @@ message DnsFilterConfig {
     google.protobuf.Duration resolver_timeout = 1 [(validate.rules).duration = {gte {seconds: 1}}];
 
     // DNS resolution configuration which includes the underlying dns resolver addresses and options.
-    config.core.v4alpha.DnsResolutionConfig dns_resolution_config = 2;
+    config.core.v4alpha.DnsResolutionConfig dns_resolution_config = 5;
 
     // Controls how many outstanding external lookup contexts the filter tracks.
     // The context structure allows the filter to respond to every query even if the external
