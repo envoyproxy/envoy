@@ -409,7 +409,6 @@ TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
                           "error: misformatted stats-tag 'f_o:bar' contains invalid char '_'");
 }
 
-
 // Test that the test constructor comes up with the same default values as the main constructor.
 TEST_F(OptionsImplTest, SaneTestConstructor) {
   std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));

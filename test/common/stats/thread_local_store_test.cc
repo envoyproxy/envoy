@@ -1262,7 +1262,7 @@ protected:
 
     // Use a tag producer that will produce tags.
     envoy::config::metrics::v3::StatsConfig stats_config;
-    store_.setTagProducer(std::make_unique<TagProducerImpl>(TagProducerImpl(stats_config, {{}})));
+    store_.setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
   ~StatsThreadLocalStoreTestNoFixture() override {
