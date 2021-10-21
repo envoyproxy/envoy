@@ -6,6 +6,7 @@
 
 #include "envoy/admin/v3/server_info.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/stats/tag.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
@@ -261,9 +262,10 @@ public:
   virtual mode_t socketMode() const PURE;
 
   /**
-   * @return the stats tags provided by the cli. The caller is responsible to deduplicate them.
+   * @return the stats tags provided by the cli. Tags may contain duplicates. It is the
+   * responsibility of the caller to handle the duplicates.
    */
-  virtual const std::vector<std::pair<std::string, std::string>>& statsTags() const PURE;
+  virtual const Stats::TagVector& statsTags() const PURE;
 };
 
 } // namespace Server

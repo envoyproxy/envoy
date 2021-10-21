@@ -425,7 +425,7 @@ public:
    */
   static Stats::TagProducerPtr
   createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                    const std::vector<std::pair<std::string, std::string>>& cli_tags);
+                    const Stats::TagVector& cli_tags);
 
   /**
    * Create StatsMatcher instance.

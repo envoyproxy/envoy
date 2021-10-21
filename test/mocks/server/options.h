@@ -52,7 +52,7 @@ public:
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
   MOCK_METHOD(const std::string&, socketPath, (), (const));
   MOCK_METHOD(mode_t, socketMode, (), (const));
-  MOCK_METHOD((const std::vector<std::pair<std::string, std::string>>&), statsTags, (), (const));
+  MOCK_METHOD((const Stats::TagVector&), statsTags, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
@@ -77,7 +77,7 @@ public:
   std::vector<std::string> disabled_extensions_;
   std::string socket_path_;
   mode_t socket_mode_;
-  std::vector<std::pair<std::string, std::string>> stats_tags_;
+  Stats::TagVector stats_tags_;
 };
 } // namespace Server
 } // namespace Envoy

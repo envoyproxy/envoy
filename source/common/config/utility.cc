@@ -216,7 +216,7 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 
 Stats::TagProducerPtr
 Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                           const std::vector<std::pair<std::string, std::string>>& cli_tags) {
+                           const Stats::TagVector& cli_tags) {
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 

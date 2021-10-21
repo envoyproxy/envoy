@@ -399,6 +399,17 @@ TEST_F(OptionsImplTest, AllowedLogLevels) {
             OptionsImpl::allowedLogLevels());
 }
 
+TEST_F(OptionsImplTest, InvalidStatsTags) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo::bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'foo::bar'");
+}
+
+TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f_o:bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'f_o:bar' contains invalid char '_'");
+}
+
+
 // Test that the test constructor comes up with the same default values as the main constructor.
 TEST_F(OptionsImplTest, SaneTestConstructor) {
   std::unique_ptr<OptionsImpl> regular_options_impl(createOptionsImpl("envoy"));
