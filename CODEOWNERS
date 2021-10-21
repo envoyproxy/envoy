@@ -159,7 +159,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # HTTP Kill Request
 /*/extensions/filters/http/kill_request @qqustc @htuch
 # HTTP Stateful Session
-/*/extensions/filters/http/stateful_session @wbpcode
+/*/extensions/filters/http/stateful_session @wbpcode @dio @zuercher
 # Rate limit expression descriptor
 /*/extensions/rate_limit_descriptors/expr @kyessenov @lizan
 # hash input matcher
@@ -195,7 +195,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Stateful session sticky
-/*/extensions/http/stateful_session/cookie @wbpcode
+/*/extensions/http/stateful_session/cookie @wbpcode @dio @zuercher
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
