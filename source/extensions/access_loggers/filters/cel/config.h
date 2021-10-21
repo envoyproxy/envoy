@@ -22,7 +22,7 @@ public:
   createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
                Random::RandomGenerator&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return "cel_extension_filter"; }
+  std::string name() const override { return "envoy.access_loggers.filters.cel"; }
 
 private:
   Extensions::Filters::Common::Expr::Builder& getOrCreateBuilder();
