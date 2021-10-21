@@ -101,6 +101,7 @@ envoy_cc_library(
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tracing:http_tracer_interface",
+        "//envoy/upstream:load_balancer_interface",
         "//source/common/common:scope_tracked_object_stack",
     ],
 )
