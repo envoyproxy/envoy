@@ -82,14 +82,6 @@ void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
                                                    /*from_self*/ false, /*is_upstream*/ true);
 }
 
-void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
-  quic::QuicSpdyClientSession::SetDefaultEncryptionLevel(level);
-  if (level == quic::ENCRYPTION_FORWARD_SECURE) {
-    // This is only reached once, when handshake is done.
-    raiseConnectionEvent(Network::ConnectionEvent::Connected);
-  }
-}
-
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
   ASSERT(codec_stats_.has_value() && http3_options_.has_value());
   return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
