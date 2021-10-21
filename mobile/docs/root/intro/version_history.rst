@@ -1,6 +1,15 @@
 Version history
 ---------------
 
+Next
+====================
+
+Features:
+
+- Adds support for using `NWPathMonitor <https://developer.apple.com/documentation/network/nwpathmonitor>`_
+  instead of `SCNetworkReachability <https://developer.apple.com/documentation/systemconfiguration/scnetworkreachability>`_
+  on supported platforms (iOS 12+) to update the preferred Envoy network cluster (e.g. WLAN vs WWAN).
+
 0.4.1 (May 28, 2021)
 ====================
 

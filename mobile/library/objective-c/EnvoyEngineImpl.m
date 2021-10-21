@@ -389,7 +389,8 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (instancetype)initWithRunningCallback:(nullable void (^)())onEngineRunning
                                  logger:(nullable void (^)(NSString *))logger
-                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker {
+                           eventTracker:(nullable void (^)(EnvoyEvent *))eventTracker
+               enableNetworkPathMonitor:(BOOL)enableNetworkPathMonitor {
   self = [super init];
   if (!self) {
     return nil;
@@ -418,7 +419,19 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 
   _engineHandle = init_engine(native_callbacks, native_logger, native_event_tracker);
-  [EnvoyNetworkMonitor startReachabilityIfNeeded];
+
+  if (enableNetworkPathMonitor) {
+    if (@available(iOS 12, *)) {
+      [EnvoyNetworkMonitor startPathMonitorIfNeeded];
+    } else {
+      NSLog(
+          @"[Envoy] Cannot use NWPathMonitor on iOS < 12. Falling back to `SCNetworkReachability`");
+      [EnvoyNetworkMonitor startReachabilityIfNeeded];
+    }
+  } else {
+    [EnvoyNetworkMonitor startReachabilityIfNeeded];
+  }
+
   return self;
 }
 

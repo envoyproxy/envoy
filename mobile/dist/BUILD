@@ -22,6 +22,7 @@ apple_static_framework_import(
         "c++",
     ],
     sdk_frameworks = [
+        "Network",
         "SystemConfiguration",
         "UIKit",
     ],

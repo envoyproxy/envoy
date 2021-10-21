@@ -3,6 +3,8 @@ import EnvoyEngine
 import Foundation
 import XCTest
 
+// swiftlint:disable file_length type_body_length
+
 private let kMockTemplate =
 """
 fixture_template:
@@ -19,12 +21,25 @@ fixture_template:
 
 private struct TestFilter: Filter {}
 
-// swiftlint:disable:next type_body_length
 final class EngineBuilderTests: XCTestCase {
   override func tearDown() {
     super.tearDown()
     MockEnvoyEngine.onRunWithConfig = nil
     MockEnvoyEngine.onRunWithTemplate = nil
+  }
+
+  func testEnableNetworkPathMonitorDefaultsToFalse() {
+    let builder = EngineBuilder()
+    XCTAssertFalse(builder.enableNetworkPathMonitor)
+  }
+
+  @available(iOS 12, *)
+  func testEnableNetworkPathMonitorSetsToValue() {
+    let builder = EngineBuilder()
+      .enableNetworkPathMonitor(true)
+    XCTAssertTrue(builder.enableNetworkPathMonitor)
+    builder.enableNetworkPathMonitor(false)
+    XCTAssertFalse(builder.enableNetworkPathMonitor)
   }
 
   func testCustomConfigTemplateUsesSpecifiedYAMLWhenRunningEnvoy() {
