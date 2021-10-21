@@ -13,7 +13,10 @@ namespace Envoy {
 namespace Grpc {
 
 // Support parameterizing over state-of-the-world xDS vs delta xDS.
-enum class SotwOrDelta { Sotw, Delta };
+enum class SotwOrDelta { Sotw, Delta, UnifiedSotw, UnifiedDelta };
+
+// Unified or Legacy grpc mux implementation
+enum class LegacyOrUnified { Legacy, Unified };
 
 class BaseGrpcClientIntegrationParamTest {
 public:
@@ -57,6 +60,26 @@ public:
   ClientType clientType() const override { return std::get<1>(GetParam()); }
 };
 
+class UnifiedOrLegacyMuxIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, ClientType, LegacyOrUnified>> {
+public:
+  ~UnifiedOrLegacyMuxIntegrationParamTest() override = default;
+  static std::string protocolTestParamsToString(
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion, ClientType, LegacyOrUnified>>& p) {
+    return fmt::format("{}_{}_{}",
+                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                       std::get<1>(p.param) == ClientType::GoogleGrpc ? "GoogleGrpc" : "EnvoyGrpc",
+                       std::get<2>(p.param) == LegacyOrUnified::Legacy ? "Legacy" : "Unified");
+  }
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+  LegacyOrUnified unifiedOrLegacy() const { return std::get<2>(GetParam()); }
+  bool isUnified() const { return std::get<2>(GetParam()) == LegacyOrUnified::Unified; }
+};
+
 class DeltaSotwIntegrationParamTest
     : public BaseGrpcClientIntegrationParamTest,
       public testing::TestWithParam<
@@ -95,6 +118,10 @@ public:
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
                    testing::Values(Grpc::SotwOrDelta::Sotw, Grpc::SotwOrDelta::Delta))
+#define UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS                                              \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),                  \
+                   testing::Values(Grpc::LegacyOrUnified::Legacy, Grpc::LegacyOrUnified::Unified))
 
 } // namespace Grpc
 } // namespace Envoy

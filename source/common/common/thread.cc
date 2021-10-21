@@ -31,6 +31,11 @@ struct ThreadIds {
     return main_thread_id_ == id || test_thread_id_ == id;
   }
 
+  bool isMainThreadActive() const {
+    absl::MutexLock lock(&mutex_);
+    return main_thread_use_count_ != 0;
+  }
+
   // Returns a singleton instance of this. The instance is never freed.
   static ThreadIds& get() { MUTABLE_CONSTRUCT_ON_FIRST_USE(ThreadIds); }
 
@@ -100,6 +105,8 @@ private:
 } // namespace
 
 bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
+
+bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
 
 TestThread::TestThread() { ThreadIds::get().registerTestThread(); }
 

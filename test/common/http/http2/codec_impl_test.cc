@@ -705,8 +705,6 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 // When having empty trailers, codec submits empty buffer and end_stream instead.
 TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "true"}});
 
   initialize();
 
@@ -729,35 +727,6 @@ TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   Buffer::OwnedImpl world("world");
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeData(BufferEqual(&empty_buffer), true));
-  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
-}
-
-// When having empty trailers and "envoy.reloadable_features.http2_skip_encoding_empty_trailers" is
-// turned off, codec submits empty trailers.
-TEST_P(Http2CodecImplTest, SubmitTrailingEmptyHeaders) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "false"}});
-
-  initialize();
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  EXPECT_CALL(request_decoder_, decodeData(_, false));
-  Buffer::OwnedImpl hello("hello");
-  request_encoder_->encodeData(hello, false);
-  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  response_encoder_->encodeHeaders(response_headers, false);
-  EXPECT_CALL(response_decoder_, decodeData(_, false));
-  Buffer::OwnedImpl world("world");
-  response_encoder_->encodeData(world, false);
-  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
 }
 
@@ -1040,7 +1009,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "max_headers_kb_: 60, max_headers_count_: 100, "
           "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
-          "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
+          "0, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));

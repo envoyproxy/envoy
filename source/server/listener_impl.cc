@@ -521,12 +521,6 @@ void ListenerImpl::createListenerFilterFactories(Network::Socket::Type socket_ty
   if (!config_.listener_filters().empty()) {
     switch (socket_type) {
     case Network::Socket::Type::Datagram:
-      if (config_.listener_filters().size() > 1) {
-        // Currently supports only 1 UDP listener filter.
-        throw EnvoyException(fmt::format(
-            "error adding listener '{}': Only 1 UDP listener filter per listener supported",
-            address_->asString()));
-      }
       udp_listener_filter_factories_ = parent_.factory_.createUdpListenerFilterFactoryList(
           config_.listener_filters(), *listener_factory_context_);
       break;
@@ -746,7 +740,8 @@ void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManage
 
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, hash={}, address={}", message, name_, hash_, address_->asString());
+  ENVOY_LOG(debug, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
+            address_->asString());
 }
 
 void ListenerImpl::initialize() {
