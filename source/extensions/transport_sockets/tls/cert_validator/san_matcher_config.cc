@@ -15,10 +15,10 @@ namespace TransportSockets {
 namespace Tls {
 
 Envoy::Ssl::SanMatcherPtr BackwardsCompatibleSanMatcherFactory::createSanMatcher(
-    const envoy::config::core::v3::TypedExtensionConfig* config) {
-  ASSERT(config->typed_config().Is<envoy::type::matcher::v3::StringMatcher>());
+    const envoy::config::core::v3::TypedExtensionConfig& config) {
+  ASSERT(config.typed_config().Is<envoy::type::matcher::v3::StringMatcher>());
   envoy::type::matcher::v3::StringMatcher string_matcher;
-  MessageUtil::unpackTo(config->typed_config(), string_matcher);
+  MessageUtil::unpackTo(config.typed_config(), string_matcher);
   return Envoy::Ssl::SanMatcherPtr{std::make_unique<BackwardsCompatibleSanMatcher>(string_matcher)};
 }
 
@@ -29,13 +29,13 @@ bool BackwardsCompatibleSanMatcher::match(const GENERAL_NAME* general_name) cons
 Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
     envoy::extensions::transport_sockets::tls::v3::StringSanMatcher const& matcher) {
   switch (matcher.san_type()) {
-  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::DNS_ID: {
+  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::DNS: {
     return Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher.matcher())};
   }
-  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::EMAIL_ID: {
+  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::EMAIL: {
     return Envoy::Ssl::SanMatcherPtr{std::make_unique<EmailSanMatcher>(matcher.matcher())};
   }
-  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI_ID: {
+  case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI: {
     return Envoy::Ssl::SanMatcherPtr{std::make_unique<UriSanMatcher>(matcher.matcher())};
   }
   case envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::IP_ADD: {

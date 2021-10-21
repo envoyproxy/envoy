@@ -41,7 +41,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     for (const auto& matcher : config->subjectAltNameMatchers()) {
       if (matcher.has_string_matcher() &&
           matcher.string_matcher().san_type() ==
-              envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI_ID) {
+              envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI) {
         // Only match against URI SAN since SPIFFE specification does not restrict values in other
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
         subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher.string_matcher()));
@@ -51,7 +51,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                 matcher.typed_config(), true);
         if (factory != nullptr) {
           subject_alt_name_matchers_.emplace_back(
-              factory->createSanMatcher(&matcher.typed_config()));
+              factory->createSanMatcher(matcher.typed_config()));
         }
       }
     }
@@ -243,6 +243,8 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
   // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
   for (const GENERAL_NAME* general_name : san_names.get()) {
+    // This check can be removed when match_subject_alt_names is removed from
+    // envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext.
     if (general_name->type == GEN_URI) {
       for (const auto& config_san_matcher : subject_alt_name_matchers_) {
         if (config_san_matcher->match(general_name)) {

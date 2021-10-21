@@ -67,10 +67,6 @@ public:
     san_matchers_.clear();
     for (auto& matcher : san_matchers) {
       san_matchers_.emplace_back();
-      san_matchers_.back().set_allocated_typed_config(
-          new ::envoy::config::core::v3::TypedExtensionConfig());
-      san_matchers_.back().mutable_typed_config()->set_allocated_typed_config(
-          new ProtobufWkt::Any());
       san_matchers_.back().mutable_typed_config()->mutable_typed_config()->PackFrom(matcher);
       san_matchers_.back().mutable_typed_config()->mutable_name()->assign(
           "envoy.san_matchers.backward_compatible_san_matcher");

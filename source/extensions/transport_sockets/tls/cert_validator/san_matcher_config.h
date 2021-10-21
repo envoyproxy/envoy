@@ -58,7 +58,7 @@ class BackwardsCompatibleSanMatcherFactory : public Envoy::Ssl::SanMatcherFactor
 public:
   ~BackwardsCompatibleSanMatcherFactory() override = default;
   Envoy::Ssl::SanMatcherPtr
-  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig* config) override;
+  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig& config) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
   }

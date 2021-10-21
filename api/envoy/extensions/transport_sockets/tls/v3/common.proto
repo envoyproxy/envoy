@@ -257,9 +257,9 @@ message CertificateProviderPluginInstance {
 // String matcher for subject alternative names, to match both type and value of the SAN.
 message StringSanMatcher {
   enum SanType {
-    EMAIL_ID = 0;
-    DNS_ID = 1;
-    URI_ID = 2;
+    EMAIL = 0;
+    DNS = 1;
+    URI = 2;
     IP_ADD = 3;
   }
 

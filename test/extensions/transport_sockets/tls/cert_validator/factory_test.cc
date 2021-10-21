@@ -36,7 +36,7 @@ TEST(FactoryTest, BackwardsCompatibleSanMatcherFactoryTest) {
   Envoy::Ssl::SanMatcherFactory* factory =
       Envoy::Config::Utility::getAndCheckFactory<Envoy::Ssl::SanMatcherFactory>(typed_config, true);
   ASSERT_NE(factory, nullptr);
-  Envoy::Ssl::SanMatcherPtr san_matcher = factory->createSanMatcher(&typed_config);
+  Envoy::Ssl::SanMatcherPtr san_matcher = factory->createSanMatcher(typed_config);
   EXPECT_NE(dynamic_cast<BackwardsCompatibleSanMatcher*>(san_matcher.get()), nullptr);
 }
 

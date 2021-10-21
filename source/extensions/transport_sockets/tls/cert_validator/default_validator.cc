@@ -156,7 +156,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
                   matcher.typed_config(), true);
           if (factory != nullptr) {
             subject_alt_name_matchers_.emplace_back(
-                factory->createSanMatcher(&matcher.typed_config()));
+                factory->createSanMatcher(matcher.typed_config()));
           }
         }
       }

@@ -69,10 +69,6 @@ CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
   // creating backwards compatible san matcher configs.
   for (auto& matcher : config.match_subject_alt_names()) {
     subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_allocated_typed_config(
-        new ::envoy::config::core::v3::TypedExtensionConfig());
-    subject_alt_name_matchers.back().mutable_typed_config()->set_allocated_typed_config(
-        new ProtobufWkt::Any());
     subject_alt_name_matchers.back().mutable_typed_config()->mutable_typed_config()->PackFrom(
         matcher);
     subject_alt_name_matchers.back().mutable_typed_config()->mutable_name()->assign(

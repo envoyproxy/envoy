@@ -34,7 +34,7 @@ public:
   ~SanMatcherFactory() override = default;
 
   virtual SanMatcherPtr
-  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig* config) PURE;
+  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
 
   std::string category() const override { return "envoy.san_matchers"; }
 };
