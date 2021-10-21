@@ -314,8 +314,8 @@ void Engine::logInterfaces() {
                                          [](std::string acc, std::string next) {
                                            return acc.empty() ? next : std::move(acc) + "," + next;
                                          });
-  ENVOY_LOG_EVENT(debug, "network_configuration_get_v4_interfaces", v4_names);
-  ENVOY_LOG_EVENT(debug, "network_configuration_get_v6_interfaces", v6_names);
+  ENVOY_LOG_EVENT(debug, "netconf_get_v4_interfaces", v4_names);
+  ENVOY_LOG_EVENT(debug, "netconf_get_v6_interfaces", v6_names);
 }
 
 } // namespace Envoy
