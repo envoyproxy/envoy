@@ -153,8 +153,6 @@ extensions/upstreams/http @alyssawilk @snowp @mattklein123
 extensions/upstreams/tcp @alyssawilk @ggreenway @mattklein123
 # OAuth2
 extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
-# Rate Limit
-/*/extensions/common/ratelimit
 # HTTP Local Rate Limit
 /*/extensions/filters/http/local_ratelimit @rgs1 @mattklein123
 /*/extensions/filters/common/local_ratelimit @mattklein123 @rgs1

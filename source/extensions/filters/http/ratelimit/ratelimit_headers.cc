@@ -1,7 +1,7 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
 #include "source/common/http/header_map_impl.h"
-#include "source/extensions/common/ratelimit/ratelimit_headers.h"
+#include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "absl/strings/substitute.h"
 
@@ -37,12 +37,13 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
       // For each descriptor status append `<LIMIT>;w=<WINDOW_IN_SECONDS>`
       absl::SubstituteAndAppend(
           &quota_policy, ", $0;$1=$2", status.current_limit().requests_per_unit(),
-          Common::RateLimit::XRateLimitHeaders::get().QuotaPolicyKeys.Window, window);
+          HttpFilters::Common::RateLimit::XRateLimitHeaders::get().QuotaPolicyKeys.Window, window);
       if (!status.current_limit().name().empty()) {
         // If the descriptor has a name, append `;name="<DESCRIPTOR_NAME>"`
-        absl::SubstituteAndAppend(&quota_policy, ";$0=\"$1\"",
-                                  Common::RateLimit::XRateLimitHeaders::get().QuotaPolicyKeys.Name,
-                                  status.current_limit().name());
+        absl::SubstituteAndAppend(
+            &quota_policy, ";$0=\"$1\"",
+            HttpFilters::Common::RateLimit::XRateLimitHeaders::get().QuotaPolicyKeys.Name,
+            status.current_limit().name());
       }
     }
   }
@@ -50,12 +51,14 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
   if (min_remaining_limit_status) {
     const std::string rate_limit_limit = absl::StrCat(
         min_remaining_limit_status.value().current_limit().requests_per_unit(), quota_policy);
-    result->addReferenceKey(Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
-                            rate_limit_limit);
-    result->addReferenceKey(Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
-                            min_remaining_limit_status.value().limit_remaining());
-    result->addReferenceKey(Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
-                            min_remaining_limit_status.value().duration_until_reset().seconds());
+    result->addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit, rate_limit_limit);
+    result->addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
+        min_remaining_limit_status.value().limit_remaining());
+    result->addReferenceKey(
+        HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
+        min_remaining_limit_status.value().duration_until_reset().seconds());
   }
   descriptor_statuses = nullptr;
   return result;

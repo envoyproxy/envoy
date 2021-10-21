@@ -6,6 +6,7 @@
 
 namespace Envoy {
 namespace Extensions {
+namespace HttpFilters {
 namespace Common {
 namespace RateLimit {
 class XRateLimitHeaderValues {
@@ -22,5 +23,6 @@ public:
 using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;
 } // namespace RateLimit
 } // namespace Common
+} // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy
