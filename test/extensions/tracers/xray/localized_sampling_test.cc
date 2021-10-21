@@ -620,7 +620,6 @@ TEST_F(LocalizedSamplingStrategyTest, NoMatchingHost) {
 
   SamplingRequest req;
   req.host_ = "amazon.com"; // host does not match, so default rules apply.
-  int i = 10;
   for (int i = 0; i < 10; ++i) {
     ASSERT_FALSE(strategy.shouldTrace(req));
   }
