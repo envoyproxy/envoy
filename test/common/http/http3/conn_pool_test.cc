@@ -68,6 +68,25 @@ public:
   ConnectionPool::InstancePtr pool_;
 };
 
+TEST_F(Http3ConnPoolImplTest, CreationWithoutSecretsLoaded) {
+  std::unique_ptr<Ssl::MockClientContextConfig> config(new NiceMock<Ssl::MockClientContextConfig>);
+  EXPECT_CALL(*config, isReady()).WillRepeatedly(Return(false));
+  auto factory = Quic::QuicClientTransportSocketFactory(move(config), context_);
+
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory_));
+  // The unique pointer of this object will be returned in createSchedulableCallback_ of
+  // dispatcher_, so there is no risk of object leak.
+  new Event::MockSchedulableCallback(&dispatcher_);
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::TransportSocketOptionsConstSharedPtr transport_options;
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, simTime(), quic_stat_names_, store_);
+
+  EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
+}
+
 TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();
