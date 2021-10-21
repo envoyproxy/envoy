@@ -134,7 +134,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 }
 
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
-TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
+TEST_P(DownstreamProtocolIntegrationTest, RouterRedirectHttpRequest) {
+  autonomous_upstream_ = true;
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
                "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
@@ -145,11 +146,17 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterRedirect) {
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/foo", "", downstream_protocol_, version_, "www.redirect.com");
   ASSERT_TRUE(response->complete());
-  EXPECT_EQ("301", response->headers().getStatusValue());
-  EXPECT_EQ("https://www.redirect.com/foo",
-            response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
-  expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
-                                       BytesCountExpectation(0, 30, 0, 30));
+  if (downstream_protocol_ <= Http::CodecType::HTTP2) {
+    EXPECT_EQ("301", response->headers().getStatusValue());
+    EXPECT_EQ("https://www.redirect.com/foo",
+              response->headers().get(Http::Headers::get().Location)[0]->value().getStringView());
+    expectDownstreamBytesSentAndReceived(BytesCountExpectation(145, 45, 111, 23),
+                                         BytesCountExpectation(0, 30, 0, 30));
+  } else {
+    // All QUIC requests use https, and should not be redirected. (Even those sent with http scheme
+    // will be overridden to https by HCM.)
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
 }
 
 TEST_P(ProtocolIntegrationTest, UnknownResponsecode) {
@@ -802,8 +809,11 @@ TEST_P(ProtocolIntegrationTest, Retry) {
   EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rq_headers_size"), 2);
   EXPECT_EQ(find_histo_sample_count("cluster.cluster_0.upstream_rs_headers_size"), 2);
 
-  expectUpstreamBytesSentAndReceived(BytesCountExpectation(2550, 635, 414, 54),
-                                     BytesCountExpectation(2262, 548, 184, 27));
+  // The two requests are sent with https scheme rather than http for QUIC downstream.
+  const size_t quic_https_extra_bytes = (downstreamProtocol() == Http::CodecType::HTTP3 ? 2u : 0u);
+  expectUpstreamBytesSentAndReceived(
+      BytesCountExpectation(2550 + quic_https_extra_bytes, 635, 414 + quic_https_extra_bytes, 54),
+      BytesCountExpectation(2262, 548, 184, 27));
 }
 
 TEST_P(ProtocolIntegrationTest, RetryStreaming) {
