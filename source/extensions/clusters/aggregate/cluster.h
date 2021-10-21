@@ -80,7 +80,7 @@ public:
   Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
   absl::optional<Upstream::SelectedPoolAndConnection>
-  selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
              std::vector<uint8_t>& /*hash_key*/) override;
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
 
@@ -103,7 +103,7 @@ private:
       return nullptr;
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
-    selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
                std::vector<uint8_t>& /*hash_key*/) override {
       return {};
     }

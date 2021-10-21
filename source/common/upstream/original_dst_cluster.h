@@ -58,7 +58,7 @@ public:
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     // Pool selection not implemented for OriginalDstCluster
     absl::optional<Upstream::SelectedPoolAndConnection>
-    selectPool(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/, const Upstream::Host& /*host*/,
                std::vector<uint8_t>& /*hash_key*/) override {
       return absl::nullopt;
     }

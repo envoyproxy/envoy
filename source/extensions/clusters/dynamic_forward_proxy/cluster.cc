@@ -178,7 +178,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 absl::optional<Upstream::SelectedPoolAndConnection>
-Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* /*context*/,
+Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
                                   const Upstream::Host& host, std::vector<uint8_t>& hash_key) {
   const std::string& hostname = host.hostname();
   if (hostname.empty()) {
