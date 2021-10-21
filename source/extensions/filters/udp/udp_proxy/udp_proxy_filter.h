@@ -240,6 +240,48 @@ private:
     }
   };
 
+  struct LocalPeerHostAddresses {
+    const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
+    const Upstream::Host& host_;
+  };
+
+  struct HeterogeneousActiveSessionHashWithUpstreamHost {
+    // See description for HeterogeneousActiveSessionHash::is_transparent.
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+    size_t operator()(const LocalPeerHostAddresses& value) const {
+      return absl::HashOf(base_hasher_(value.local_peer_addresses_),
+                          value.host_.address()->asStringView());
+    }
+    size_t operator()(const ActiveSessionPtr& value) const {
+      return absl::HashOf(base_hasher_(value), value->host().address()->asStringView());
+    }
+    size_t operator()(const ActiveSession* value) const {
+      return absl::HashOf(base_hasher_(value), value->host().address()->asStringView());
+    }
+
+  private:
+    HeterogeneousActiveSessionHash base_hasher_;
+  };
+
+  struct HeterogeneousActiveSessionEqualWithUpstreamHost {
+    // See description for HeterogeneousActiveSessionHash::is_transparent.
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+    bool operator()(const ActiveSessionPtr& lhs, const LocalPeerHostAddresses& rhs) const {
+      return base_equal_(lhs, rhs.local_peer_addresses_) && &lhs->host() == &rhs.host_;
+    }
+    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
+      return base_equal_(lhs, rhs) && &lhs->host() == &rhs->host();
+    }
+    bool operator()(const ActiveSessionPtr& lhs, const ActiveSession* rhs) const {
+      return base_equal_(lhs, rhs) && &lhs->host() == &rhs->host();
+    }
+
+  private:
+    HeterogeneousActiveSessionEqual base_equal_;
+  };
+
   /**
    * Wraps all cluster specific UDP processing including session tracking, stats, etc. In the future
    * we will very likely support different types of routing to multiple upstream clusters.
@@ -256,8 +298,6 @@ private:
     UdpProxyUpstreamStats cluster_stats_;
 
   private:
-    virtual ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                         const Upstream::HostConstSharedPtr& host) PURE;
     static UdpProxyUpstreamStats generateStats(Stats::Scope& scope) {
       const auto final_prefix = "udp";
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -266,54 +306,47 @@ private:
 
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
 
+  template <typename SessionHash, typename SessionEqual>
+  class ClusterInfoBase : public ClusterInfo {
+  public:
+    ClusterInfoBase(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
+    ~ClusterInfoBase() override;
+    void removeSession(const ActiveSession* session) final;
+
+  protected:
+    absl::flat_hash_set<ActiveSessionPtr, SessionHash, SessionEqual> sessions_;
+    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+        host_to_sessions_;
+
+    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                 const Upstream::HostConstSharedPtr& host);
+
+  private:
+    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
+  };
+
   /**
    * Performs forwarding and replying data to one, selected at the beginning upstream host
    * In case of not healthy upstream host, selects a new one
    */
-  class StickySessionClusterInfo : public ClusterInfo {
+  class StickySessionClusterInfo
+      : public ClusterInfoBase<HeterogeneousActiveSessionHash, HeterogeneousActiveSessionEqual> {
   public:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    ~StickySessionClusterInfo() override;
     void onData(Network::UdpRecvData& data) override;
-    void removeSession(const ActiveSession* session) override;
-
-  private:
-    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                 const Upstream::HostConstSharedPtr& host) override;
-
-    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-    absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
-                        HeterogeneousActiveSessionEqual>
-        sessions_;
-    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
-        host_to_sessions_;
   };
 
   /**
    * On each data chunk selects another host using underlying load balancing method and communicates
    * with that host
    */
-  class PerPacketLoadBalancingClusterInfo : public ClusterInfo {
+  class PerPacketLoadBalancingClusterInfo
+      : public ClusterInfoBase<HeterogeneousActiveSessionHashWithUpstreamHost,
+                               HeterogeneousActiveSessionEqualWithUpstreamHost> {
   public:
     PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
                                       Upstream::ThreadLocalCluster& cluster);
-    ~PerPacketLoadBalancingClusterInfo() override;
     void onData(Network::UdpRecvData& data) override;
-    void removeSession(const ActiveSession* session) override;
-
-  private:
-    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                 const Upstream::HostConstSharedPtr& host) override;
-    Upstream::HostConstSharedPtr getAnotherHealthyHost(UdpLoadBalancerContext& context,
-                                                       const Upstream::Host& current_host);
-    ActiveSession* findSession(const Upstream::Host& host,
-                               const Network::UdpRecvData::LocalPeerAddresses& addresses) const;
-
-    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-    absl::flat_hash_map<const Upstream::Host*,
-                        absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
-                                            HeterogeneousActiveSessionEqual>>
-        host_to_sessions_;
   };
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {

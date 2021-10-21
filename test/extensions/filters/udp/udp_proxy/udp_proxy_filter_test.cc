@@ -719,7 +719,7 @@ use_per_packet_load_balancing: true
                    .upstream_cx_none_healthy_.value());
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
   EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
@@ -748,8 +748,8 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
 
   expectSessionCreate(upstream_address_);
-  test_sessions_[1].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  test_sessions_[1].expectWriteToUpstream("hello2");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
   EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
   EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
@@ -808,69 +808,6 @@ use_per_packet_load_balancing: true
   EXPECT_EQ(
       1,
       cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
-}
-
-// In this case the host becomes unhealthy, but we get the same host back, so just keep using the
-// current session.
-TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingHostUnhealthyPickSameHost) {
-  InSequence s;
-
-  setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_per_packet_load_balancing: true
-  )EOF");
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-
-  EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
-      .WillRepeatedly(Return(Upstream::Host::Health::Unhealthy));
-  test_sessions_[0].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-}
-
-// Make sure that we are able to reuse already existing session if there is an available healthy
-// host, assigned to active session and our current host is unhealthy.
-TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingHostUnhealthyPickDifferentHost) {
-  InSequence s;
-
-  setup(R"EOF(
-stat_prefix: foo
-cluster: fake_cluster
-use_per_packet_load_balancing: true
-  )EOF");
-
-  // Allow for two sessions.
-  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
-
-  expectSessionCreate(upstream_address_);
-  test_sessions_[0].expectWriteToUpstream("hello");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
-  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
-
-  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
-  auto new_host = createHost(new_host_address);
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
-  expectSessionCreate(new_host_address);
-  test_sessions_[1].expectWriteToUpstream("hello2");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
-  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
-
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(DoDefault());
-  EXPECT_CALL(*cluster_manager_.thread_local_cluster_.lb_.host_, health())
-      .WillOnce(Return(Upstream::Host::Health::Unhealthy));
-  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
-  // EXPECT_CALL(*new_host, health()); // This causes leakage of some mocks
-  test_sessions_[1].expectWriteToUpstream("hello3");
-  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
-  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
-  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 }
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.
