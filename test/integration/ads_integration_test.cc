@@ -26,8 +26,8 @@ using testing::AssertionResult;
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
@@ -1007,7 +1007,7 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsInvalidated) {
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
 }
 
-class AdsFailIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+class AdsFailIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
                                public HttpIntegrationTest {
 public:
   AdsFailIntegrationTest()
@@ -1029,6 +1029,8 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
+                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1042,8 +1044,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsFailIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsFailIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
 
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
@@ -1054,7 +1056,7 @@ TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   xds_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+class AdsConfigIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
                                  public HttpIntegrationTest {
 public:
   AdsConfigIntegrationTest()
@@ -1076,6 +1078,8 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
+                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1098,8 +1102,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsConfigIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsConfigIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
 
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
@@ -1247,7 +1251,7 @@ TEST_P(AdsIntegrationTest, SetNodeAlways) {
 };
 
 // Check if EDS cluster defined in file is loaded before ADS request and used as xDS server
-class AdsClusterFromFileIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest,
+class AdsClusterFromFileIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
                                           public HttpIntegrationTest {
 public:
   AdsClusterFromFileIntegrationTest()
@@ -1269,6 +1273,8 @@ public:
   void TearDown() override { cleanUpXdsConnection(); }
 
   void initialize() override {
+    config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
+                                      oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* grpc_service =
           bootstrap.mutable_dynamic_resources()->mutable_ads_config()->add_grpc_services();
@@ -1320,8 +1326,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsClusterFromFileIntegrationTest,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsClusterFromFileIntegrationTest,
+                         ADS_INTEGRATION_PARAMS);
 
 // Validate if ADS cluster defined as EDS will be loaded from file and connection with ADS cluster
 // will be established.
@@ -1383,8 +1389,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtds,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard, AdsIntegrationTestWithRtds,
+                         ADS_INTEGRATION_PARAMS);
 
 TEST_P(AdsIntegrationTestWithRtds, Basic) {
   initialize();
@@ -1437,8 +1443,8 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, AdsIntegrationTestWithRtdsAndSecondaryClusters,
-                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeltaWildcard,
+                         AdsIntegrationTestWithRtdsAndSecondaryClusters, ADS_INTEGRATION_PARAMS);
 
 TEST_P(AdsIntegrationTestWithRtdsAndSecondaryClusters, Basic) {
   initialize();
@@ -1529,12 +1535,13 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersionsClientTypeDelta, XdsTpAdsIntegrationTest,
+    IpVersionsClientTypeDeltaWildcard, XdsTpAdsIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      // There should be no variation across clients.
                      testing::Values(Grpc::ClientType::EnvoyGrpc),
                      // Only delta xDS is supported for XdsTp
-                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
+                     testing::Values(OldDssOrNewDss::Old, OldDssOrNewDss::New)));
 
 TEST_P(XdsTpAdsIntegrationTest, Basic) {
   initialize();
