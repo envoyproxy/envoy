@@ -207,8 +207,8 @@ void ListenSocketFactoryImpl::doFinalPreWorkerInit() {
 ListenerFactoryContextBaseImpl::ListenerFactoryContextBaseImpl(
     Envoy::Server::Instance& server, ProtobufMessage::ValidationVisitor& validation_visitor,
     const envoy::config::listener::v3::Listener& config, DrainManagerPtr drain_manager)
-    : server_(server), metadata_(config.metadata()), direction_(config.traffic_direction()),
-      global_scope_(server.stats().createScope("")),
+    : server_(server), metadata_(config.metadata()), typed_metadata_(config.metadata()),
+      direction_(config.traffic_direction()), global_scope_(server.stats().createScope("")),
       listener_scope_(server_.stats().createScope(
           fmt::format("listener.{}.",
                       !config.stat_prefix().empty()
@@ -249,6 +249,9 @@ Admin& ListenerFactoryContextBaseImpl::admin() { return server_.admin(); }
 const envoy::config::core::v3::Metadata& ListenerFactoryContextBaseImpl::listenerMetadata() const {
   return metadata_;
 };
+const Envoy::Config::TypedMetadata& ListenerFactoryContextBaseImpl::listenerTypedMetadata() const {
+  return typed_metadata_;
+}
 envoy::config::core::v3::TrafficDirection ListenerFactoryContextBaseImpl::direction() const {
   return direction_;
 };
@@ -680,6 +683,9 @@ Admin& PerListenerFactoryContextImpl::admin() { return listener_factory_context_
 const envoy::config::core::v3::Metadata& PerListenerFactoryContextImpl::listenerMetadata() const {
   return listener_factory_context_base_->listenerMetadata();
 };
+const Envoy::Config::TypedMetadata& PerListenerFactoryContextImpl::listenerTypedMetadata() const {
+  return listener_factory_context_base_->listenerTypedMetadata();
+}
 envoy::config::core::v3::TrafficDirection PerListenerFactoryContextImpl::direction() const {
   return listener_factory_context_base_->direction();
 };
