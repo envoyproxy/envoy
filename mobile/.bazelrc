@@ -18,6 +18,8 @@ build --workspace_status_command=envoy/bazel/get_workspace_status
 build --xcode_version=13.0
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+# https://github.com/bazelbuild/rules_jvm_external/issues/445
+build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
 # https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
