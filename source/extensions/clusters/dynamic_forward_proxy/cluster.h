@@ -67,7 +67,7 @@ private:
     }
     absl::optional<Upstream::SelectedPoolAndConnection>
     selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
-               std::vector<uint8_t>& hash_key) override;
+                             std::vector<uint8_t>& hash_key) override;
     OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override;
 
     // Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks

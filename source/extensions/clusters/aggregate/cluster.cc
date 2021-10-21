@@ -190,8 +190,8 @@ AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* con
 
 absl::optional<Upstream::SelectedPoolAndConnection>
 AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
-                                         const Upstream::Host& host,
-                                         std::vector<uint8_t>& hash_key) {
+                                                       const Upstream::Host& host,
+                                                       std::vector<uint8_t>& hash_key) {
   if (load_balancer_) {
     return load_balancer_->selectExistingConnection(context, host, hash_key);
   }
