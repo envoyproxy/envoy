@@ -92,10 +92,33 @@ static inline NSData *to_ios_data(envoy_data data) {
   return platformData;
 }
 
-static inline NSString *to_ios_string(envoy_data data) {
+static inline NSString *to_ios_string_no_release(envoy_data data) {
   NSString *platformString = [[NSString alloc] initWithBytes:data.bytes
                                                       length:data.length
                                                     encoding:NSUTF8StringEncoding];
+
+  if (platformString == nil) {
+    NSData *bridgedData = [NSData dataWithBytes:(void *)data.bytes length:data.length];
+    BOOL usedLossyConversion = NO;
+    NSStringEncoding guessedEncoding = [NSString stringEncodingForData:bridgedData
+                                                       encodingOptions:@{}
+                                                       convertedString:&platformString
+                                                   usedLossyConversion:&usedLossyConversion];
+    // TODO(jpsim): Use ENVOY_LOG_EVENT to emit log events instead of NSLog.
+    // We can't right now because we're not in a C++ context.
+    if (platformString == nil) {
+      NSLog(@"Could not convert envoy_data (%@ bytes) to NSString", @(data.length));
+    } else {
+      NSLog(@"envoy_data was converted to NSString using encoding %@: %@", @(guessedEncoding),
+            platformString);
+    }
+  }
+
+  return platformString;
+}
+
+static inline NSString *to_ios_string(envoy_data data) {
+  NSString *platformString = to_ios_string_no_release(data);
   release_envoy_data(data);
   return platformString;
 }
@@ -104,12 +127,8 @@ static inline EnvoyEvent *to_ios_map(envoy_map map) {
   NSMutableDictionary *newMap = [NSMutableDictionary new];
   for (envoy_map_size_t i = 0; i < map.length; i++) {
     envoy_map_entry entry = map.entries[i];
-    NSString *entryKey = [[NSString alloc] initWithBytes:entry.key.bytes
-                                                  length:entry.key.length
-                                                encoding:NSUTF8StringEncoding];
-    NSString *entryValue = [[NSString alloc] initWithBytes:entry.value.bytes
-                                                    length:entry.value.length
-                                                  encoding:NSUTF8StringEncoding];
+    NSString *entryKey = to_ios_string_no_release(entry.key);
+    NSString *entryValue = to_ios_string_no_release(entry.value);
     newMap[entryKey] = entryValue;
   }
 
@@ -121,12 +140,8 @@ static inline EnvoyHeaders *to_ios_headers(envoy_headers headers) {
   NSMutableDictionary *headerDict = [NSMutableDictionary new];
   for (envoy_map_size_t i = 0; i < headers.length; i++) {
     envoy_map_entry header = headers.entries[i];
-    NSString *headerKey = [[NSString alloc] initWithBytes:header.key.bytes
-                                                   length:header.key.length
-                                                 encoding:NSUTF8StringEncoding];
-    NSString *headerValue = [[NSString alloc] initWithBytes:header.value.bytes
-                                                     length:header.value.length
-                                                   encoding:NSUTF8StringEncoding];
+    NSString *headerKey = to_ios_string_no_release(header.key);
+    NSString *headerValue = to_ios_string_no_release(header.value);
     // TODO: https://github.com/envoyproxy/envoy-mobile/issues/1825. All header values passed in
     // here should be valid.
     if (headerKey != nil && headerValue != nil) {
