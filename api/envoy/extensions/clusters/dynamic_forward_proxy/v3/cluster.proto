@@ -32,4 +32,26 @@ message ClusterConfig {
   // in the :ref:`cluster's upstream_http_protocol_options
   // <envoy_v3_api_field_config.cluster.v3.Cluster.upstream_http_protocol_options>`
   bool allow_insecure_cluster_options = 2;
+
+  // [#not-implemented-hide:]
+  // If true allow HTTP/2 and HTTP/3 connections to be reused for requests to different
+  // origins than the connection was initially created for. This will only happen when the
+  // resolved address for the new connection matches the peer address of the connection and
+  // the TLS certificate is also valid for the new hostname. For example, if a connection
+  // has previously been established to foo.example.com at IP 1.2.3.4 with a certificate
+  // that is valid for `*.example.com`, then this connection could be used for requests to
+  // bar.example.com if that also resolved to 1.2.3.4.
+  //
+  // .. note::
+  //   By design, this feature will maximize reuse of connections. This means that instead
+  //   opening a new connection when an existing connection reaches the maximum number of
+  //   concurrent streams, requests will instead be sent to the existing connection.
+  //   TODO(alyssawilk) implement request queueing in connections.
+  //
+  // .. note::
+  //   The coalesced connections might be to upstreams that would not be otherwise
+  //   selected by Envoy. See the section `Connection Reuse in RFC 7540
+  //   <https://datatracker.ietf.org/doc/html/rfc7540#section-9.1.1>`_
+  //
+  bool allow_coalesced_connections = 3;
 }
