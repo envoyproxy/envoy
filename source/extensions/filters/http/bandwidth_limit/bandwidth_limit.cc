@@ -21,6 +21,7 @@ const Http::LowerCaseString DefaultRequestDelayTrailer =
     Http::LowerCaseString("bandwidth-request-delay-ms");
 const Http::LowerCaseString DefaultResponseDelayTrailer =
     Http::LowerCaseString("bandwidth-response-delay-ms");
+const std::chrono::milliseconds ZeroMilliseconds = std::chrono::milliseconds(0);
 } // namespace
 
 FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
@@ -31,14 +32,16 @@ FilterConfig::FilterConfig(const BandwidthLimit& config, Stats::Scope& scope,
           config, fill_interval, StreamRateLimiter::DefaultFillInterval.count()))),
       enabled_(config.runtime_enabled(), runtime),
       stats_(generateStats(config.stat_prefix(), scope)),
-      request_delay_trailer_(config.response_trailer_prefix().empty()
-                                 ? DefaultRequestDelayTrailer
-                                 : Http::LowerCaseString(config.response_trailer_prefix() + "-" +
-                                                         DefaultRequestDelayTrailer.get())),
-      response_delay_trailer_(config.response_trailer_prefix().empty()
-                                  ? DefaultResponseDelayTrailer
-                                  : Http::LowerCaseString(config.response_trailer_prefix() + "-" +
-                                                          DefaultResponseDelayTrailer.get())),
+      request_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultRequestDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultRequestDelayTrailer.get()))),
+      response_delay_trailer_(
+          config.response_trailer_prefix().empty()
+              ? DefaultResponseDelayTrailer
+              : Http::LowerCaseString(absl::StrCat(config.response_trailer_prefix(), "-",
+                                                   DefaultResponseDelayTrailer.get()))),
       enable_response_trailers_(config.enable_response_trailers()) {
   if (per_route && !config.has_limit_kbps()) {
     throw EnvoyException("bandwidthlimitfilter: limit must be set for per route filter config");
@@ -164,7 +167,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
     // Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
     // If upstream has trailers, addEncodedTrailers won't be called
     bool trailer_added = false;
-    if (end_stream) {
+    if (end_stream && config.enableResponseTrailers()) {
       trailers_ = &encoder_callbacks_->addEncodedTrailers();
       trailer_added = true;
     }
@@ -201,7 +204,7 @@ BandwidthLimiter::encodeTrailers(Http::ResponseTrailerMap& response_trailers) {
 
 void BandwidthLimiter::updateStatsOnDecodeFinish() {
   if (request_latency_) {
-    request_duration_ = request_latency_.get()->elapsed().count();
+    request_duration_ = request_latency_.get()->elapsed();
     request_latency_->complete();
     request_latency_.reset();
     getConfig().stats().request_pending_.dec();
@@ -213,12 +216,13 @@ void BandwidthLimiter::updateStatsOnEncodeFinish() {
     const auto& config = getConfig();
 
     if (config.enableResponseTrailers() && trailers_ != nullptr) {
-      auto response_duration = response_latency_.get()->elapsed().count();
-      if (request_duration_ > 0) {
-        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_));
+      auto response_duration = response_latency_.get()->elapsed();
+      if (request_duration_ > ZeroMilliseconds) {
+        trailers_->setCopy(config.requestDelayTrailer(), std::to_string(request_duration_.count()));
       }
-      if (response_duration > 0) {
-        trailers_->setCopy(config.responseDelayTrailer(), std::to_string(response_duration));
+      if (response_duration > ZeroMilliseconds) {
+        trailers_->setCopy(config.responseDelayTrailer(),
+                           std::to_string(response_duration.count()));
       }
     }
 

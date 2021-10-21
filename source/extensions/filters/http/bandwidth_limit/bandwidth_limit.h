@@ -149,7 +149,7 @@ private:
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
-  uint64_t request_duration_ = 0;
+  std::chrono::milliseconds request_duration_;
   Http::ResponseTrailerMap* trailers_;
 };
 
