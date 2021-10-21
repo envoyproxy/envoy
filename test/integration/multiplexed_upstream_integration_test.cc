@@ -255,6 +255,20 @@ TEST_P(Http2UpstreamIntegrationTest, TooManySimultaneousRequests) {
   manySimultaneousRequests(1024, 1024, 200);
 }
 
+TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequestsTightUpstreamLimits) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(config);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(options);
+
+  manySimultaneousRequests(1024, 1024, 10);
+}
+
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   manySimultaneousRequests(1024 * 20, 1024 * 20);

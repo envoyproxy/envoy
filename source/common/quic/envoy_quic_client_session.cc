@@ -94,22 +94,14 @@ void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
                                                    /*from_self*/ false, /*is_upstream*/ true);
 }
 
-void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel level) {
-  quic::QuicSpdyClientSession::SetDefaultEncryptionLevel(level);
-  if (level == quic::ENCRYPTION_FORWARD_SECURE) {
-    // This is only reached once, when handshake is done.
-    raiseConnectionEvent(Network::ConnectionEvent::Connected);
-  }
-}
-
 void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
   if (!http_connection_callbacks_ || unidirectional) {
     return;
   }
-  quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
-  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
-  uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
-  http_connection_callbacks_->onMaxStreamsChanged(streams_available);
+  uint32_t streams_available = streamsAvailable();
+  if (streams_available > 0) {
+    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
+  }
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
@@ -140,9 +132,23 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
   return initialized_ ? connection() : nullptr;
 }
 
+uint64_t EnvoyQuicClientSession::streamsAvailable() {
+  quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
+  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
+  uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
+  return streams_available;
+}
+
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
-  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+
+  // Arguably the peer could start a connection with 0 streams and increase open
+  // streams later but this is currently unsupported.
+  ASSERT(streamsAvailable());
+  if (streamsAvailable() > 0) {
+    OnCanCreateNewOutgoingStream(false);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
+  }
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {

@@ -106,6 +106,7 @@ public:
   // This will start out as the total number of streams per connection if capped
   // by configuration, or it will be set to std::numeric_limits<uint32_t>::max() to be
   // (functionally) unlimited.
+  // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
@@ -266,9 +267,10 @@ public:
     connecting_stream_capacity_ -= delta;
   }
 
-protected:
-  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+  // Called when an upstream is ready to serve pending streams.
+  void onUpstreamReady();
 
+protected:
   enum class ConnectionResult {
     FailedToCreateConnection,
     CreatedNewConnection,
@@ -276,10 +278,11 @@ protected:
     NoConnectionRateLimited,
     CreatedButRateLimited,
   };
-
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
   ConnectionResult tryCreateNewConnections();
+
+  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
@@ -353,7 +356,6 @@ private:
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};
 
-  void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 

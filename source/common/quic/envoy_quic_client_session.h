@@ -60,8 +60,6 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
-  // quic::QuicSpdyClientSessionBase
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {
@@ -98,6 +96,8 @@ protected:
   quic::QuicConnection* quicConnection() override;
 
 private:
+  uint64_t streamsAvailable();
+
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};

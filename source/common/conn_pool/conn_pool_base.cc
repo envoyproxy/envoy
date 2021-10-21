@@ -182,7 +182,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
     ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
-  } else if (capacity <= 1) {
+  } else if (capacity == 1) {
     // As soon as the new stream is created, the client will be maxed out.
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
   }
@@ -303,6 +303,9 @@ void ConnPoolImplBase::onUpstreamReady() {
     attachStreamToClient(*client, pending_streams_.back()->context());
     state_.decrPendingStreams(1);
     pending_streams_.pop_back();
+  }
+  if (!pending_streams_.empty()) {
+    tryCreateNewConnections();
   }
 }
 
