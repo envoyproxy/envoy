@@ -84,7 +84,7 @@ Http::FilterHeadersStatus BandwidthLimiter::decodeHeaders(Http::RequestHeaderMap
           decoder_callbacks_->continueDecoding();
         },
         [&config](uint64_t len, bool limit_enforced) {
-          config.stats().request_allowed_size_.add(len);
+          config.stats().request_allowed_size_.set(len);
           if (limit_enforced) {
             config.stats().request_enforced_.inc();
           }
@@ -106,7 +106,7 @@ Http::FilterDataStatus BandwidthLimiter::decodeData(Buffer::Instance& data, bool
           const_cast<FilterConfig*>(&config)->timeSource());
       config.stats().request_pending_.inc();
     }
-    config.stats().request_incoming_size_.add(data.length());
+    config.stats().request_incoming_size_.set(data.length());
 
     request_limiter_->writeData(data, end_stream);
     return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -148,7 +148,7 @@ Http::FilterHeadersStatus BandwidthLimiter::encodeHeaders(Http::ResponseHeaderMa
           encoder_callbacks_->continueEncoding();
         },
         [&config](uint64_t len, bool limit_enforced) {
-          config.stats().response_allowed_size_.add(len);
+          config.stats().response_allowed_size_.set(len);
           if (limit_enforced) {
             config.stats().response_enforced_.inc();
           }
@@ -178,7 +178,7 @@ Http::FilterDataStatus BandwidthLimiter::encodeData(Buffer::Instance& data, bool
           const_cast<FilterConfig*>(&config)->timeSource());
       config.stats().response_pending_.inc();
     }
-    config.stats().response_incoming_size_.add(data.length());
+    config.stats().response_incoming_size_.set(data.length());
 
     response_limiter_->writeData(data, end_stream, trailer_added);
     return Http::FilterDataStatus::StopIterationNoBuffer;
