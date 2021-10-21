@@ -28,6 +28,7 @@ objc_library(
     ],
     module_name = "EnvoyEngine",
     sdk_frameworks = [
+        "Network",
         "SystemConfiguration",
         "UIKit",
     ],
