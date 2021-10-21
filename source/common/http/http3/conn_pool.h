@@ -72,6 +72,12 @@ public:
   // We track the QUIC capacity here, and overload currentUnusedCapacity so the
   // connection pool can accurately keep track of when it is safe to create new
   // streams.
+  //
+  // Though HTTP/3 should arguably start out with 0 stream capacity until the
+  // initial handshake is complete and MAX_STREAMS frame has been received,
+  // assume optimistically it will get ~100 streams, so that the connection pool
+  // won't fetch a connection for each incoming stream but will assume that the
+  // first connection will likely be able to serve 100.
   uint64_t quiche_capacity_ = 100;
 };
 

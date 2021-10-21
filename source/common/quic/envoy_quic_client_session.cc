@@ -103,12 +103,13 @@ void EnvoyQuicClientSession::SetDefaultEncryptionLevel(quic::EncryptionLevel lev
 }
 
 void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
-  if (http_connection_callbacks_ && !unidirectional) {
-    quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
-    ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
-    uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
-    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
+  if (!http_connection_callbacks_ || unidirectional) {
+    return;
   }
+  quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
+  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
+  uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
+  http_connection_callbacks_->onMaxStreamsChanged(streams_available);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
