@@ -86,8 +86,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "delta_subscription_state_lib",
-    srcs = ["delta_subscription_state.cc"],
-    hdrs = ["delta_subscription_state.h"],
+    srcs = [
+        "delta_subscription_state.cc",
+        "new_delta_subscription_state.cc",
+        "old_delta_subscription_state.cc",
+    ],
+    hdrs = [
+        "delta_subscription_state.h",
+        "new_delta_subscription_state.h",
+        "old_delta_subscription_state.h",
+    ],
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
@@ -402,6 +410,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
