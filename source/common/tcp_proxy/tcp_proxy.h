@@ -261,7 +261,8 @@ public:
     if (hash_policy) {
       return hash_policy->generateHash(
           downstreamConnection()->connectionInfoProvider().remoteAddress().get(),
-          downstreamConnection()->connectionInfoProvider().localAddress().get());
+          downstreamConnection()->connectionInfoProvider().localAddress().get(),
+          downstreamConnection()->streamInfo().filterState());
     }
 
     return {};

@@ -94,6 +94,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":address_interface",
+        "//envoy/stream_info:filter_state_interface",
     ],
 )
 
