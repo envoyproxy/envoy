@@ -103,7 +103,7 @@ TEST(Factory, RouteSpecificFilterConfigDefault) {
   const auto* config = dynamic_cast<const FilterConfig*>(route_config.get());
   EXPECT_EQ(config->limit(), 10);
   EXPECT_EQ(config->fillInterval().count(), 50);
-  
+
   // default trailers
   EXPECT_EQ(config->enableResponseTrailers(), false);
   EXPECT_EQ(const_cast<FilterConfig*>(config)->requestDelayTrailer(),
