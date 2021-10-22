@@ -4,6 +4,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/event/timer.h"
+#include "envoy/http/message.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
@@ -31,8 +32,7 @@ public:
 class MetadataCredentialsProviderBase : public CredentialsProvider,
                                         public Logger::Loggable<Logger::Id::aws> {
 public:
-  using MetadataFetcher = std::function<absl::optional<std::string>(
-      const std::string& host, const std::string& path, const std::string& auth_token)>;
+  using MetadataFetcher = std::function<absl::optional<std::string>(Http::RequestMessage&)>;
 
   MetadataCredentialsProviderBase(Api::Api& api, const MetadataFetcher& metadata_fetcher)
       : api_(api), metadata_fetcher_(metadata_fetcher) {}
@@ -93,6 +93,29 @@ private:
 };
 
 /**
+ * Retrieve AWS credentials from Security Token Service using a web identity token (e.g. OAuth,
+ * OpenID)
+ */
+class WebIdentityCredentialsProvider : public MetadataCredentialsProviderBase {
+public:
+  WebIdentityCredentialsProvider(Api::Api& api, const MetadataFetcher& metadata_fetcher,
+                                 absl::string_view token_file_path, absl::string_view sts_endpoint,
+                                 absl::string_view role_arn, absl::string_view role_session_name)
+      : MetadataCredentialsProviderBase(api, metadata_fetcher), token_file_path_(token_file_path),
+        sts_endpoint_(sts_endpoint), role_arn_(role_arn), role_session_name_(role_session_name) {}
+
+private:
+  SystemTime expiration_time_;
+  const std::string token_file_path_;
+  const std::string sts_endpoint_;
+  const std::string role_arn_;
+  const std::string role_session_name_;
+
+  bool needsRefresh() override;
+  void refresh() override;
+};
+
+/**
  * AWS credentials provider chain, able to fallback between multiple credential providers.
  */
 class CredentialsProviderChain : public CredentialsProvider,
@@ -116,6 +139,11 @@ public:
 
   virtual CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const PURE;
 
+  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
+      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
+      absl::string_view role_session_name) const PURE;
+
   virtual CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(
       Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
       absl::string_view credential_uri, absl::string_view authorization_token = {}) const PURE;
@@ -135,16 +163,26 @@ class DefaultCredentialsProviderChain : public CredentialsProviderChain,
                                         public CredentialsProviderChainFactories {
 public:
   DefaultCredentialsProviderChain(
-      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher)
-      : DefaultCredentialsProviderChain(api, metadata_fetcher, *this) {}
+      Api::Api& api, absl::string_view region,
+      const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher)
+      : DefaultCredentialsProviderChain(api, region, metadata_fetcher, *this) {}
 
   DefaultCredentialsProviderChain(
-      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
+      Api::Api& api, absl::string_view region,
+      const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
       const CredentialsProviderChainFactories& factories);
 
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
     return std::make_shared<EnvironmentCredentialsProvider>();
+  }
+
+  virtual CredentialsProviderSharedPtr createWebIdentityCredentialsProvider(
+      Api::Api& api, const MetadataCredentialsProviderBase::MetadataFetcher& metadata_fetcher,
+      absl::string_view token_file_path, absl::string_view sts_endpoint, absl::string_view role_arn,
+      absl::string_view role_session_name) const override {
+    return std::make_shared<WebIdentityCredentialsProvider>(
+        api, metadata_fetcher, token_file_path, sts_endpoint, role_arn, role_session_name);
   }
 
   CredentialsProviderSharedPtr createTaskRoleCredentialsProvider(

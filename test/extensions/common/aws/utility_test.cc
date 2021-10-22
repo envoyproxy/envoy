@@ -346,6 +346,19 @@ TEST(UtilityTest, JoinCanonicalHeaderNamesWithEmptyMap) {
   EXPECT_EQ("", names);
 }
 
+// The region is simply interpolated into sts.{}.amazonaws.com for most regions
+TEST(UtilityTest, GetNormalSTSEndpoints) {
+  EXPECT_EQ("sts.us-west-2.amazonaws.com", Utility::getSTSEndpoint("us-west-2"));
+  EXPECT_EQ("sts.us-east-1.amazonaws.com", Utility::getSTSEndpoint("us-east-1"));
+  EXPECT_EQ("sts.some-new-region.amazonaws.com", Utility::getSTSEndpoint("some-new-region"));
+}
+
+// Except the China regions: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region
+TEST(UtilityTest, GetChinaSTSEndpoints) {
+  EXPECT_EQ("sts.cn-north-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-north-1"));
+  EXPECT_EQ("sts.cn-northwest-1.amazonaws.com.cn", Utility::getSTSEndpoint("cn-northwest-1"));
+}
+
 } // namespace
 } // namespace Aws
 } // namespace Common

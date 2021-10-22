@@ -44,10 +44,11 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
+        const auto region = getRegion(config);
         auto credentials_provider = std::make_shared<Common::Aws::DefaultCredentialsProviderChain>(
-            api, Common::Aws::Utility::metadataFetcher);
+            api, region, Common::Aws::Utility::fetchMetadata);
         auto signer = std::make_unique<Common::Aws::SignerImpl>(
-            config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
+            config.service_name(), region, credentials_provider, api.timeSource(),
             // TODO: extend API to allow specifying header exclusion. ref:
             // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigV4HeaderExclusionVector{});
