@@ -294,24 +294,25 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   if (!stats_tag.getValue().empty()) {
     for (const auto& cli_tag_pair : stats_tag.getValue()) {
-      std::vector<absl::string_view> splitted_tag_pair = absl::StrSplit(cli_tag_pair, ':');
-      if (splitted_tag_pair.size() != 2) {
+      std::vector<absl::string_view> splitted_tag_pair_tokens = absl::StrSplit(cli_tag_pair, ':');
+      if (splitted_tag_pair_tokens.size() != 2) {
         throw MalformedArgvException(
             fmt::format("error: misformatted stats-tag '{}'", cli_tag_pair));
       }
 
-      for (const auto& value : splitted_tag_pair) {
-        for (const auto& tag_pair_char : value) {
-          if (!iswalnum(tag_pair_char)) {
+      for (const auto& value : splitted_tag_pair_tokens) {
+        for (const auto& splitted_tag_pair_token_char : value) {
+          if (!(iswalnum(splitted_tag_pair_token_char) || splitted_tag_pair_token_char == '-' ||
+                splitted_tag_pair_token_char == '_')) {
             throw MalformedArgvException(
                 fmt::format("error: misformatted stats-tag '{}' contains invalid char '{}'",
-                            cli_tag_pair, tag_pair_char));
+                            cli_tag_pair, splitted_tag_pair_token_char));
           }
         }
       }
 
-      stats_tags_.emplace_back(
-          Stats::Tag{std::string(splitted_tag_pair[0]), std::string(splitted_tag_pair[1])});
+      stats_tags_.emplace_back(Stats::Tag{std::string(splitted_tag_pair_tokens[0]),
+                                          std::string(splitted_tag_pair_tokens[1])});
     }
   }
 }

@@ -405,8 +405,16 @@ TEST_F(OptionsImplTest, InvalidStatsTags) {
 }
 
 TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f_o:bar"), MalformedArgvException,
-                          "error: misformatted stats-tag 'f_o:bar' contains invalid char '_'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f>o:bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'f>o:bar' contains invalid char '>'");
+}
+
+TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b-ar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b_ar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b--ar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b__ar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b_-ar"));
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.

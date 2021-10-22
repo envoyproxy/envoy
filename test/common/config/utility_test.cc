@@ -99,8 +99,8 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 TEST(UtilityTest, createTagProducer) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap, {});
-  ASSERT(producer != nullptr);
-  std::vector<Stats::Tag> tags;
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
   ASSERT_EQ(extracted_name, "http.rq_total");
   ASSERT_EQ(tags.size(), 1);
@@ -109,8 +109,8 @@ TEST(UtilityTest, createTagProducer) {
 TEST(UtilityTest, createTagProducerWithDefaultTgs) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap, {{"foo", "bar"}});
-  ASSERT(producer != nullptr);
-  std::vector<Stats::Tag> tags;
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
   EXPECT_EQ(extracted_name, "http.rq_total");
   EXPECT_EQ(tags.size(), 2);
