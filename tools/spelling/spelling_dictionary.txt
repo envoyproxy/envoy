@@ -236,6 +236,8 @@ Nilsson
 Nonhashable
 Oauth
 OCSP
+OD
+ODCDS
 OID
 OK
 OOM
@@ -749,6 +751,7 @@ interpretable
 intra
 ints
 invariance
+invoker
 iovec
 iovecs
 ips
