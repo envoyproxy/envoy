@@ -87,6 +87,8 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
   using quic::QuicSession::PerformActionOnActiveStreams;
 
 protected:

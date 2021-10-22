@@ -177,6 +177,7 @@ envoy_cc_library(
         ":udp_packet_writer_handler_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:resource_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/init:manager_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:interval_value",
