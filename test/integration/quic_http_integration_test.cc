@@ -666,6 +666,100 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   ASSERT_TRUE(response->waitForReset());
 }
 
+TEST_P(QuicHttpIntegrationTest, Http3ClientKeepalive) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 5;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(max_interval_sec + 2));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // connection would have idle timed out.
+  Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
+  timer->enableTimer(std::chrono::seconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  // First 6 PING frames should be sent every 1s, and the following ones less frequently.
+  EXPECT_LE(quic_connection_->GetStats().ping_frames_sent, 8u);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3ClientKeepaliveDisabled) {
+  initialize();
+
+  constexpr uint64_t max_interval_sec = 0;
+  constexpr uint64_t initial_interval_sec = 1;
+  // Set connection idle network timeout to be a little larger than max interval.
+  dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+      .quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromSeconds(5));
+  client_quic_options_.mutable_connection_keepalive()->mutable_max_interval()->set_seconds(
+      max_interval_sec);
+  client_quic_options_.mutable_connection_keepalive()->mutable_initial_interval()->set_seconds(
+      initial_interval_sec);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // As keepalive is disabled, the connection will timeout after 5s.
+  EXPECT_TRUE(response->waitForReset());
+  EXPECT_EQ(quic_connection_->GetStats().ping_frames_sent, 0u);
+}
+
+TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
+  constexpr uint64_t max_interval_sec = 5;
+  constexpr uint64_t initial_interval_sec = 1;
+  config_helper_.addConfigModifier(
+      [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        auto* keepalive_options = hcm.mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options()
+                                      ->mutable_connection_keepalive();
+        keepalive_options->mutable_initial_interval()->set_seconds(initial_interval_sec);
+        keepalive_options->mutable_max_interval()->set_seconds(max_interval_sec);
+      });
+  // Set connection idle network timeout to be a little larger than max interval.
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->mutable_idle_timeout()
+        ->set_seconds(max_interval_sec + 2);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Wait for 10s before sending back response. If keepalive is disabled, the
+  // connection would have idle timed out.
+  Event::TimerPtr timer(dispatcher_->createTimer([this]() -> void { dispatcher_->exit(); }));
+  timer->enableTimer(std::chrono::seconds(10));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"},
+                                                                   {"set-cookie", "foo"},
+                                                                   {"set-cookie", "bar"}},
+                                   true);
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
