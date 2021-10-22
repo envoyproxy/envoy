@@ -35,6 +35,7 @@ cc_library(
     linkopts = [
         "-lm",
         "-llog",
+        "-ldl",
     ] + select({
         "@envoy//bazel:dbg_build": ["-Wl,--build-id=sha1"],
         "//conditions:default": ["-Wl,-s"],
