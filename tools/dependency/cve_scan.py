@@ -80,6 +80,15 @@ IGNORES_CVES = set([
     # Tracking issue to fix versioning:
     #  https://github.com/envoyproxy/envoy/issues/18354
     'CVE-2021-38153',
+    # Excluded by version
+    #
+    # wasmtime
+    "CVE-2021-39216",
+    "CVE-2021-39218",
+    "CVE-2021-39219",
+    #
+    # libcurl
+    "CVE-2021-22945",
 ])
 
 # Subset of CVE fields that are useful below.
