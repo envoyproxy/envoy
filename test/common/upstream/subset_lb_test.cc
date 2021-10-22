@@ -504,7 +504,7 @@ TEST_F(SubsetLoadBalancerTest, NoFallback) {
   EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_FALSE(lb_->selectPool(nullptr, *mock_host, hash_key).has_value());
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 }
 
 TEST_F(SubsetLoadBalancerTest, SelectOverrideHost) {

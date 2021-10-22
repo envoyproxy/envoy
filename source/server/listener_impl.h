@@ -5,8 +5,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
@@ -15,6 +17,7 @@
 
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
@@ -121,6 +124,7 @@ public:
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
@@ -146,6 +150,8 @@ public:
 private:
   Envoy::Server::Instance& server_;
   const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
+      typed_metadata_;
   envoy::config::core::v3::TrafficDirection direction_;
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
@@ -195,6 +201,7 @@ public:
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
