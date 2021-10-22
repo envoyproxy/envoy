@@ -60,6 +60,8 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  // quic::ProofHandler
+  void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {
@@ -80,7 +82,12 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   std::unique_ptr<quic::QuicCryptoClientStreamBase> CreateQuicCryptoStream() override;
-
+  bool ShouldCreateOutgoingBidirectionalStream() override {
+    ASSERT(quic::QuicSpdyClientSession::ShouldCreateOutgoingBidirectionalStream());
+    // Prefer creating an "invalid" stream outside of current stream bounds to
+    // crashing when dereferencing a nullptr in QuicHttpClientConnectionImpl::newStream
+    return true;
+  }
   // QuicFilterManagerConnectionImpl
   bool hasDataToWrite() override;
   // Used by base class to access quic connection after initialization.

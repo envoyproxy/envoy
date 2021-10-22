@@ -332,7 +332,7 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
 }
 
 // c-ares DNS resolver factory
-class CaresDnsResolverFactoryImpl : public DnsResolverFactory {
+class CaresDnsResolverFactory : public DnsResolverFactory {
 public:
   std::string name() const override { return std::string(CaresDnsResolver); }
 
@@ -365,7 +365,7 @@ public:
 };
 
 // Register the CaresDnsResolverFactory
-REGISTER_FACTORY(CaresDnsResolverFactoryImpl, DnsResolverFactory);
+REGISTER_FACTORY(CaresDnsResolverFactory, DnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy

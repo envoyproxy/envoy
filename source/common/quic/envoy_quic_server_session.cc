@@ -23,6 +23,7 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
                                       send_buffer_limit),
       quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
       listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory) {
+  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
 }
 
 EnvoyQuicServerSession::~EnvoyQuicServerSession() {

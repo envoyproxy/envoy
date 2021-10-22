@@ -313,6 +313,9 @@ public:
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
 
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
                                 absl::string_view cluster_name = "cluster_0");

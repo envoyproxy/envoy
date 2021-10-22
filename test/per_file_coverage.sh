@@ -8,7 +8,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/api/posix:78.5"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
-"source/common/config/xds_mux:94.5"
 "source/common/crypto:0.0"
 "source/common/event:94.1" # Emulated edge events guards don't report LCOV
 "source/common/filesystem/posix:95.5"
@@ -32,7 +31,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/exe:92.6"
 "source/extensions/common:95.8"
 "source/extensions/common/tap:94.2"
-"source/extensions/common/wasm:95.3" # flaky: be careful adjusting
+"source/extensions/common/wasm:95.2" # flaky: be careful adjusting
 "source/extensions/common/wasm/ext:92.0"
 "source/extensions/filters/common:96.1"
 "source/extensions/filters/common/expr:96.2"
@@ -72,7 +71,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/zipkin:96.1"
 "source/extensions/transport_sockets:95.3"
 "source/extensions/transport_sockets/tls:94.5"
-"source/extensions/transport_sockets/tls/cert_validator:96.0"
+"source/extensions/transport_sockets/tls/cert_validator:95.8"
 "source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build

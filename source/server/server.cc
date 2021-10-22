@@ -31,6 +31,7 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -849,6 +850,8 @@ void InstanceImpl::terminate() {
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   Config::GrpcMuxImpl::shutdownAll();
   Config::NewGrpcMuxImpl::shutdownAll();
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+  Config::XdsMux::GrpcMuxDelta::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();

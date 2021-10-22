@@ -36,6 +36,8 @@
 namespace Envoy {
 namespace Config {
 
+constexpr absl::string_view Wildcard = "*";
+
 /**
  * Constant Api Type Values, used by envoy::config::core::v3::ApiConfigSource.
  */
