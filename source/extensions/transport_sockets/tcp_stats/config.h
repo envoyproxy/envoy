@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
