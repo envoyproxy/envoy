@@ -20,12 +20,10 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
 
 CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
     const CookieBasedSessionStateProto& config)
-    : name_(config.name()), path_(config.path()) {
+    : name_(config.name()), path_(config.path()), ttl_(config.ttl().seconds()) {
   if (name_.empty()) {
     throw EnvoyException("Cookie key cannot be empty for cookie based stateful session sticky");
   }
-
-  ttl_ = std::chrono::seconds(config.ttl().seconds());
 }
 
 } // namespace Cookie

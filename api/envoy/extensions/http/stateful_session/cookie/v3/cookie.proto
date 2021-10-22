@@ -33,7 +33,7 @@ message CookieBasedSessionState {
   // If specified, a TTL will be added to new session state
   // cookies in the set-cookie header. Specify a TTL of 0 to
   // use a session cookie.
-  google.protobuf.Duration ttl = 2;
+  google.protobuf.Duration ttl = 2 [(validate.rules).duration = {gte {}}];
 
   // The name of the path for the cookie. If no path is specified
   // here, no path will be set for the cookie.

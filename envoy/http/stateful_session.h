@@ -13,8 +13,8 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Interface class for session state. Session state is used to get address of upstream host that
- * the session stuck on.
+ * Interface class for session state. Session state is used to get address of upstream host
+ * assigned to the session.
  */
 class SessionState {
 public:

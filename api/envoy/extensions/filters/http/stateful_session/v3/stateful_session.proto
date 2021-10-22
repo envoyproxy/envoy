@@ -15,20 +15,26 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stateful Session Filter]
 //
-// This filter sets override host based on the extensible session state and update the session
-// state based on the final selected upstream host.
+// This filter sets an override host based on the extensible session state and updates the
+// session state based on the final selected upstream host.
 //
 // [#extension: envoy.filters.http.stateful_session]
-
+// [#comment:TODO(wbpcode): To support global feature enabled or disabled flag.]
 message StatefulSession {
-  // The expected health status of the host. Suppose the one session stuck on the host X.
+  // The expected health status of the host. Suppose a session is assigned to the host X.
   // However, if the health status of host X does not meet expectations, Envoy will select
-  // new host for the session according to the load balancing algorithm.
+  // new host for the session according to the load balancing algorithm. In other words,
+  // the status of the target host must be in this list for session sticky to take effect.
+  //
+  // .. note::
+  //
+  //    The *DRAINING* and *TIMEOUT* will be interpreted as *UNHEALTHY* and *UNKNOWN* will
+  //    be interpreted as *HEALTHY*.
   repeated config.core.v3.HealthStatus host_statuses = 1
       [(validate.rules).repeated = {min_items: 1}];
 
   // Specific implementation of session state. This session state will be used to store and
-  // get address of upstream host that session stuck on.
+  // get address of the upstream host to which the session is assigned.
   //
   // [#extension-category: envoy.http.stateful_session]
   config.core.v3.TypedExtensionConfig session_state = 2
