@@ -3,11 +3,15 @@
 
 #include </usr/include/linux/tcp.h>
 
+#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
+
+#include "source/extensions/transport_sockets/tcp_stats/config.h"
 #include "source/extensions/transport_sockets/tcp_stats/tcp_stats.h"
 
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -15,6 +19,7 @@
 using testing::_;
 using testing::AtLeast;
 using testing::Return;
+using testing::ReturnNull;
 
 namespace Envoy {
 namespace Extensions {
@@ -247,6 +252,38 @@ TEST_F(TcpStatsTest, Values) {
   // Delta of 1 on numerator and denominator.
   EXPECT_EQ(Stats::Histogram::PercentScale /* 100% */,
             histogramValue("cx_tx_percent_retransmitted_segments"));
+}
+
+class TcpStatsSocketFactoryTest : public testing::Test {
+public:
+  void initialize() {
+    envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
+    auto inner_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+    inner_factory_ = inner_factory.get();
+    factory_ =
+        std::make_unique<TcpStatsSocketFactory>(context_, proto_config, std::move(inner_factory));
+  }
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context_;
+  NiceMock<Network::MockTransportSocketFactory>* inner_factory_;
+  std::unique_ptr<TcpStatsSocketFactory> factory_;
+};
+
+// Test createTransportSocket returns nullptr if inner call returns nullptr
+TEST_F(TcpStatsSocketFactoryTest, CreateSocketReturnsNullWhenInnerFactoryReturnsNull) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, createTransportSocket(_)).WillOnce(ReturnNull());
+  EXPECT_EQ(nullptr, factory_->createTransportSocket(nullptr));
+}
+
+// Test implementsSecureTransport calls inner factory
+TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
+  initialize();
+  EXPECT_CALL(*inner_factory_, implementsSecureTransport()).WillOnce(Return(true));
+  EXPECT_TRUE(factory_->implementsSecureTransport());
+
+  EXPECT_CALL(*inner_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_FALSE(factory_->implementsSecureTransport());
 }
 
 } // namespace

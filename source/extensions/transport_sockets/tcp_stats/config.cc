@@ -1,3 +1,5 @@
+#include "source/extensions/transport_sockets/tcp_stats/config.h"
+
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.validate.h"
 #include "envoy/registry/registry.h"
@@ -11,46 +13,41 @@ namespace Extensions {
 namespace TransportSockets {
 namespace TcpStats {
 
-class TcpStatsSocketFactory : public Network::TransportSocketFactory {
-public:
-  TcpStatsSocketFactory(Server::Configuration::TransportSocketFactoryContext& context,
-                        const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
-                        Network::TransportSocketFactoryPtr&& inner_factory)
-      : inner_factory_(std::move(inner_factory)) {
+TcpStatsSocketFactory::TcpStatsSocketFactory(
+    Server::Configuration::TransportSocketFactoryContext& context,
+    const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
+    Network::TransportSocketFactoryPtr&& inner_factory)
+    : inner_factory_(std::move(inner_factory)) {
 #if defined(__linux__)
-    config_ = std::make_shared<Config>(config, context.scope());
+  config_ = std::make_shared<Config>(config, context.scope());
 #else
-    UNREFERENCED_PARAMETER(config);
-    UNREFERENCED_PARAMETER(context);
-    throw EnvoyException("envoy.transport_sockets.tcp_stats is not supported on this platform.");
+  UNREFERENCED_PARAMETER(config);
+  UNREFERENCED_PARAMETER(context);
+  throw EnvoyException("envoy.transport_sockets.tcp_stats is not supported on this platform.");
 #endif
-  }
+}
 
-  Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override {
+Network::TransportSocketPtr TcpStatsSocketFactory::createTransportSocket(
+    Network::TransportSocketOptionsConstSharedPtr options) const {
 #if defined(__linux__)
-    return std::make_unique<TcpStatsSocket>(config_,
-                                            inner_factory_->createTransportSocket(options));
-#else
-    UNREFERENCED_PARAMETER(options);
+  auto inner_socket = inner_factory_->createTransportSocket(options);
+  if (inner_socket == nullptr) {
     return nullptr;
+  }
+  return std::make_unique<TcpStatsSocket>(config_, std::move(inner_socket));
+#else
+  UNREFERENCED_PARAMETER(options);
+  return nullptr;
 #endif
-  }
+}
 
-  bool implementsSecureTransport() const override {
-    return inner_factory_->implementsSecureTransport();
-  }
+bool TcpStatsSocketFactory::implementsSecureTransport() const {
+  return inner_factory_->implementsSecureTransport();
+}
 
-  bool usesProxyProtocolOptions() const override {
-    return inner_factory_->usesProxyProtocolOptions();
-  }
-
-private:
-  Network::TransportSocketFactoryPtr inner_factory_;
-#if defined(__linux__)
-  ConfigConstSharedPtr config_;
-#endif
-};
+bool TcpStatsSocketFactory::usesProxyProtocolOptions() const {
+  return inner_factory_->usesProxyProtocolOptions();
+}
 
 class TcpStatsConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
