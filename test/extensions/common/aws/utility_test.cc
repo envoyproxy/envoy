@@ -87,9 +87,17 @@ TEST(UtilityTest, CanonicalizeHeadersTrimmingWhitespace) {
 // Headers that are likely to mutate are not considered canonical
 TEST(UtilityTest, CanonicalizeHeadersDropMutatingHeaders) {
   Http::TestRequestHeaderMapImpl headers{
-      {":authority", "example.com"},          {"x-forwarded-for", "1.2.3.4"},
-      {"x-forwarded-proto", "https"},         {"x-amz-date", "20130708T220855Z"},
+      {":authority", "example.com"},
+      {"x-forwarded-for", "1.2.3.4"},
+      {"x-forwarded-proto", "https"},
+      {"x-amz-date", "20130708T220855Z"},
       {"x-amz-content-sha256", "e3b0c44..."},
+      {"x-envoy-retry-on", "5xx"},
+      {"x-envoy-retry-grpc-on", "cancelled"},
+      {"x-envoy-max-retries", "2"},
+      {"x-envoy-hedge-on-per-try-timeout", "true"},
+      {"x-envoy-retriable-header-names", "X-Upstream-Retry,X-Try-Again"},
+      {"x-envoy-upstream-rq-per-try-timeout-ms", "100"},
   };
   const auto map = Utility::canonicalizeHeaders(headers);
   EXPECT_THAT(map,
