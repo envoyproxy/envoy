@@ -91,7 +91,7 @@ public:
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& config,
                                Server::Configuration::TransportSocketFactoryContext& context,
-                               const std::vector<std::string>& server_names) {
+                               const std::vector<std::string>& server_names) override {
     const auto& outer_config = MessageUtil::downcastAndValidate<
         const envoy::extensions::transport_sockets::tcp_stats::v3::Config&>(
         config, context.messageValidationVisitor());
