@@ -364,8 +364,8 @@ typedef void (*envoy_logger_release_f)(const void* context);
  * body upload.
  *
  * This is only ever called when the library is in explicit flow control mode.
- * In async mode, this will be called after the first call to decodeData, when
- * more buffer is available locally for request body. It will be called once per
+ * In explicit mode, this will be called after the first call to decodeData, when
+ * more buffer is available locally for request body. It will then be called once per
  * decodeData call to inform the sender when it is safe to send more data.
  *
  * @param stream_intel, contains internal stream metrics, context, and other details.

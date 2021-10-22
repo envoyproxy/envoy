@@ -55,4 +55,15 @@ public interface EnvoyHTTPCallbacks {
    * Called when the async HTTP stream is canceled.
    */
   void onCancel(EnvoyStreamIntel streamIntel);
+
+  /**
+   * Callback signature which notify when there is buffer available for request body upload.
+   *
+   * This is only ever called when the library is in explicit flow control mode. When enabled,
+   * the issuer should wait for this callback after calling sendData, before making another call
+   * to sendData.
+   *
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   */
+  void onSendWindowAvailable(EnvoyStreamIntel streamIntel);
 }
