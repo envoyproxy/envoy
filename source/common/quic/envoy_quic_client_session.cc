@@ -132,11 +132,35 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
 void EnvoyQuicClientSession::setHttp3Options(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
   QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
-  if (http3_options_->has_quic_protocol_options()) {
-    static_cast<EnvoyQuicClientConnection*>(connection())
-        ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-            http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
+  if (!http3_options_->has_quic_protocol_options()) {
+    return;
   }
+  static_cast<EnvoyQuicClientConnection*>(connection())
+      ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
+
+  if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
+    const uint64_t initial_interval = PROTOBUF_GET_MS_OR_DEFAULT(
+        http3_options_->quic_protocol_options().connection_keepalive(), initial_interval, 0);
+    const uint64_t max_interval =
+        PROTOBUF_GET_MS_OR_DEFAULT(http3_options_->quic_protocol_options().connection_keepalive(),
+                                   max_interval, quic::kPingTimeoutSecs);
+    // If the keepalive max_interval is configured to zero, disable the probe completely.
+    if (max_interval == 0u) {
+      disable_keepalive_ = true;
+      return;
+    }
+    connection()->set_ping_timeout(quic::QuicTime::Delta::FromMilliseconds(max_interval));
+    if (max_interval > initial_interval && initial_interval > 0u) {
+      connection()->set_initial_retransmittable_on_wire_timeout(
+          quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+    }
+  }
+}
+
+bool EnvoyQuicClientSession::ShouldKeepConnectionAlive() const {
+  // Do not probe at all if keepalive is disabled via config.
+  return !disable_keepalive_ && quic::QuicSpdyClientSession::ShouldKeepConnectionAlive();
 }
 
 void EnvoyQuicClientSession::OnProofVerifyDetailsAvailable(

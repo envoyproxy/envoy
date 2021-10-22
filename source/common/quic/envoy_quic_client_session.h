@@ -60,6 +60,7 @@ public:
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   // quic::QuicSpdyClientSessionBase
   void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
@@ -104,6 +105,7 @@ private:
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  bool disable_keepalive_{false};
 };
 
 } // namespace Quic
