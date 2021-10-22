@@ -761,6 +761,8 @@ private:
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
             envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
+        // Initialize QUICHE flags.
+        quiche::FlagRegistry::getInstance();
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
