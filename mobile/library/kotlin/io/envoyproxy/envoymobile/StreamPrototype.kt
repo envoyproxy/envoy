@@ -116,6 +116,22 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
   }
 
   /**
+   * Specify a callback for when additional send window becomes available.
+   * This is only ever called when the library is in explicit flow control mode. When enabled,
+   * the issuer should wait for this callback after calling sendData, before making another call
+   * to sendData.
+   *
+   * @param closure Closure which will be called when additional send window becomes available.
+   * @return This stream, for chaining syntax.
+   */
+  fun setOnSendWindowAvailable(
+    closure: (streamIntel: StreamIntel) -> Unit
+  ): StreamPrototype {
+    callbacks.onSendWindowAvailable = closure
+    return this
+  }
+
+  /**
    * Create engine callbacks using the provided queue.
    *
    * @param executor Executor on which to receive callback events.

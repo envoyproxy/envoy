@@ -1,4 +1,4 @@
-package integration;
+package test.kotlin.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

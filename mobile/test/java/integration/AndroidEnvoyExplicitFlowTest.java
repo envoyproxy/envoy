@@ -1,4 +1,4 @@
-package integration;
+package test.kotlin.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider;
 import io.envoyproxy.envoymobile.AndroidEngineBuilder;
 import io.envoyproxy.envoymobile.Engine;
 import io.envoyproxy.envoymobile.EnvoyError;
+import io.envoyproxy.envoymobile.LogLevel;
 import io.envoyproxy.envoymobile.RequestHeaders;
 import io.envoyproxy.envoymobile.RequestHeadersBuilder;
 import io.envoyproxy.envoymobile.RequestMethod;
@@ -15,16 +16,15 @@ import io.envoyproxy.envoymobile.ResponseTrailers;
 import io.envoyproxy.envoymobile.Stream;
 import io.envoyproxy.envoymobile.UpstreamHttpProtocol;
 import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +35,6 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -46,39 +45,31 @@ import org.robolectric.RobolectricTestRunner;
 @RunWith(RobolectricTestRunner.class)
 public class AndroidEnvoyExplicitFlowTest {
 
-  private static Engine engine;
-
   private final MockWebServer mockWebServer = new MockWebServer();
+  private Engine engine;
 
   @BeforeClass
   public static void loadJniLibrary() {
     AndroidJniLibrary.loadTestLibrary();
   }
 
-  @AfterClass
-  public static void shutdownEngine() {
-    if (engine != null) {
-      engine.terminate();
-    }
-  }
-
   @Before
   public void setUpEngine() throws Exception {
-    if (engine == null) {
-      CountDownLatch latch = new CountDownLatch(1);
-      Context appContext = ApplicationProvider.getApplicationContext();
-      engine = new AndroidEngineBuilder(appContext)
-                   .setOnEngineRunning(() -> {
-                     latch.countDown();
-                     return null;
-                   })
-                   .build();
-      latch.await(); // Don't launch a request before initialization has completed.
-    }
+    CountDownLatch latch = new CountDownLatch(1);
+    Context appContext = ApplicationProvider.getApplicationContext();
+    engine = new AndroidEngineBuilder(appContext)
+                 .addLogLevel(LogLevel.DEBUG)
+                 .setOnEngineRunning(() -> {
+                   latch.countDown();
+                   return null;
+                 })
+                 .build();
+    latch.await(); // Don't launch a request before initialization has completed.
   }
 
   @After
-  public void shutdownMockWebServer() throws IOException {
+  public void shutdownEngine() throws Exception {
+    engine.terminate();
     mockWebServer.shutdown();
   }
 
@@ -133,6 +124,26 @@ public class AndroidEnvoyExplicitFlowTest {
   }
 
   @Test
+  @Ignore("Crashes on callbacks->onResetStream(reason, absl::string_view()) in codec_helper.h")
+  public void get_cancelOnResponseHeaders() throws Exception {
+    mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
+    mockWebServer.start();
+    RequestScenario requestScenario =
+        new RequestScenario()
+            .setHttpMethod(RequestMethod.GET)
+            .setUrl(mockWebServer.url("get/flowers").toString())
+            .setResponseBufferSize(20) // Larger than the response body size
+            .cancelOnResponseHeaders();
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+    assertThat(response.getBodyAsString()).isEmpty();
+    assertThat(response.getEnvoyError()).isNull();
+    assertThat(response.isCancelled()).isTrue();
+  }
+
+  @Test
   public void get_withThrottledBodyResponse_bufferLargerThanResponseBody() throws Exception {
     // Note: throttle must be long enough to trickle the chunking. Chunk size is 5 bytes.
     mockWebServer.enqueue(
@@ -176,17 +187,132 @@ public class AndroidEnvoyExplicitFlowTest {
     assertThat(response.getNbResponseChunks()).isEqualTo(6); // 3&2 bytes, 3&2 bytes, 2, and 0 bytes
   }
 
-  // TODO(carloseltuerto) Add tests for POST once the Explicit Flow Control surfaces.
+  @Test
+  public void post_simple() throws Exception {
+    mockWebServer.setDispatcher(new Dispatcher() {
+      @Override
+      public MockResponse dispatch(RecordedRequest recordedRequest) {
+        assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
+        assertThat(recordedRequest.getBody().readUtf8()).isEqualTo("This is my request body");
+        return new MockResponse().setBody("This is my response Body");
+      }
+    });
+    mockWebServer.start();
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.POST)
+                                          .setUrl(mockWebServer.url("post/flowers").toString())
+                                          .addHeader("content-length", "23")
+                                          .addBody("This is my request body");
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    assertThat(response.getEnvoyError()).isNull();
+  }
+
+  @Test
+  public void post_chunkedBody() throws Exception {
+    mockWebServer.setDispatcher(new Dispatcher() {
+      @Override
+      public MockResponse dispatch(RecordedRequest recordedRequest) {
+        assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.POST.name());
+        assertThat(recordedRequest.getBody().readUtf8())
+            .isEqualTo("This is the first part of by body. This is the second part of by body.");
+        return new MockResponse().setBody("This is my response Body");
+      }
+    });
+    mockWebServer.start();
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.POST)
+                                          .setUrl(mockWebServer.url("post/flowers").toString())
+                                          .addBody("This is the first part of by body. ")
+                                          .addBody("This is the second part of by body.");
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    assertThat(response.getEnvoyError()).isNull();
+  }
+
+  @Test
+  public void put_bigBody() throws Exception {
+    mockWebServer.setDispatcher(new Dispatcher() {
+      @Override
+      public MockResponse dispatch(RecordedRequest recordedRequest) {
+        assertThat(recordedRequest.getMethod()).isEqualTo(RequestMethod.PUT.name());
+        assertThat(recordedRequest.getBody().size()).isEqualTo(100_000_000);
+        return new MockResponse().setBody("This is my response Body");
+      }
+    });
+    mockWebServer.start();
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.PUT)
+                                          .setUrl(mockWebServer.url("put/flowers").toString());
+    byte[] buf = new byte[10_000];
+    for (int chunckNo = 0; chunckNo < 10000; chunckNo++) { // total = 100MB
+      requestScenario.addBody(buf);
+    }
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+    assertThat(response.getBodyAsString()).isEqualTo("This is my response Body");
+    assertThat(response.getEnvoyError()).isNull();
+  }
+
+  @Test
+  public void post_cancelUploadOnChunkZero() throws Exception {
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.POST)
+                                          .setUrl(mockWebServer.url("post/flowers").toString())
+                                          .addBody("Chunk0")
+                                          .cancelUploadOnChunk(0);
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.isCancelled()).isTrue();
+    assertThat(response.getRequestChunkSent()).isZero();
+    assertThat(response.getEnvoyError()).isNull();
+  }
+
+  @Test
+  public void post_cancelUploadOnChunkOne() throws Exception {
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.POST)
+                                          .setUrl(mockWebServer.url("post/flowers").toString())
+                                          .addBody("Chunk0")
+                                          .addBody("Chunk1")
+                                          .cancelUploadOnChunk(1);
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.isCancelled()).isTrue();
+    assertThat(response.getRequestChunkSent()).isOne();
+    assertThat(response.getEnvoyError()).isNull();
+  }
 
   private Response sendRequest(RequestScenario requestScenario) throws Exception {
     final CountDownLatch latch = new CountDownLatch(1);
     final AtomicReference<Response> response = new AtomicReference<>(new Response());
     final AtomicReference<Stream> streamRef = new AtomicReference<>();
+    final Iterator<ByteBuffer> chunkIterator = requestScenario.getBodyChunks().iterator();
 
     Stream stream = engine.streamClient()
                         .newStreamPrototype()
+                        .setOnSendWindowAvailable(ignored -> {
+                          onSendWindowAvailable(requestScenario, streamRef.get(), chunkIterator,
+                                                response.get());
+                          return null;
+                        })
                         .setOnResponseHeaders((responseHeaders, endStream, ignored) -> {
                           response.get().setHeaders(responseHeaders);
+                          if (requestScenario.cancelOnResponseHeaders) {
+                            streamRef.get().cancel();
+                            // latch.countDown();
+                            return null;
+                          }
                           if (endStream) {
                             latch.countDown();
                           }
@@ -221,12 +347,27 @@ public class AndroidEnvoyExplicitFlowTest {
                         .start(Executors.newSingleThreadExecutor());
     streamRef.set(stream); // Set before sending headers to avoid race conditions.
     stream.sendHeaders(requestScenario.getHeaders(), !requestScenario.hasBody());
-    requestScenario.getBodyChunks().forEach(stream::sendData);
-    requestScenario.getClosingBodyChunk().ifPresent(stream::close);
-
+    if (requestScenario.hasBody()) {
+      // The first "send" is assumes that the window is available - API contract.
+      onSendWindowAvailable(requestScenario, streamRef.get(), chunkIterator, response.get());
+    }
     latch.await();
     response.get().throwAssertionErrorIfAny();
     return response.get();
+  }
+
+  private static void onSendWindowAvailable(RequestScenario requestScenario, Stream stream,
+                                            Iterator<ByteBuffer> chunkIterator, Response response) {
+    if (requestScenario.cancelUploadOnChunk == response.requestChunkSent) {
+      stream.cancel();
+      return;
+    }
+    response.requestChunkSent++;
+    if (chunkIterator.hasNext()) {
+      stream.sendData(chunkIterator.next());
+    } else {
+      stream.close(requestScenario.getClosingBodyChunk());
+    }
   }
 
   private static class RequestScenario {
@@ -234,8 +375,9 @@ public class AndroidEnvoyExplicitFlowTest {
     private RequestMethod method = null;
     private final List<ByteBuffer> bodyChunks = new ArrayList<>();
     private final List<Map.Entry<String, String>> headers = new ArrayList<>();
-    private boolean closeBodyStream = false;
     private int responseBufferSize = 1000;
+    private boolean cancelOnResponseHeaders = false;
+    private int cancelUploadOnChunk = -1;
 
     RequestHeaders getHeaders() {
       RequestHeadersBuilder requestHeadersBuilder =
@@ -246,15 +388,11 @@ public class AndroidEnvoyExplicitFlowTest {
     }
 
     List<ByteBuffer> getBodyChunks() {
-      return closeBodyStream
-          ? Collections.unmodifiableList(bodyChunks.subList(0, bodyChunks.size() - 1))
-          : Collections.unmodifiableList(bodyChunks);
+      return Collections.unmodifiableList(
+          bodyChunks.subList(0, Math.max(bodyChunks.size() - 1, 0)));
     }
 
-    Optional<ByteBuffer> getClosingBodyChunk() {
-      return closeBodyStream ? Optional.of(bodyChunks.get(bodyChunks.size() - 1))
-                             : Optional.empty();
-    }
+    ByteBuffer getClosingBodyChunk() { return bodyChunks.get(bodyChunks.size() - 1); }
 
     boolean hasBody() { return !bodyChunks.isEmpty(); }
 
@@ -269,8 +407,7 @@ public class AndroidEnvoyExplicitFlowTest {
     }
 
     RequestScenario addBody(byte[] requestBodyChunk) {
-      ByteBuffer byteBuffer = ByteBuffer.allocateDirect(requestBodyChunk.length);
-      byteBuffer.put(requestBodyChunk);
+      ByteBuffer byteBuffer = ByteBuffer.wrap(requestBodyChunk);
       bodyChunks.add(byteBuffer);
       return this;
     }
@@ -289,8 +426,13 @@ public class AndroidEnvoyExplicitFlowTest {
       return this;
     }
 
-    RequestScenario closeBodyStream() {
-      closeBodyStream = true;
+    RequestScenario cancelOnResponseHeaders() {
+      this.cancelOnResponseHeaders = true;
+      return this;
+    }
+
+    public RequestScenario cancelUploadOnChunk(int chunkNo) {
+      this.cancelUploadOnChunk = chunkNo;
       return this;
     }
   }
@@ -302,6 +444,7 @@ public class AndroidEnvoyExplicitFlowTest {
     private final List<ByteBuffer> bodies = new ArrayList<>();
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private final AtomicReference<AssertionError> assertionError = new AtomicReference<>();
+    private int requestChunkSent = 0;
 
     void setHeaders(ResponseHeaders headers) {
       if (!this.headers.compareAndSet(null, headers)) {
@@ -339,6 +482,8 @@ public class AndroidEnvoyExplicitFlowTest {
     ResponseTrailers getTrailers() { return trailers.get(); }
 
     boolean isCancelled() { return cancelled.get(); }
+
+    int getRequestChunkSent() { return requestChunkSent; }
 
     String getBodyAsString() {
       int totalSize = bodies.stream().mapToInt(ByteBuffer::limit).sum();

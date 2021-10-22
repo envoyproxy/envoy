@@ -732,10 +732,22 @@ static void jvm_http_filter_on_cancel(envoy_stream_intel stream_intel, const voi
   call_jvm_on_cancel(stream_intel, const_cast<void*>(context));
 }
 
-// TODO(goaway) switch this to call_jvm_on_send_window_available
 static void* jvm_on_send_window_available(envoy_stream_intel stream_intel, void* context) {
-  void* result = call_jvm_on_cancel(envoy_stream_intel{}, const_cast<void*>(context));
-  jni_delete_global_ref(context);
+  jni_log("[Envoy]", "jvm_on_send_window_available");
+
+  JNIEnv* env = get_env();
+  jobject j_context = static_cast<jobject>(context);
+
+  jclass jcls_JvmObserverContext = env->GetObjectClass(j_context);
+  jmethodID jmid_onSendWindowAvailable =
+      env->GetMethodID(jcls_JvmObserverContext, "onSendWindowAvailable", "([J)Ljava/lang/Object;");
+
+  jlongArray j_stream_intel = native_stream_intel_to_array(env, stream_intel);
+
+  jobject result = env->CallObjectMethod(j_context, jmid_onSendWindowAvailable, j_stream_intel);
+
+  env->DeleteLocalRef(j_stream_intel);
+  env->DeleteLocalRef(jcls_JvmObserverContext);
   return result;
 }
 
