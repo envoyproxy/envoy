@@ -653,6 +653,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  ASSERT_TRUE(static_resources->listeners_size() > 0);
+  auto* listener = static_resources->mutable_listeners(0);
+  auto* map = listener->mutable_metadata()->mutable_typed_filter_metadata();
+  (*map)[std::string(key)] = packed_value;
+};
+
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
   RELEASE_ASSERT(!finalized_, "");
@@ -786,11 +795,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
-}
-
-void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
-  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,

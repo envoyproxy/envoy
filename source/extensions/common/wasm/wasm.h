@@ -41,12 +41,13 @@ class WasmHandle;
 class Wasm : public WasmBase, Logger::Loggable<Logger::Id::wasm> {
 public:
   Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
-       Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher);
+       Api::Api& api, Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher);
   Wasm(std::shared_ptr<WasmHandle> other, Event::Dispatcher& dispatcher);
   ~Wasm() override;
 
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Event::Dispatcher& dispatcher() { return dispatcher_; }
+  Api::Api& api() { return api_; }
   Context* getRootContext(const std::shared_ptr<PluginBase>& plugin, bool allow_closed) {
     return static_cast<Context*>(WasmBase::getRootContext(plugin, allow_closed));
   }
@@ -98,6 +99,7 @@ protected:
   proxy_wasm::WasmCallVoid<2> on_stats_update_;
 
   Stats::ScopeSharedPtr scope_;
+  Api::Api& api_;
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName custom_stat_namespace_;
   Upstream::ClusterManager& cluster_manager_;

@@ -24,6 +24,7 @@ def _genrule_repository(ctx):
         ))
 
     ctx.file("WORKSPACE", "workspace(name=%r)" % (ctx.name,))
+    ctx.delete("BUILD.bazel")
     ctx.symlink(ctx.attr.build_file, "BUILD.bazel")
 
     # Inject the genrule_cmd content into a .bzl file that can be loaded

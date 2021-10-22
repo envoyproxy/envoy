@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/network/address_impl.h"
@@ -18,9 +18,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 using Http::LowerCaseString;
 
@@ -129,7 +129,7 @@ protected:
   }
 
   TestProcessor test_processor_;
-  envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
@@ -472,6 +472,7 @@ TEST_P(StreamingIntegrationTest, GetAndProcessStreamedResponseBody) {
   EXPECT_TRUE(client_response_->complete());
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
   EXPECT_EQ(client_response_->body().size(), response_size);
+  test_processor_.shutdown();
   EXPECT_EQ(processor_response_hash_, HashUtil::xxHash64(client_response_->body()));
 }
 

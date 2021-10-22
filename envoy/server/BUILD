@@ -184,6 +184,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/grpc:context_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",

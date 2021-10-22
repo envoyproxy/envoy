@@ -984,6 +984,23 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
 
   if (existing_draining_listener != draining_listeners_.cend()) {
     draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
+    existing_draining_listener->listener_->debugLog("clones listener sockets");
+  } else {
+    auto existing_draining_filter_chain = std::find_if(
+        draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
+        [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
+          return draining_filter_chain.getDrainingListener()
+                     .listenSocketFactory()
+                     .getListenSocket(0)
+                     ->isOpen() &&
+                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+        });
+
+    if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
+      draining_listen_socket_factory =
+          &existing_draining_filter_chain->getDrainingListener().getSocketFactory();
+      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+    }
   }
 
   listener.setSocketFactory(draining_listen_socket_factory != nullptr

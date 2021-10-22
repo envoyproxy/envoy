@@ -74,6 +74,16 @@ public:
   virtual bool readMessageEnd(Buffer::Instance& buffer) PURE;
 
   /**
+   * Peeks the start of a Thrift protocol reply payload in the buffer and updates the reply
+   * type parameter with the reply type of the payload.
+   * @param buffer the buffer to peek from
+   * @param reply_type ReplyType to set the payload's reply type to success or error
+   * @return true if reply type was successfully read, false if more data is required
+   * @throw EnvoyException if the data is not a valid payload
+   */
+  virtual bool peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) PURE;
+
+  /**
    * Reads the start of a Thrift struct from the buffer and updates the name parameter with the
    * value from the struct header. If successful, the struct header is removed from the buffer.
    * @param buffer the buffer to read from
