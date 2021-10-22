@@ -14,11 +14,10 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Stateful Session Filter]
-//
 // This filter sets an override host based on the extensible session state and updates the
 // session state based on the final selected upstream host.
-//
 // [#extension: envoy.filters.http.stateful_session]
+
 // [#comment:TODO(wbpcode): To support global feature enabled or disabled flag.]
 message StatefulSession {
   // The expected health status of the host. Suppose a session is assigned to the host X.
