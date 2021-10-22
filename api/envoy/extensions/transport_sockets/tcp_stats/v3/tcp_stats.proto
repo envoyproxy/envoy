@@ -30,5 +30,5 @@ message Config {
 
   // Period to update stats while the connection is open. If unset, updates only happen when the
   // connection is closed. Stats are always updated one final time when the connection is closed.
-  google.protobuf.Duration update_period = 2;
+  google.protobuf.Duration update_period = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
