@@ -168,6 +168,20 @@ message TlsCertificate {
   // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
+  // PFX file containing TLS certificate and private key.
+  //
+  // If *pfx_file* is a filesystem path, the file will be read, but no watch will
+  // be added to the parent directory, since *pfx_file* isn't used by SDS.
+  // This field is mutually exclusive with *certificate_chain* and *private_key*.
+  // This can't be marked as ``oneof`` due to API compatibility reasons. Setting
+  // both :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>`
+  // or :ref:`certificate_chain <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.certificate_chain>`
+  // and :ref:`pfx_file <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pfx_file>`
+  // fields will result in an error. Use :ref:`password
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.password>`
+  // to specify the password to unprotect the PFX, if necessary.
+  config.core.v3.DataSource pfx_file = 8 [(udpa.annotations.sensitive) = true];
+
   // If specified, updates of file-based *certificate_chain* and *private_key*
   // sources will be triggered by this watch. The certificate/key pair will be
   // read together and validated for atomic read consistency (i.e. no
