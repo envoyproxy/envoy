@@ -60,6 +60,10 @@ struct ThreadIds {
     }
   }
 
+  void incSkipAsserts() { ++skip_asserts_; }
+  void decSkipAsserts() { --skip_asserts_; }
+  bool skipAsserts() const { return skip_asserts_ > 0; }
+
 private:
   // The atomic thread IDs can be read without a mutex, but they are written
   // under a mutex so that they are consistent with their use_counts. this
@@ -69,6 +73,8 @@ private:
 
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
+
+  std::atomic<uint32_t> skip_asserts_{};
 };
 
 } // namespace
@@ -93,6 +99,12 @@ bool TestThread::isTestThread() {
   // Note: final #else fallback omitted intentionally.
 }
 #endif
+
+SkipAsserts::SkipAsserts() { ThreadIds::get().incSkipAsserts(); }
+
+SkipAsserts::~SkipAsserts() { ThreadIds::get().decSkipAsserts(); }
+
+bool SkipAsserts::skip() { return ThreadIds::get().skipAsserts(); }
 
 } // namespace Thread
 } // namespace Envoy

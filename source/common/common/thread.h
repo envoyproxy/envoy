@@ -254,12 +254,16 @@ public:
 
 #elif TEST_THREAD_SUPPORTED
 
-#define ASSERT_IS_TEST_THREAD() ASSERT(Thread::TestThread::isTestThread())
+#define ASSERT_IS_TEST_THREAD()                                                                    \
+  ASSERT(Thread::SkipAsserts::skip() || Thread::TestThread::isTestThread())
 #define ASSERT_IS_MAIN_OR_TEST_THREAD()                                                            \
-  ASSERT(Thread::TestThread::isTestThread() || Thread::MainThread::isMainThread())
-#define ASSERT_IS_NOT_TEST_THREAD() ASSERT(!Thread::TestThread::isTestThread())
+  ASSERT(Thread::SkipAsserts::skip() || Thread::TestThread::isTestThread() ||                      \
+         Thread::MainThread::isMainThread())
+#define ASSERT_IS_NOT_TEST_THREAD()                                                                \
+  ASSERT(Thread::SkipAsserts::skip() || !Thread::TestThread::isTestThread())
 #define ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()                                                        \
-  ASSERT(!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()))
+  ASSERT(Thread::SkipAsserts::skip() ||                                                            \
+         (!Thread::MainThread::isMainThread() && !Thread::TestThread::isTestThread()))
 
 #else // !TEST_THREAD_SUPPORTED -- test-thread checks are skipped
 
@@ -278,6 +282,17 @@ public:
 #define TRY_ASSERT_MAIN_THREAD                                                                     \
   try {                                                                                            \
     ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+/**
+ * RAII class to override thread assertions checks in the above macro.
+ */
+class SkipAsserts {
+public:
+  SkipAsserts();
+  ~SkipAsserts();
+
+  static bool skip();
+};
 
 } // namespace Thread
 } // namespace Envoy

@@ -319,6 +319,20 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
         EXPECT_FALSE(Thread::TestThread::isTestThread());
         EXPECT_FALSE(Thread::MainThread::isMainOrTestThread());
 #endif
+
+        ASSERT_IS_NOT_TEST_THREAD();
+        ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+        {
+          Thread::SkipAsserts skip;
+          ASSERT_IS_NOT_TEST_THREAD();
+          ASSERT_IS_NOT_MAIN_OR_TEST_THREAD();
+          ASSERT_IS_TEST_THREAD();
+          ASSERT_IS_MAIN_OR_TEST_THREAD();
+          TRY_ASSERT_MAIN_THREAD {}
+          END_TRY
+          catch (const std::exception&) {
+          }
+        }
       });
   thread->join();
 
