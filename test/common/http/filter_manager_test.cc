@@ -585,6 +585,8 @@ TEST_F(FilterManagerTest, SetAndGetUpstreamOverrideHost) {
   auto override_host = decoder_filter->callbacks_->upstreamOverrideHost();
   EXPECT_EQ(override_host->first, "1.2.3.4");
   EXPECT_EQ(override_host->second, 0b111);
+
+  filter_manager_->destroyFilters();
 };
 
 } // namespace

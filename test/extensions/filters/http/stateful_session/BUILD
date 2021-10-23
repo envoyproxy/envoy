@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stateful_session_mock",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
