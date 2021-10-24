@@ -6379,12 +6379,6 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
           }));
   expectResponseTimerCreate();
 
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-
-  // Simulate the normal first request.
-  router_.decodeHeaders(headers, true);
-
   // Simulate the load balancer to call the `overrideHostToSelect`. When `overrideHostToSelect` of
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
@@ -6396,10 +6390,18 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   EXPECT_EQ("1.2.3.4", override_host->first);
   EXPECT_EQ(0b111, override_host->second);
 
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  // Simulate the normal first request.
+  router_.decodeHeaders(headers, true);
+
   // Mock response with status 503.
   router_.retry_state_->expectHeadersRetry();
   Http::ResponseHeaderMapPtr response_headers_503(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers_503), true);
 
   // Kick off a new request.
@@ -6426,6 +6428,8 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
 
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  ASSERT(response_decoder != nullptr);
+  // NOLINTNEXTLINE: Silence null pointer access warning
   response_decoder->decodeHeaders(std::move(response_headers_200), true);
 
   EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());

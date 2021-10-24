@@ -14,6 +14,7 @@ namespace StatefulSession {
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::CommonFactoryContext& context) {
   std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
+  host_statuses.reserve(config.host_statuses_size());
   for (int i = 0; i < config.host_statuses_size(); i++) {
     host_statuses.push_back(config.host_statuses(i));
   }
