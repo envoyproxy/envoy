@@ -16,9 +16,11 @@ envoy.gpg.sign
 flake8
 frozendict
 gitpython
+google.api.core
 jinja2
 pep8-naming
 ply
+protobuf==3.19.0
 pygithub
 pyreadline
 pytest
