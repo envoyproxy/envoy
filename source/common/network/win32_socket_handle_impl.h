@@ -45,7 +45,6 @@ public:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   IoHandlePtr duplicate() override;
 
-
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 };

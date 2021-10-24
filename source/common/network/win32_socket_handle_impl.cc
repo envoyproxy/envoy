@@ -17,21 +17,21 @@ namespace Envoy {
 namespace Network {
 
 Api::IoCallUint64Result Win32SocketHandleImpl::readv(uint64_t max_length, Buffer::RawSlice* slices,
-                                                  uint64_t num_slice) {
+                                                     uint64_t num_slice) {
   auto result = IoSocketHandleImpl::readv(max_length, slices, num_slice);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::read(Buffer::Instance& buffer,
-                                                 absl::optional<uint64_t> max_length_opt) {
+                                                    absl::optional<uint64_t> max_length_opt) {
   auto result = IoSocketHandleImpl::read(buffer, max_length_opt);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::writev(const Buffer::RawSlice* slices,
-                                                   uint64_t num_slice) {
+                                                      uint64_t num_slice) {
   auto result = IoSocketHandleImpl::writev(slices, num_slice);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Write);
   return result;
@@ -44,26 +44,27 @@ Api::IoCallUint64Result Win32SocketHandleImpl::write(Buffer::Instance& buffer) {
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
-                                                    uint64_t num_slice, int flags,
-                                                    const Address::Ip* self_ip,
-                                                    const Address::Instance& peer_address) {
+                                                       uint64_t num_slice, int flags,
+                                                       const Address::Ip* self_ip,
+                                                       const Address::Instance& peer_address) {
 
-  Api::IoCallUint64Result result = IoSocketHandleImpl::sendmsg(slices, num_slice, flags, self_ip, peer_address);
+  Api::IoCallUint64Result result =
+      IoSocketHandleImpl::sendmsg(slices, num_slice, flags, self_ip, peer_address);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Write);
   return result;
-
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
-                                                    const uint64_t num_slice, uint32_t self_port,
-                                                    RecvMsgOutput& output) {
-  Api::IoCallUint64Result result = IoSocketHandleImpl::recvmsg(slices, num_slice, self_port, output );
+                                                       const uint64_t num_slice, uint32_t self_port,
+                                                       RecvMsgOutput& output) {
+  Api::IoCallUint64Result result =
+      IoSocketHandleImpl::recvmsg(slices, num_slice, self_port, output);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
 }
 
 Api::IoCallUint64Result Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
-                                                     RecvMsgOutput& output) {
+                                                        RecvMsgOutput& output) {
   Api::IoCallUint64Result result = IoSocketHandleImpl::recvmmsg(slices, self_port, output);
   reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
   return result;
@@ -93,8 +94,9 @@ IoHandlePtr Win32SocketHandleImpl::duplicate() {
   return std::make_unique<Win32SocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
 }
 
-void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event) {
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result,
+                                                         uint32_t event) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     if (result.wouldBlock() && file_event_) {
       file_event_->registerEventIfEmulatedEdge(event);
     }
