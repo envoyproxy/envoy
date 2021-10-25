@@ -66,27 +66,28 @@ TYPED_TEST(OwnedImplTest, AddBufferFragmentNoCleanup) {
 
 TYPED_TEST(OwnedImplTest, AddBufferFragmentWithCleanup) {
   std::string input(2048, 'a');
-  BufferFragmentImpl frag(
-      input.c_str(), input.size(),
-      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
+  BufferFragmentImpl frag(input.c_str(), input.size(),
+                          [this](const void*, size_t, const BufferFragmentImpl*) {
+                            this->release_callback_called_ = true;
+                          });
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(frag);
   EXPECT_EQ(2048, buffer.length());
 
   buffer.drain(2000);
   EXPECT_EQ(48, buffer.length());
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   buffer.drain(48);
   EXPECT_EQ(0, buffer.length());
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, AddEmptyFragment) {
   char input[] = "hello world";
   BufferFragmentImpl frag1(input, 11, [](const void*, size_t, const BufferFragmentImpl*) {});
   BufferFragmentImpl frag2("", 0, [this](const void*, size_t, const BufferFragmentImpl*) {
-    release_callback_called_ = true;
+    this->release_callback_called_ = true;
   });
   BufferFragmentImpl frag3(input, 11, [](const void*, size_t, const BufferFragmentImpl*) {});
   Buffer::OwnedImpl buffer;
@@ -109,7 +110,7 @@ TYPED_TEST(OwnedImplTest, AddEmptyFragment) {
 
   buffer.drain(22);
   EXPECT_EQ(0, buffer.length());
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
@@ -119,7 +120,7 @@ TYPED_TEST(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
 
   BufferFragmentImpl* frag = new BufferFragmentImpl(
       input, 2048, [this](const void* data, size_t, const BufferFragmentImpl* frag) {
-        release_callback_called_ = true;
+        this->release_callback_called_ = true;
         delete[] static_cast<const char*>(data);
         delete frag;
       });
@@ -130,11 +131,11 @@ TYPED_TEST(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
 
   buffer.drain(2042);
   EXPECT_EQ(6, buffer.length());
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   buffer.drain(6);
   EXPECT_EQ(0, buffer.length());
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
@@ -142,7 +143,7 @@ TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
   const size_t expected_length = input.size();
   auto frag = OwnedBufferFragmentImpl::create(
       {input.c_str(), expected_length},
-      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+      [this](const OwnedBufferFragmentImpl*) { this->release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(*frag);
   EXPECT_EQ(expected_length, buffer.length());
@@ -150,11 +151,11 @@ TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
   const uint64_t partial_drain_size = 5;
   buffer.drain(partial_drain_size);
   EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   buffer.drain(expected_length - partial_drain_size);
   EXPECT_EQ(0, buffer.length());
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 // Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
@@ -166,7 +167,7 @@ TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
 
   auto* frag = OwnedBufferFragmentImpl::create({input, expected_length},
                                                [this, input](const OwnedBufferFragmentImpl* frag) {
-                                                 release_callback_called_ = true;
+                                                 this->release_callback_called_ = true;
                                                  delete[] input;
                                                  delete frag;
                                                })
@@ -179,11 +180,11 @@ TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
   const uint64_t partial_drain_size = 5;
   buffer.drain(partial_drain_size);
   EXPECT_EQ(expected_length - partial_drain_size, buffer.length());
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   buffer.drain(expected_length - partial_drain_size);
   EXPECT_EQ(0, buffer.length());
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, Add) {
@@ -265,7 +266,8 @@ TYPED_TEST(OwnedImplTest, Write) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  TestFixture::IoSocketHandleType io_handle;
+  typedef typename TestFixture::IoSocketHandleType tt;
+  tt io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
   Api::IoCallUint64Result result = io_handle.write(buffer);
@@ -316,7 +318,8 @@ TYPED_TEST(OwnedImplTest, Read) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  TestFixture::IoSocketHandleType io_handle;
+  typedef typename TestFixture::IoSocketHandleType tt;
+  tt io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   Api::IoCallUint64Result result = io_handle.read(buffer, 100);
   EXPECT_TRUE(result.ok());
@@ -450,7 +453,7 @@ TYPED_TEST(OwnedImplTest, ExtractUnownedSlice) {
   const size_t expected_length0 = input.size();
   auto frag = OwnedBufferFragmentImpl::create(
       {input.c_str(), expected_length0},
-      [this](const OwnedBufferFragmentImpl*) { release_callback_called_ = true; });
+      [this](const OwnedBufferFragmentImpl*) { this->release_callback_called_ = true; });
   Buffer::OwnedImpl buffer;
   buffer.addBufferFragment(*frag);
 
@@ -467,7 +470,7 @@ TYPED_TEST(OwnedImplTest, ExtractUnownedSlice) {
   const uint64_t partial_drain_size = 5;
   buffer.drain(partial_drain_size);
   EXPECT_EQ(expected_length0 - partial_drain_size + expected_length1, buffer.length());
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
   EXPECT_FALSE(drain_tracker_called);
 
   // Extract what remains of the unowned slice, leaving only the owned slice.
@@ -484,7 +487,7 @@ TYPED_TEST(OwnedImplTest, ExtractUnownedSlice) {
   // The underlying immutable unowned slice was discarded during the extract
   // operation and replaced with a mutable copy. The drain trackers were
   // called as part of the extract, implying that the release callback was called.
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, ExtractWithDrainTracker) {
@@ -655,9 +658,10 @@ TYPED_TEST(OwnedImplTest, Linearize) {
 
   // Unowned slice to track when linearize kicks in.
   std::string input(1000, 'a');
-  BufferFragmentImpl frag(
-      input.c_str(), input.size(),
-      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
+  BufferFragmentImpl frag(input.c_str(), input.size(),
+                          [this](const void*, size_t, const BufferFragmentImpl*) {
+                            this->release_callback_called_ = true;
+                          });
   buffer.addBufferFragment(frag);
 
   // Second slice with more data.
@@ -666,11 +670,11 @@ TYPED_TEST(OwnedImplTest, Linearize) {
   // Linearize does not change the pointer associated with the first slice if requested size is less
   // than or equal to size of the first slice.
   EXPECT_EQ(input.c_str(), buffer.linearize(input.size()));
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   constexpr uint64_t LinearizeSize = 2000;
   void* out_ptr = buffer.linearize(LinearizeSize);
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
   EXPECT_EQ(input + std::string(1000, 'b'),
             absl::string_view(reinterpret_cast<const char*>(out_ptr), LinearizeSize));
 }
@@ -685,16 +689,17 @@ TYPED_TEST(OwnedImplTest, LinearizeSingleSlice) {
 
   // Unowned slice to track when linearize kicks in.
   std::string input(1000, 'a');
-  BufferFragmentImpl frag(
-      input.c_str(), input.size(),
-      [this](const void*, size_t, const BufferFragmentImpl*) { release_callback_called_ = true; });
+  BufferFragmentImpl frag(input.c_str(), input.size(),
+                          [this](const void*, size_t, const BufferFragmentImpl*) {
+                            this->release_callback_called_ = true;
+                          });
   buffer->addBufferFragment(frag);
 
   EXPECT_EQ(input.c_str(), buffer->linearize(buffer->length()));
-  EXPECT_FALSE(release_callback_called_);
+  EXPECT_FALSE(this->release_callback_called_);
 
   buffer.reset();
-  EXPECT_TRUE(release_callback_called_);
+  EXPECT_TRUE(this->release_callback_called_);
 }
 
 TYPED_TEST(OwnedImplTest, LinearizeDrainTracking) {
@@ -741,17 +746,17 @@ TYPED_TEST(OwnedImplTest, LinearizeDrainTracking) {
   }
   buffer.addDrainTracker(tracker5.AsStdFunction());
 
-  expectSlices({{16184, 200, 16384},
-                {400, 0, 400},
-                {0, 0, 0},
-                {32768, 0, 32768},
-                {4096, 0, 4096},
-                {4096, 0, 4096},
-                {4096, 0, 4096},
-                {4096, 0, 4096},
-                {4096, 0, 4096},
-                {320, 3776, 4096}},
-               buffer);
+  this->expectSlices({{16184, 200, 16384},
+                      {400, 0, 400},
+                      {0, 0, 0},
+                      {32768, 0, 32768},
+                      {4096, 0, 4096},
+                      {4096, 0, 4096},
+                      {4096, 0, 4096},
+                      {4096, 0, 4096},
+                      {4096, 0, 4096},
+                      {320, 3776, 4096}},
+                     buffer);
 
   testing::InSequence s;
   testing::MockFunction<void(int, int)> drain_tracker;
@@ -776,13 +781,13 @@ TYPED_TEST(OwnedImplTest, LinearizeDrainTracking) {
                                                                   {4616, 3576, 8192}}) {
     const uint32_t write_size = std::min<uint32_t>(LinearizeSize, buffer.length());
     buffer.linearize(write_size);
-    expectFirstSlice(expected_first_slice, buffer);
+    this->expectFirstSlice(expected_first_slice, buffer);
     drain_tracker.Call(buffer.length(), write_size);
     buffer.drain(write_size);
   }
   done_tracker.Call();
 
-  expectSlices({}, buffer);
+  this->expectSlices({}, buffer);
 }
 
 TYPED_TEST(OwnedImplTest, ReserveCommit) {
@@ -829,7 +834,7 @@ TYPED_TEST(OwnedImplTest, ReserveCommit) {
     // should result in the buffer creating a second slice and splitting the reservation between the
     // last two slices.
     {
-      expectSlices({{1, 16383, 16384}}, buffer);
+      this->expectSlices({{1, 16383, 16384}}, buffer);
       auto reservation = buffer.reserveForRead();
       EXPECT_GE(reservation.numSlices(), 2);
       EXPECT_GE(reservation.length(), 32767);
@@ -842,13 +847,13 @@ TYPED_TEST(OwnedImplTest, ReserveCommit) {
     // should make a new slice to satisfy the reservation; it cannot safely use any of
     // the previously seen slices, because they are no longer at the end of the buffer.
     {
-      expectSlices({{1, 16383, 16384}}, buffer);
+      this->expectSlices({{1, 16383, 16384}}, buffer);
       buffer.addBufferFragment(fragment);
       EXPECT_EQ(13, buffer.length());
       auto reservation = buffer.reserveForRead();
       EXPECT_NE(slice1, reservation.slices()[0].mem_);
       reservation.commit(1);
-      expectSlices({{1, 16383, 16384}, {12, 0, 12}, {1, 16383, 16384}}, buffer);
+      this->expectSlices({{1, 16383, 16384}, {12, 0, 12}, {1, 16383, 16384}}, buffer);
     }
     EXPECT_EQ(14, buffer.length());
   }
@@ -892,12 +897,12 @@ TYPED_TEST(OwnedImplTest, ReserveCommitReuse) {
   // Commit part of the first slice and none of the second slice.
   const void* first_slice;
   {
-    expectSlices({{8000, 4288, 12288}}, buffer);
+    this->expectSlices({{8000, 4288, 12288}}, buffer);
     auto reservation = buffer.reserveForRead();
 
     // No additional slices are added to the buffer until `commit()` is called
     // on the reservation.
-    expectSlices({{8000, 4288, 12288}}, buffer);
+    this->expectSlices({{8000, 4288, 12288}}, buffer);
     first_slice = reservation.slices()[0].mem_;
 
     EXPECT_GE(reservation.numSlices(), 2);
@@ -905,7 +910,7 @@ TYPED_TEST(OwnedImplTest, ReserveCommitReuse) {
   }
   EXPECT_EQ(8001, buffer.length());
   // The second slice is now released because there's nothing in the second slice.
-  expectSlices({{8001, 4287, 12288}}, buffer);
+  this->expectSlices({{8001, 4287, 12288}}, buffer);
 
   // Reserve again.
   {
@@ -914,7 +919,7 @@ TYPED_TEST(OwnedImplTest, ReserveCommitReuse) {
     EXPECT_EQ(static_cast<const uint8_t*>(first_slice) + 1,
               static_cast<const uint8_t*>(reservation.slices()[0].mem_));
   }
-  expectSlices({{8001, 4287, 12288}}, buffer);
+  this->expectSlices({{8001, 4287, 12288}}, buffer);
 }
 
 // Test behavior when the size to commit() is larger than the reservation.
@@ -1152,9 +1157,9 @@ TYPED_TEST(OwnedImplTest, ReserveZeroCommit) {
   buf.addBufferFragment(frag);
   buf.prepend("bbbbb");
   buf.add("");
-  expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
+  this->expectSlices({{5, 0, 4096}, {0, 0, 0}}, buf);
   { auto reservation = buf.reserveSingleSlice(1280); }
-  expectSlices({{5, 0, 4096}}, buf);
+  this->expectSlices({{5, 0, 4096}}, buf);
   os_fd_t pipe_fds[2] = {0, 0};
   auto& os_sys_calls = Api::OsSysCallsSingleton::get();
 #ifdef WIN32
@@ -1162,7 +1167,8 @@ TYPED_TEST(OwnedImplTest, ReserveZeroCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  TestFixture::IoSocketHandleType io_handle(pipe_fds[0]);
+  typedef typename TestFixture::IoSocketHandleType tt;
+  tt io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
   const uint32_t max_length = 1953;
@@ -1175,7 +1181,7 @@ TYPED_TEST(OwnedImplTest, ReserveZeroCommit) {
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
   ASSERT_EQ(previous_length, buf.search(data.data(), rc, previous_length, 0));
   EXPECT_EQ("bbbbb", buf.toString().substr(0, 5));
-  expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
+  this->expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
 }
 
 TYPED_TEST(OwnedImplTest, ReadReserveAndCommit) {
@@ -1190,7 +1196,8 @@ TYPED_TEST(OwnedImplTest, ReadReserveAndCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  TestFixture::IoSocketHandleType io_handle(pipe_fds[0]);
+  typedef typename TestFixture::IoSocketHandleType IoSocketHandleType;
+  IoSocketHandleType io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
 
@@ -1202,7 +1209,7 @@ TYPED_TEST(OwnedImplTest, ReadReserveAndCommit) {
   ASSERT_EQ(result.return_value_, static_cast<uint64_t>(rc));
   ASSERT_EQ(os_sys_calls.close(pipe_fds[1]).return_value_, 0);
   EXPECT_EQ("bbbbbe", buf.toString());
-  expectSlices({{6, 4090, 4096}}, buf);
+  this->expectSlices({{6, 4090, 4096}}, buf);
 }
 
 TEST(OverflowDetectingUInt64, Arithmetic) {
