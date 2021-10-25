@@ -6,8 +6,8 @@
 #include "envoy/network/socket.h"
 
 #include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/win32_socket_handle_impl.h"
 #include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 #include "test/test_common/network_utility.h"
 
