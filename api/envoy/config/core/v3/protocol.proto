@@ -28,7 +28,34 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
+// Config for keepalive probes in a QUIC connection.
+// Note that QUIC keep-alive probing packets work differently from HTTP/2 keep-alive PINGs in a sense that the probing packet
+// itself doesn't timeout waiting for a probing response. Quic has a shorter idle timeout than TCP, so it doesn't rely on such probing to discover dead connections. If the peer fails to respond, the connection will idle timeout eventually. Thus, they are configured differently from :ref:`connection_keepalive <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.connection_keepalive>`.
+message QuicKeepAliveSettings {
+  // The max interval for a connection to send keep-alive probing packets (with PING or PATH_RESPONSE). The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout while not less than 1s to avoid throttling the connection or flooding the peer with probes.
+  //
+  // If :ref:`initial_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.initial_interval>` is absent or zero, a client connection will use this value to start probing.
+  //
+  // If zero, disable keepalive probing.
+  // If absent, use the QUICHE default interval to probe.
+  google.protobuf.Duration max_interval = 1 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
+
+  // The interval to send the first few keep-alive probing packets to prevent connection from hitting the idle timeout. Subsequent probes will be sent, each one with an interval exponentially longer than previous one, till it reaches :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`. And the probes afterwards will always use :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`.
+  //
+  // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
+  //
+  // If absent or zero, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>`  is also zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
+  google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
+    lte {}
+    gte {seconds: 1}
+  }];
+}
+
 // QUIC protocol options which apply to both downstream and upstream connections.
+// [#next-free-field: 6]
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
@@ -65,6 +92,10 @@ message QuicProtocolOptions {
   // TODO(renjietang): Plumb through quiche to make this config able to adjust the amount of timeouts needed to trigger port migration.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
       [(validate.rules).uint32 = {lte: 1 gte: 0}];
+
+  // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
+  // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
+  QuicKeepAliveSettings connection_keepalive = 5;
 }
 
 message UpstreamHttpProtocolOptions {
@@ -299,6 +330,8 @@ message KeepaliveSettings {
   // If this is zero, this type of PING will not be sent.
   // If an interval ping is outstanding, a second ping will not be sent as the
   // interval ping will determine if the connection is dead.
+  //
+  // The same feature for HTTP/3 is given by inheritance from QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before sending a new request.
   google.protobuf.Duration connection_idle_interval = 4
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 }
