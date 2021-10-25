@@ -397,6 +397,7 @@ public:
 
   /**
    * Fires when the MAX_STREAMS frame is received from the peer.
+   * This is an HTTP/3 frame, indicating the new maximum stream ID which can be opened.
    * This may occur multiple times across the lifetime of an HTTP/3 connection.
    * @param num_streams the number of streams now allowed to be opened.
    */

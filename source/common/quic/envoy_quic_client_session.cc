@@ -142,8 +142,7 @@ uint64_t EnvoyQuicClientSession::streamsAvailable() {
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
 
-  // Arguably the peer could start a connection with 0 streams and increase open
-  // streams later but this is currently unsupported.
+  // TODO(alyssawilk) support the case where a connection starts with 0 max streams.
   ASSERT(streamsAvailable());
   if (streamsAvailable() > 0) {
     OnCanCreateNewOutgoingStream(false);
