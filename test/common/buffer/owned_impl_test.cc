@@ -26,7 +26,7 @@ namespace {
 template <class T> class OwnedImplTest : public testing::Test {
 public:
   bool release_callback_called_ = false;
-  using IoSocketHandleType = T;
+  using IoSocketHandleTestType = T;
 
 protected:
   static void expectSlices(std::vector<std::vector<int>> buffer_list, OwnedImpl& buffer) {
@@ -48,8 +48,7 @@ protected:
   }
 };
 
-typedef ::testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>
-    IoSocketHandleTypes;
+using IoSocketHandleTypes = testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>;
 
 TYPED_TEST_CASE(OwnedImplTest, IoSocketHandleTypes);
 
@@ -266,8 +265,8 @@ TYPED_TEST(OwnedImplTest, Write) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  typedef typename TestFixture::IoSocketHandleType tt;
-  tt io_handle;
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
   Api::IoCallUint64Result result = io_handle.write(buffer);
@@ -318,8 +317,8 @@ TYPED_TEST(OwnedImplTest, Read) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  typedef typename TestFixture::IoSocketHandleType tt;
-  tt io_handle;
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   Api::IoCallUint64Result result = io_handle.read(buffer, 100);
   EXPECT_TRUE(result.ok());
@@ -1167,8 +1166,8 @@ TYPED_TEST(OwnedImplTest, ReserveZeroCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  typedef typename TestFixture::IoSocketHandleType tt;
-  tt io_handle(pipe_fds[0]);
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
+  IoSocketHandleType io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
   const uint32_t max_length = 1953;
@@ -1196,7 +1195,7 @@ TYPED_TEST(OwnedImplTest, ReadReserveAndCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  typedef typename TestFixture::IoSocketHandleType IoSocketHandleType;
+  using IoSocketHandleType = typename TestFixture::IoSocketHandleTestType;
   IoSocketHandleType io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
