@@ -452,9 +452,11 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
 
   // Ensure we only have one connection upstream, one request active at a time.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    auto* cluster = static_resources->mutable_clusters(0);
-    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    envoy::config::bootstrap::v3::Bootstrap::StaticResources* static_resources =
+        bootstrap.mutable_static_resources();
+    envoy::config::cluster::v3::Cluster* cluster = static_resources->mutable_clusters(0);
+    envoy::config::cluster::v3::CircuitBreakers* circuit_breakers =
+        cluster->mutable_circuit_breakers();
     circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
     ConfigHelper::HttpProtocolOptions protocol_options;
     protocol_options.mutable_explicit_http_config()
@@ -472,17 +474,19 @@ TEST_P(ProxyFilterIntegrationTest, MultipleRequestsLowStreamLimit) {
 
   // Start sending the request, but ensure no end stream will be sent, so the
   // stream will stay in use.
-  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_request_headers_);
   request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
 
-  // make sure the headers are received.
+  // Make sure the headers are received.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
 
   // Start another request.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 2);
   // Make sure the stream is not received.
   ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
