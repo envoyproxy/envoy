@@ -86,9 +86,8 @@ Config::GrpcMuxWatchPtr GrpcMuxImpl<S, F, RQ, RS>::addWatch(
     watch_map =
         watch_maps_.emplace(type_url, std::make_unique<WatchMap>(options.use_namespace_matching_))
             .first;
-    subscriptions_.emplace(
-        type_url, subscription_state_factory_->makeSubscriptionState(
-                      type_url, *watch_maps_[type_url], resource_decoder, resources.empty()));
+    subscriptions_.emplace(type_url, subscription_state_factory_->makeSubscriptionState(
+                                         type_url, *watch_maps_[type_url], resource_decoder));
     subscription_ordering_.emplace_back(type_url);
   }
 

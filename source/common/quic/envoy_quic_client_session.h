@@ -61,6 +61,11 @@ public:
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
 
+  // quic::QuicSpdyClientSessionBase
+  bool ShouldKeepConnectionAlive() const override;
+  // quic::ProofHandler
+  void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
+
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() override {
     // Do one round of reading per active stream, or to see if there's a new
@@ -107,6 +112,7 @@ private:
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  bool disable_keepalive_{false};
 };
 
 } // namespace Quic

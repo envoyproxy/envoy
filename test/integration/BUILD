@@ -1856,3 +1856,17 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "typed_metadata_integration_test",
+    srcs = [
+        "typed_metadata_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/protobuf",
+        "//test/integration/filters:listener_typed_metadata_filter_lib",
+        "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

@@ -67,7 +67,7 @@ private:
   uint32_t low_watermark_{0};
   uint32_t overflow_watermark_{0};
   // Tracks the latest state of watermark callbacks.
-  // True between the time above_high_watermark_ has been called until above_high_watermark_ has
+  // True between the time above_high_watermark_ has been called until below_low_watermark_ has
   // been called.
   bool above_high_watermark_called_{false};
   // Set to true when above_overflow_watermark_ is called (and isn't cleared).
