@@ -77,7 +77,7 @@ public:
   // initial handshake is complete and MAX_STREAMS frame has been received,
   // assume optimistically it will get ~100 streams, so that the connection pool
   // won't fetch a connection for each incoming stream but will assume that the
-  // first connection will likely be ablie to serve 100.
+  // first connection will likely be able to serve 100.
   // This number will be updated to the correct value before the connection is
   // deemed connected, at which point further connections will be established if
   // necessary.
