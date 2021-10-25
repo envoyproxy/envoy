@@ -96,10 +96,8 @@ IoHandlePtr Win32SocketHandleImpl::duplicate() {
 
 void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result,
                                                          uint32_t event) {
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(event);
-    }
+  if (result.wouldBlock() && file_event_) {
+    file_event_->registerEventIfEmulatedEdge(event);
   }
 }
 

@@ -4,6 +4,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/mocks/api/mocks.h"
@@ -22,9 +23,10 @@ namespace Envoy {
 namespace Buffer {
 namespace {
 
-class OwnedImplTest : public testing::Test {
+template <class T> class OwnedImplTest : public testing::Test {
 public:
   bool release_callback_called_ = false;
+  using IoSocketHandleType = T;
 
 protected:
   static void expectSlices(std::vector<std::vector<int>> buffer_list, OwnedImpl& buffer) {
@@ -46,7 +48,12 @@ protected:
   }
 };
 
-TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
+typedef ::testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>
+    IoSocketHandleTypes;
+
+TYPED_TEST_CASE(OwnedImplTest, IoSocketHandleTypes);
+
+TYPED_TEST(OwnedImplTest, AddBufferFragmentNoCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, nullptr);
   Buffer::OwnedImpl buffer;
@@ -57,7 +64,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
+TYPED_TEST(OwnedImplTest, AddBufferFragmentWithCleanup) {
   std::string input(2048, 'a');
   BufferFragmentImpl frag(
       input.c_str(), input.size(),
@@ -75,7 +82,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, AddEmptyFragment) {
+TYPED_TEST(OwnedImplTest, AddEmptyFragment) {
   char input[] = "hello world";
   BufferFragmentImpl frag1(input, 11, [](const void*, size_t, const BufferFragmentImpl*) {});
   BufferFragmentImpl frag2("", 0, [this](const void*, size_t, const BufferFragmentImpl*) {
@@ -105,7 +112,7 @@ TEST_F(OwnedImplTest, AddEmptyFragment) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
+TYPED_TEST(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   std::string input_str(2048, 'a');
   char* input = new char[2048];
   std::copy(input_str.c_str(), input_str.c_str() + 11, input);
@@ -130,7 +137,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
+TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
   std::string input(2048, 'a');
   const size_t expected_length = input.size();
   auto frag = OwnedBufferFragmentImpl::create(
@@ -151,7 +158,7 @@ TEST_F(OwnedImplTest, AddOwnedBufferFragmentWithCleanup) {
 }
 
 // Verify that OwnedBufferFragment work correctly when input buffer is allocated on the heap.
-TEST_F(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
+TYPED_TEST(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
   std::string input_str(2048, 'a');
   const size_t expected_length = input_str.size();
   char* input = new char[expected_length];
@@ -179,7 +186,7 @@ TEST_F(OwnedImplTest, AddOwnedBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, Add) {
+TYPED_TEST(OwnedImplTest, Add) {
   const std::string string1 = "Hello, ", string2 = "World!";
   Buffer::OwnedImpl buffer;
   buffer.add(string1);
@@ -203,7 +210,7 @@ TEST_F(OwnedImplTest, Add) {
   EXPECT_EQ(string1 + string2 + big_suffix, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, Prepend) {
+TYPED_TEST(OwnedImplTest, Prepend) {
   const std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix);
@@ -225,7 +232,7 @@ TEST_F(OwnedImplTest, Prepend) {
   EXPECT_EQ(big_prefix + prefix + suffix, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
+TYPED_TEST(OwnedImplTest, PrependToEmptyBuffer) {
   std::string data = "Hello, World!";
   Buffer::OwnedImpl buffer;
   buffer.prepend(data);
@@ -239,7 +246,7 @@ TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
   EXPECT_EQ(data, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, PrependBuffer) {
+TYPED_TEST(OwnedImplTest, PrependBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix);
@@ -253,12 +260,12 @@ TEST_F(OwnedImplTest, PrependBuffer) {
   EXPECT_EQ(0, prefixBuffer.length());
 }
 
-TEST_F(OwnedImplTest, Write) {
+TYPED_TEST(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  Network::IoSocketHandleImpl io_handle;
+  TestFixture::IoSocketHandleType io_handle;
   buffer.add("example");
   EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
   Api::IoCallUint64Result result = io_handle.write(buffer);
@@ -304,12 +311,12 @@ TEST_F(OwnedImplTest, Write) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, Read) {
+TYPED_TEST(OwnedImplTest, Read) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  Network::IoSocketHandleImpl io_handle;
+  TestFixture::IoSocketHandleType io_handle;
   EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   Api::IoCallUint64Result result = io_handle.read(buffer, 100);
   EXPECT_TRUE(result.ok());
@@ -339,7 +346,7 @@ TEST_F(OwnedImplTest, Read) {
   EXPECT_THAT(buffer.describeSlicesForTest(), testing::IsEmpty());
 }
 
-TEST_F(OwnedImplTest, ExtractOwnedSlice) {
+TYPED_TEST(OwnedImplTest, ExtractOwnedSlice) {
   // Create a buffer with two owned slices.
   Buffer::OwnedImpl buffer;
   buffer.appendSliceForTest("abcde");
@@ -379,7 +386,7 @@ TEST_F(OwnedImplTest, ExtractOwnedSlice) {
   EXPECT_EQ(buffer.toString(), "Abcde");
 }
 
-TEST_F(OwnedImplTest, ExtractAfterSentinelDiscard) {
+TYPED_TEST(OwnedImplTest, ExtractAfterSentinelDiscard) {
   // Create a buffer with a sentinel and one owned slice.
   Buffer::OwnedImpl buffer;
   bool sentinel_discarded = false;
@@ -411,7 +418,7 @@ TEST_F(OwnedImplTest, ExtractAfterSentinelDiscard) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
+TYPED_TEST(OwnedImplTest, DrainThenExtractOwnedSlice) {
   // Create a buffer with two owned slices.
   Buffer::OwnedImpl buffer;
   buffer.appendSliceForTest("abcde");
@@ -437,7 +444,7 @@ TEST_F(OwnedImplTest, DrainThenExtractOwnedSlice) {
   EXPECT_EQ(buffer.toString(), "123");
 }
 
-TEST_F(OwnedImplTest, ExtractUnownedSlice) {
+TYPED_TEST(OwnedImplTest, ExtractUnownedSlice) {
   // Create a buffer with an unowned slice.
   std::string input{"unowned test slice"};
   const size_t expected_length0 = input.size();
@@ -480,7 +487,7 @@ TEST_F(OwnedImplTest, ExtractUnownedSlice) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, ExtractWithDrainTracker) {
+TYPED_TEST(OwnedImplTest, ExtractWithDrainTracker) {
   testing::InSequence s;
 
   Buffer::OwnedImpl buffer;
@@ -502,7 +509,7 @@ TEST_F(OwnedImplTest, ExtractWithDrainTracker) {
   slice.reset();
 }
 
-TEST_F(OwnedImplTest, DrainTracking) {
+TYPED_TEST(OwnedImplTest, DrainTracking) {
   testing::InSequence s;
 
   Buffer::OwnedImpl buffer;
@@ -521,7 +528,7 @@ TEST_F(OwnedImplTest, DrainTracking) {
   done.Call();
 }
 
-TEST_F(OwnedImplTest, MoveDrainTrackersWhenTransferingSlices) {
+TYPED_TEST(OwnedImplTest, MoveDrainTrackersWhenTransferingSlices) {
   testing::InSequence s;
 
   Buffer::OwnedImpl buffer1;
@@ -556,7 +563,7 @@ TEST_F(OwnedImplTest, MoveDrainTrackersWhenTransferingSlices) {
   done.Call();
 }
 
-TEST_F(OwnedImplTest, MoveDrainTrackersWhenCopying) {
+TYPED_TEST(OwnedImplTest, MoveDrainTrackersWhenCopying) {
   testing::InSequence s;
 
   Buffer::OwnedImpl buffer1;
@@ -586,7 +593,7 @@ TEST_F(OwnedImplTest, MoveDrainTrackersWhenCopying) {
   done.Call();
 }
 
-TEST_F(OwnedImplTest, PartialMoveDrainTrackers) {
+TYPED_TEST(OwnedImplTest, PartialMoveDrainTrackers) {
   testing::InSequence s;
 
   Buffer::OwnedImpl buffer1;
@@ -627,7 +634,7 @@ TEST_F(OwnedImplTest, PartialMoveDrainTrackers) {
   buffer2.drain(buffer2.length());
 }
 
-TEST_F(OwnedImplTest, DrainTrackingOnDestruction) {
+TYPED_TEST(OwnedImplTest, DrainTrackingOnDestruction) {
   testing::InSequence s;
 
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
@@ -643,7 +650,7 @@ TEST_F(OwnedImplTest, DrainTrackingOnDestruction) {
   done.Call();
 }
 
-TEST_F(OwnedImplTest, Linearize) {
+TYPED_TEST(OwnedImplTest, Linearize) {
   Buffer::OwnedImpl buffer;
 
   // Unowned slice to track when linearize kicks in.
@@ -668,12 +675,12 @@ TEST_F(OwnedImplTest, Linearize) {
             absl::string_view(reinterpret_cast<const char*>(out_ptr), LinearizeSize));
 }
 
-TEST_F(OwnedImplTest, LinearizeEmptyBuffer) {
+TYPED_TEST(OwnedImplTest, LinearizeEmptyBuffer) {
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(nullptr, buffer.linearize(0));
 }
 
-TEST_F(OwnedImplTest, LinearizeSingleSlice) {
+TYPED_TEST(OwnedImplTest, LinearizeSingleSlice) {
   auto buffer = std::make_unique<Buffer::OwnedImpl>();
 
   // Unowned slice to track when linearize kicks in.
@@ -690,7 +697,7 @@ TEST_F(OwnedImplTest, LinearizeSingleSlice) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, LinearizeDrainTracking) {
+TYPED_TEST(OwnedImplTest, LinearizeDrainTracking) {
   constexpr uint32_t SmallChunk = 200;
   constexpr uint32_t LargeChunk = 16384 - SmallChunk;
   constexpr uint32_t LinearizeSize = SmallChunk + LargeChunk;
@@ -778,7 +785,7 @@ TEST_F(OwnedImplTest, LinearizeDrainTracking) {
   expectSlices({}, buffer);
 }
 
-TEST_F(OwnedImplTest, ReserveCommit) {
+TYPED_TEST(OwnedImplTest, ReserveCommit) {
   // This fragment will later be added to the buffer. It is declared in an enclosing scope to
   // ensure it is not destructed until after the buffer is.
   const std::string input = "Hello, world";
@@ -866,7 +873,7 @@ TEST_F(OwnedImplTest, ReserveCommit) {
   }
 }
 
-TEST_F(OwnedImplTest, ReserveCommitReuse) {
+TYPED_TEST(OwnedImplTest, ReserveCommitReuse) {
   Buffer::OwnedImpl buffer;
 
   // Reserve 8KB and commit all but a few bytes of it, to ensure that
@@ -911,7 +918,7 @@ TEST_F(OwnedImplTest, ReserveCommitReuse) {
 }
 
 // Test behavior when the size to commit() is larger than the reservation.
-TEST_F(OwnedImplTest, ReserveOverCommit) {
+TYPED_TEST(OwnedImplTest, ReserveOverCommit) {
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveForRead();
   const auto reservation_length = reservation.length();
@@ -925,7 +932,7 @@ TEST_F(OwnedImplTest, ReserveOverCommit) {
 }
 
 // Test behavior when the size to commit() is larger than the reservation.
-TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
+TYPED_TEST(OwnedImplTest, ReserveSingleOverCommit) {
   Buffer::OwnedImpl buffer;
   auto reservation = buffer.reserveSingleSlice(10);
   const auto reservation_length = reservation.length();
@@ -939,7 +946,7 @@ TEST_F(OwnedImplTest, ReserveSingleOverCommit) {
 }
 
 // Test functionality of the `freelist` (a performance optimization)
-TEST_F(OwnedImplTest, SliceFreeList) {
+TYPED_TEST(OwnedImplTest, SliceFreeList) {
   Buffer::OwnedImpl b1, b2;
   std::vector<void*> slices;
   {
@@ -984,7 +991,7 @@ TEST_F(OwnedImplTest, SliceFreeList) {
   }
 }
 
-TEST_F(OwnedImplTest, Search) {
+TYPED_TEST(OwnedImplTest, Search) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
@@ -1011,7 +1018,7 @@ TEST_F(OwnedImplTest, Search) {
   EXPECT_EQ(-1, buffer.search("abaaaabaaaaabaa", 15, 0, 0));
 }
 
-TEST_F(OwnedImplTest, SearchWithLengthLimit) {
+TYPED_TEST(OwnedImplTest, SearchWithLengthLimit) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the search implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
@@ -1046,7 +1053,7 @@ TEST_F(OwnedImplTest, SearchWithLengthLimit) {
   EXPECT_EQ(12, buffer.search("ba", 2, 11, 10e6));
 }
 
-TEST_F(OwnedImplTest, StartsWith) {
+TYPED_TEST(OwnedImplTest, StartsWith) {
   // Populate a buffer with a string split across many small slices, to
   // exercise edge cases in the startsWith implementation.
   static const char* Inputs[] = {"ab", "a", "", "aaa", "b", "a", "aaa", "ab", "a"};
@@ -1068,7 +1075,7 @@ TEST_F(OwnedImplTest, StartsWith) {
   EXPECT_FALSE(buffer.startsWith({"ba", 2}));
 }
 
-TEST_F(OwnedImplTest, ToString) {
+TYPED_TEST(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
   EXPECT_EQ("", buffer.toString());
   auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
@@ -1083,7 +1090,7 @@ TEST_F(OwnedImplTest, ToString) {
   EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
 }
 
-TEST_F(OwnedImplTest, AppendSliceForTest) {
+TYPED_TEST(OwnedImplTest, AppendSliceForTest) {
   static constexpr size_t NumInputs = 3;
   static constexpr const char* Inputs[] = {"one", "2", "", "four", ""};
   Buffer::OwnedImpl buffer;
@@ -1122,7 +1129,7 @@ TEST_F(OwnedImplTest, AppendSliceForTest) {
 // Regression test for oss-fuzz issue
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=13263, where prepending
 // an empty buffer resulted in a corrupted libevent internal state.
-TEST_F(OwnedImplTest, PrependEmpty) {
+TYPED_TEST(OwnedImplTest, PrependEmpty) {
   Buffer::OwnedImpl buf;
   Buffer::OwnedImpl other_buf;
   char input[] = "foo";
@@ -1139,7 +1146,7 @@ TEST_F(OwnedImplTest, PrependEmpty) {
 // Regression test for oss-fuzz issues
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=14466, empty commit
 // following a reserve resulted in a corrupted libevent internal state.
-TEST_F(OwnedImplTest, ReserveZeroCommit) {
+TYPED_TEST(OwnedImplTest, ReserveZeroCommit) {
   BufferFragmentImpl frag("", 0, nullptr);
   Buffer::OwnedImpl buf;
   buf.addBufferFragment(frag);
@@ -1155,7 +1162,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
+  TestFixture::IoSocketHandleType io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
   const uint32_t max_length = 1953;
@@ -1171,7 +1178,7 @@ TEST_F(OwnedImplTest, ReserveZeroCommit) {
   expectSlices({{5, 0, 4096}, {1953, 14431, 16384}}, buf);
 }
 
-TEST_F(OwnedImplTest, ReadReserveAndCommit) {
+TYPED_TEST(OwnedImplTest, ReadReserveAndCommit) {
   BufferFragmentImpl frag("", 0, nullptr);
   Buffer::OwnedImpl buf;
   buf.add("bbbbb");
@@ -1183,7 +1190,7 @@ TEST_F(OwnedImplTest, ReadReserveAndCommit) {
 #else
   ASSERT_EQ(pipe(pipe_fds), 0);
 #endif
-  Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
+  TestFixture::IoSocketHandleType io_handle(pipe_fds[0]);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[0], false).return_value_, 0);
   ASSERT_EQ(os_sys_calls.setsocketblocking(pipe_fds[1], false).return_value_, 0);
 
@@ -1230,27 +1237,27 @@ void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
 // Slice size large enough to prevent slice content from being coalesced into an existing slice
 constexpr uint64_t kLargeSliceSize = 2048;
 
-TEST_F(OwnedImplTest, MoveBuffersWithLargeSlices) {
+TYPED_TEST(OwnedImplTest, MoveBuffersWithLargeSlices) {
   // Large slices should not be coalesced together
   TestBufferMove(kLargeSliceSize, kLargeSliceSize, 2);
 }
 
-TEST_F(OwnedImplTest, MoveBuffersWithSmallSlices) {
+TYPED_TEST(OwnedImplTest, MoveBuffersWithSmallSlices) {
   // Small slices should be coalesced together
   TestBufferMove(1, 1, 1);
 }
 
-TEST_F(OwnedImplTest, MoveSmallSliceIntoLargeSlice) {
+TYPED_TEST(OwnedImplTest, MoveSmallSliceIntoLargeSlice) {
   // Small slices should be coalesced with a large one
   TestBufferMove(kLargeSliceSize, 1, 1);
 }
 
-TEST_F(OwnedImplTest, MoveLargeSliceIntoSmallSlice) {
+TYPED_TEST(OwnedImplTest, MoveLargeSliceIntoSmallSlice) {
   // Large slice should NOT be coalesced into the small one
   TestBufferMove(1, kLargeSliceSize, 2);
 }
 
-TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
+TYPED_TEST(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
   // Small slice will not be coalesced if a previous slice does not have enough free space
   // Slice buffer sizes are allocated in 4Kb increments
   // Make first slice have 127 of free space (it is actually less as there is small overhead of the
@@ -1258,7 +1265,7 @@ TEST_F(OwnedImplTest, MoveSmallSliceIntoNotEnoughFreeSpace) {
   TestBufferMove(4096 - 127, 128, 2);
 }
 
-TEST_F(OwnedImplTest, FrontSlice) {
+TYPED_TEST(OwnedImplTest, FrontSlice) {
   Buffer::OwnedImpl buffer;
   EXPECT_EQ(0, buffer.frontSlice().len_);
   buffer.add("a");
