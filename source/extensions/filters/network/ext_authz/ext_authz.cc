@@ -88,12 +88,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
 
+  bool denied = false;
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    denied = true;
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
@@ -101,12 +103,18 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
+      denied = true;
     }
 
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_check_) {
       filter_callbacks_->continueReading();
     }
+  }
+
+  if (denied) {
+    filter_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
   }
 }
 
