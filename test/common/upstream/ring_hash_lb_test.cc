@@ -101,7 +101,10 @@ TEST_P(RingHashLoadBalancerTest, NoHost) {
   EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_FALSE(lb_->factory()->create()->selectPool(nullptr, *mock_host, hash_key).has_value());
+  EXPECT_FALSE(lb_->factory()
+                   ->create()
+                   ->selectExistingConnection(nullptr, *mock_host, hash_key)
+                   .has_value());
 }
 
 TEST_P(RingHashLoadBalancerTest, BaseMethods) {
@@ -110,7 +113,7 @@ TEST_P(RingHashLoadBalancerTest, BaseMethods) {
   EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
   std::vector<uint8_t> hash_key;
   auto mock_host = std::make_shared<NiceMock<MockHost>>();
-  EXPECT_FALSE(lb_->selectPool(nullptr, *mock_host, hash_key).has_value());
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
 
 TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {

@@ -55,10 +55,7 @@ ActiveQuicListener::ActiveQuicListener(
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
-  // Do not include 32-byte per-entry overhead while counting header size.
-  quiche::FlagRegistry::getInstance();
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   if (Runtime::LoaderSingleton::getExisting()) {

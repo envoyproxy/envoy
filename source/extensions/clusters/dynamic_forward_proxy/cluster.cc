@@ -11,6 +11,7 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/filters/network/common/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -177,8 +178,9 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 }
 
 absl::optional<Upstream::SelectedPoolAndConnection>
-Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* /*context*/,
-                                  const Upstream::Host& host, std::vector<uint8_t>& hash_key) {
+Cluster::LoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                                                const Upstream::Host& host,
+                                                std::vector<uint8_t>& hash_key) {
   const std::string& hostname = host.hostname();
   if (hostname.empty()) {
     return absl::nullopt;
@@ -194,7 +196,7 @@ Cluster::LoadBalancer::selectPool(Upstream::LoadBalancerContext* /*context*/,
     Envoy::Ssl::ConnectionInfoConstSharedPtr ssl = info.connection_->ssl();
     ASSERT(ssl);
     for (const std::string& san : ssl->dnsSansPeerCertificate()) {
-      if (Extensions::TransportSockets::Tls::DefaultCertValidator::dnsNameMatch(hostname, san)) {
+      if (Extensions::TransportSockets::Tls::Utility::dnsNameMatch(hostname, san)) {
         return Upstream::SelectedPoolAndConnection{*info.pool_, *info.connection_};
       }
     }
