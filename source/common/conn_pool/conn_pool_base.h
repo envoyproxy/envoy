@@ -271,6 +271,8 @@ public:
   void onUpstreamReady();
 
 protected:
+  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
+
   enum class ConnectionResult {
     FailedToCreateConnection,
     CreatedNewConnection,
@@ -281,8 +283,6 @@ protected:
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
   ConnectionResult tryCreateNewConnections();
-
-  virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
   // Creates a new connection if there is sufficient demand, it is allowed by resourceManager, or
   // to avoid starving this pool.
