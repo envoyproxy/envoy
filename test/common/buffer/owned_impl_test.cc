@@ -48,7 +48,8 @@ protected:
   }
 };
 
-using IoSocketHandleTypes = testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>;
+using IoSocketHandleTypes =
+    testing::Types<Network::IoSocketHandleImpl, Network::Win32SocketHandleImpl>;
 
 TYPED_TEST_CASE(OwnedImplTest, IoSocketHandleTypes);
 
