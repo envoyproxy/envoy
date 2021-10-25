@@ -29,7 +29,8 @@ std::string createHeader(const std::string& format, uint32_t version) {
 
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint)
     : address_(Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/)),
-      io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, address_)) {}
+      io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, address_,
+                                          false /* mptcp_enabled */)) {}
 
 void DaemonBrokerImpl::send(const std::string& data) const {
   auto& logger = Logger::Registry::getLog(Logger::Id::tracing);

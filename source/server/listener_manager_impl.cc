@@ -168,7 +168,8 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, bool mptcp_enabled,
+    uint32_t worker_index) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Socket::Type::Stream ||
@@ -213,7 +214,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
 
   if (socket_type == Network::Socket::Type::Stream) {
     return std::make_shared<Network::TcpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+                                                      bind_type != BindType::NoBind, mptcp_enabled);
   } else {
     return std::make_shared<Network::UdpListenSocket>(address, options,
                                                       bind_type != BindType::NoBind);
@@ -1019,7 +1020,8 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
   TRY_ASSERT_MAIN_THREAD {
     return std::make_unique<ListenSocketFactoryImpl>(
         factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, server_.options().concurrency());
+        listener.tcpBacklogSize(), bind_type, listener.mptcpEnabled(),
+        server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {

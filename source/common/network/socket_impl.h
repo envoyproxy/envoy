@@ -69,7 +69,7 @@ private:
 class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address);
+             const Address::InstanceConstSharedPtr& remote_address, bool mptcp_enabled);
 
   // Network::Socket
   ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }

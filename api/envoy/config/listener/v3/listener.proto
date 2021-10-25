@@ -314,4 +314,6 @@ message Listener {
     // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
+
+  google.protobuf.BoolValue mptcp_enabled = 30;
 }

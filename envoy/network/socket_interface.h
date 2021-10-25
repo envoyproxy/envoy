@@ -20,7 +20,7 @@ public:
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
   virtual IoHandlePtr socket(Socket::Type type, Address::Type addr_type, Address::IpVersion version,
-                             bool socket_v6only) const PURE;
+                             bool socket_v6only, bool mptcp) const PURE;
 
   /**
    * Low level api to create a socket in the underlying host stack. Does not create an
@@ -29,8 +29,8 @@ public:
    * @param addr address that is gleaned for address type and version if needed
    * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
    */
-  virtual IoHandlePtr socket(Socket::Type socket_type,
-                             const Address::InstanceConstSharedPtr addr) const PURE;
+  virtual IoHandlePtr socket(Socket::Type socket_type, const Address::InstanceConstSharedPtr addr,
+                             bool mptcp) const PURE;
 
   /**
    * Returns true if the given family is supported on this machine.
@@ -48,8 +48,8 @@ using SocketInterfacePtr = std::unique_ptr<SocketInterface>;
  * @return @ref Network::IoHandlePtr that wraps the underlying socket file descriptor
  */
 static inline IoHandlePtr ioHandleForAddr(Socket::Type type,
-                                          const Address::InstanceConstSharedPtr addr) {
-  return addr->socketInterface().socket(type, addr);
+                                          const Address::InstanceConstSharedPtr addr, bool mptcp) {
+  return addr->socketInterface().socket(type, addr, mptcp);
 }
 
 } // namespace Network

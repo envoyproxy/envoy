@@ -152,7 +152,7 @@ public:
   Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
                                               Network::Socket::Type,
                                               const Network::Socket::OptionsSharedPtr&,
-                                              ListenerComponentFactory::BindType,
+                                              ListenerComponentFactory::BindType, bool,
                                               uint32_t) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.

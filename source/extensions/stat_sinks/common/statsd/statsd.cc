@@ -30,8 +30,9 @@ namespace Common {
 namespace Statsd {
 
 UdpStatsdSink::WriterImpl::WriterImpl(UdpStatsdSink& parent)
-    : parent_(parent), io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram,
-                                                           parent_.server_address_)) {}
+    : parent_(parent),
+      io_handle_(Network::ioHandleForAddr(Network::Socket::Type::Datagram, parent_.server_address_,
+                                          false /* mptcp_enabled */)) {}
 
 void UdpStatsdSink::WriterImpl::write(const std::string& message) {
   // TODO(mattklein123): We can avoid this const_cast pattern by having a constant variant of

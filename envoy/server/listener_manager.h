@@ -71,7 +71,7 @@ public:
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
                      Network::Socket::Type socket_type,
                      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-                     uint32_t worker_index) PURE;
+                     bool mptcp_enabled, uint32_t worker_index) PURE;
 
   /**
    * Creates a list of filter factories.

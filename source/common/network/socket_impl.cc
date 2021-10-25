@@ -11,8 +11,8 @@ namespace Network {
 
 SocketImpl::SocketImpl(Socket::Type sock_type,
                        const Address::InstanceConstSharedPtr& address_for_io_handle,
-                       const Address::InstanceConstSharedPtr& remote_address)
-    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle)),
+                       const Address::InstanceConstSharedPtr& remote_address, bool mptcp_enabled)
+    : io_handle_(ioHandleForAddr(sock_type, address_for_io_handle, mptcp_enabled)),
       connection_info_provider_(
           std::make_shared<ConnectionInfoSetterImpl>(nullptr, remote_address)),
       sock_type_(sock_type), addr_type_(address_for_io_handle->type()) {}
