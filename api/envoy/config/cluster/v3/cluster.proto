@@ -1044,7 +1044,7 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // If this field is set and is supported by the client, it will supercede the value of
+  // If this field is set and is supported by the client, it will supersede the value of
   // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
