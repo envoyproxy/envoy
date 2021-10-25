@@ -53,7 +53,7 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   waitForSeconds(45);
   // Cache entry hasn't been evicted because it was accessed 45s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
-  waitForSeconds(80);
+  waitForSeconds(51);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
 }
 
@@ -64,7 +64,7 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     client_cache_.setCache(grpc_service, foo_client);
   }
-  waitForSeconds(80);
+  waitForSeconds(21);
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     client_cache_.setCache(grpc_service, foo_client);

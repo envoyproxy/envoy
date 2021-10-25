@@ -149,9 +149,5 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
-
-
-
-
 } // namespace Grpc
 } // namespace Envoy
