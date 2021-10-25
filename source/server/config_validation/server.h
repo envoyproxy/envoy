@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
@@ -15,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -75,7 +77,10 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -195,11 +200,11 @@ private:
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   std::unique_ptr<Server::ValidationAdmin> admin_;
   Singleton::ManagerPtr singleton_manager_;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   std::unique_ptr<Runtime::ScopedLoaderSingleton> runtime_singleton_;
   Random::RandomGeneratorImpl random_generator_;
   std::unique_ptr<Ssl::ContextManager> ssl_context_manager_;

@@ -190,12 +190,12 @@ protected:
       read_filters_.push_back(std::move(read_filter));
       // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
       // calls for the same object.
-      EXPECT_CALL(*filter_chain_, transportSocketFactory())
-          .InSequence(seq)
-          .WillOnce(ReturnRef(transport_socket_factory_));
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
+      EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(transport_socket_factory_));
     }
   }
 
@@ -207,9 +207,9 @@ protected:
     Buffer::RawSliceVector slice = payload.getRawSlices();
     ASSERT_EQ(1u, slice.size());
     // Send a full CHLO to finish 0-RTT handshake.
-    auto send_rc =
-        Network::Utility::writeToSocket(client_sockets_.back()->ioHandle(), slice.data(), 1,
-                                        nullptr, *listen_socket_->addressProvider().localAddress());
+    auto send_rc = Network::Utility::writeToSocket(
+        client_sockets_.back()->ioHandle(), slice.data(), 1, nullptr,
+        *listen_socket_->connectionInfoProvider().localAddress());
     ASSERT_EQ(slice[0].len_, send_rc.return_value_);
 
 #if defined(__APPLE__)
@@ -217,7 +217,7 @@ protected:
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
-    ::usleep(1000);
+    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
 #endif
   }
 

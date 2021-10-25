@@ -23,6 +23,7 @@ config_env() {
 build_platforms() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
 
   if is_windows; then
     echo "windows/amd64"
@@ -36,8 +37,18 @@ build_platforms() {
 build_args() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-ltsc2022/}"
 
   printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
+  if [[ "${TYPE}" == *-windows* ]]; then
+   printf ' --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
+  fi
+
+  if [[ "${TYPE}" == *-contrib* ]]; then
+      printf ' --build-arg ENVOY_BINARY=envoy-contrib'
+  fi
+
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
   elif [[ "${TYPE}" == "-google-vrp" ]]; then
@@ -97,7 +108,7 @@ push_images() {
   PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
-    docker push "${BUILD_TAG}"
+  docker push "${BUILD_TAG}"
 }
 
 MAIN_BRANCH="refs/heads/main"
@@ -119,12 +130,12 @@ DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 
 if is_windows; then
-  BUILD_TYPES=("-windows")
+  BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
   # BuildKit is not available for Windows images, use standard build command
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-alpine" "-distroless" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-alpine" "-distroless" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
@@ -141,7 +152,7 @@ for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
     build_images "${BUILD_TYPE}" "$image_tag"
 
     if ! is_windows; then
-        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-alpine" ]]; then
+        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" || "$BUILD_TYPE" == "-distroless" ]]; then
             # verify_examples expects the base and alpine images, and for them to be named `-dev`
             dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
             docker tag "$image_tag" "$dev_image"

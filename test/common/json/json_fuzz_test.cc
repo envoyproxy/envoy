@@ -39,10 +39,10 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // round-trip.
     std::string yaml = MessageUtil::getYamlStringFromMessage(message);
     ProtobufWkt::Struct yaml_message;
-    MessageUtil::loadFromYaml(yaml, yaml_message);
+    TestUtility::loadFromYaml(yaml, yaml_message);
 
     ProtobufWkt::Struct message3;
-    MessageUtil::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
+    TestUtility::loadFromYaml(MessageUtil::getYamlStringFromMessage(yaml_message), message3);
     FUZZ_ASSERT(TestUtility::protoEqual(yaml_message, message3));
   } catch (const Envoy::EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "Failed due to {}", e.what());

@@ -254,44 +254,79 @@ bool maybeAdjustForIpv6(absl::string_view absolute_url, uint64_t& offset, uint64
   return true;
 }
 
-std::string parseCookie(const HeaderMap& headers, const std::string& key,
-                        const std::string& cookie) {
+void forEachCookie(
+    const HeaderMap& headers, const LowerCaseString& cookie_header,
+    const std::function<bool(absl::string_view, absl::string_view)>& cookie_consumer) {
+  const Http::HeaderMap::GetResult cookie_headers = headers.get(cookie_header);
 
-  std::string ret;
+  for (size_t index = 0; index < cookie_headers.size(); index++) {
+    auto cookie_header_value = cookie_headers[index]->value().getStringView();
 
-  headers.iterateReverse([&key, &ret, &cookie](const HeaderEntry& header) -> HeaderMap::Iterate {
-    // Find the cookie headers in the request (typically, there's only one).
-    if (header.key() == cookie) {
+    // Split the cookie header into individual cookies.
+    for (const auto& s : StringUtil::splitToken(cookie_header_value, ";")) {
+      // Find the key part of the cookie (i.e. the name of the cookie).
+      size_t first_non_space = s.find_first_not_of(' ');
+      size_t equals_index = s.find('=');
+      if (equals_index == absl::string_view::npos) {
+        // The cookie is malformed if it does not have an `=`. Continue
+        // checking other cookies in this header.
+        continue;
+      }
+      absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
+      absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
 
-      // Split the cookie header into individual cookies.
-      for (const auto& s : StringUtil::splitToken(header.value().getStringView(), ";")) {
-        // Find the key part of the cookie (i.e. the name of the cookie).
-        size_t first_non_space = s.find_first_not_of(' ');
-        size_t equals_index = s.find('=');
-        if (equals_index == absl::string_view::npos) {
-          // The cookie is malformed if it does not have an `=`. Continue
-          // checking other cookies in this header.
-          continue;
-        }
-        const absl::string_view k = s.substr(first_non_space, equals_index - first_non_space);
-        // If the key matches, parse the value from the rest of the cookie string.
-        if (k == key) {
-          absl::string_view v = s.substr(equals_index + 1, s.size() - 1);
+      // Cookie values may be wrapped in double quotes.
+      // https://tools.ietf.org/html/rfc6265#section-4.1.1
+      if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
+        v = v.substr(1, v.size() - 2);
+      }
 
-          // Cookie values may be wrapped in double quotes.
-          // https://tools.ietf.org/html/rfc6265#section-4.1.1
-          if (v.size() >= 2 && v.back() == '"' && v[0] == '"') {
-            v = v.substr(1, v.size() - 2);
-          }
-          ret = std::string{v};
-          return HeaderMap::Iterate::Break;
-        }
+      if (!cookie_consumer(k, v)) {
+        return;
       }
     }
-    return HeaderMap::Iterate::Continue;
+  }
+}
+
+std::string parseCookie(const HeaderMap& headers, const std::string& key,
+                        const LowerCaseString& cookie) {
+  std::string value;
+
+  // Iterate over each cookie & return if its value is not empty.
+  forEachCookie(headers, cookie, [&key, &value](absl::string_view k, absl::string_view v) -> bool {
+    if (key == k) {
+      value = std::string{v};
+      return false;
+    }
+
+    // continue iterating until a cookie that matches `key` is found.
+    return true;
   });
 
-  return ret;
+  return value;
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers) {
+  return Utility::parseCookies(headers, [](absl::string_view) -> bool { return true; });
+}
+
+absl::flat_hash_map<std::string, std::string>
+Utility::parseCookies(const RequestHeaderMap& headers,
+                      const std::function<bool(absl::string_view)>& key_filter) {
+  absl::flat_hash_map<std::string, std::string> cookies;
+
+  forEachCookie(headers, Http::Headers::get().Cookie,
+                [&cookies, &key_filter](absl::string_view k, absl::string_view v) -> bool {
+                  if (key_filter(k)) {
+                    cookies.emplace(k, v);
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  return cookies;
 }
 
 bool Utility::Url::initialize(absl::string_view absolute_url, bool is_connect) {
@@ -428,12 +463,25 @@ std::string Utility::stripQueryString(const HeaderString& path) {
                      query_offset != path_str.npos ? query_offset : path_str.size());
 }
 
+std::string Utility::replaceQueryString(const HeaderString& path,
+                                        const Utility::QueryParams& params) {
+  std::string new_path{Http::Utility::stripQueryString(path)};
+
+  if (!params.empty()) {
+    const auto new_query_string = Http::Utility::queryParamsToString(params);
+    absl::StrAppend(&new_path, new_query_string);
+  }
+
+  return new_path;
+}
+
 std::string Utility::parseCookieValue(const HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().Cookie.get());
+  // TODO(wbpcode): Modify the headers parameter type to 'RequestHeaderMap'.
+  return parseCookie(headers, key, Http::Headers::get().Cookie);
 }
 
 std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const std::string& key) {
-  return parseCookie(headers, key, Http::Headers::get().SetCookie.get());
+  return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 
 std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
@@ -549,7 +597,8 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       // status.
       // JsonFormatter adds a '\n' at the end. For header value, it should be removed.
       // https://github.com/envoyproxy/envoy/blob/main/source/common/formatter/substitution_formatter.cc#L129
-      if (body_text[body_text.length() - 1] == '\n') {
+      if (content_type == Headers::get().ContentTypeValues.Json &&
+          body_text[body_text.length() - 1] == '\n') {
         body_text = body_text.substr(0, body_text.length() - 1);
       }
       response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
@@ -1027,6 +1076,46 @@ Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   }
 
   return {is_ip_address, host_to_resolve, port};
+}
+
+envoy::config::route::v3::RetryPolicy
+Utility::convertCoreToRouteRetryPolicy(const envoy::config::core::v3::RetryPolicy& retry_policy,
+                                       const std::string& retry_on) {
+  envoy::config::route::v3::RetryPolicy route_retry_policy;
+  constexpr uint64_t default_base_interval_ms = 1000;
+  constexpr uint64_t default_max_interval_ms = 10 * default_base_interval_ms;
+
+  uint64_t base_interval_ms = default_base_interval_ms;
+  uint64_t max_interval_ms = default_max_interval_ms;
+
+  if (retry_policy.has_retry_back_off()) {
+    const auto& core_back_off = retry_policy.retry_back_off();
+
+    base_interval_ms = PROTOBUF_GET_MS_REQUIRED(core_back_off, base_interval);
+    max_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(core_back_off, max_interval, base_interval_ms * 10);
+
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("max_interval must be greater than or equal to the base_interval");
+    }
+  }
+
+  route_retry_policy.mutable_num_retries()->set_value(
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1));
+
+  auto* route_mutable_back_off = route_retry_policy.mutable_retry_back_off();
+
+  route_mutable_back_off->mutable_base_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(base_interval_ms));
+  route_mutable_back_off->mutable_max_interval()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(max_interval_ms));
+
+  // set all the other fields with appropriate values.
+  route_retry_policy.set_retry_on(retry_on);
+  route_retry_policy.mutable_per_try_timeout()->CopyFrom(
+      route_retry_policy.retry_back_off().max_interval());
+
+  return route_retry_policy;
 }
 
 } // namespace Http

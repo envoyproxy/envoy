@@ -15,14 +15,28 @@
 namespace Envoy {
 namespace Http {
 namespace Http3 {
+namespace {
+
+uint32_t getMaxStreams(const Upstream::ClusterInfo& cluster) {
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster.http3Options().quic_protocol_options(),
+                                         max_concurrent_streams, 100);
+}
+
+} // namespace
+
+ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+                           Upstream::Host::CreateConnectionData& data)
+    : MultiplexedActiveClientBase(parent, getMaxStreams(parent.host()->cluster()),
+                                  parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
+}
 
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
                                                        quic::QuicConfig& quic_config) {
+  // TODO(alyssawilk) use and test other defaults.
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
   quic_config.set_max_time_before_crypto_handshake(crypto_timeout);
-  int32_t max_streams =
-      cluster.http3Options().quic_protocol_options().max_concurrent_streams().value();
+  int32_t max_streams = getMaxStreams(cluster);
   quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
   quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
   Quic::configQuicInitialFlowControlWindow(cluster.http3Options().quic_protocol_options(),
@@ -65,10 +79,15 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       host, priority, dispatcher, options, transport_socket_options, random_generator, state,
       [&quic_stat_names,
        &scope](HttpConnPoolImplBase* pool) -> ::Envoy::ConnectionPool::ActiveClientPtr {
+        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), debug,
+                            "Creating Http/3 client");
         // If there's no ssl context, the secrets are not loaded. Fast-fail by returning null.
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
         if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
+                              "Failed to create Http/3 client. Transport socket "
+                              "factory is not configured correctly.");
           return nullptr;
         }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
@@ -82,7 +101,13 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         data.connection_ =
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
                                               source_address, quic_stat_names, scope);
-        return std::make_unique<ActiveClient>(*pool, data);
+        // Store a handle to connection as it will be moved during client construction.
+        Network::Connection& connection = *data.connection_;
+        auto client = std::make_unique<ActiveClient>(*pool, data);
+        if (connection.state() == Network::Connection::State::Closed) {
+          return nullptr;
+        }
+        return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
         CodecClientPtr codec{new CodecClientProd(CodecType::HTTP3, std::move(data.connection_),

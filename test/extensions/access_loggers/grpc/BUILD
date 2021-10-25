@@ -93,9 +93,21 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "tcp_config_test",
+    srcs = ["tcp_config_test.cc"],
+    extension_names = ["envoy.access_loggers.tcp_grpc"],
+    deps = [
+        "//source/extensions/access_loggers/grpc:tcp_config",
+        "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "tcp_grpc_access_log_integration_test",
     srcs = ["tcp_grpc_access_log_integration_test.cc"],
-    extension_names = ["envoy.access_loggers.http_grpc"],
+    extension_names = ["envoy.access_loggers.tcp_grpc"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",

@@ -577,7 +577,7 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 // Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
 // the downstream via DecoderFilterBelowWriteBufferLowWatermark.
 TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
   )EOF");
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
@@ -1497,6 +1497,49 @@ TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
   floodClient(Http2Frame::makePingFrame(),
               Http2::Utility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
+}
+
+TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
+  const uint32_t num_requests = 80;
+
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(num_requests / 2);
+  mergeOptions(config);
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
+  beginSession();
+
+  // Send a normal request and wait for the response as a way to prime the upstream connection and
+  // ensure that SETTINGS are exchanged. Skipping this step may result in the upstream seeing too
+  // many active streams at the same  time and terminating the connection to the proxy since stream
+  // limits were not obeyed.
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Open a large number of streams and wait until they are active at the proxy.
+  for (uint32_t i = 0; i < num_requests; ++i) {
+    auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(i), "host", "/",
+                                           {Http2Frame::Header("no_end_stream", "1")});
+    sendFrame(request);
+  }
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", num_requests,
+                               TestUtility::DefaultTimeout);
+
+  // Disconnect downstream connection. Envoy should send RST_STREAM to cancel active upstream
+  // requests.
+  tcp_client_->close();
+
+  // Wait until the disconnect is detected and all upstream connections have been closed.
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0,
+                               TestUtility::DefaultTimeout);
+
+  // The disconnect shouldn't trigger an outbound control frame flood.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
+  // Verify that the upstream connections are still active.
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 }
 
 } // namespace Envoy

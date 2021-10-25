@@ -84,6 +84,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dns_utils_lib",
+    srcs = ["dns_utils.cc"],
+    hdrs = ["dns_utils.h"],
+    deps = [
+        ":assert_lib",
+        "//envoy/network:dns_interface",
+        "//source/common/network:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "documentation_url_lib",
     hdrs = ["documentation_url.h"],
 )
@@ -135,6 +147,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "interval_value",
     hdrs = ["interval_value.h"],
+)
+
+envoy_cc_library(
+    name = "key_value_store_lib",
+    srcs = ["key_value_store_base.cc"],
+    hdrs = ["key_value_store_base.h"],
+    deps = [
+        "//envoy/common:key_value_store_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/filesystem:filesystem_interface",
+    ],
 )
 
 envoy_cc_library(
@@ -301,6 +324,7 @@ envoy_cc_library(
         "//envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@com_googlesource_code_re2//:re2",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
@@ -360,8 +384,8 @@ envoy_cc_library(
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
     deps = envoy_cc_platform_dep("thread_impl_lib") + [
+        ":macros",
         ":non_copyable",
-        "//source/common/singleton:threadsafe_singleton",
     ],
 )
 

@@ -268,6 +268,9 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2020/08/11  12202    37061       38500   router: add new retry back-off strategy
   // 2020/09/11  12973                38993   upstream: predictive preconnect
   // 2020/10/02  13251                39326   switch to google tcmalloc
+  // 2021/08/15  17290                40349   add all host map to priority set for fast host
+  //                                          searching
+  // 2021/08/18  13176    40577       40700   Support slow start mode
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -288,7 +291,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 40000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 40700); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {

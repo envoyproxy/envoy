@@ -1,3 +1,15 @@
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
+
+#include "quiche/quic/core/crypto/null_encrypter.h"
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_client_stream.h"
@@ -43,8 +55,8 @@ public:
                       std::unique_ptr<EnvoyQuicClientConnection>(quic_connection_), *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2,
                       crypto_stream_factory_),
-        stream_id_(4u), stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
-                                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
+        stats_({ALL_HTTP3_CODEC_STATS(POOL_COUNTER_PREFIX(scope_, "http3."),
+                                      POOL_GAUGE_PREFIX(scope_, "http3."))}),
         quic_stream_(new EnvoyQuicClientStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL,
                                                stats_, http3_options_)),
         request_headers_{{":authority", host_}, {":method", "POST"}, {":path", "/"}},
@@ -70,9 +82,14 @@ public:
   void SetUp() override {
     quic_session_.Initialize();
     quic_connection_->setEnvoyConnection(quic_session_);
+    quic_connection_->SetEncrypter(
+        quic::ENCRYPTION_FORWARD_SECURE,
+        std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
+    quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+
     setQuicConfigWithDefaultValues(quic_session_.config());
     quic_session_.OnConfigNegotiated();
-    quic_connection_->setUpConnectionSocket(delegate_);
+    quic_connection_->setUpConnectionSocket(*quic_connection_->connectionSocket(), delegate_);
     spdy_response_headers_[":status"] = "200";
 
     spdy_trailers_["key1"] = "value1";
@@ -119,7 +136,7 @@ protected:
   EnvoyQuicClientConnection* quic_connection_;
   TestQuicCryptoClientStreamFactory crypto_stream_factory_;
   MockEnvoyQuicClientSession quic_session_;
-  quic::QuicStreamId stream_id_;
+  quic::QuicStreamId stream_id_{4u};
   Stats::IsolatedStoreImpl scope_;
   Http::Http3::CodecStats stats_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;

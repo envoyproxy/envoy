@@ -31,13 +31,6 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --bootstrap-version <integer>
-
-   *(optional)* The API version to load the bootstrap as. The value should be a single integer, e.g.
-   to parse the bootstrap configuration as V3, specify ``--bootstrap-version 3``. If unset, Envoy will
-   attempt to load the bootstrap as the previous API version and upgrade it to the latest. If that fails,
-   Envoy will attempt to load the configuration as the latest version.
-
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:
@@ -326,6 +319,14 @@ following are the command line options that Envoy supports.
   configuration. Unlike setting :option:`--reject-unknown-dynamic-fields` to false, it does not log warnings
   or count occurrences of unknown fields, in the interest of configuration processing speed. If
   :option:`--reject-unknown-dynamic-fields` is set to true, this flag has no effect.
+
+  .. attention::
+
+    In addition to not logging warnings or counting occurrences of unknown fields, setting this
+    option also disables counting and warnings of deprecated fields as well as work-in-progress
+    message and fields. It is *strongly* recommended that this option is not set on at least a
+    small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
+    deprecated, or work-in-progress usage.
 
 .. option:: --disable-extensions <extension list>
 

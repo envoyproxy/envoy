@@ -49,7 +49,7 @@ stat_prefix: test_prefix
   )EOF";
 
   ZooKeeperProxyProtoConfig proto_config;
-  TestUtility::loadFromYamlAndValidate(yaml, proto_config, false, true);
+  TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   ZooKeeperConfigFactory factory;

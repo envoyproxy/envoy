@@ -30,9 +30,9 @@ struct LookupRequestTestCase {
 
 using Seconds = std::chrono::seconds;
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;
@@ -46,7 +46,7 @@ public:
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {":scheme", "https"}, {":authority", "example.com"}};
 
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 
   static const SystemTime& currentTime() {
     CONSTRUCT_ON_FIRST_USE(SystemTime, Event::SimulatedTimeSystem().systemTime());
@@ -624,17 +624,6 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_P(ParseInvalidRangeHeaderTest, InvalidRangeReturnsEmpty) {
   std::vector<RawByteRange> result_vector = RangeRequests::parseRanges(range(), 5);
   ASSERT_EQ(0, result_vector.size());
-}
-
-TEST_F(LookupRequestTest, VariedHeaders) {
-  request_headers_.addCopy("accept", "image/*");
-  request_headers_.addCopy("other-header", "abc123");
-  const LookupRequest lookup_request(request_headers_, currentTime(), vary_allow_list_);
-  const Http::RequestHeaderMap& result = lookup_request.getVaryHeaders();
-
-  ASSERT_FALSE(result.get(Http::LowerCaseString("accept")).empty());
-  ASSERT_EQ(result.get(Http::LowerCaseString("accept"))[0]->value().getStringView(), "image/*");
-  ASSERT_TRUE(result.get(Http::LowerCaseString("other-header")).empty());
 }
 
 } // namespace

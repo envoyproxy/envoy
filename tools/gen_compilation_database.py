@@ -71,7 +71,10 @@ def modify_compile_command(target, args):
     if is_header(target["file"]):
         options += " -Wno-pragma-once-outside-header -Wno-unused-const-variable"
         options += " -Wno-unused-function"
-        if not target["file"].startswith("external/"):
+        # By treating external/envoy* as C++ files we are able to use this script from subrepos that
+        # depend on Envoy targets.
+        if not target["file"].startswith("external/") or target["file"].startswith(
+                "external/envoy"):
             # *.h file is treated as C header by default while our headers files are all C++17.
             options = "-x c++ -std=c++17 -fexceptions " + options
 
@@ -93,6 +96,13 @@ if __name__ == "__main__":
     parser.add_argument('--include_headers', action='store_true')
     parser.add_argument('--vscode', action='store_true')
     parser.add_argument(
-        'bazel_targets', nargs='*', default=["//source/...", "//test/...", "//tools/..."])
+        'bazel_targets',
+        nargs='*',
+        default=[
+            "//source/...",
+            "//test/...",
+            "//tools/...",
+            "//contrib/...",
+        ])
     args = parser.parse_args()
     fix_compilation_database(args, generate_compilation_database(args))

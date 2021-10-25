@@ -45,6 +45,10 @@ routing PRs, questions, etc. to the right place.
   * Event management, security, performance, data plane.
 * Sotiris Nanopoulos ([davinci26](https://github.com/davinci26)) (Sotiris.Nanopoulos@microsoft.com)
   * Windows, low level networking.
+* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
+  * Scalability and performance.
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3, upstream connection management.
 
 # Senior extension maintainers
 
@@ -54,11 +58,15 @@ without further review.
 
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
   * Wasm
+* Raúl Gutiérrez Segalés ([rgs1](https://github.com/rgs1)) (rgs@pinterest.com)
+  * Thrift
 
 # Envoy security team
 
-* All maintainers
-* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
+* All senior maintainers
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
 
 # Emeritus maintainers
 
@@ -76,5 +84,3 @@ matter expert reviews. Feel free to loop them in as needed.
   * v2 xDS, listeners, filter chain discovery service.
 * Michael Payne ([moderation](https://github.com/moderation)) (m@m17e.org)
   * External dependencies, Envoy's supply chain and documentation.
-* Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
-  * Scalability and performance.

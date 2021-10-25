@@ -109,7 +109,7 @@ public:
    * @param all_hosts provides the updated hosts.
    * @return indicate if the cluster slot is updated or not.
    */
-  virtual bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) PURE;
+  virtual bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap& all_hosts) PURE;
 
   /**
    * Callback when a host's health status is updated
@@ -129,7 +129,7 @@ public:
   RedisClusterLoadBalancerFactory(Random::RandomGenerator& random) : random_(random) {}
 
   // ClusterSlotUpdateCallBack
-  bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap all_hosts) override;
+  bool onClusterSlotUpdate(ClusterSlotsPtr&& slots, Upstream::HostMap& all_hosts) override;
 
   void onHostHealthUpdate() override;
 
@@ -187,6 +187,17 @@ private:
     Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override;
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
+    }
+    // Pool selection not implemented.
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    // Lifetime tracking not implemented.
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
     }
 
   private:

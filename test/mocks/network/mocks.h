@@ -18,6 +18,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/dns_resolver/dns_factory.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
@@ -62,6 +63,22 @@ public:
               (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
+};
+
+class MockDnsResolverFactory : public DnsResolverFactory {
+public:
+  MockDnsResolverFactory() = default;
+  ~MockDnsResolverFactory() override = default;
+
+  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolver,
+              (Event::Dispatcher & dispatcher, Api::Api& api,
+               const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
+              (const, override));
+  std::string name() const override { return std::string(CaresDnsResolver); };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
+  }
 };
 
 class MockAddressResolver : public Address::Resolver {
@@ -243,10 +260,12 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   MOCK_METHOD(IoHandle&, ioHandle, ());
   MOCK_METHOD(SocketPtr, duplicate, ());
@@ -272,7 +291,7 @@ public:
   MOCK_METHOD(Api::SysCallIntResult, setBlockingForTest, (bool));
 
   std::unique_ptr<MockIoHandle> io_handle_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  Network::ConnectionInfoSetterSharedPtr connection_info_provider_;
   OptionsSharedPtr options_;
   bool socket_is_open_ = true;
 };
@@ -297,10 +316,12 @@ public:
   void addOption(const Socket::OptionConstSharedPtr& option) override { addOption_(option); }
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
-  SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const SocketAddressProvider& addressProvider() const override { return *address_provider_; }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   MOCK_METHOD(void, setDetectedTransportProtocol, (absl::string_view));
   MOCK_METHOD(absl::string_view, detectedTransportProtocol, (), (const));
@@ -334,7 +355,7 @@ public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   IoHandlePtr io_handle_;
-  std::shared_ptr<Network::SocketAddressSetterImpl> address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
   bool is_closed_;
 };
 
@@ -573,7 +594,8 @@ public:
   MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
   ~MockUdpListenerReadFilter() override;
 
-  MOCK_METHOD(void, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onReceiveError, (Api::IoError::IoErrorCode));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {

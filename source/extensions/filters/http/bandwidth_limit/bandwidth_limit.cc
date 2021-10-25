@@ -8,7 +8,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/stats/timespan_impl.h"
 
-using envoy::extensions::filters::http::bandwidth_limit::v3alpha::BandwidthLimit;
+using envoy::extensions::filters::http::bandwidth_limit::v3::BandwidthLimit;
 using Envoy::Extensions::HttpFilters::Common::StreamRateLimiter;
 
 namespace Envoy {

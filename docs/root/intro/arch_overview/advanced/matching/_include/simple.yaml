@@ -29,7 +29,7 @@ static_resources:
                     percentage:
                       numerator: 0
                       denominator: HUNDRED
-              matcher:
+              xds_matcher:
                 matcher_tree:
                   input:
                     name: request-headers

@@ -8,7 +8,6 @@ node:
       minor_number: 8
       patch: 7
 admin:
-  access_log_path: "{{ null_device_path }}"
   address:
     socket_address:
       address: "{{ ntop_ip_loopback_address }}"

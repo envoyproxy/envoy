@@ -15,18 +15,23 @@ ARN
 ASAN
 ASCII
 ASM
+ASSERTed
 ASSERTs
 AST
 AWS
 BACKTRACE
 BSON
 BPF
+Repick
+btree
 CAS
 CB
+cbor
 CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -41,6 +46,8 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
+WRSQ
 WASI
 ceil
 CCM
@@ -122,6 +129,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -187,6 +196,7 @@ LEDS
 LEV
 LF
 LHS
+libsxg
 LLVM
 LPT
 LRS
@@ -194,6 +204,7 @@ Loggable
 MB
 MD
 MERCHANTABILITY
+Merkle
 MGET
 MQ
 MSDN
@@ -246,6 +257,7 @@ PGV
 PID
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -322,6 +334,7 @@ STRLEN
 STS
 SVG
 SVID
+SXG
 Symbolizer
 TBD
 TCLAP
@@ -356,6 +369,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -471,6 +485,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -487,6 +502,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -598,6 +614,7 @@ dubbo
 dup
 durations
 dynamodb
+eg
 emplace
 emplaced
 emscripten
@@ -763,6 +780,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -840,6 +858,7 @@ namespaced
 namespaces
 namespacing
 nan
+nanos
 natively
 ndk
 netblock
@@ -1003,6 +1022,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified
@@ -1070,11 +1090,13 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
 sigaction
 sigactions
+sigaltstack
 siginfo
 signalstack
 siloed
@@ -1261,6 +1283,7 @@ wildcards
 winsock
 workspace
 writev
+wrsq
 xDS
 xDSes
 xdstp
@@ -1278,3 +1301,11 @@ zlib
 OBQ
 SemVer
 SCM
+SCTP
+CRLF
+clen
+crlf
+ep
+suri
+transid
+routable

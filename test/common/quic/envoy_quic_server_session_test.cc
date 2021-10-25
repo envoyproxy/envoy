@@ -64,6 +64,8 @@ public:
     // behavior.
     return false;
   }
+
+  using EnvoyQuicServerSession::GetCryptoStream;
 };
 
 class ProofSourceDetailsSetter {
@@ -152,7 +154,7 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()),
-        quic_version_({quic::CurrentSupportedHttp3Versions()[0]}),
+        quic_version_({[]() { return quic::CurrentSupportedHttp3Versions()[0]; }()}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
         quic_connection_(new MockEnvoyQuicServerConnection(
             connection_helper_, alarm_factory_, writer_, quic_version_, *listener_config_.socket_)),
@@ -164,8 +166,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_,
-                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
+                            crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -291,6 +292,8 @@ TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
 TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
+  EXPECT_EQ(envoy_quic_session_.GetCryptoStream()->GetSsl(),
+            static_cast<const QuicSslConnectionInfo&>(*envoy_quic_session_.ssl()).ssl());
   Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));
@@ -1003,8 +1006,8 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
   EXPECT_TRUE(stream2->IsFlowControlBlocked());
 
   // Resetting stream3 should lower the buffered bytes, but callbacks will not
-  // be triggered because reset callback has been already triggered.
-  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, ""));
+  // be triggered because end stream is already encoded.
+  EXPECT_CALL(stream_callbacks3, onResetStream(Http::StreamResetReason::LocalReset, "")).Times(0);
   // Connection buffered data book keeping should also be updated.
   EXPECT_CALL(network_connection_callbacks_, onBelowWriteBufferLowWatermark());
   stream3->resetStream(Http::StreamResetReason::LocalReset);
@@ -1021,6 +1024,23 @@ TEST_F(EnvoyQuicServerSessionTest, SendBufferWatermark) {
 
   EXPECT_TRUE(stream1->write_side_closed());
   EXPECT_TRUE(stream2->write_side_closed());
+}
+
+TEST_F(EnvoyQuicServerSessionTest, IncomingUnidirectionalReadStream) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // IETF stream 2 is client initiated uni-directional stream.
+  quic::QuicStreamId stream_id = 2u;
+  auto payload = std::make_unique<char[]>(8);
+  quic::QuicDataWriter payload_writer(8, payload.get());
+  EXPECT_TRUE(payload_writer.WriteVarInt62(1ul));
+  EXPECT_CALL(http_connection_callbacks_, newStream(_, false)).Times(0u);
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_HTTP_RECEIVE_SERVER_PUSH, _,
+                                                           "Received server push stream"));
+  quic::QuicStreamFrame stream_frame(stream_id, false, 0, absl::string_view(payload.get(), 1));
+  envoy_quic_session_.OnStreamFrame(stream_frame);
 }
 
 } // namespace Quic

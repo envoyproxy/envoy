@@ -148,7 +148,6 @@ class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::health::v3::Healt
                     Logger::Loggable<Logger::Id::upstream> {
 public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
-              envoy::config::core::v3::ApiVersion transport_api_version,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory,
               AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
@@ -188,7 +187,6 @@ private:
   Grpc::AsyncClient<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse,
                     envoy::service::health::v3::HealthCheckSpecifier>
       async_client_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
   Grpc::AsyncStream<envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse>
       stream_{};
   Event::Dispatcher& dispatcher_;

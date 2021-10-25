@@ -276,7 +276,6 @@ private:
   const ClusterSlotUpdateCallBackSharedPtr lb_factory_;
 
   Upstream::HostVector hosts_;
-  Upstream::HostMap all_hosts_;
 
   const std::string auth_username_;
   const std::string auth_password_;

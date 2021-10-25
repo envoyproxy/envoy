@@ -51,3 +51,22 @@ envoy_cc_library(
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "grpc_mux_lib",
+    srcs = ["grpc_mux_impl.cc"],
+    hdrs = ["grpc_mux_impl.h"],
+    deps = [
+        ":delta_subscription_state_lib",
+        ":sotw_subscription_state_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:async_client_interface",
+        "//source/common/config:grpc_stream_lib",
+        "//source/common/config:pausable_ack_queue_lib",
+        "//source/common/config:watch_map_lib",
+        "//source/common/config:xds_context_params_lib",
+        "//source/common/config:xds_resource_lib",
+        "//source/common/memory:utils_lib",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)

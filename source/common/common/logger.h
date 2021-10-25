@@ -28,6 +28,7 @@ namespace Logger {
 // TODO: find out a way for extensions to register new logger IDs
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
   FUNCTION(backtrace)                                                                              \
@@ -37,6 +38,7 @@ namespace Logger {
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
   FUNCTION(decompression)                                                                          \
+  FUNCTION(dns)                                                                                    \
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(envoy_bug)                                                                              \
   FUNCTION(ext_authz)                                                                              \
@@ -45,6 +47,7 @@ namespace Logger {
   FUNCTION(filter)                                                                                 \
   FUNCTION(forward_proxy)                                                                          \
   FUNCTION(grpc)                                                                                   \
+  FUNCTION(happy_eyeballs)                                                                         \
   FUNCTION(hc)                                                                                     \
   FUNCTION(health_checker)                                                                         \
   FUNCTION(http)                                                                                   \
@@ -54,6 +57,7 @@ namespace Logger {
   FUNCTION(io)                                                                                     \
   FUNCTION(jwt)                                                                                    \
   FUNCTION(kafka)                                                                                  \
+  FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
@@ -106,6 +110,8 @@ public:
   virtual ~SinkDelegate();
 
   virtual void log(absl::string_view msg) PURE;
+  virtual void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                                 absl::string_view component, absl::string_view msg);
   virtual void flush() PURE;
 
 protected:
@@ -156,6 +162,12 @@ public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
   void clearLock() { stderr_sink_->clearLock(); }
 
+  template <class... Args>
+  void logWithStableName(absl::string_view stable_name, absl::string_view level,
+                         absl::string_view component, Args... msg) {
+    absl::ReaderMutexLock sink_lock(&sink_mutex_);
+    sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
+  }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override {
@@ -322,9 +334,10 @@ template <Id id> class Loggable {
 protected:
   /**
    * Do not use this directly, use macros defined below.
+   * See source/docs/logging.md for more details.
    * @return spdlog::logger& the static log instance to use for class local logging.
    */
-  static spdlog::logger& __log_do_not_use_read_comment() {
+  static spdlog::logger& __log_do_not_use_read_comment() { // NOLINT(readability-identifier-naming)
     static spdlog::logger& instance = Registry::getLog(id);
     return instance;
   }
@@ -443,6 +456,30 @@ public:
  * Command line options for log macros: use Fancy Logger or not.
  */
 #define ENVOY_LOG(LEVEL, ...) ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, ##__VA_ARGS__)
+
+/**
+ * Log with a stable event name. This allows emitting a log line with a stable name in addition to
+ * the standard log line. The stable log line is passed to custom sinks that may want to intercept
+ * these log messages.
+ *
+ * By default these named logs are not handled, but a custom log sink may intercept them by
+ * implementing the logWithStableName function.
+ */
+#define ENVOY_LOG_EVENT(LEVEL, EVENT_NAME, ...)                                                    \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, ##__VA_ARGS__)
+
+#define ENVOY_LOG_EVENT_TO_LOGGER(LOGGER, LEVEL, EVENT_NAME, ...)                                  \
+  do {                                                                                             \
+    ENVOY_LOG_TO_LOGGER(LOGGER, LEVEL, ##__VA_ARGS__);                                             \
+    if (ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL)) {                                                     \
+      ::Envoy::Logger::Registry::getSink()->logWithStableName(EVENT_NAME, #LEVEL, (LOGGER).name(), \
+                                                              ##__VA_ARGS__);                      \
+    }                                                                                              \
+  } while (0)
+
+#define ENVOY_CONN_LOG_EVENT(LEVEL, EVENT_NAME, FORMAT, CONNECTION, ...)                           \
+  ENVOY_LOG_EVENT_TO_LOGGER(ENVOY_LOGGER(), LEVEL, EVENT_NAME, "[C{}] " FORMAT, (CONNECTION).id(), \
+                            ##__VA_ARGS__);
 
 #define ENVOY_LOG_FIRST_N_TO_LOGGER(LOGGER, LEVEL, N, ...)                                         \
   do {                                                                                             \

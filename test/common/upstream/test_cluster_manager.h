@@ -115,6 +115,7 @@ public:
   }
 
   Secret::SecretManager& secretManager() override { return secret_manager_; }
+  Singleton::Manager& singletonManager() override { return singleton_manager_; }
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
@@ -215,7 +216,7 @@ protected:
     }
   }
 
-  void postThreadLocalDrainConnections(const Cluster&, const HostVector& hosts_removed) override {
+  void postThreadLocalRemoveHosts(const Cluster&, const HostVector& hosts_removed) override {
     local_hosts_removed_.post(hosts_removed);
   }
 

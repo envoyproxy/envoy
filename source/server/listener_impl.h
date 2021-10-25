@@ -5,8 +5,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
@@ -15,10 +17,12 @@
 
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/filter_chain_manager_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -103,7 +107,7 @@ public:
                                  Server::DrainManagerPtr drain_manager);
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -113,12 +117,14 @@ public:
   Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& serverScope() override { return server_.stats(); }
   Stats::Scope& scope() override;
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
@@ -144,6 +150,8 @@ public:
 private:
   Envoy::Server::Instance& server_;
   const envoy::config::core::v3::Metadata metadata_;
+  const Envoy::Config::TypedMetadataImpl<Envoy::Network::ListenerTypedMetadataFactory>
+      typed_metadata_;
   envoy::config::core::v3::TrafficDirection direction_;
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
@@ -176,7 +184,7 @@ public:
   // FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -187,11 +195,13 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return listener_factory_context_base_->serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;
@@ -364,8 +374,7 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               uint32_t concurrency);
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog();
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
@@ -412,7 +421,7 @@ private:
   Network::Socket::OptionsSharedPtr listen_socket_options_;
   const std::chrono::milliseconds listener_filters_timeout_;
   const bool continue_on_listener_filters_timeout_;
-  std::unique_ptr<UdpListenerConfigImpl> udp_listener_config_;
+  std::shared_ptr<UdpListenerConfigImpl> udp_listener_config_;
   Network::ConnectionBalancerSharedPtr connection_balancer_;
   std::shared_ptr<PerListenerFactoryContextImpl> listener_factory_context_;
   FilterChainManagerImpl filter_chain_manager_;
@@ -429,6 +438,8 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected watcher
   // callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+  std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
+      transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
 

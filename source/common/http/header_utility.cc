@@ -69,7 +69,9 @@ HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatc
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kStringMatch:
     header_match_type_ = HeaderMatchType::StringMatch;
-    string_match_ = std::make_unique<Matchers::StringMatcherImpl>(config.string_match());
+    string_match_ =
+        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+            config.string_match());
     break;
   case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
@@ -337,6 +339,18 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
       return absl::InvalidArgumentError(
           absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Host.get()));
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_connect")) {
+      if (headers.Path() && !headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Protocol.get()));
+      }
+      if (!headers.Path() && headers.Protocol()) {
+        // Path and Protocol header should only be present for CONNECT for upgrade style CONNECT.
+        return absl::InvalidArgumentError(
+            absl::StrCat("missing required header: ", Envoy::Http::Headers::get().Path.get()));
+      }
+    }
   } else {
     if (!headers.Path()) {
       // :path header must be present for non-CONNECT requests.
@@ -363,8 +377,7 @@ bool HeaderUtility::isRemovableHeader(absl::string_view header) {
 
 bool HeaderUtility::isModifiableHeader(absl::string_view header) {
   return (header.empty() || header[0] != ':') &&
-         (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.treat_host_like_authority") ||
-          !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get()));
+         !absl::EqualsIgnoreCase(header, Headers::get().HostLegacy.get());
 }
 
 HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscores(
@@ -391,7 +404,7 @@ HeaderUtility::HeaderValidationResult HeaderUtility::checkHeaderNameForUnderscor
 HeaderUtility::HeaderValidationResult
 HeaderUtility::validateContentLength(absl::string_view header_value,
                                      bool override_stream_error_on_invalid_http_message,
-                                     bool& should_close_connection) {
+                                     bool& should_close_connection, size_t& content_length_output) {
   should_close_connection = false;
   std::vector<absl::string_view> values = absl::StrSplit(header_value, ',');
   absl::optional<uint64_t> content_length;
@@ -416,6 +429,7 @@ HeaderUtility::validateContentLength(absl::string_view header_value,
       return HeaderValidationResult::REJECT;
     }
   }
+  content_length_output = content_length.value();
   return HeaderValidationResult::ACCEPT;
 }
 

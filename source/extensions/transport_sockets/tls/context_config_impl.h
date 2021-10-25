@@ -68,6 +68,7 @@ protected:
                     const std::string& default_cipher_suites, const std::string& default_curves,
                     Server::Configuration::TransportSocketFactoryContext& factory_context);
   Api::Api& api_;
+  const Server::Options& options_;
 
 private:
   static unsigned tlsVersionFromProto(
@@ -99,6 +100,7 @@ private:
   Ssl::HandshakerFactoryCb handshaker_factory_cb_;
   Ssl::HandshakerCapabilities capabilities_;
   Ssl::SslCtxCb sslctx_cb_;
+  Server::Configuration::TransportSocketFactoryContext& factory_context_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public Envoy::Ssl::ClientContextConfig {

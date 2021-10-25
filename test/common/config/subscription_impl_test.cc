@@ -6,7 +6,6 @@
 #include "test/common/config/grpc_subscription_test_harness.h"
 #include "test/common/config/http_subscription_test_harness.h"
 #include "test/common/config/subscription_test_harness.h"
-#include "test/config/v2_link_hacks.h"
 
 using testing::InSequence;
 
@@ -17,6 +16,8 @@ namespace {
 enum class SubscriptionType {
   Grpc,
   DeltaGrpc,
+  UnifiedGrpc,
+  UnifiedDeltaGrpc,
   Http,
   Filesystem,
 };
@@ -49,10 +50,20 @@ public:
   void initialize(std::chrono::milliseconds init_fetch_timeout = std::chrono::milliseconds(0)) {
     switch (GetParam()) {
     case SubscriptionType::Grpc:
-      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(LegacyOrUnified::Legacy,
+                                                                    init_fetch_timeout);
       break;
     case SubscriptionType::DeltaGrpc:
-      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(init_fetch_timeout);
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(LegacyOrUnified::Legacy,
+                                                                    init_fetch_timeout);
+      break;
+    case SubscriptionType::UnifiedGrpc:
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(LegacyOrUnified::Unified,
+                                                                    init_fetch_timeout);
+      break;
+    case SubscriptionType::UnifiedDeltaGrpc:
+      test_harness_ = std::make_unique<GrpcSubscriptionTestHarness>(LegacyOrUnified::Unified,
+                                                                    init_fetch_timeout);
       break;
     case SubscriptionType::Http:
       test_harness_ = std::make_unique<HttpSubscriptionTestHarness>(init_fetch_timeout);

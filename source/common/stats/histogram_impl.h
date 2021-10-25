@@ -28,14 +28,15 @@ public:
   static ConstSupportedBuckets& defaultBuckets();
 
 private:
-  using Config = std::pair<Matchers::StringMatcherImpl, ConstSupportedBuckets>;
+  using Config = std::pair<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>,
+                           ConstSupportedBuckets>;
   const std::vector<Config> configs_{};
 };
 
 /**
  * Implementation of HistogramStatistics for circllhist.
  */
-class HistogramStatisticsImpl : public HistogramStatistics, NonCopyable {
+class HistogramStatisticsImpl final : public HistogramStatistics, NonCopyable {
 public:
   HistogramStatisticsImpl();
 
@@ -45,7 +46,7 @@ public:
    * will not be retained.
    */
   HistogramStatisticsImpl(
-      const histogram_t* histogram_ptr,
+      const histogram_t* histogram_ptr, Histogram::Unit unit = Histogram::Unit::Unspecified,
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
   static ConstSupportedBuckets& defaultSupportedBuckets();
@@ -68,6 +69,7 @@ private:
   std::vector<uint64_t> computed_buckets_;
   uint64_t sample_count_;
   double sample_sum_;
+  const Histogram::Unit unit_;
 };
 
 class HistogramImplHelper : public MetricImpl<Histogram> {

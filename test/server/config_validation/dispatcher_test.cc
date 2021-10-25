@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+
 #include "source/common/common/thread.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/libevent.h"
@@ -24,7 +26,7 @@ public:
   ConfigValidation() {
     validation_ = std::make_unique<Api::ValidationImpl>(
         Thread::threadFactoryForTest(), stats_store_, test_time_.timeSystem(),
-        Filesystem::fileSystemForTest(), random_generator_);
+        Filesystem::fileSystemForTest(), random_generator_, bootstrap_);
     dispatcher_ = validation_->allocateDispatcher("test_thread");
   }
 
@@ -32,6 +34,7 @@ public:
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Random::MockRandomGenerator> random_generator_;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap_;
 
 private:
   // Using config validation API.
@@ -55,22 +58,6 @@ TEST_P(ConfigValidation, CreateScaledTimer) {
                 Event::ScaledTimerMinimum(Event::ScaledMinimum(UnitFloat(0.5f))), [] {}),
             nullptr);
   SUCCEED();
-}
-
-// Make sure that creating DnsResolver does not cause crash and each call to create
-// DNS resolver returns the same shared_ptr.
-TEST_F(ConfigValidation, SharedDnsResolver) {
-  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
-
-  Network::DnsResolverSharedPtr dns1 =
-      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
-  long use_count = dns1.use_count();
-  Network::DnsResolverSharedPtr dns2 =
-      dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
-
-  EXPECT_EQ(dns1.get(), dns2.get());          // Both point to the same instance.
-  EXPECT_EQ(use_count + 1, dns2.use_count()); // Each call causes ++ in use_count.
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ConfigValidation,

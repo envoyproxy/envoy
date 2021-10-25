@@ -7,7 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/assert.h"
@@ -186,7 +186,7 @@ class LookupRequest {
 public:
   // Prereq: request_headers's Path(), Scheme(), and Host() are non-null.
   LookupRequest(const Http::RequestHeaderMap& request_headers, SystemTime timestamp,
-                const VaryHeader& vary_allow_list);
+                const VaryAllowList& vary_allow_list);
 
   const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
 
@@ -206,8 +206,8 @@ public:
   LookupResult makeLookupResult(Http::ResponseHeaderMapPtr&& response_headers,
                                 ResponseMetadata&& metadata, uint64_t content_length) const;
 
-  // Warning: this should not be accessed out-of-thread!
-  const Http::RequestHeaderMap& getVaryHeaders() const { return *vary_headers_; }
+  const Http::RequestHeaderMap& requestHeaders() const { return *request_headers_; }
+  const VaryAllowList& varyAllowList() const { return vary_allow_list_; }
 
 private:
   void initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers);
@@ -216,15 +216,10 @@ private:
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
+  Http::RequestHeaderMapPtr request_headers_;
+  const VaryAllowList& vary_allow_list_;
   // Time when this LookupRequest was created (in response to an HTTP request).
   SystemTime timestamp_;
-  // The subset of this request's headers that match one of the rules in
-  // envoy::extensions::filters::http::cache::v3alpha::CacheConfig::allowed_vary_headers. If a cache
-  // storage implementation forwards lookup requests to a remote cache server that supports *vary*
-  // headers, that server may need to see these headers. For local implementations, it may be
-  // simpler to instead call makeLookupResult with each potential response.
-  Http::RequestHeaderMapPtr vary_headers_;
-
   RequestCacheControl request_cache_control_;
 };
 
@@ -374,7 +369,7 @@ public:
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
   virtual HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config) PURE;
   ~HttpCacheFactory() override = default;
 
 private:

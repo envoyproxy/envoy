@@ -16,7 +16,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
@@ -72,7 +71,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener.config()));
+  state.mutable_listener()->PackFrom(listener.config());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -265,7 +264,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener->config()));
+      static_listener.mutable_listener()->PackFrom(listener->config());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -369,7 +368,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(e.what());
-    it->second->mutable_failed_configuration()->PackFrom(API_RECOVER_ORIGINAL(config));
+    it->second->mutable_failed_configuration()->PackFrom(config);
     throw e;
   }
   error_state_tracker_.erase(it);
@@ -985,6 +984,23 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
 
   if (existing_draining_listener != draining_listeners_.cend()) {
     draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
+    existing_draining_listener->listener_->debugLog("clones listener sockets");
+  } else {
+    auto existing_draining_filter_chain = std::find_if(
+        draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
+        [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
+          return draining_filter_chain.getDrainingListener()
+                     .listenSocketFactory()
+                     .getListenSocket(0)
+                     ->isOpen() &&
+                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+        });
+
+    if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
+      draining_listen_socket_factory =
+          &existing_draining_filter_chain->getDrainingListener().getSocketFactory();
+      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+    }
   }
 
   listener.setSocketFactory(draining_listen_socket_factory != nullptr

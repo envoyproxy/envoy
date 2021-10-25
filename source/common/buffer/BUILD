@@ -17,6 +17,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 

@@ -26,6 +26,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -65,8 +66,51 @@ public:
 
   void prepareCheck() {
     ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  }
+
+  void queryParameterTest(const std::string& original_path, const std::string& expected_path,
+                          const Http::Utility::QueryParamsVector& add_me,
+                          const std::vector<std::string>& remove_me) {
+    InSequence s;
+
+    // Set up all the typical headers plus a path with a query string that we'll remove later.
+    request_headers_.addCopy(Http::Headers::get().Host, "example.com");
+    request_headers_.addCopy(Http::Headers::get().Method, "GET");
+    request_headers_.addCopy(Http::Headers::get().Path, original_path);
+    request_headers_.addCopy(Http::Headers::get().Scheme, "https");
+
+    prepareCheck();
+
+    Filters::Common::ExtAuthz::Response response{};
+    response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    response.query_parameters_to_set = add_me;
+    response.query_parameters_to_remove = remove_me;
+
+    auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+    EXPECT_CALL(*client_, check(_, _, _, _))
+        .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                             const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                             const StreamInfo::StreamInfo&) -> void {
+          callbacks.onComplete(std::move(response_ptr));
+        }));
+    EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+    EXPECT_EQ(request_headers_.getPathValue(), expected_path);
+
+    Buffer::OwnedImpl response_data{};
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    Http::TestResponseTrailerMapImpl response_trailers{};
+    Http::MetadataMap response_metadata{};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
+    EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
   }
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
@@ -234,8 +278,8 @@ TEST_F(HttpFilterTest, ErrorFailClose) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -273,8 +317,8 @@ TEST_F(HttpFilterTest, ErrorCustomStatusCode) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -313,8 +357,8 @@ TEST_F(HttpFilterTest, ErrorOpen) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(
           Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
@@ -347,8 +391,8 @@ TEST_F(HttpFilterTest, ImmediateErrorOpen) {
   )EOF");
 
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
   Filters::Common::ExtAuthz::Response response{};
   response.status = Filters::Common::ExtAuthz::CheckStatus::Error;
@@ -437,8 +481,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessage) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -479,8 +523,8 @@ TEST_F(HttpFilterTest, RequestDataWithPartialMessageThenContinueDecoding) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
 
   // The check call should only be called once.
   EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
@@ -535,8 +579,8 @@ TEST_F(HttpFilterTest, RequestDataWithSmallBuffer) {
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   ON_CALL(filter_callbacks_, decodingBuffer()).WillByDefault(Return(&data_));
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -1603,12 +1647,28 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
-// Test that the request continues when the filter_callbacks has no route.
+// Test that authentication will do when the filter_callbacks has no route.(both
+// direct response and redirect have no route)
 TEST_P(HttpFilterTestParam, NoRoute) {
-  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
+  prepareCheck();
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+}
+
+// Test that the authentication will be skipped when the filter_callbacks has no route(both
+// direct response and redirect have no route) when the runtime flag
+// `envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect` is false.
+TEST_P(HttpFilterTestParam, NoRouteWithSkipAuth) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.http_ext_authz_do_not_skip_direct_response_and_redirect",
+        "false"}});
+  EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillOnce(Return(nullptr));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 // Test that the request is stopped till there is an OK response back after which it continues on.
@@ -1727,8 +1787,13 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   response.headers_to_append = Http::HeaderVector{{request_header_key, "bar"}};
   response.headers_to_set = Http::HeaderVector{{key_to_add, "foo"}, {key_to_override, "bar"}};
   response.headers_to_remove = std::vector<Http::LowerCaseString>{key_to_remove};
+  // This cookie will be appended to the encoded headers.
   response.response_headers_to_add =
-      Http::HeaderVector{{Http::LowerCaseString{"cookie"}, "flavor=gingerbread"}};
+      Http::HeaderVector{{Http::LowerCaseString{"set-cookie"}, "cookie2=gingerbread"}};
+  // This "should-be-overridden" header value from the auth server will override the
+  // "should-be-overridden" entry from the upstream server.
+  response.response_headers_to_set = Http::HeaderVector{
+      {Http::LowerCaseString{"should-be-overridden"}, "finally-set-by-auth-server"}};
 
   auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
@@ -1749,14 +1814,70 @@ TEST_P(HttpFilterTestParam, ImmediateOkResponseWithHttpAttributes) {
   EXPECT_EQ(request_headers_.has(key_to_remove), false);
 
   Buffer::OwnedImpl response_data{};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"set-cookie", "cookie1=snickerdoodle"},
+      {"should-be-overridden", "originally-set-by-upstream"}};
   Http::TestResponseTrailerMapImpl response_trailers{};
   Http::MetadataMap response_metadata{};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, false));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
-  EXPECT_EQ(response_headers.get_("cookie"), "flavor=gingerbread");
+  EXPECT_EQ(Http::HeaderUtility::getAllOfHeaderAsString(response_headers,
+                                                        Http::LowerCaseString("set-cookie"))
+                .result()
+                .value(),
+            "cookie1=snickerdoodle,cookie2=gingerbread");
+  EXPECT_EQ(response_headers.get_("should-be-overridden"), "finally-set-by-auth-server");
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {
+  const std::string original_path{"/users?leave-me=alone"};
+  const std::string expected_path{"/users?leave-me=alone"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{"remove-me"};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedQueryParameters) {
+  const std::string original_path{"/users"};
+  const std::string expected_path{"/users?add-me=123"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "123"}};
+  const std::vector<std::string> remove_me{};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithAddedAndRemovedQueryParameters) {
+  const std::string original_path{"/users?remove-me=123"};
+  const std::string expected_path{"/users?add-me=456"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "456"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithRemovedQueryParameters) {
+  const std::string original_path{"/users?remove-me=definitely"};
+  const std::string expected_path{"/users"};
+  const Http::Utility::QueryParamsVector add_me{};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithOverwrittenQueryParameters) {
+  const std::string original_path{"/users?overwrite-me=original"};
+  const std::string expected_path{"/users?overwrite-me=new"};
+  const Http::Utility::QueryParamsVector add_me{{"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
+}
+
+TEST_P(HttpFilterTestParam, ImmediateOkResponseWithManyModifiedQueryParameters) {
+  const std::string original_path{"/users?remove-me=1&overwrite-me=2&leave-me=3"};
+  const std::string expected_path{"/users?add-me=9&leave-me=3&overwrite-me=new"};
+  const Http::Utility::QueryParamsVector add_me{{"add-me", "9"}, {"overwrite-me", "new"}};
+  const std::vector<std::string> remove_me{{"remove-me"}};
+  queryParameterTest(original_path, expected_path, add_me, remove_me);
 }
 
 // Test that an synchronous denied response from the authorization service, on the call stack,
@@ -2200,8 +2321,8 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   test_disable_request_body_buffering(true);
   // When request body buffering is skipped, setDecoderBufferLimit is not called.
   EXPECT_CALL(filter_callbacks_, setDecoderBufferLimit(_)).Times(0);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   EXPECT_CALL(*client_, check(_, _, _, _));
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, false));

@@ -10,6 +10,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"
 
@@ -102,7 +103,7 @@ TEST_P(WasmCommonTest, WasmFailState) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
 
   auto wasm = std::make_shared<WasmHandle>(
-      std::make_unique<Wasm>(plugin->wasmConfig(), "", scope, cluster_manager, *dispatcher));
+      std::make_unique<Wasm>(plugin->wasmConfig(), "", scope, *api, cluster_manager, *dispatcher));
   auto wasm_base = std::dynamic_pointer_cast<proxy_wasm::WasmHandleBase>(wasm);
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::UnableToCreateVm);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::UnableToCreateVm);
@@ -119,28 +120,27 @@ TEST_P(WasmCommonTest, WasmFailState) {
   wasm->wasm()->setFailStateForTesting(proxy_wasm::FailState::RuntimeError);
   EXPECT_EQ(toWasmEvent(wasm_base), WasmEvent::RuntimeError);
 
-  auto root_context = static_cast<Context*>(wasm->wasm()->createRootContext(plugin));
-  uint32_t grpc_call_token1 = root_context->nextGrpcCallToken();
-  uint32_t grpc_call_token2 = root_context->nextGrpcCallToken();
+  uint32_t grpc_call_token1 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token1));
+  uint32_t grpc_call_token2 = wasm->wasm()->nextGrpcCallId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcCallId(grpc_call_token2));
   EXPECT_NE(grpc_call_token1, grpc_call_token2);
-  root_context->setNextGrpcTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcCallToken(), 1);
 
-  uint32_t grpc_stream_token1 = root_context->nextGrpcStreamToken();
-  uint32_t grpc_stream_token2 = root_context->nextGrpcStreamToken();
+  uint32_t grpc_stream_token1 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token1));
+  uint32_t grpc_stream_token2 = wasm->wasm()->nextGrpcStreamId();
+  EXPECT_TRUE(wasm->wasm()->isGrpcStreamId(grpc_stream_token2));
   EXPECT_NE(grpc_stream_token1, grpc_stream_token2);
-  root_context->setNextGrpcTokenForTesting(0xFFFFFFFF); // Rollover.
-  EXPECT_EQ(root_context->nextGrpcStreamToken(), 2);
 
-  uint32_t http_call_token1 = root_context->nextHttpCallToken();
-  uint32_t http_call_token2 = root_context->nextHttpCallToken();
+  uint32_t http_call_token1 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token1));
+  uint32_t http_call_token2 = wasm->wasm()->nextHttpCallId();
+  EXPECT_TRUE(wasm->wasm()->isHttpCallId(http_call_token2));
   EXPECT_NE(http_call_token1, http_call_token2);
-  root_context->setNextHttpCallTokenForTesting(0); // Rollover.
-  EXPECT_EQ(root_context->nextHttpCallToken(), 1);
 
+  auto root_context = static_cast<Context*>(wasm->wasm()->createRootContext(plugin));
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::HttpCallResponseBody), nullptr);
   EXPECT_EQ(root_context->getBuffer(WasmBufferType::PluginConfiguration), nullptr);
-
   delete root_context;
 
   Filters::Common::Expr::CelStatePrototype wasm_state_prototype(
@@ -188,7 +188,7 @@ TEST_P(WasmCommonTest, Logging) {
 
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_shared<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   EXPECT_NE(wasm->buildVersion(), "");
   EXPECT_NE(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
@@ -263,7 +263,7 @@ TEST_P(WasmCommonTest, BadSignature) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", "", code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_FALSE(wasm->initialize());
@@ -299,7 +299,7 @@ TEST_P(WasmCommonTest, Segv) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_TRUE(wasm->initialize());
   TestContext* root_context = nullptr;
@@ -349,7 +349,7 @@ TEST_P(WasmCommonTest, DivByZero) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
   EXPECT_TRUE(wasm->load(code, false));
@@ -394,7 +394,7 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->load(code, false));
@@ -440,7 +440,7 @@ TEST_P(WasmCommonTest, Utilities) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->load(code, false));
@@ -513,7 +513,7 @@ TEST_P(WasmCommonTest, Stats) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
   EXPECT_TRUE(wasm->load(code, false));
@@ -550,7 +550,7 @@ TEST_P(WasmCommonTest, Foreign) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -570,13 +570,8 @@ TEST_P(WasmCommonTest, Foreign) {
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
         auto root_context = new TestContext(wasm, plugin);
-#ifdef ZLIBNG_VERSION
-        EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 22")));
-        EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 22 -> 2000")));
-#else
         EXPECT_CALL(*root_context, log_(spdlog::level::trace, Eq("compress 2000 -> 23")));
         EXPECT_CALL(*root_context, log_(spdlog::level::debug, Eq("uncompress 23 -> 2000")));
-#endif
         return root_context;
       });
   wasm->start(plugin);
@@ -600,7 +595,7 @@ TEST_P(WasmCommonTest, OnForeign) {
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
   EXPECT_NE(wasm, nullptr);
   std::string code;
   if (GetParam() != "null") {
@@ -651,7 +646,7 @@ TEST_P(WasmCommonTest, WASI) {
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
       plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), "", scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_NE(wasm, nullptr);
   std::string code;
@@ -1062,7 +1057,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
       {"foo", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
@@ -1120,7 +1115,7 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
       {"proxy_on_vm_start", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
   EXPECT_FALSE(wasm->capabilityAllowed("proxy_log"));
@@ -1183,7 +1178,7 @@ TEST_P(WasmCommonTest, AllowLog) {
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1242,7 +1237,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
       {"fd_write", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow fd_write
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1302,7 +1297,7 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
       {"proxy_log", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   // Restrict capabilities, but allow proxy_log
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1362,7 +1357,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
       {"fd_write", proxy_wasm::SanitizationConfig()}};
   plugin->wasmConfig().allowedCapabilities() = allowed_capabilities;
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(plugin->wasmConfig(), vm_key, scope,
-                                                               cluster_manager, *dispatcher);
+                                                               *api, cluster_manager, *dispatcher);
 
   // Restrict capabilities
   EXPECT_TRUE(wasm->capabilityAllowed("proxy_on_vm_start"));
@@ -1443,7 +1438,10 @@ TEST_P(WasmCommonContextTest, OnDnsResolve) {
   EXPECT_FALSE(code.empty());
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillRepeatedly(Return(dns_resolver));
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
+      .WillRepeatedly(Return(dns_resolver));
   Network::DnsResolver::ResolveCb dns_callback;
   Network::MockActiveDnsQuery active_dns_query;
   EXPECT_CALL(*dns_resolver, resolve(_, _, _))

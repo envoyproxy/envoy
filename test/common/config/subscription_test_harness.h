@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Config {
 
+enum class LegacyOrUnified { Legacy, Unified };
 const uint64_t TEST_TIME_MILLIS = 42000;
 
 /**

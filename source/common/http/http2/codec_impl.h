@@ -39,9 +39,12 @@ namespace Envoy {
 namespace Http {
 namespace Http2 {
 
+class Http2CodecImplTestFixture;
+
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
+constexpr uint64_t H2_FRAME_HEADER_SIZE = 9;
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
@@ -181,25 +184,16 @@ protected:
    * Base class for client and server side streams.
    */
   struct StreamImpl : public virtual StreamEncoder,
-                      public Stream,
                       public LinkedObject<StreamImpl>,
                       public Event::DeferredDeletable,
-                      public StreamCallbackHelper,
+                      public Http::MultiplexedStreamImplBase,
                       public ScopeTrackedObject {
 
     StreamImpl(ConnectionImpl& parent, uint32_t buffer_limit);
-    ~StreamImpl() override;
-    // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
-    // deferred delete lifetime issues that need sorting out if the destructor of the stream is
-    // going to be able to refer to the parent connection.
-    virtual void destroy();
-    void disarmStreamIdleTimer() {
-      if (stream_idle_timer_ != nullptr) {
-        // To ease testing and the destructor assertion.
-        stream_idle_timer_->disableTimer();
-        stream_idle_timer_.reset();
-      }
-    }
+
+    // Http::MultiplexedStreamImplBase
+    void destroy() override;
+    void onPendingFlushTimer() override;
 
     StreamImpl* base() { return this; }
     ssize_t onDataSourceRead(uint64_t length, uint32_t* data_flags);
@@ -207,18 +201,19 @@ protected:
     void resetStreamWorker(StreamResetReason reason);
     static void buildHeaders(std::vector<nghttp2_nv>& final_headers, const HeaderMap& headers);
     void saveHeader(HeaderString&& name, HeaderString&& value);
-    void encodeHeadersBase(const std::vector<nghttp2_nv>& final_headers, bool end_stream);
-    virtual void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                               nghttp2_data_provider* provider) PURE;
+    void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
+    virtual void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     void submitMetadata(uint8_t flags);
+    // Returns true if the stream should defer the local reset stream until after the next call to
+    // sendPendingFrames so pending outbound frames have one final chance to be flushed. If we
+    // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
+    virtual bool useDeferredReset() const PURE;
     virtual StreamDecoder& decoder() PURE;
     virtual HeaderMap& headers() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
-    virtual void createPendingFlushTimer() PURE;
-    void onPendingFlushTimer();
 
     // Http::StreamEncoder
     void encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -233,12 +228,9 @@ protected:
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
-      return parent_.connection_.addressProvider().localAddress();
+      return parent_.connection_.connectionInfoProvider().localAddress();
     }
     absl::string_view responseDetails() override { return details_; }
-    void setFlushTimeout(std::chrono::milliseconds timeout) override {
-      stream_idle_timeout_ = timeout;
-    }
     void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override;
 
     // ScopeTrackedObject
@@ -291,10 +283,12 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
+    const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+    StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
@@ -317,9 +311,12 @@ protected:
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     absl::string_view details_;
-    // See HttpConnectionManager.stream_idle_timeout.
-    std::chrono::milliseconds stream_idle_timeout_{};
-    Event::TimerPtr stream_idle_timer_;
+
+  protected:
+    // Http::MultiplexedStreamImplBase
+    bool hasPendingData() override {
+      return pending_send_data_->length() > 0 || pending_trailers_to_encode_ != nullptr;
+    }
   };
 
   using StreamImplPtr = std::unique_ptr<StreamImpl>;
@@ -333,9 +330,14 @@ protected:
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
           headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
 
+    // Http::MultiplexedStreamImplBase
+    // Client streams do not need a flush timer because we currently assume that any failure
+    // to flush would be covered by a request/stream/etc. timeout.
+    void setFlushTimeout(std::chrono::milliseconds /*timeout*/) override {}
     // StreamImpl
-    void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                       nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    // Do not use deferred reset on upstream connections.
+    bool useDeferredReset() const override { return false; }
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
@@ -357,10 +359,6 @@ protected:
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<RequestTrailerMapImpl>(trailers);
-    }
-    void createPendingFlushTimer() override {
-      // Client streams do not create a flush timer because we currently assume that any failure
-      // to flush would be covered by a request/stream/etc. timeout.
     }
 
     // RequestEncoder
@@ -389,8 +387,11 @@ protected:
 
     // StreamImpl
     void destroy() override;
-    void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
-                       nghttp2_data_provider* provider) override;
+    void submitHeaders(const HeaderMap& headers, nghttp2_data_provider* provider) override;
+    // Enable deferred reset on downstream connections so outbound HTTP internal error replies are
+    // written out before force resetting the stream, assuming there is enough H2 connection flow
+    // control window is available.
+    bool useDeferredReset() const override { return true; }
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
@@ -407,7 +408,6 @@ protected:
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
-    void createPendingFlushTimer() override;
     void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
@@ -525,12 +525,7 @@ protected:
   // nghttp2 library will keep calling this callback to write the rest of the frame.
   ssize_t onSend(const uint8_t* data, size_t length);
 
-  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
-  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514. This is
-  // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
-  // flag.
-  const bool skip_encoding_empty_trailers_;
+  const bool skip_dispatching_frames_for_closed_connection_;
 
   // dumpState helper method.
   virtual void dumpStreams(std::ostream& os, int indent_level) const;
@@ -541,6 +536,8 @@ protected:
   const MonotonicTime& lastReceivedDataTime() { return last_received_data_time_; }
 
 private:
+  friend class Http2CodecImplTestFixture;
+
   virtual ConnectionCallbacks& callbacks() PURE;
   virtual Status onBeginHeaders(const nghttp2_frame* frame) PURE;
   int onData(int32_t stream_id, const uint8_t* data, size_t len);
@@ -563,13 +560,18 @@ private:
   virtual Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length) PURE;
   void onKeepaliveResponse();
   void onKeepaliveResponseTimeout();
+  bool slowContainsStreamId(int32_t stream_id) const;
   virtual StreamResetReason getMessagingErrorResetReason() const PURE;
 
   // Tracks the current slice we're processing in the dispatch loop.
   const Buffer::RawSlice* current_slice_ = nullptr;
+  // Streams that are pending deferred reset. Using an ordered map provides determinism in the rare
+  // case where there are multiple streams waiting for deferred reset. The stream id is also used to
+  // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
+  // after the stream has been removed from the active list.
+  std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
   bool dispatching_ : 1;
   bool raised_goaway_ : 1;
-  bool pending_deferred_reset_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
   MonotonicTime last_received_data_time_{};

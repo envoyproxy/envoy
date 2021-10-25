@@ -1,7 +1,6 @@
 #include "source/common/http/path_utility.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/http/legacy_path_canonicalizer.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
@@ -15,19 +14,15 @@ namespace Http {
 
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_forked_chromium_url")) {
-    std::string canonical_path;
-    url::Component in_component(0, original_path.size());
-    url::Component out_component;
-    url::StdStringCanonOutput output(&canonical_path);
-    if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
-      return absl::nullopt;
-    } else {
-      output.Complete();
-      return absl::make_optional(std::move(canonical_path));
-    }
+  std::string canonical_path;
+  url::Component in_component(0, original_path.size());
+  url::Component out_component;
+  url::StdStringCanonOutput output(&canonical_path);
+  if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
+    return absl::nullopt;
   }
-  return LegacyPathCanonicalizer::canonicalizePath(original_path);
+  output.Complete();
+  return absl::make_optional(std::move(canonical_path));
 }
 
 void unescapeInPath(std::string& path, absl::string_view escape_sequence,

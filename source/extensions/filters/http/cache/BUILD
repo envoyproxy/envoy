@@ -28,7 +28,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +41,17 @@ envoy_cc_library(
         ":cache_headers_utils_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:headers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "cache_policy_lib",
+    hdrs = ["cache_policy.h"],
+    deps = [
+        ":cache_headers_utils_lib",
+        ":http_cache_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/stream_info:filter_state_lib",
     ],
 )
 
@@ -66,7 +77,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -84,7 +95,8 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@com_google_absl//absl/container:btree",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )
 
@@ -104,6 +116,6 @@ envoy_cc_extension(
     deps = [
         ":cache_filter_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/cache/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cache/v3:pkg_cc_proto",
     ],
 )

@@ -68,6 +68,57 @@ TEST_F(LuaHeaderMapWrapperTest, Methods) {
   start("callMe");
 }
 
+// Get the total number of values for a certain header with multiple values.
+TEST_F(LuaHeaderMapWrapperTest, GetNumValues) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(object:getNumValues("X-Test"))
+        testPrint(object:getNumValues(":path"))
+        testPrint(object:getNumValues("foobar"))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(printer_, testPrint("2"));
+  EXPECT_CALL(printer_, testPrint("1"));
+  EXPECT_CALL(printer_, testPrint("0"));
+  start("callMe");
+}
+
+// Get the value on a certain index for a header with multiple values.
+TEST_F(LuaHeaderMapWrapperTest, GetAtIndex) {
+  const std::string SCRIPT{R"EOF(
+        function callMe(object)
+          if object:getAtIndex("x-test", -1) == nil then
+            testPrint("invalid_negative_index")
+          end
+          testPrint(object:getAtIndex("X-Test", 0))
+          testPrint(object:getAtIndex("x-test", 1))
+          testPrint(object:getAtIndex("x-test", 2))
+          if object:getAtIndex("x-test", 3) == nil then
+            testPrint("nil_value")
+          end
+        end
+      )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":path", "/"}, {"x-test", "foo"}, {"x-test", "bar"}, {"x-test", ""}};
+  HeaderMapWrapper::create(coroutine_->luaState(), headers, []() { return true; });
+  EXPECT_CALL(printer_, testPrint("invalid_negative_index"));
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+  EXPECT_CALL(printer_, testPrint(""));
+  EXPECT_CALL(printer_, testPrint("nil_value"));
+  start("callMe");
+}
+
 // Test modifiable methods.
 TEST_F(LuaHeaderMapWrapperTest, ModifiableMethods) {
   const std::string SCRIPT{R"EOF(
@@ -289,8 +340,9 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnCurrentDownstreamAddresses) {
       new Network::Address::Ipv4Instance("127.0.0.1", 8000)};
   auto downstream_direct_remote =
       Network::Address::InstanceConstSharedPtr{new Network::Address::Ipv4Instance("8.8.8.8", 3000)};
-  stream_info.downstream_address_provider_->setLocalAddress(address);
-  stream_info.downstream_address_provider_->setDirectRemoteAddressForTest(downstream_direct_remote);
+  stream_info.downstream_connection_info_provider_->setLocalAddress(address);
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+      downstream_direct_remote);
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint(address->asString()));
@@ -310,7 +362,7 @@ TEST_F(LuaStreamInfoWrapperTest, ReturnRequestedServerName) {
   setup(SCRIPT);
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  stream_info.downstream_address_provider_->setRequestedServerName("some.sni.io");
+  stream_info.downstream_connection_info_provider_->setRequestedServerName("some.sni.io");
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("some.sni.io"));
