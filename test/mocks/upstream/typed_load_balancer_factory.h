@@ -14,9 +14,10 @@ public:
 
   // Upstream::TypedLoadBalancerFactory
   MOCK_METHOD(std::string, name, (), (const));
-  MOCK_METHOD(ThreadAwareLoadBalancerPtr, create, (const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& stats_scope,
-         Runtime::Loader& runtime, Random::RandomGenerator& random,
-         const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy& lb_policy));
+  MOCK_METHOD(ThreadAwareLoadBalancerPtr, create,
+              (const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& stats_scope,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               const ::envoy::config::cluster::v3::LoadBalancingPolicy_Policy& lb_policy));
 };
 } // namespace Upstream
 } // namespace Envoy

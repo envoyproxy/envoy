@@ -963,8 +963,7 @@ void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Clus
 
   if (load_balancer_factory_ == nullptr) {
     throw EnvoyException(fmt::format(
-        "Didn't find a registered load balancer factory implementation for cluster: '{}'",
-        name_));
+        "Didn't find a registered load balancer factory implementation for cluster: '{}'", name_));
   }
 
   lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
