@@ -28,7 +28,8 @@ public:
 
   TestIoSocketHandle(WritevOverrideProc writev_override_proc, os_fd_t fd = INVALID_SOCKET,
                      bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
-      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain), writev_override_(writev_override_proc) {}
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
+        writev_override_(writev_override_proc) {}
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override {
