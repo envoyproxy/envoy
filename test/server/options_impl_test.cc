@@ -400,20 +400,18 @@ TEST_F(OptionsImplTest, AllowedLogLevels) {
 }
 
 TEST_F(OptionsImplTest, InvalidStatsTags) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo::bar"), MalformedArgvException,
-                          "error: misformatted stats-tag 'foo::bar'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo"), MalformedArgvException,
+                          "error: misformatted stats-tag 'foo'");
 }
 
 TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f>o:bar"), MalformedArgvException,
-                          "error: misformatted stats-tag 'f>o:bar' contains invalid char '>'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo:b.ar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'foo:b.ar' contains invalid char '.'");
 }
 
 TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b-ar"));
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b_ar"));
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b--ar"));
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b__ar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:bar"));
+  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b:ar"));
   EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b_-ar"));
 }
 

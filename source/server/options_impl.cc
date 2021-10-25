@@ -294,25 +294,32 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
 
   if (!stats_tag.getValue().empty()) {
     for (const auto& cli_tag_pair : stats_tag.getValue()) {
-      std::vector<absl::string_view> splitted_tag_pair_tokens = absl::StrSplit(cli_tag_pair, ':');
+      std::vector<absl::string_view> splitted_tag_pair_tokens =
+          absl::StrSplit(cli_tag_pair, absl::MaxSplits(':', 1));
       if (splitted_tag_pair_tokens.size() != 2) {
         throw MalformedArgvException(
             fmt::format("error: misformatted stats-tag '{}'", cli_tag_pair));
       }
+      std::string name = std::string(splitted_tag_pair_tokens[0]);
+      std::string value = std::string(splitted_tag_pair_tokens[1]);
 
-      for (const auto& value : splitted_tag_pair_tokens) {
-        for (const auto& splitted_tag_pair_token_char : value) {
-          if (!(iswalnum(splitted_tag_pair_token_char) || splitted_tag_pair_token_char == '-' ||
-                splitted_tag_pair_token_char == '_')) {
-            throw MalformedArgvException(
-                fmt::format("error: misformatted stats-tag '{}' contains invalid char '{}'",
-                            cli_tag_pair, splitted_tag_pair_token_char));
-          }
+      for (const auto& token : name) {
+        if (isspace(token)) {
+          throw MalformedArgvException(fmt::format(
+              "error: misformatted stats-tag '{}' contains whitespace char '{}' in the name",
+              cli_tag_pair));
         }
       }
 
-      stats_tags_.emplace_back(Stats::Tag{std::string(splitted_tag_pair_tokens[0]),
-                                          std::string(splitted_tag_pair_tokens[1])});
+      for (const auto& token : value) {
+        if (isspace(token) || token == '.') {
+          throw MalformedArgvException(
+              fmt::format("error: misformatted stats-tag '{}' contains invalid char '{}'",
+                          cli_tag_pair, token));
+        }
+      }
+
+      stats_tags_.emplace_back(Stats::Tag{name, value});
     }
   }
 }
