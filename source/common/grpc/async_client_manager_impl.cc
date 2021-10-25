@@ -149,32 +149,9 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
-RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
-    const envoy::config::core::v3::GrpcService& config) {
-  auto it = cache_.find(config);
-  if (it == cache_.end()) {
-    return nullptr;
-  }
-  if (idle_keys_.find(config) != idle_keys_.end()) {
-    active_keys_.insert(idle_keys_.extract(config));
-  }
-  return it->second;
-}
 
-void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
-    const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  cache_[config] = client;
-  active_keys_.insert(config);
-}
 
-void AsyncClientManagerImpl::RawAsyncClientCache::evictIdleEntries() {
-  // Remove all the cache entries idle in the last interval.
-  for (const auto& config : idle_keys_) {
-    cache_.erase(config);
-  }
-  // Reset all the entries to be idle at the beginning of next interval.
-  idle_keys_ = std::move(active_keys_);
-}
+
 
 } // namespace Grpc
 } // namespace Envoy

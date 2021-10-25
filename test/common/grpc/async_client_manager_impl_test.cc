@@ -48,10 +48,10 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
   waitForSeconds(45);
-  // Cache entry hasn't been evicted because it was created 10s ago.
+  // Cache entry hasn't been evicted because it was created 45s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(45);
-  // Cache entry hasn't been evicted because it was accessed 10s ago.
+  // Cache entry hasn't been evicted because it was accessed 45s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(80);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);

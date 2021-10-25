@@ -56,7 +56,7 @@ public:
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) {
+    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {
       evict_idle_entries_timer_ = dispatcher.createTimer([this] {
         evictIdleEntries();
         evict_idle_entries_timer_->enableTimer(RefreshInterval);
@@ -64,20 +64,55 @@ public:
       evict_idle_entries_timer_->enableTimer(RefreshInterval);
     }
     void setCache(const envoy::config::core::v3::GrpcService& config,
-                  const RawAsyncClientSharedPtr& client);
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
+                  const RawAsyncClientSharedPtr& client) {
+      cache_.emplace_front(config, client);
+      cache_.front().accessed_time_ = dispatcher_.timeSource().monotonicTime();
+      look_up_[config] = cache_.begin();
+    }
 
-    void evictIdleEntries();
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) {
+      auto it = look_up_.find(config);
+      if (it != look_up_.end()) {
+        it->second->accessed_time_ = dispatcher_.timeSource().monotonicTime();
+        cache_.splice(cache_.begin(), cache_, it->second);
+        return it->second->client_;
+      }
+      return nullptr;
+    }
+
+    void evictIdleEntries() {
+      while (true) {
+        if (cache_.empty()) {
+          break;
+        }
+        MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+        MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::milliseconds(50000);
+        if (now > next_expire) {
+          look_up_.erase(cache_.back().config_);
+          cache_.pop_back();
+          continue;
+        }
+        break;
+      }
+    }
 
   private:
-    absl::flat_hash_map<envoy::config::core::v3::GrpcService, RawAsyncClientSharedPtr, MessageUtil,
-                        MessageUtil>
-        cache_;
-    // The keys of cache entries that haven't been accessed since last eviction.
-    absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil> idle_keys_;
-    // The keys of cache entries that have been accessed since last eviction.
-    absl::flat_hash_set<envoy::config::core::v3::GrpcService, MessageUtil, MessageUtil>
-        active_keys_;
+    struct CacheEntry {
+      CacheEntry(const envoy::config::core::v3::GrpcService& config,
+                 RawAsyncClientSharedPtr const& client)
+          : config_(config), client_(client) {}
+      envoy::config::core::v3::GrpcService config_;
+      RawAsyncClientSharedPtr client_;
+      MonotonicTime accessed_time_;
+    };
+    absl::flat_hash_map<envoy::config::core::v3::GrpcService, std::list<CacheEntry>::iterator,
+                        MessageUtil, MessageUtil>
+        look_up_;
+    std::list<CacheEntry> cache_;
+    Event::Dispatcher& dispatcher_;
+    // The timer fire every 50s, and clean up cache entries that haven't been accesses since last
+    // eviction. Therefore, any entry that haven't been used for 50s will be evicted when the timer
+    // fires but some entries can linger for up to 100s.
     Envoy::Event::TimerPtr evict_idle_entries_timer_;
     static constexpr std::chrono::milliseconds RefreshInterval{50000};
   };
