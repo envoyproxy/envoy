@@ -19,9 +19,8 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
-      crypto_config_(crypto_config),
-      crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
-      scope_(scope) {
+      crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
+      quic_stat_names_(quic_stat_names), scope_(scope) {
   quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
 }
 
