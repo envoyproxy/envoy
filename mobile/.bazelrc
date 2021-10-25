@@ -112,7 +112,6 @@ build:remote-ci-common --spawn_strategy=remote,sandboxed,local
 build:remote-ci-common --grpc_keepalive_time=61s
 #############################################################################
 # remote-ci-linux: These options are linux-only using GCC by default
-# TODO(lfpino): Add --remote_default_exec_properties=Pool=linux once the pool is defined
 #############################################################################
 # Common Engflow flags
 build:remote-ci-linux --define=EXECUTOR=remote
@@ -211,8 +210,8 @@ build:remote-ci-linux-coverage --config=remote-ci-common
 build:remote-ci-linux-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # remote-ci-macos: These options are macOS-only
-# TODO(lfpino): Add --remote_default_exec_properties=Pool=macos once the pool is defined
 #############################################################################
+build:remote-ci-macos --remote_default_exec_properties=Pool=macos
 build:remote-ci-macos --config=remote-ci-common
 build:remote-ci-macos --xcode_version_config=//ci:xcode_config
 #############################################################################

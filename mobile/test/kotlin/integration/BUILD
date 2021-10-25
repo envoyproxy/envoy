@@ -118,6 +118,10 @@ envoy_mobile_jni_kt_test(
     srcs = [
         "ReceiveDataTest.kt",
     ],
+    exec_properties = {
+        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
     native_deps = [
         "//library/common/jni:libjava_jni_lib.so",
         "//library/common/jni:java_jni_lib.jnilib",

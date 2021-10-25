@@ -11,6 +11,10 @@ envoy_mobile_android_test(
         "CronvoyEngineTest.java",
         "UrlRequestCallbackTester.java",
     ],
+    exec_properties = {
+        # TODO(lfpino): Remove this once the sandboxNetwork=off works for ipv4 localhost addresses.
+        "sandboxNetwork": "standard",
+    },
     native_deps = [
         "//library/common/jni:libndk_envoy_jni.so",
         "//library/common/jni:libndk_envoy_jni.jnilib",
