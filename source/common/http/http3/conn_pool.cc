@@ -32,15 +32,10 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
                                                        quic::QuicConfig& quic_config) {
-  // TODO(alyssawilk) use and test other defaults.
+  Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_config);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
   quic_config.set_max_time_before_crypto_handshake(crypto_timeout);
-  int32_t max_streams = getMaxStreams(cluster);
-  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
-  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
-  Quic::configQuicInitialFlowControlWindow(cluster.http3Options().quic_protocol_options(),
-                                           quic_config);
 }
 
 Http3ConnPoolImpl::Http3ConnPoolImpl(

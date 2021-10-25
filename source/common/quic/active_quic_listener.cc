@@ -254,11 +254,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
           : 20000;
   quic_config_.set_max_time_before_crypto_handshake(
       quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  int32_t max_streams =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
-  quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
-  quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
-  configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
+  convertQuicConfig(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.
   envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;
