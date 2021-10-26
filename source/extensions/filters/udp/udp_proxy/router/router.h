@@ -14,47 +14,17 @@ namespace UdpProxy {
 namespace Router {
 
 /**
- * RouteEntry is an individual resolved route entry.
+ * The router.
  */
-class RouteEntry {
+class Router {
 public:
-  virtual ~RouteEntry() = default;
+  virtual ~Router() = default;
 
-  /**
-   * @return const std::string& the upstream cluster that owns the route.
-   */
-  virtual const std::string& clusterName() const PURE;
+  virtual const std::string& route(Network::Address::InstanceConstSharedPtr address) const PURE;
+  virtual const std::vector<std::string>& entries() const PURE;
 };
 
-using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
-
-/**
- * Route holds the RouteEntry for a request.
- */
-class Route {
-public:
-  virtual ~Route() = default;
-
-  /**
-   * @return the route entry or nullptr if there is no matching route for the request.
-   */
-  virtual const RouteEntry* routeEntry() const PURE;
-};
-
-using RouteConstSharedPtr = std::shared_ptr<const Route>;
-
-/**
- * The router configuration.
- */
-class Config {
-public:
-  virtual ~Config() = default;
-
-  virtual RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const PURE;
-  virtual const std::vector<RouteEntryConstSharedPtr>& entries() const PURE;
-};
-
-using ConfigConstSharedPtr = std::shared_ptr<const Config>;
+using RouterConstSharedPtr = std::shared_ptr<const Router>;
 
 } // namespace Router
 } // namespace UdpProxy

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
@@ -69,9 +71,10 @@ class UdpProxyFilterConfig {
 public:
   UdpProxyFilterConfig(Upstream::ClusterManager& cluster_manager, TimeSource& time_source,
                        Stats::Scope& root_scope,
+                       Server::Configuration::ServerFactoryContext& context,
                        const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
       : cluster_manager_(cluster_manager), time_source_(time_source),
-        router_config_(std::make_shared<Router::ConfigImpl>(config)),
+        router_(std::make_shared<Router::RouterImpl>(config, context)),
         session_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, idle_timeout, 60 * 1000)),
         use_original_src_ip_(config.use_original_src_ip()),
         stats_(generateStats(config.stat_prefix(), root_scope)),
@@ -88,16 +91,9 @@ public:
   }
 
   const std::string& cluster(Network::Address::InstanceConstSharedPtr address) const {
-    auto route = router_config_->route(address);
-    if (!route) {
-      return EMPTY_STRING;
-    }
-
-    return route->routeEntry()->clusterName();
+    return router_->route(address);
   }
-  const std::vector<Router::RouteEntryConstSharedPtr>& entries() const {
-    return router_config_->entries();
-  }
+  const std::vector<std::string>& entries() const { return router_->entries(); }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }
@@ -118,7 +114,7 @@ private:
 
   Upstream::ClusterManager& cluster_manager_;
   TimeSource& time_source_;
-  Router::ConfigConstSharedPtr router_config_;
+  Router::RouterConstSharedPtr router_;
   const std::chrono::milliseconds session_timeout_;
   const bool use_original_src_ip_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;

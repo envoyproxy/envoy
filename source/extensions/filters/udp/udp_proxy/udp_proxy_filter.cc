@@ -15,8 +15,7 @@ UdpProxyFilter::UdpProxyFilter(Network::UdpReadFilterCallbacks& callbacks,
       cluster_update_callbacks_(
           config->clusterManager().addThreadLocalClusterUpdateCallbacks(*this)) {
   for (const auto& entry : config_->entries()) {
-    Upstream::ThreadLocalCluster* cluster =
-        config->clusterManager().getThreadLocalCluster(entry->clusterName());
+    Upstream::ThreadLocalCluster* cluster = config->clusterManager().getThreadLocalCluster(entry);
     if (cluster != nullptr) {
       onClusterAddOrUpdate(*cluster);
     }

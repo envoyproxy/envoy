@@ -3,9 +3,11 @@ syntax = "proto3";
 package envoy.extensions.filters.udp.udp_proxy.v3;
 
 import "envoy/config/core/v3/udp_socket_config.proto";
-import "envoy/extensions/filters/udp/udp_proxy/v3/route.proto";
 
 import "google/protobuf/duration.proto";
+
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -58,8 +60,9 @@ message UdpProxyConfig {
       (envoy.annotations.deprecated_at_minor_version) = "3.0"
     ];
 
-    // The route table for the connection manager is static and is specified in this property.
-    RouteConfiguration route_config = 7;
+    // The match tree to use when resolving route actions for incoming requests.
+    xds.type.matcher.v3.Matcher matcher = 7
+        [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
   // The idle timeout for sessions. Idle is defined as no datagrams between received or sent by

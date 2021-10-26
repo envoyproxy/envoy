@@ -2,8 +2,11 @@
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/server/factory_context.h"
 
-#include "source/common/network/lc_trie.h"
+#include "source/common/matcher/matcher.h"
+#include "source/common/matcher/validation_visitor.h"
+#include "source/common/network/matching/data.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router.h"
 
 namespace Envoy {
@@ -12,42 +15,51 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace Router {
 
-class ClusterRouteEntry : public RouteEntry, public Route {
+struct RouteActionContext {};
+
+class RouteMatchAction
+    : public Matcher::ActionBase<envoy::extensions::filters::udp::udp_proxy::v3::Route> {
 public:
-  ClusterRouteEntry(const envoy::extensions::filters::udp::udp_proxy::v3::Route& route);
-  ClusterRouteEntry(const std::string& cluster);
-  ~ClusterRouteEntry() override = default;
+  explicit RouteMatchAction(const std::string& cluster) : cluster_(cluster) {}
 
-  // Router::RouteEntry
-  const std::string& clusterName() const override { return cluster_name_; }
-
-  // Router::Route
-  const RouteEntry* routeEntry() const override { return this; }
+  const std::string& cluster() const { return cluster_; }
 
 private:
-  const std::string cluster_name_;
+  const std::string cluster_;
 };
 
-class ConfigImpl : public Config {
+class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  ConfigImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config);
-  ~ConfigImpl() override = default;
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  std::string name() const override { return "route"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::extensions::filters::udp::udp_proxy::v3::Route>();
+  }
+};
 
-  // Router::Config
-  RouteConstSharedPtr route(Network::Address::InstanceConstSharedPtr address) const override;
-  const std::vector<RouteEntryConstSharedPtr>& entries() const override { return entries_; }
+class RouteActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Network::Matching::NetworkMatchingData> {
+public:
+  absl::Status performDataInputValidation(
+      const Matcher::DataInputFactory<Network::Matching::NetworkMatchingData>& data_input,
+      absl::string_view type_url) override;
+};
+
+class RouterImpl : public Router {
+public:
+  RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
+             Server::Configuration::ServerFactoryContext& context);
+
+  // Router::Router
+  const std::string& route(Network::Address::InstanceConstSharedPtr address) const override;
+  const std::vector<std::string>& entries() const override;
 
 private:
-  using SourceIPsTrie = Network::LcTrie::LcTrie<RouteConstSharedPtr>;
-  using RouteConfiguration = envoy::extensions::filters::udp::udp_proxy::v3::RouteConfiguration;
-
-  RouteConstSharedPtr cluster_;
-  const SourceIPsTrie source_ips_trie_;
-  const std::vector<RouteEntryConstSharedPtr> entries_;
-
-  SourceIPsTrie buildRouteTrie(const RouteConfiguration& config);
-  std::vector<RouteEntryConstSharedPtr> buildEntryList(const std::string& cluster,
-                                                       const RouteConfiguration& config);
+  absl::optional<std::string> cluster_;
+  Matcher::MatchTreeSharedPtr<Network::Matching::NetworkMatchingData> matcher_;
+  std::vector<std::string> entries_;
 };
 
 } // namespace Router

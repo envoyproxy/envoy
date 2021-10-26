@@ -1,6 +1,12 @@
 #include "source/extensions/filters/udp/udp_proxy/router/router_impl.h"
 
-#include "absl/container/flat_hash_set.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.validate.h"
+#include "envoy/type/matcher/v3/network_inputs.pb.h"
+
+#include "source/common/common/empty_string.h"
+#include "source/common/network/matching/data_impl.h"
+#include "source/common/network/matching/inputs.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,80 +14,65 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace Router {
 
-ClusterRouteEntry::ClusterRouteEntry(
-    const envoy::extensions::filters::udp::udp_proxy::v3::Route& route)
-    : cluster_name_(route.route().cluster()) {}
+Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
+    const Protobuf::Message& config, RouteActionContext&,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  const auto& route_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::udp::udp_proxy::v3::Route&>(config, validation_visitor);
+  const auto& cluster = route_config.cluster();
 
-ClusterRouteEntry::ClusterRouteEntry(const std::string& cluster) : cluster_name_(cluster) {}
-
-ConfigImpl::ConfigImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config)
-    : cluster_(std::make_shared<ClusterRouteEntry>(config.cluster())),
-      source_ips_trie_(buildRouteTrie(config.route_config())),
-      entries_(buildEntryList(config.cluster(), config.route_config())) {}
-
-RouteConstSharedPtr ConfigImpl::route(Network::Address::InstanceConstSharedPtr address) const {
-  if (!cluster_->routeEntry()->clusterName().empty()) {
-    return cluster_;
-  }
-
-  const auto& data = source_ips_trie_.getData(address);
-  if (!data.empty()) {
-    ASSERT(data.size() == 1);
-    return data.back();
-  }
-
-  return nullptr;
+  return [cluster]() { return std::make_unique<RouteMatchAction>(cluster); };
 }
 
-ConfigImpl::SourceIPsTrie ConfigImpl::buildRouteTrie(const RouteConfiguration& config) {
-  std::vector<std::pair<RouteConstSharedPtr, std::vector<Network::Address::CidrRange>>>
-      source_ips_list;
-  source_ips_list.reserve(config.routes().size());
+REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
-  auto convertAddress = [](const auto& prefix_ranges) -> std::vector<Network::Address::CidrRange> {
-    std::vector<Network::Address::CidrRange> ips;
-    ips.reserve(prefix_ranges.size());
-    for (const auto& ip : prefix_ranges) {
-      const auto& cidr_range = Network::Address::CidrRange::create(ip);
-      ips.push_back(cidr_range);
+absl::Status RouteActionValidationVisitor::performDataInputValidation(
+    const Matcher::DataInputFactory<Network::Matching::NetworkMatchingData>&,
+    absl::string_view type_url) {
+  static std::string source_ip_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+      envoy::type::matcher::v3::SourceIpMatchInput::descriptor()->full_name());
+  if (type_url == source_ip_input_name) {
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError(
+      fmt::format("Route table can only match on source IP, saw {}", type_url));
+}
+
+RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::UdpProxyConfig& config,
+                       Server::Configuration::ServerFactoryContext& factory_context) {
+  if (config.has_cluster()) {
+    cluster_ = config.cluster();
+    entries_.push_back(config.cluster());
+  } else {
+    RouteActionContext context{};
+    RouteActionValidationVisitor validation_visitor;
+    Matcher::MatchTreeFactory<Network::Matching::NetworkMatchingData, RouteActionContext> factory(
+        context, factory_context, validation_visitor);
+    matcher_ = factory.create(config.matcher())();
+  }
+}
+
+const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr address) const {
+  if (cluster_.has_value()) {
+    return cluster_.value();
+  } else {
+    Network::Address::CidrRange cidr = Network::Address::CidrRange::create(address, address->ip()->ipv4() ? 32 : 128);
+    Network::Matching::NetworkMatchingDataImpl data;
+    data.onSourceIp(cidr);
+
+    auto result = matcher_->match(data);
+    if (result.match_state_ == Matcher::MatchState::MatchComplete) {
+      if (result.on_match_.has_value()) {
+        return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
+      }
     }
-    return ips;
-  };
 
-  for (auto& route : config.routes()) {
-    auto ranges = route.match().source_prefix_ranges();
-    auto route_entry = std::make_shared<ClusterRouteEntry>(route);
-
-    source_ips_list.push_back(make_pair(route_entry, convertAddress(ranges)));
+    return EMPTY_STRING;
   }
-
-  return {source_ips_list, true};
 }
 
-std::vector<RouteEntryConstSharedPtr> ConfigImpl::buildEntryList(const std::string& cluster,
-                                                                 const RouteConfiguration& config) {
-  auto set = absl::flat_hash_set<RouteEntryConstSharedPtr>();
-
-  if (!cluster.empty()) {
-    set.emplace(std::make_shared<ClusterRouteEntry>(cluster));
-  }
-
-  for (const auto& route : config.routes()) {
-    auto route_entry = std::make_shared<ClusterRouteEntry>(route);
-    auto cluster_name = route_entry->routeEntry()->clusterName();
-    if (!cluster_name.empty()) {
-      set.emplace(std::make_shared<ClusterRouteEntry>(cluster_name));
-    }
-  }
-
-  auto list = std::vector<RouteEntryConstSharedPtr>();
-  list.reserve(set.size());
-  for (const auto& entry : set) {
-    list.push_back(entry);
-  }
-
-  return list;
-}
+const std::vector<std::string>& RouterImpl::entries() const { return entries_; }
 
 } // namespace Router
 } // namespace UdpProxy
