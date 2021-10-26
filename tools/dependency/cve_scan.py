@@ -72,6 +72,7 @@ IGNORES_CVES = set([
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
     'CVE-2021-22918',
     'CVE-2021-22921',
+    'CVE-2021-22930',
     'CVE-2021-22931',
     'CVE-2021-22939',
     'CVE-2021-22940',
