@@ -3,8 +3,6 @@
 xDS REST and gRPC protocol
 ==========================
 
-BOGUS CHANGE
-
 Envoy discovers its various dynamic resources via the filesystem or by
 querying one or more management servers. Collectively, these discovery
 services and their corresponding APIs are referred to as *xDS*.
