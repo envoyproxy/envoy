@@ -715,6 +715,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["other"],
     ),
     org_llvm_llvm = dict(
+        # When changing this, you must re-generate the list of llvm libs
+        # see `bazel/foreign_cc/BUILD` for further information.
         project_name = "LLVM",
         project_desc = "LLVM Compiler Infrastructure",
         project_url = "https://llvm.org",
