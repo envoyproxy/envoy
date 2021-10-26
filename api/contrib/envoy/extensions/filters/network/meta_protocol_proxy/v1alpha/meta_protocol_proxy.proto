@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package aeraki.meta_protocol_proxy.v1alpha;
+
+import "envoy/config/core/v3/config_source.proto";
+
+import "envoy/extensions/filters/network/meta_protocol_proxy/config/route/v1alpha/route.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v1alpha";
+option java_outer_classname = "MetaProtocolProxyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Meta Protocol proxy]
+// Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
+// [#extension: envoy.filters.network.meta_protocol_proxy]
+
+// [#next-free-field: 7]
+message MetaProtocolProxy {
+
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The name of the application protocol built on top of meta protocol.
+  string application_protocol = 2 [(validate.rules).string = {min_len: 1}];
+
+  oneof route_specifier {
+    option (validate.required) = true;
+
+    // The meta protocol proxy’s route table will be dynamically loaded via the RDS API.
+    Rds rds = 3;
+
+    // The route table for the meta protocol proxy is static and is specified in this property.
+    config.route.v1alpha.RouteConfiguration route_config = 4;
+  }
+
+  // The codec which encodes and decodes the application protocol.
+  Codec codec = 5;
+
+  // A list of individual Layer-7 filters that make up the filter chain for requests made to
+  // the meta protocol proxy. Order matters as the filters are processed sequentially as
+  // request events happen. If no meta_protocol_filters are specified, a default router filter
+  // (`aeraki.meta_protocol.filters.router`) is used.
+  repeated MetaProtocolFilter meta_protocol_filters = 6;
+}
+
+message Rds {
+  // Configuration source specifier for RDS.
+  envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the route configuration. This name will be passed to the RDS
+  // API. This allows an Envoy configuration with multiple HTTP listeners (and
+  // associated HTTP connection manager filters) to use different route
+  // configurations.
+  string route_config_name = 2;
+}
+
+// MetaProtocolFilter configures a MetaProtocol filter.
+message MetaProtocolFilter {
+  // The name of the filter to instantiate. The name must match a supported filter.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  google.protobuf.Any config = 2;
+}
+
+message Codec {
+  // The name of the codec configuration.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Codec specific configuration which depends on the codec being instantiated.
+  google.protobuf.Any config = 2;
+}
+
