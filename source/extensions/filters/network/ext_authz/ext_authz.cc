@@ -14,6 +14,13 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
+// Response code details when the check method gets a denied response from the external auth
+// service.
+constexpr absl::string_view AuthzDenied = "ext_authz_denied";
+// Response code details when the check method experiences (network) failure in a fail-close
+// (failure_mode_allow is true) setup.
+constexpr absl::string_view AuthzError = "ext_authz_error";
+
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
@@ -88,14 +95,17 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
 
-  bool denied = false;
   // Fail open only if configured to do so and if the check status was a error.
   if (response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ||
       (response->status == Filters::Common::ExtAuthz::CheckStatus::Error &&
        !config_->failureModeAllow())) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    denied = true;
+    filter_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+    filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ? AuthzDenied
+                                                                           : AuthzError);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
@@ -103,18 +113,12 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         response->status == Filters::Common::ExtAuthz::CheckStatus::Error) {
       // Status is Error and yet we are configured to allow traffic. Click a counter.
       config_->stats().failure_mode_allowed_.inc();
-      denied = true;
     }
 
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_check_) {
       filter_callbacks_->continueReading();
     }
-  }
-
-  if (denied) {
-    filter_callbacks_->connection().streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
   }
 }
 

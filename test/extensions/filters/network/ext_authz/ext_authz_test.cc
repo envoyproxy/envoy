@@ -208,6 +208,8 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseCodeDetails("ext_authz_denied"));
   EXPECT_CALL(*client_, cancel()).Times(0);
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
 
@@ -278,6 +280,10 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseCodeDetails("ext_authz_error"));
   request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
 
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
@@ -433,6 +439,8 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
       }));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseCodeDetails("ext_authz_denied"));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
