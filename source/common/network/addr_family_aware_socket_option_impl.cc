@@ -14,8 +14,9 @@ namespace Network {
 
 namespace {
 
-  OptRef<const Socket::Option> getOptionForSocket(const Socket& socket, const Socket::Option& ipv4_option,
-                                                  const Socket::Option& ipv6_option) {
+OptRef<const Socket::Option> getOptionForSocket(const Socket& socket,
+                                                const Socket::Option& ipv4_option,
+                                                const Socket::Option& ipv6_option) {
   auto version = socket.ipVersion();
   if (!version.has_value()) {
     return {};
