@@ -130,6 +130,20 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(data_with_leading_lws, string.getStringView());
   }
 
+  // Inline trim removes leading and trailing whitespace.
+  {
+    const std::string data_without_leading_and_trailing_lws = "data";
+    const std::string data_with_leading_and_trailing_lws =
+        " \t\f\v " + data_without_leading_and_trailing_lws + " \t\f\v";
+    HeaderString string;
+    string.append(data_with_leading_and_trailing_lws.data(),
+                  data_with_leading_and_trailing_lws.size());
+    EXPECT_EQ(data_with_leading_and_trailing_lws, string.getStringView());
+    string.trim();
+    EXPECT_NE(data_with_leading_and_trailing_lws, string.getStringView());
+    EXPECT_EQ(data_without_leading_and_trailing_lws, string.getStringView());
+  }
+
   // Static clear() does nothing.
   {
     std::string static_string("HELLO");

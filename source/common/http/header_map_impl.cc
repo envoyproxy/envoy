@@ -115,6 +115,15 @@ void HeaderString::rtrim() {
   }
 }
 
+void HeaderString::trim() {
+  ASSERT(type() == Type::Inline);
+  absl::string_view original = getStringView();
+  absl::string_view trimmed = StringUtil::trim(original);
+  if (original.size() != trimmed.size()) {
+    getInVec(buffer_).assign(trimmed.begin(), trimmed.end());
+  }
+}
+
 absl::string_view HeaderString::getStringView() const {
   if (type() == Type::Reference) {
     return getStrView(buffer_);
