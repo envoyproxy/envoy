@@ -252,6 +252,7 @@ envoy_cc_test(
         "//test/config/integration/certs",
     ],
     deps = [
+        ":ads_integration_lib",
         ":fake_upstream_lib",
         ":http_integration_lib",
         "//source/common/common:macros",

@@ -7,6 +7,7 @@
 #include "source/common/common/macros.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/integration/ads_integration.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/resources.h"
@@ -283,6 +284,129 @@ TEST_P(OdCdsIntegrationTestDisabled, DisablingODCDSAtRouteLevelWorks) {
 
   response->waitForHeaders();
   EXPECT_EQ("503", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+}
+
+envoy::config::listener::v3::Listener buildOdCdsListener(const std::string& address) {
+  envoy::config::listener::v3::Listener listener;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      name: http
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+      - filters:
+        - name: http
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            stat_prefix: config_test
+            http_filters:
+            - name: envoy.filters.http.on_demand
+            - name: envoy.filters.http.router
+            codec_type: HTTP2
+            route_config:
+              name: local_route
+              virtual_hosts:
+              - name: local_service
+                domains: ["*"]
+                typed_per_filter_config:
+                  envoy.filters.http.on_demand:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.PerRouteConfig
+                    odcds_config:
+                      resource_api_version: V3
+                      ads: {{}}
+                routes:
+                - match: {{ prefix: "/" }}
+                  route:
+                    cluster_header: "Pick-This-Cluster"
+)EOF",
+                                        address),
+                            listener);
+  return listener;
+}
+
+class OdCdsAdsIntegrationTest : public AdsIntegrationTest {
+public:
+  void initialize() override {
+    AdsIntegrationTest::initialize();
+
+    test_server_->waitUntilListenersReady();
+    fake_upstream_idx_ = fake_upstreams_.size();
+    auto& upstream = addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    new_cluster_ =
+        ConfigHelper::buildStaticCluster("new_cluster", upstream.localAddress()->ip()->port(),
+                                         Network::Test::getLoopbackAddressString(ipVersion()));
+  }
+
+  std::size_t fake_upstream_idx_;
+  envoy::config::cluster::v3::Cluster new_cluster_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, OdCdsAdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     // Only delta xDS is supported for on-demand CDS.
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta),
+                     // Only new DSS is supported for on-demand CDS.
+                     testing::Values(OldDssOrNewDss::New)));
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - a response contains the cluster
+//  - request is resumed
+TEST_P(OdCdsAdsIntegrationTest, OnDemandClusterDiscoveryWorksWithClusterHeader) {
+  initialize();
+
+  auto compareRequest = [this](const std::string& type_url,
+                               const std::vector<std::string>& expected_resource_subscriptions,
+                               const std::vector<std::string>& expected_resource_unsubscriptions,
+                               bool expect_node = false) {
+    return compareDeltaDiscoveryRequest(type_url, expected_resource_subscriptions,
+                                        expected_resource_unsubscriptions,
+                                        Grpc::Status::WellKnownGrpcStatus::Ok, "", expect_node);
+  };
+
+  // initial cluster query
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}, true));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                                  {}, {}, "1");
+
+  // initial listener query
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
+  auto odcds_listener = buildOdCdsListener(Network::Test::getLoopbackAddressString(ipVersion()));
+  sendDeltaDiscoveryResponse<envoy::config::listener::v3::Listener>(Config::TypeUrl::get().Listener,
+                                                                    {odcds_listener}, {}, "2");
+
+  // acks
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Listener, {}, {}));
+
+  // listener got acked, so register the http port now.
+  test_server_->waitUntilListenersReady();
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", "new_cluster"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {"new_cluster"}, {}));
+  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                                  {new_cluster_}, {}, "3");
+  EXPECT_TRUE(compareRequest(Config::TypeUrl::get().Cluster, {}, {}));
+
+  waitForNextUpstreamRequest(fake_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().getStatusValue());
 
   cleanupUpstreamAndDownstream();
 }
