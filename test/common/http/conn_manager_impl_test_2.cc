@@ -1089,7 +1089,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   // Mimic the upstream connection backing up. The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
   // stats.
-  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -1104,7 +1104,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
 
   // Backup upstream once again.
-  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -1139,6 +1139,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
   // complete headers.
   {
     setUpBufferLimits();
+    EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_));
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
       decoder_ = &conn_manager_->newStream(response_encoder_);
       // Call the high buffer callbacks as the codecs do.
@@ -1201,6 +1202,7 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
   // complete headers.
   {
     setUpBufferLimits();
+    EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(1)).WillRepeatedly(ReturnRef(stream_));
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
       decoder_ = &conn_manager_->newStream(response_encoder_);
       // Call the high buffer callbacks as the codecs do.
@@ -1383,6 +1385,7 @@ TEST_F(HttpConnectionManagerImplTest, HitRequestBufferLimitsIntermediateFilter) 
   }));
 
   setUpBufferLimits();
+  ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
   setupFilterChain(2, 1);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))

@@ -138,7 +138,6 @@ void HttpConnectionManagerImplTest::setupFilterChain(int num_decoder_filters,
 }
 
 void HttpConnectionManagerImplTest::setUpBufferLimits() {
-  ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
   EXPECT_CALL(stream_, bufferLimit()).WillOnce(Return(initial_buffer_limit_));
   EXPECT_CALL(stream_, addCallbacks(_))
       .WillOnce(Invoke(
@@ -149,6 +148,7 @@ void HttpConnectionManagerImplTest::setUpBufferLimits() {
 void HttpConnectionManagerImplTest::setUpEncoderAndDecoder(bool request_with_data_and_trailers,
                                                            bool decode_headers_stop_all) {
   setUpBufferLimits();
+  ON_CALL(response_encoder_, getStream()).WillByDefault(ReturnRef(stream_));
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Invoke([&, request_with_data_and_trailers](Buffer::Instance&) -> Http::Status {
         RequestDecoder* decoder = &conn_manager_->newStream(response_encoder_);

@@ -227,6 +227,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
   }
 
   if (!reset_stream) {
+    if (stream.response_encoder_ != nullptr) {
+      stream.response_encoder_->getStream().removeCallbacks(stream);
+    }
     doDeferredStreamDestroy(stream);
   }
 
