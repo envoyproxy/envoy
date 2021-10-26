@@ -805,7 +805,7 @@ TEST_P(QuicHttpIntegrationTest, NoInitialStreams) {
   ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
                                                            std::chrono::milliseconds(100)));
 
-  // Update the upstream to have 1 stream available. Now Enovy should ship the
+  // Update the upstream to have 1 stream available. Now Envoy should ship the
   // original request upstream.
   fake_upstream_connection_->updateConcurrentStreams(1);
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
