@@ -36,7 +36,7 @@ public:
     return nullptr;
   }
 
-  std::string category() const override { return "proxy.filters.generic"; }
+  std::string category() const override { return "envoy.generic_proxy.filters"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

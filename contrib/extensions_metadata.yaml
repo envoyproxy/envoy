@@ -53,3 +53,8 @@ envoy.bootstrap.vcl:
   - envoy.bootstrap
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.network.generic_proxy:
+  categories:
+  - envoy.filters.network
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha

@@ -41,13 +41,14 @@ class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
                         public ResponseDecoderCallback,
                         Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  UpstreamRequest(RouterFilter& parent, Tcp::ConnectionPool::Instance& pool);
+  UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data);
 
   void startStream();
   void resetStream(StreamResetReason reason);
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                    Upstream::HostDescriptionConstSharedPtr host) override;
@@ -68,7 +69,7 @@ public:
   bool stream_reset_{};
 
   RouterFilter& parent_;
-  Tcp::ConnectionPool::Instance& conn_pool_;
+  Upstream::TcpPoolData tcp_data_;
 
   Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;

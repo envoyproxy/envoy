@@ -2,14 +2,11 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_contrib_package",
-    "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
-
-envoy_package()
 
 envoy_cc_library(
     name = "router_lib",
@@ -19,10 +16,6 @@ envoy_cc_library(
     hdrs = [
         "router.h",
     ],
-    copts = [
-        "-Wno-error=unused-private-field",
-    ],
-    repository = "@envoy",
     deps = [
         "//contrib/generic_proxy/filters/network/source/interface:generic_codec_interface",
         "//contrib/generic_proxy/filters/network/source/interface:generic_config_interface",
@@ -31,5 +24,20 @@ envoy_cc_library(
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
         "//source/common/upstream:load_balancer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "config",
+    srcs = [
+        "config.cc",
+    ],
+    hdrs = [
+        "config.h",
+    ],
+    deps = [
+        ":router_lib",
+        "//contrib/generic_proxy/filters/network/source/interface:generic_config_interface",
+        "//envoy/registry",
     ],
 )

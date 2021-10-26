@@ -23,20 +23,21 @@ CodecFactoryPtr FilterConfig::codecFactoryFromProto(
       Config::Utility::getAndCheckFactoryByName<CodecFactoryConfig>(codec_config.name());
 
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(), ProtobufWkt::Struct(),
+  Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
                                                 context.messageValidationVisitor(), *message);
   return factory.createFactory(*message, context);
 }
 
 RouteMatcherPtr FilterConfig::routeMatcherFromProto(
-    const envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration& route_config,
+    const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteConfiguration&
+        route_config,
     Envoy::Server::Configuration::FactoryContext& context) {
   return std::make_unique<RouteMatcherImpl>(route_config, context);
 }
 
 std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
     const ProtobufWkt::RepeatedPtrField<
-        envoy::extensions::filters::network::generic_proxy::v3::GenericFilter>& filters,
+        envoy::extensions::filters::network::generic_proxy::v3alpha::GenericFilter>& filters,
     const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
 
   std::vector<FilterFactoryCb> factories;
@@ -52,7 +53,7 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
         Config::Utility::getAndCheckFactoryByName<NamedGenericFilterConfigFactory>(filter.name());
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(filter.config(), ProtobufWkt::Struct(),
+    Envoy::Config::Utility::translateOpaqueConfig(filter.config(),
                                                   context.messageValidationVisitor(), *message);
 
     factories.push_back(factory.createFilterFactoryFromProto(*message, stats_prefix, context));

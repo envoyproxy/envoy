@@ -11,6 +11,7 @@ proto_library(
     deps = [
         "//contrib/envoy/extensions/filters/http/squash/v3:pkg",
         "//contrib/envoy/extensions/filters/http/sxg/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/generic_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/mysql_proxy/v3:pkg",

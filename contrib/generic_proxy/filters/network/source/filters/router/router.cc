@@ -21,11 +21,11 @@ absl::string_view resetReasonToStringView(StreamResetReason reason) {
 }
 } // namespace
 
-UpstreamRequest::UpstreamRequest(RouterFilter& parent, Tcp::ConnectionPool::Instance& pool)
-    : parent_(parent), conn_pool_(pool) {}
+UpstreamRequest::UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data)
+    : parent_(parent), tcp_data_(std::move(tcp_data)) {}
 
 void UpstreamRequest::startStream() {
-  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
+  Tcp::ConnectionPool::Cancellable* handle = tcp_data_.newConnection(*this);
   conn_pool_handle_ = handle;
 }
 
@@ -51,7 +51,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
-void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
+void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
 
@@ -216,9 +216,8 @@ GenericFilterStatus RouterFilter::onStreamDecoded(GenericRequest& request) {
     return GenericFilterStatus::StopIteration;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool =
-      thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
+  auto tcp_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
+  if (!tcp_data.has_value()) {
     callbacks_->sendLocalReply(GenericState::LocalUnknowedError, "no_healthy_upstream");
     return GenericFilterStatus::StopIteration;
   }
@@ -226,7 +225,7 @@ GenericFilterStatus RouterFilter::onStreamDecoded(GenericRequest& request) {
   request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
   request_encoder_->encode(request, upstream_request_buffer_);
 
-  auto upstream_request = std::make_unique<UpstreamRequest>(*this, *conn_pool);
+  auto upstream_request = std::make_unique<UpstreamRequest>(*this, std::move(tcp_data.value()));
   auto raw_upstream_request = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
 

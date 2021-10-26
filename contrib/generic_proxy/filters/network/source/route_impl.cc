@@ -4,7 +4,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/utility.h"
 
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3alpha/generic_proxy.pb.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_config.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
 
@@ -14,7 +14,7 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 SingleHeaderMatch::SingleHeaderMatch(
-    const envoy::extensions::filters::network::generic_proxy::v3::HeaderMatch& header)
+    const envoy::extensions::filters::network::generic_proxy::v3alpha::HeaderMatch& header)
     : name_(header.name()), invert_match_(header.invert_match()) {
   if (header.has_string_match()) {
     string_.emplace(Envoy::Matchers::StringMatcherImpl(header.string_match()));
@@ -35,7 +35,7 @@ bool SingleHeaderMatch::match(const GenericRequest& request) const {
 }
 
 SingleRouteMatch ::SingleRouteMatch(
-    const envoy::extensions::filters::network::generic_proxy::v3::RouteMatch& matcher) {
+    const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteMatch& matcher) {
   if (matcher.has_path()) {
     path_.emplace(Envoy::Matchers::StringMatcherImpl(matcher.path()));
   }
@@ -65,7 +65,7 @@ bool SingleRouteMatch::match(const GenericRequest& request) const {
 }
 
 RouteEntryImpl::RouteEntryImpl(
-    const envoy::extensions::filters::network::generic_proxy::v3::Route& route,
+    const envoy::extensions::filters::network::generic_proxy::v3alpha::Route& route,
     Envoy::Server::Configuration::FactoryContext& context)
     : route_match_(route.match()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route, timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
@@ -76,7 +76,7 @@ RouteEntryImpl::RouteEntryImpl(
         proto_filter_config.first);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyRouteConfigProto();
-    Envoy::Config::Utility::translateOpaqueConfig(proto_filter_config.second, ProtobufWkt::Struct(),
+    Envoy::Config::Utility::translateOpaqueConfig(proto_filter_config.second,
                                                   context.messageValidationVisitor(), *message);
 
     auto route_config = factory.createRouteSpecificFilterConfig(*message, context,
@@ -86,7 +86,8 @@ RouteEntryImpl::RouteEntryImpl(
 }
 
 RouteMatcherImpl::RouteMatcherImpl(
-    const envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration& route_config,
+    const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteConfiguration&
+        route_config,
     Envoy::Server::Configuration::FactoryContext& context)
     : name_(route_config.name()) {
   for (const auto& authority : route_config.config()) {

@@ -7,7 +7,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/metadata.h"
 
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3alpha/generic_proxy.pb.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
 
@@ -19,7 +19,7 @@ namespace GenericProxy {
 class SingleHeaderMatch {
 public:
   SingleHeaderMatch(
-      const envoy::extensions::filters::network::generic_proxy::v3::HeaderMatch& header);
+      const envoy::extensions::filters::network::generic_proxy::v3alpha::HeaderMatch& header);
 
   bool match(const GenericRequest& request) const;
 
@@ -28,27 +28,28 @@ private:
 
   const bool invert_match_{};
 
-  absl::optional<Envoy::Matchers::StringMatcherImpl> string_;
+  absl::optional<Envoy::Matchers::StringMatcherImpl<>> string_;
   bool present_match_{};
 };
 
 class SingleRouteMatch {
 public:
   SingleRouteMatch(
-      const envoy::extensions::filters::network::generic_proxy::v3::RouteMatch& matcher);
+      const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteMatch& matcher);
 
   bool match(const GenericRequest& request) const;
 
 private:
-  absl::optional<Envoy::Matchers::StringMatcherImpl> path_;
-  absl::optional<Envoy::Matchers::StringMatcherImpl> method_;
+  absl::optional<Envoy::Matchers::StringMatcherImpl<>> path_;
+  absl::optional<Envoy::Matchers::StringMatcherImpl<>> method_;
 
   std::vector<SingleHeaderMatch> headers_;
 };
 
 class RetryPolicyImpl : public RetryPolicy {
 public:
-  RetryPolicyImpl(const envoy::extensions::filters::network::generic_proxy::v3::RetryPolicy&) {}
+  RetryPolicyImpl(const envoy::extensions::filters::network::generic_proxy::v3alpha::RetryPolicy&) {
+  }
 
   bool shouldRetry(uint32_t, const GenericResponse*, absl::optional<GenericEvent>) const override {
     return false;
@@ -58,7 +59,7 @@ public:
 
 class RouteEntryImpl : public RouteEntry {
 public:
-  RouteEntryImpl(const envoy::extensions::filters::network::generic_proxy::v3::Route& route,
+  RouteEntryImpl(const envoy::extensions::filters::network::generic_proxy::v3alpha::Route& route,
                  Envoy::Server::Configuration::FactoryContext& context);
 
   bool match(const GenericRequest& request) const { return route_match_.match(request); }
@@ -95,9 +96,10 @@ using RouteEntryImplConstSharedPtr = std::shared_ptr<const RouteEntryImpl>;
 
 class RouteMatcherImpl : public RouteMatcher {
 public:
-  RouteMatcherImpl(const envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration&
-                       route_config,
-                   Envoy::Server::Configuration::FactoryContext& context);
+  RouteMatcherImpl(
+      const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteConfiguration&
+          route_config,
+      Envoy::Server::Configuration::FactoryContext& context);
 
   RouteEntryConstSharedPtr routeEntry(const GenericRequest& request) const override;
 

@@ -16,8 +16,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
 
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3alpha/generic_proxy.pb.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3alpha/generic_proxy.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
@@ -30,7 +30,7 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 using GenericProxyConfig =
-    envoy::extensions::filters::network::generic_proxy::v3::GenericProxyConfig;
+    envoy::extensions::filters::network::generic_proxy::v3alpha::GenericProxyConfig;
 
 class Filter;
 class ActiveStream;
@@ -38,11 +38,9 @@ class ActiveStream;
 class FilterConfig : public FilterChainFactory {
 public:
   FilterConfig(const std::string& stat_prefix, CodecFactoryPtr codec, RouteMatcherPtr route_matcher,
-               std::vector<FilterFactoryCb> factories,
-               Server::Configuration::FactoryContext& context)
+               std::vector<FilterFactoryCb> factories, Server::Configuration::FactoryContext&)
       : stat_prefix_(stat_prefix), codec_factory_(std::move(codec)),
-        route_matcher_(std::move(route_matcher)), factories_(std::move(factories)),
-        context_(context) {}
+        route_matcher_(std::move(route_matcher)), factories_(std::move(factories)) {}
 
   FilterConfig(const GenericProxyConfig& config, Server::Configuration::FactoryContext& context)
       : FilterConfig(
@@ -73,13 +71,13 @@ private:
                         Server::Configuration::FactoryContext& context);
 
   static RouteMatcherPtr routeMatcherFromProto(
-      const envoy::extensions::filters::network::generic_proxy::v3::RouteConfiguration&
+      const envoy::extensions::filters::network::generic_proxy::v3alpha::RouteConfiguration&
           route_config,
       Server::Configuration::FactoryContext& context);
 
   static std::vector<FilterFactoryCb> filtersFactoryFromProto(
       const ProtobufWkt::RepeatedPtrField<
-          envoy::extensions::filters::network::generic_proxy::v3::GenericFilter>& filters,
+          envoy::extensions::filters::network::generic_proxy::v3alpha::GenericFilter>& filters,
       const std::string stats_prefix, Server::Configuration::FactoryContext& context);
 
   const std::string stat_prefix_;
@@ -89,8 +87,6 @@ private:
   RouteMatcherPtr route_matcher_;
 
   std::vector<FilterFactoryCb> factories_;
-
-  Server::Configuration::FactoryContext& context_;
 };
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
@@ -200,7 +196,7 @@ public:
     return callbacks_->connection();
   }
 
-  Server::Configuration::FactoryContext& factoryContext() { return config_->context_; }
+  Server::Configuration::FactoryContext& factoryContext() { return context_; }
 
   void newDownstreamRequest(GenericRequestPtr request);
   void deferredStream(ActiveStream& stream);

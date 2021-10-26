@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.generic_proxy.v3;
+package envoy.extensions.filters.network.generic_proxy.v3alpha;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
@@ -15,20 +15,21 @@ import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
-option java_package = "io.proxy.filters.network.generic_proxy.v2";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.v3alpha";
 option java_outer_classname = "GenericProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Generic Proxy]
 // [#extension: proxy.filters.network.generic_proxy]
+// [#next-free-field: 8]
 message GenericProxyConfig {
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // Specific codec implementation for generic proxy. The codec will be used to decode/encode
   // downstream request and upstream response.
-  envoy.config.core.v3.TypedExtensionConfig codec_specifier = 2
+  config.core.v3.TypedExtensionConfig codec_specifier = 2
       [(validate.rules).message = {required: true}];
 
   oneof route_specifier {
@@ -46,7 +47,7 @@ message GenericProxyConfig {
 
 message GRDS {
   // Configuration source specifier for RDS.
-  envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This name will be passed to the RDS API. This allows
   // an Envoy configuration with multiple Generic listeners ( and associated Generic filters)
@@ -65,6 +66,7 @@ message GenericFilter {
   google.protobuf.Any config = 2;
 }
 
+// [#next-free-field: 9]
 message HeaderMatch {
   // The name of header/metadata need to match.
   string name = 1 [(validate.rules).string = {min_len: 1}];
@@ -72,7 +74,7 @@ message HeaderMatch {
   // Specific match rule of header/metadata.
   oneof match_specifier {
     // If specified, header match will be performed based on the string match rule.
-    envoy.type.matcher.v3.StringMatcher string_match = 2;
+    type.matcher.v3.StringMatcher string_match = 2;
 
     // If specified, header match will be performed based on whether the header is in the
     // request.
@@ -100,11 +102,11 @@ message Authority {
 message RouteMatch {
   // Used to match request path of downstream request. If request path does not match
   // this rule, the entire request does not match the current route.
-  envoy.type.matcher.v3.StringMatcher path = 1;
+  type.matcher.v3.StringMatcher path = 1;
 
   // Used to match request method of downstream request. If request method does not match
   // this rule, the entire request does not match the current route.
-  envoy.type.matcher.v3.StringMatcher method = 2;
+  type.matcher.v3.StringMatcher method = 2;
 
   // A list of header match rules that downstream request need to match. As long as one
   // of the rules is not matched successfully, the entire request is not matched successfully.
@@ -127,6 +129,7 @@ message RetryPolicy {
 message DirectReturn {
 }
 
+// [#next-free-field: 9]
 message Route {
   // Match rules of current route. Used to determine whether a request should be forwarded
   // using the current routing rules.
@@ -141,7 +144,7 @@ message Route {
     // Multiple upstream clusters can be specified for a given route. The request is routed
     // to one of the upstream clusters based on weights assigned to each cluster. Currently
     // ClusterWeight only supports the name and weight fields.
-    envoy.config.route.v3.WeightedCluster weighted_clusters = 3;
+    config.route.v3.WeightedCluster weighted_clusters = 3;
 
     // Return a fixed response downstream.
     DirectReturn direct = 4;
@@ -157,7 +160,7 @@ message Route {
   map<string, google.protobuf.Any> per_filter_config = 7;
 
   // Route metadata.
-  envoy.config.core.v3.Metadata metadata = 8;
+  config.core.v3.Metadata metadata = 8;
 }
 
 message RouteConfiguration {
