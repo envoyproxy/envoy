@@ -30,6 +30,15 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
 }
 
+void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
+  updateCapacity(num_streams);
+  if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+    // If there's waiting streams, make sure the pool will now serve them.
+    parent_.onUpstreamReady();
+  }
+}
+
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
                                                        quic::QuicConfig& quic_config) {
   Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_config);
