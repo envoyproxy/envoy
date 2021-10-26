@@ -62,6 +62,8 @@ message DiscoveryRequest {
   // internal exception related to the failure. It is only intended for consumption during manual
   // debugging, the string provided is not guaranteed to be stable across Envoy versions.
   google.rpc.Status error_detail = 6;
+
+  bool BOGUS = 7;
 }
 
 // [#next-free-field: 7]
