@@ -5,7 +5,7 @@
 
 #include "source/common/config/datasource.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 

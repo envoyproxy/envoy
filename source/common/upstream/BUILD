@@ -634,7 +634,7 @@ envoy_cc_library(
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
-        "//source/common/network/dns_resolver:dns_factory_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/server:transport_socket_config_lib",

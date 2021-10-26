@@ -23,7 +23,7 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
-        "//source/common/network/dns_resolver:dns_factory_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/common:random_generator_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
