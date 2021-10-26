@@ -1,0 +1,170 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.generic_proxy.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/string.proto";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.proxy.filters.network.generic_proxy.v2";
+option java_outer_classname = "GenericProxyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Generic Proxy]
+// [#extension: proxy.filters.network.generic_proxy]
+message GenericProxyConfig {
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Specific codec implementation for generic proxy. The codec will be used to decode/encode
+  // downstream request and upstream response.
+  envoy.config.core.v3.TypedExtensionConfig codec_specifier = 2
+    [(validate.rules).message = {required: true}];
+
+  oneof route_specifier {
+    // Static route table for generic proxy.
+    RouteConfiguration route_config = 6;
+
+    // the generic proxy's route table will be dynamically loaded via the GRDS API.
+    GRDS grds = 7;
+  }
+
+  // A list of individual generic filters that make up the filter chain for requests made to the
+  // generic proxy. Order matters as the filters are processed sequentially.
+  repeated GenericFilter generic_filters = 5;
+}
+
+message GRDS {
+  // Configuration source specifier for GRDS.
+  envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the route configuration. This name will be passed to the GRDS API. This allows
+  // an Envoy configuration with multiple Generic listeners ( and associated Generic filters)
+  // to use different route configurations.
+  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+}
+
+// GenericFilter configures a generic filter.
+message GenericFilter {
+  // The name of the filter to instantiate. The name must match a supported
+  // filter.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Filter specific configuration which depends on the filter being instantiated. See the
+  // supported filters for further documentation.
+  google.protobuf.Any config = 2;
+}
+
+message HeaderMatch {
+  // The name of header/metadata need to match.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Specific match rule of header/metadata.
+  oneof match_specifier {
+    // If specified, header match will be performed based on the string match rule.
+    envoy.type.matcher.v3.StringMatcher string_match = 2;
+
+    // If specified, header match will be performed based on whether the header is in the
+    // request.
+    bool present_match = 3;
+  }
+
+  // If specified, the match result will be inverted before checking. Defaults to false.
+  //
+  // Examples:
+  //
+  // * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
+  // * The range [-10,0) will match the value -1, so it will not match when inverted.
+  bool invert_match = 8;
+}
+
+
+message Authority {
+  // A list of authority value. Used to match request authority of downstream reqeust.
+  // If request authority does not match this rule, the entire request does not match the
+  // current route set.
+  repeated string authorities = 1 [(validate.rules).repeated = {min_items: 1}];
+
+  repeated Route routes = 2;
+}
+
+message RouteMatch {
+  // Used to match request path of downstream request. If request path does not match
+  // this rule, the entire request does not match the current route.
+  envoy.type.matcher.v3.StringMatcher path = 1;
+
+  // Used to match request method of downstream request. If request method does not match
+  // this rule, the entire request does not match the current route.
+  envoy.type.matcher.v3.StringMatcher method = 2;
+
+  // A list of header match rules that downstream request need to match. As long as one
+  // of the rules is not matched successfully, the entire request is not matched successfully.
+  repeated HeaderMatch headers = 3;
+}
+
+message RetryPolicy {
+  // When certain conditions are met, the upstream request is retried. Supports retry when a
+  // network error occurs or when the response status is a specific status.
+  string retry_on = 1;
+
+  // Maximum number of retries. For a downstream request, envoy may issue `1 + may_retry`
+  // upstream requests.
+  uint32 max_retry = 2;
+
+  // If not specified, then Route.timeout will be used.
+  google.protobuf.Duration per_try_timeout = 3;
+}
+
+message DirectReturn {
+}
+
+message Route {
+  // Match rules of current route. Used to determine whether a request should be forwarded
+  // using the current routing rules.
+  RouteMatch match = 1;
+
+  oneof route_specifier {
+    option (validate.required) = true;
+
+    // Indicates the upstream cluster to which the request should be routed.
+    string cluster = 2 [(validate.rules).string = {min_len: 1}];
+
+    // Multiple upstream clusters can be specified for a given route. The request is routed
+    // to one of the upstream clusters based on weights assigned to each cluster. Currently
+    // ClusterWeight only supports the name and weight fields.
+    envoy.config.route.v3.WeightedCluster weighted_clusters = 3;
+
+    // Return a fixed response downstream.
+    DirectReturn direct = 4;
+  }
+
+  // Downstream request timeout.
+  google.protobuf.Duration timeout = 5;
+
+  // Retry policy used by current route.
+  RetryPolicy retry = 6;
+
+  // Route level config for L7 generic filters. The key should always be the generic filter name.
+  map<string, google.protobuf.Any> per_filter_config = 7;
+
+  // Route metadata.
+  envoy.config.core.v3.Metadata metadata = 8;
+}
+
+message RouteConfiguration {
+  // The name of route config.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // A list of route entry config.
+  repeated Authority config = 2;
+}
