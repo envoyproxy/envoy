@@ -100,12 +100,11 @@ FancyLogLevelMap FancyContext::getAllFancyLogLevelsForTest() ABSL_LOCKS_EXCLUDED
 }
 
 void FancyContext::initSink() {
-  spdlog::sink_ptr sink = Logger::Registry::getSink();
-  Logger::DelegatingLogSinkSharedPtr sp = std::static_pointer_cast<Logger::DelegatingLogSink>(sink);
-  if (!sp->hasLock()) {
+  Logger::DelegatingLogSinkSharedPtr sink = Logger::Registry::getSink();
+  if (!sink->hasLock()) {
     static FancyBasicLockable tlock;
-    sp->setLock(tlock);
-    sp->setShouldEscape(false);
+    sink->setLock(tlock);
+    sink->setShouldEscape(false);
   }
 }
 

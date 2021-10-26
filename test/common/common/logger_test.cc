@@ -185,5 +185,42 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
 }
 
+struct TlsLogSink : SinkDelegate {
+  TlsLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setTlsDelegate(); }
+  ~TlsLogSink() override { restoreTlsDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  void flush() override {}
+};
+
+TEST(NamedLogtest, OverrideSink) {
+  NamedLogSink global_sink(Envoy::Logger::Registry::getSink());
+  testing::InSequence s;
+
+  {
+    TlsLogSink tls_sink(Envoy::Logger::Registry::getSink());
+
+    // Calls on the current thread goes to the TLS sink.
+    EXPECT_CALL(tls_sink, log(_));
+    ENVOY_LOG_MISC(info, "hello tls");
+
+    // Calls on other threads should use the global sink.
+    std::thread([&]() {
+      EXPECT_CALL(global_sink, log(_));
+      ENVOY_LOG_MISC(info, "hello global");
+    }).join();
+
+    // Sanity checking that we're still using the TLS sink.
+    EXPECT_CALL(tls_sink, log(_));
+    ENVOY_LOG_MISC(info, "hello tls");
+  }
+
+  // Now that the TLS sink is out of scope, log calls on this thread should use the global sink
+  // again.
+  EXPECT_CALL(global_sink, log(_));
+  ENVOY_LOG_MISC(info, "hello global 2");
+}
 } // namespace Logger
 } // namespace Envoy

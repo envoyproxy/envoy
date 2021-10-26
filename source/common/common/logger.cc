@@ -31,11 +31,24 @@ SinkDelegate::~SinkDelegate() {
   assert(previous_delegate_ == nullptr);
 }
 
+void SinkDelegate::setTlsDelegate() {
+  assert(previous_delegate_ == nullptr);
+  previous_delegate_ = log_sink_->tlsDelegate();
+  log_sink_->setTlsDelegate(this);
+}
+
 void SinkDelegate::setDelegate() {
   // There should be no previous delegate before this call.
   assert(previous_delegate_ == nullptr);
   previous_delegate_ = log_sink_->delegate();
   log_sink_->setDelegate(this);
+}
+
+void SinkDelegate::restoreTlsDelegate() {
+  // Ensures stacked allocation of delegates.
+  assert(log_sink_->tlsDelegate() == this);
+  log_sink_->setTlsDelegate(previous_delegate_);
+  previous_delegate_ = nullptr;
 }
 
 void SinkDelegate::restoreDelegate() {
@@ -80,6 +93,19 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
   lock.Release();
 
+  auto log_to_sink = [this, msg_view](SinkDelegate& sink) {
+    if (should_escape_) {
+      sink.log(escapeLogLine(msg_view));
+    } else {
+      sink.log(msg_view);
+    }
+  };
+  auto* tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    log_to_sink(*tls_sink);
+    return;
+  }
+
   // Hold the sink mutex while performing the actual logging. This prevents the sink from being
   // swapped during an individual log event.
   // TODO(mattklein123): In production this lock will never be contended. In practice, thread
@@ -87,11 +113,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   // mechanism for this that does not require extra locking that we don't explicitly need in the
   // prod code.
   absl::ReaderMutexLock sink_lock(&sink_mutex_);
-  if (should_escape_) {
-    sink_->log(escapeLogLine(msg_view));
-  } else {
-    sink_->log(msg_view);
-  }
+  log_to_sink(*sink_);
 }
 
 std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {

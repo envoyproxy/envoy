@@ -2,6 +2,7 @@
 
 #include <bitset>
 #include <chrono>
+#include <iostream>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -115,15 +116,23 @@ public:
   virtual void flush() PURE;
 
 protected:
-  // Swap the current log sink delegate for this one. This should be called by the derived class
-  // constructor immediately before returning. This is required to match restoreDelegate(),
-  // otherwise it's possible for the previous delegate to get set in the base class constructor,
-  // the derived class constructor throws, and cleanup becomes broken.
+  // Swap the current thread local log sink delegate for this one. This should be called by the
+  // derived class constructor immediately before returning. This is required to match
+  // restoreTlsDelegate(), otherwise it's possible for the previous delegate to get set in the base
+  // class constructor, the derived class constructor throws, and cleanup becomes broken.
+  void setTlsDelegate();
+
+  // Swap the current *global* log sink delegate for this one. This behaves as setTlsDelegate, but
+  // operates on the global log sink instead of the thread local one.
   void setDelegate();
 
-  // Swap the current log sink (this) for the previous one. This should be called by the derived
-  // class destructor in the body. This is critical as otherwise it's possible for a log message
-  // to get routed to a partially destructed sink.
+  // Swap the current thread local log sink (this) for the previous one. This should be called by
+  // the derived class destructor in the body. This is critical as otherwise it's possible for a log
+  // message to get routed to a partially destructed sink.
+  void restoreTlsDelegate();
+
+  // Swap the current *global* log sink delegate for the previous one. This behaves as
+  // restoreTlsDelegate, but operates on the global sink instead of the thread local one.
   void restoreDelegate();
 
   SinkDelegate* previousDelegate() { return previous_delegate_; }
@@ -165,12 +174,22 @@ public:
   template <class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
                          absl::string_view component, Args... msg) {
+    auto tls_sink = tlsDelegate();
+    if (tls_sink != nullptr) {
+      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      return;
+    }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
     sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
   void flush() override {
+    auto* tls_sink = tlsDelegate();
+    if (tls_sink != nullptr) {
+      tls_sink->flush();
+      return;
+    }
     absl::ReaderMutexLock lock(&sink_mutex_);
     sink_->flush();
   }
@@ -219,6 +238,16 @@ private:
   SinkDelegate* delegate() {
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
+  }
+
+  void setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
+
+  SinkDelegate* tlsDelegate() { return *tlsSink(); }
+
+  SinkDelegate** tlsSink() {
+    static thread_local SinkDelegate* tls_sink = nullptr;
+
+    return &tls_sink;
   }
 
   SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
