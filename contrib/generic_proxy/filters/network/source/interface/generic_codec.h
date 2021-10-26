@@ -1,10 +1,10 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/server/factory_context.h"
+
+#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
 
 namespace Envoy {
 namespace Proxy {

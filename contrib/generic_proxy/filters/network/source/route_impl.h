@@ -7,10 +7,9 @@
 #include "source/common/common/matchers.h"
 #include "source/common/config/metadata.h"
 
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
-
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 
 namespace Envoy {
 namespace Proxy {

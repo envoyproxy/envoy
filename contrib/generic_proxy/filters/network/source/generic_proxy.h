@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bits/stdint-uintn.h>
+
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -10,19 +11,18 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/stream_info/stream_info_impl.h"
-#include "source/common/buffer/buffer_impl.h"
 
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
+#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_filter.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
 #include "contrib/generic_proxy/filters/network/source/route_impl.h"
-
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Proxy {
@@ -78,7 +78,7 @@ private:
       Server::Configuration::FactoryContext& context);
 
   static std::vector<FilterFactoryCb> filtersFactoryFromProto(
-      const google::protobuf::RepeatedPtrField<
+      const ProtobufWkt::RepeatedPtrField<
           envoy::extensions::filters::network::generic_proxy::v3::GenericFilter>& filters,
       const std::string stats_prefix, Server::Configuration::FactoryContext& context);
 

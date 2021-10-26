@@ -29,13 +29,13 @@ message GenericProxyConfig {
   // Specific codec implementation for generic proxy. The codec will be used to decode/encode
   // downstream request and upstream response.
   envoy.config.core.v3.TypedExtensionConfig codec_specifier = 2
-    [(validate.rules).message = {required: true}];
+      [(validate.rules).message = {required: true}];
 
   oneof route_specifier {
     // Static route table for generic proxy.
     RouteConfiguration route_config = 6;
 
-    // the generic proxy's route table will be dynamically loaded via the GRDS API.
+    // the generic proxy's route table will be dynamically loaded via the RDS API.
     GRDS grds = 7;
   }
 
@@ -45,13 +45,13 @@ message GenericProxyConfig {
 }
 
 message GRDS {
-  // Configuration source specifier for GRDS.
+  // Configuration source specifier for RDS.
   envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // The name of the route configuration. This name will be passed to the GRDS API. This allows
+  // The name of the route configuration. This name will be passed to the RDS API. This allows
   // an Envoy configuration with multiple Generic listeners ( and associated Generic filters)
   // to use different route configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string route_config_name = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // GenericFilter configures a generic filter.
@@ -88,9 +88,8 @@ message HeaderMatch {
   bool invert_match = 8;
 }
 
-
 message Authority {
-  // A list of authority value. Used to match request authority of downstream reqeust.
+  // A list of authority value. Used to match request authority of downstream request.
   // If request authority does not match this rule, the entire request does not match the
   // current route set.
   repeated string authorities = 1 [(validate.rules).repeated = {min_items: 1}];

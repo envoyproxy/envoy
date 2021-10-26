@@ -1,15 +1,15 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/interface/generic_codec.h"
-#include "contrib/generic_proxy/filters/network/source/interface/generic_filter.h"
-#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
-
 #include "envoy/network/connection.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/upstream/load_balancer_impl.h"
+
+#include "contrib/generic_proxy/filters/network/source/interface/generic_codec.h"
+#include "contrib/generic_proxy/filters/network/source/interface/generic_filter.h"
+#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
 
 namespace Envoy {
 namespace Proxy {

@@ -1,12 +1,12 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/network/connection.h"
+#include "envoy/stream_info/stream_info.h"
+
 #include "contrib/generic_proxy/filters/network/source/interface/generic_codec.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_route.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
-
-#include "envoy/network/connection.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace Proxy {

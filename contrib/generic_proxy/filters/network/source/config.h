@@ -5,10 +5,9 @@
 
 #include "source/extensions/filters/network/common/factory_base.h"
 
-#include "contrib/generic_proxy/filters/network/source/generic_proxy.h"
-
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
+#include "contrib/generic_proxy/filters/network/source/generic_proxy.h"
 
 namespace Envoy {
 namespace Proxy {

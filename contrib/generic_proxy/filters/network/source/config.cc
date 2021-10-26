@@ -1,4 +1,3 @@
-
 #include "contrib/generic_proxy/filters/network/source/config.h"
 
 namespace Envoy {

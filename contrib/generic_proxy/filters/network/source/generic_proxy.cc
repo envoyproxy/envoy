@@ -1,11 +1,11 @@
-
 #include "contrib/generic_proxy/filters/network/source/generic_proxy.h"
-
-#include "source/common/config/utility.h"
-#include "source/common/stream_info/stream_info_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
+
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "contrib/generic_proxy/filters/network/source/interface/generic_config.h"
 #include "contrib/generic_proxy/filters/network/source/interface/generic_filter.h"
@@ -35,7 +35,7 @@ RouteMatcherPtr FilterConfig::routeMatcherFromProto(
 }
 
 std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
-    const google::protobuf::RepeatedPtrField<
+    const ProtobufWkt::RepeatedPtrField<
         envoy::extensions::filters::network::generic_proxy::v3::GenericFilter>& filters,
     const std::string stats_prefix, Envoy::Server::Configuration::FactoryContext& context) {
 

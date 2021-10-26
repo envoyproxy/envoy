@@ -1,12 +1,13 @@
 #pragma once
 
-#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
+#include <bits/stdint-uintn.h>
 
-#include "envoy/config/typed_metadata.h"
+#include <chrono>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include <bits/stdint-uintn.h>
-#include <chrono>
+#include "envoy/config/typed_metadata.h"
+
+#include "contrib/generic_proxy/filters/network/source/interface/generic_stream.h"
 
 namespace Envoy {
 namespace Proxy {
