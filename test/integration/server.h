@@ -502,6 +502,10 @@ public:
     return TestUtility::findGauge(statStore(), name);
   }
 
+  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
+    return TestUtility::findHistogram(statStore(), name);
+  }
+
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }

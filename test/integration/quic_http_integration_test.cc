@@ -343,6 +343,33 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
+TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
+  supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
+  initialize();
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_TRUE(codec_client_->disconnected());
+  EXPECT_EQ(quic::QUIC_INVALID_VERSION,
+            static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->error());
+}
+
+TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
+  supported_versions_ = {quic::ParsedQuicVersion::Draft29()};
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29",
+      "false");
+  initialize();
+
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  EXPECT_EQ(transport_socket_factory_->clientContextConfig().serverNameIndication(),
+            codec_client_->connection()->requestedServerName());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+  test_server_->waitForCounterEq("http3.quic_version_h3_29", 1u);
+}
+
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Make sure both connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;

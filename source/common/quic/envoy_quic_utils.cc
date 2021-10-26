@@ -237,6 +237,14 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
   return connection_socket;
 }
 
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config) {
+  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
+  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config, quic_config);
+}
+
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config) {
   size_t stream_flow_control_window_to_send = PROTOBUF_GET_WRAPPED_OR_DEFAULT(

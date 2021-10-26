@@ -23,6 +23,6 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
-        "//source/common/network/dns_resolver:dns_factory_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
     ],
 )

@@ -16,7 +16,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/json:90.1"
 "source/common/matcher:94.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
-"source/common/network/dns_resolver:90.8"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
+"source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
 "source/common/router:96.5"
