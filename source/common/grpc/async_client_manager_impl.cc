@@ -149,5 +149,67 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
+void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
+    const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
+  // Create a new cache entry at the beginning of the list.
+  cache_.emplace_front(config, client);
+  cache_.front().accessed_time_ = dispatcher_.timeSource().monotonicTime();
+  look_up_[config] = cache_.begin();
+  // If inserting to an empty cache, enable eviction timer.
+  if (cache_.size() == 1) {
+    resetEvictionTimer();
+  }
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
+    const envoy::config::core::v3::GrpcService& config) {
+  auto it = look_up_.find(config);
+  if (it != look_up_.end()) {
+    auto cache_entry = it->second;
+    // Reset the eviction timer if the next entry to expire is accessed.
+    if (cache_entry == --cache_.end()) {
+      resetEvictionTimer();
+    }
+    cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
+    // Move the cache entry to the beginning of the list upon access.
+    cache_.splice(cache_.begin(), cache_, cache_entry);
+    return cache_entry->client_;
+  }
+  return nullptr;
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::evictIdleEntries() {
+  std::cerr << "evict entry\n";
+  while (!cache_.empty()) {
+    MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+    MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
+    // If the oldest cache entry has expired, erase it and continue to the next oldest entry.
+    if (now > next_expire) {
+      look_up_.erase(cache_.back().config_);
+      cache_.pop_back();
+      continue;
+    }
+    break;
+  }
+  resetEvictionTimer();
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::resetEvictionTimer() {
+  while (!cache_.empty()) {
+    MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+    MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
+    if (now >= next_expire) {
+      // Erase the expired entry.
+      look_up_.erase(cache_.back().config_);
+      cache_.pop_back();
+    } else {
+      // Evict in a while loop because now timestamp keep changing, make sure next_expire > now
+      cache_eviction_timer_->enableTimer(
+          std::chrono::duration_cast<std::chrono::seconds>(next_expire - now));
+      return;
+    }
+  }
+}
+
 } // namespace Grpc
 } // namespace Envoy

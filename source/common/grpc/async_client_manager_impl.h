@@ -60,64 +60,13 @@ public:
       cache_eviction_timer_ = dispatcher.createTimer([this] { evictIdleEntries(); });
     }
     void setCache(const envoy::config::core::v3::GrpcService& config,
-                  const RawAsyncClientSharedPtr& client) {
-      cache_.emplace_front(config, client);
-      cache_.front().accessed_time_ = dispatcher_.timeSource().monotonicTime();
-      look_up_[config] = cache_.begin();
-      // If inserting to an empty cache, enableeviction timer.
-      if (cache_.size() == 1) {
-        resetEvictionTimer();
-      }
-    }
+                  const RawAsyncClientSharedPtr& client);
 
-    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config) {
-      auto it = look_up_.find(config);
-      if (it != look_up_.end()) {
-        // Reset the eviction timer if the next entry to expire is accessed.
-        if (it->second == --cache_.end()) {
-          resetEvictionTimer();
-        }
-        it->second->accessed_time_ = dispatcher_.timeSource().monotonicTime();
-        cache_.splice(cache_.begin(), cache_, it->second);
-        return it->second->client_;
-      }
-      return nullptr;
-    }
-
-    void evictIdleEntries() {
-      std::cerr << "evict entry\n";
-      while (!cache_.empty()) {
-        MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-        MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
-        if (now > next_expire) {
-          look_up_.erase(cache_.back().config_);
-          cache_.pop_back();
-          continue;
-        }
-        break;
-      }
-      resetEvictionTimer();
-      std::cerr << "finish evict entry\n";
-    }
+    RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
   private:
-    void resetEvictionTimer() {
-      while (!cache_.empty()) {
-        MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-        MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
-        if (now >= next_expire) {
-          // Erase the expired entry.
-          look_up_.erase(cache_.back().config_);
-          cache_.pop_back();
-        } else {
-          cache_eviction_timer_->enableTimer(
-              std::chrono::duration_cast<std::chrono::seconds>(next_expire - now));
-          std::cerr << std::chrono::duration_cast<std::chrono::seconds>(next_expire - now).count()
-                    << std::endl;
-          return;
-        }
-      }
-    }
+    void evictIdleEntries();
+    void resetEvictionTimer();
     struct CacheEntry {
       CacheEntry(const envoy::config::core::v3::GrpcService& config,
                  RawAsyncClientSharedPtr const& client)

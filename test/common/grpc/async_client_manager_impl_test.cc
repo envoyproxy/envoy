@@ -47,10 +47,10 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
-  waitForSeconds(45);
+  waitForSeconds(49);
   // Cache entry hasn't been evicted because it was created 45s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
-  waitForSeconds(45);
+  waitForSeconds(49);
   // Cache entry hasn't been evicted because it was accessed 45s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(51);
@@ -70,12 +70,12 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
     client_cache_.setCache(grpc_service, foo_client);
   }
   waitForSeconds(30);
-  // Cache entries that have expired.
+  // Cache entries created 51s before have expired.
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     EXPECT_EQ(client_cache_.getCache(grpc_service).get(), nullptr);
   }
-  // Cache entries that haven't expired.
+  // Cache entries 30s before haven't expired.
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     EXPECT_EQ(client_cache_.getCache(grpc_service).get(), foo_client.get());
