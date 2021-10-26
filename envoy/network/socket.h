@@ -299,8 +299,16 @@ public:
     virtual absl::optional<Details>
     getOptionDetails(const Socket& socket,
                      envoy::config::core::v3::SocketOption::SocketState state) const PURE;
+
+    /**
+     * Implementations should typically return true. Unsupported or placeholder implementations
+     * may indicate such by returning false.
+     * @return Whether this is an actual socket option.
+     */
+    virtual bool isSupported() const PURE;
   };
 
+  using OptionConstPtr = std::unique_ptr<const Option>;
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
   using Options = std::vector<OptionConstSharedPtr>;
   using OptionsSharedPtr = std::shared_ptr<Options>;
