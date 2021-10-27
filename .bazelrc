@@ -79,11 +79,13 @@ build:clang-asan --linkopt -fuse-ld=lld
 build:clang-asan --linkopt --rtlib=compiler-rt
 build:clang-asan --linkopt --unwindlib=libgcc
 
-# macOS ASAN/UBSAN
+# macOS
 build:macos --cxxopt=-std=c++17
 build:macos --action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
 build:macos --host_action_env=PATH=/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/opt/local/bin
+build:macos --define tcmalloc=disabled
 
+# macOS ASAN/UBSAN
 build:macos-asan --config=asan
 # Workaround, see https://github.com/bazelbuild/bazel/issues/6932
 build:macos-asan --copt -Wno-macro-redefined
