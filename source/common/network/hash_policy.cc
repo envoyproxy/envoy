@@ -11,9 +11,8 @@ namespace Network {
 
 class SourceIpHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                    const Network::Address::Instance*,
-                                    const StreamInfo::FilterState&) const override {
+  absl::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
+    const auto* downstream_addr = connection.connectionInfoProvider().remoteAddress().get();
     if (downstream_addr && downstream_addr->ip()) {
       ASSERT(!downstream_addr->ip()->addressAsString().empty());
       return HashUtil::xxHash64(downstream_addr->ip()->addressAsString());
@@ -27,9 +26,8 @@ class FilterStateHashMethod : public HashPolicyImpl::HashMethod {
 public:
   FilterStateHashMethod(absl::string_view key) : key_(key) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const Network::Address::Instance*,
-                                    const StreamInfo::FilterState& filter_state) const override {
+  absl::optional<uint64_t> evaluate(const Network::Connection& connection) const override {
+    const auto& filter_state = connection.streamInfo().filterState();
     if (filter_state.hasData<Hashable>(key_)) {
       return filter_state.getDataReadOnly<Hashable>(key_).hash();
     }
@@ -55,11 +53,8 @@ HashPolicyImpl::HashPolicyImpl(
   }
 }
 
-absl::optional<uint64_t>
-HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
-                             const Network::Address::Instance* upstream_addr,
-                             const StreamInfo::FilterState& filter_state) const {
-  return hash_impl_->evaluate(downstream_addr, upstream_addr, filter_state);
+absl::optional<uint64_t> HashPolicyImpl::generateHash(const Network::Connection& connection) const {
+  return hash_impl_->evaluate(connection);
 }
 
 } // namespace Network
