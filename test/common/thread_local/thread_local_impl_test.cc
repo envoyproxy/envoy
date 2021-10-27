@@ -105,16 +105,9 @@ TEST_F(ThreadLocalInstanceImplTest, All) {
   tls_.shutdownThread();
 }
 
-TEST(ThreadLocalInstanceImpl, PostOnAllThreads) {
-  InstanceImpl tls_;
-  Event::MockDispatcher main_dispatcher_{"test_main_thread"};
-  Event::MockDispatcher thread_dispatcher_{"test_worker_thread"};
-  // Called only in postOnAllThreads.
+TEST_F(ThreadLocalInstanceImplTest, PostOnAllThreads) {
   EXPECT_CALL(main_dispatcher_, post(_));
-  // Called in registerThread and postOnAllThreads.
-  EXPECT_CALL(thread_dispatcher_, post(_)).Times(2);
-  tls_.registerThread(main_dispatcher_, true);
-  tls_.registerThread(thread_dispatcher_, false);
+  EXPECT_CALL(thread_dispatcher_, post(_));
   tls_.postOnAllThreads([] {});
   tls_.shutdownGlobalThreading();
 }
