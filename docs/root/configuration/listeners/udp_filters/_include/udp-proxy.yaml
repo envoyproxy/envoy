@@ -20,13 +20,26 @@ static_resources:
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
         stat_prefix: service
-        route_config:
-          routes:
-          - match:
-              source_prefix_ranges:
-              - address_prefix: 0.0.0.0
-            route:
-              cluster: service_udp
+        matcher:
+          matcher_tree:
+            input:
+              name: source-ip
+              typed_config:
+                '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+            exact_match_map:
+              map:
+                "127.0.0.1":
+                  action:
+                    name: route
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                      cluster: service_udp
+          on_no_match:
+            action:
+              name: route
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+                cluster: service_udp
         upstream_socket_config:
           max_rx_datagram_size: 9000
   clusters:
