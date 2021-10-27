@@ -382,21 +382,6 @@ public:
 
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
-      if (absl::StartsWith(field.name(), "hidden_envoy_deprecated_")) {
-        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
-        // unless it is part of an explicit test that needs access to the deprecated field
-        // when we enable runtime deprecation override to allow point field overrides for tests.
-        if (!runtime_ ||
-            !runtime_->snapshot().deprecatedFeatureEnabled(
-                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
-          const std::string fatal_error = absl::StrCat(
-              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
-              "' from file ", filename,
-              " while using the latest V3 configuration. This field has been removed from the "
-              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          throw ProtoValidationException(fatal_error, message);
-        }
-      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -644,9 +629,10 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
 }
 
 // To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
-bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type,
+                       bool ancestor_is_sensitive) {
   return redactOpaque(
-      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
@@ -664,7 +650,8 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 // Recursive helper method for MessageUtil::redact() below.
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
-      redactTypedStruct(message, ancestor_is_sensitive)) {
+      redactTypedStruct(message, "xds.type.v3.TypedStruct", ancestor_is_sensitive) ||
+      redactTypedStruct(message, "udpa.type.v1.TypedStruct", ancestor_is_sensitive)) {
     return;
   }
 

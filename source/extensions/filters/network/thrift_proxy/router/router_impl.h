@@ -10,6 +10,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/http/header_utility.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/upstream/load_balancer_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -266,7 +267,25 @@ public:
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    return route_entry_ ? route_entry_->metadataMatchCriteria() : nullptr;
+    const Envoy::Router::MetadataMatchCriteria* route_criteria =
+        (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
+    // Support getting metadata match criteria from thrift request.
+    const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
+    if (filter_it == request_metadata.end()) {
+      return route_criteria;
+    }
+
+    if (route_criteria != nullptr) {
+      metadata_match_criteria_ = route_criteria->mergeMatchCriteria(filter_it->second);
+    } else {
+      metadata_match_criteria_ =
+          std::make_unique<Envoy::Router::MetadataMatchCriteriaImpl>(filter_it->second);
+    }
+
+    return metadata_match_criteria_.get();
   }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
@@ -282,6 +301,7 @@ private:
   std::unique_ptr<UpstreamResponseCallbacksImpl> upstream_response_callbacks_{};
   RouteConstSharedPtr route_{};
   const RouteEntry* route_entry_{};
+  Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;

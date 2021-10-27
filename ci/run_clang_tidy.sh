@@ -38,18 +38,12 @@ function exclude_win32_impl() {
 # Do not run clang-tidy against macOS impl
 # TODO: We should run clang-tidy against macOS impl for completeness
 function exclude_macos_impl() {
-  grep -v source/common/filesystem/kqueue/ | grep -v source/common/network/apple_dns_impl | grep -v test/common/network/apple_dns_impl_test
+  grep -v source/common/filesystem/kqueue/ | grep -v source/extensions/network/dns_resolver/apple/apple_dns_impl | grep -v test/extensions/network/dns_resolver/apple/apple_dns_impl_test
 }
 
 # Do not run incremental clang-tidy on check_format testdata files.
 function exclude_check_format_testdata() {
   grep -v tools/testdata/check_format/
-}
-
-# Do not run clang-tidy against Chromium URL import, this needs to largely
-# reflect the upstream structure.
-function exclude_chromium_url() {
-  grep -v source/common/chromium_url/
 }
 
 # Exclude files in third_party which are temporary forks from other OSS projects.
@@ -83,7 +77,7 @@ function exclude_wasm_examples() {
 }
 
 function filter_excludes() {
-  exclude_check_format_testdata | exclude_chromium_url | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
+  exclude_check_format_testdata | exclude_win32_impl | exclude_macos_impl | exclude_third_party | exclude_wasm_emscripten | exclude_wasm_sdk | exclude_wasm_host | exclude_wasm_test_data | exclude_wasm_examples
 }
 
 function run_clang_tidy() {

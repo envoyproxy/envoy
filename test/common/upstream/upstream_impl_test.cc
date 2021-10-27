@@ -39,6 +39,8 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/thread_aware_load_balancer.h"
+#include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -2079,6 +2081,138 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
       EnvoyException, "invalid value \"fakelbtype\"");
 }
 
+// load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: LOAD_BALANCING_POLICY_CONFIG
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
+// load_balancing_policy should also be used when lb_policy is set to something else besides
+// LOAD_BALANCING_POLICY_CONFIG.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: ROUND_ROBIN
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
+// load_balancing_policy should also be used when lb_policy is omitted.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
   const std::string yaml = R"EOF(
     name: name
@@ -2837,6 +2971,33 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
 
   EXPECT_FALSE(cluster_config.has_connect_timeout());
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
+}
+
+TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options: {{}}
+      common_http_protocol_options:
+        max_connection_duration: {}
+  )EOF";
+
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
 TEST_F(ClusterInfoImplTest, Timeouts) {

@@ -86,9 +86,9 @@ JSON_STRING_TO_MESSAGE_ALLOWLIST = (
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
 HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = (
-    "downstream_cx_length_ms", "downstream_cx_length_ms", "initialization_time_ms",
-    "loop_duration_us", "poll_delay_us", "request_time_ms", "upstream_cx_connect_ms",
-    "upstream_cx_length_ms")
+    "cx_rtt_us", "cx_rtt_variance_us", "downstream_cx_length_ms", "downstream_cx_length_ms",
+    "initialization_time_ms", "loop_duration_us", "poll_delay_us", "request_time_ms",
+    "upstream_cx_connect_ms", "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
 STD_REGEX_ALLOWLIST = (
@@ -682,9 +682,11 @@ class FormatChecker:
             if "RealTimeSource" in line or \
               ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
               "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
-              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line):
+              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line) or \
+              " usleep(" in line or "::usleep(" in line:
                 report_error(
-                    "Don't reference real-world time sources from production code; use injection")
+                    "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
+                )
         duration_arg = DURATION_VALUE_REGEX.search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero
@@ -1172,7 +1174,7 @@ if __name__ == "__main__":
         owned = []
         maintainers = [
             '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente'
+            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente', '@ggreenway'
         ]
 
         try:
