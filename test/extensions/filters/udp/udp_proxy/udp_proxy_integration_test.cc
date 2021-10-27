@@ -98,14 +98,7 @@ name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
-  route_config:
-    routes:
-    - match:
-        source_prefix_ranges:
-        - address_prefix: 0.0.0.0
-        - address_prefix: 0::0
-      route:
-        cluster: cluster_0
+  cluster: cluster_0
   upstream_socket_config:
     max_rx_datagram_size: {}
 )EOF",
@@ -116,14 +109,7 @@ name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
   stat_prefix: foo
-  route_config:
-    routes:
-    - match:
-        source_prefix_ranges:
-        - address_prefix: 0.0.0.0
-        - address_prefix: 0::0
-      route:
-        cluster: cluster_0
+  cluster: cluster_0
 )EOF");
     }
 
