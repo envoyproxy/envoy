@@ -175,18 +175,23 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);
 
+  // Latch capacity before updating remaining streams.
+  uint64_t capacity = client.currentUnusedCapacity();
   client.remaining_streams_--;
   if (client.remaining_streams_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
-  } else if (client.numActiveStreams() + 1 >= client.concurrent_stream_limit_) {
+  } else if (capacity == 1) {
     // As soon as the new stream is created, the client will be maxed out.
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
   }
 
   // Decrement the capacity, as there's one less stream available for serving.
-  state_.decrConnectingAndConnectedStreamCapacity(1);
+  // For HTTP/3, the capacity is updated in newStreamEncoder.
+  if (trackStreamCapacity()) {
+    state_.decrConnectingAndConnectedStreamCapacity(1);
+  }
   // Track the new active stream.
   state_.incrActiveStreams(1);
   num_active_streams_++;
@@ -213,14 +218,17 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // If the effective client capacity was limited by concurrency, increase connecting capacity.
   // If the effective client capacity was limited by max total streams, this will not result in an
   // increment as no capacity is freed up.
-  if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1 ||
-      had_negative_capacity) {
+  // We don't update the capacity for HTTP/3 as the stream count should only
+  // increase when a MAX_STREAMS frame is received.
+  if (trackStreamCapacity() && (client.remaining_streams_ > client.concurrent_stream_limit_ -
+                                                                client.numActiveStreams() - 1 ||
+                                had_negative_capacity)) {
     state_.incrConnectingAndConnectedStreamCapacity(1);
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
-  } else if (client.state() == ActiveClient::State::BUSY) {
+  } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() != 0) {
     transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_stream) {
       onUpstreamReady();
@@ -295,6 +303,9 @@ void ConnPoolImplBase::onUpstreamReady() {
     attachStreamToClient(*client, pending_streams_.back()->context());
     state_.decrPendingStreams(1);
     pending_streams_.pop_back();
+  }
+  if (!pending_streams_.empty()) {
+    tryCreateNewConnections();
   }
 }
 

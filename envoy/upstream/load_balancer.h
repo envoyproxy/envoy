@@ -155,7 +155,8 @@ public:
    *         for example if no matching connection is found.
    */
   virtual absl::optional<SelectedPoolAndConnection>
-  selectPool(LoadBalancerContext* context, const Host& host, std::vector<uint8_t>& hash_key) PURE;
+  selectExistingConnection(LoadBalancerContext* context, const Host& host,
+                           std::vector<uint8_t>& hash_key) PURE;
 };
 
 using LoadBalancerPtr = std::unique_ptr<LoadBalancer>;

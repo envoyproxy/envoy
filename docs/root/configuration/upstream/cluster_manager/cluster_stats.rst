@@ -245,6 +245,16 @@ If TLS is used by the cluster the following statistics are rooted at *cluster.<n
 
 .. include:: ../../../_include/ssl_stats.rst
 
+.. _config_cluster_manager_cluster_stats_tcp:
+
+TCP statistics
+--------------
+
+The following TCP statistics, which are available when using the :ref:`TCP stats transport socket <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`,
+are rooted at *cluster.<name>.tcp_stats.*:
+
+.. include:: ../../../_include/tcp_stats.rst
+
 .. _config_cluster_manager_cluster_stats_alt_tree:
 
 Alternate tree dynamic HTTP statistics

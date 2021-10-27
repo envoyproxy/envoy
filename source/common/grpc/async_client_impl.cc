@@ -9,6 +9,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Grpc {
 
@@ -226,10 +228,14 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent, absl::string_view se
     : AsyncStreamImpl(parent, service_full_name, method_name, *this, options),
       request_(std::move(request)), callbacks_(callbacks) {
 
-  current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
-                                         "async " + parent.remote_cluster_name_ + " egress",
-                                         parent.time_source_.systemTime());
+  current_span_ =
+      parent_span.spawnChild(Tracing::EgressConfig::get(),
+                             absl::StrCat("async ", service_full_name, ".", method_name, " egress"),
+                             parent.time_source_.systemTime());
   current_span_->setTag(Tracing::Tags::get().UpstreamCluster, parent.remote_cluster_name_);
+  current_span_->setTag(Tracing::Tags::get().UpstreamAddress, parent.host_name_.empty()
+                                                                  ? parent.remote_cluster_name_
+                                                                  : parent.host_name_);
   current_span_->setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 }
 

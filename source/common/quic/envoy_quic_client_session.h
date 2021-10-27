@@ -11,6 +11,8 @@
 namespace Envoy {
 namespace Quic {
 
+class EnvoyQuicClientSession;
+
 // Act as a Network::ClientConnection to ClientCodec.
 // TODO(danzh) This class doesn't need to inherit Network::FilterManager
 // interface but need all other Network::Connection implementation in
@@ -58,8 +60,9 @@ public:
   void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
                                quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
+
   // quic::QuicSpdyClientSessionBase
-  void SetDefaultEncryptionLevel(quic::EncryptionLevel level) override;
+  bool ShouldKeepConnectionAlive() const override;
   // quic::ProofHandler
   void OnProofVerifyDetailsAvailable(const quic::ProofVerifyDetails& verify_details) override;
 
@@ -72,6 +75,9 @@ public:
 
   // QuicFilterManagerConnectionImpl
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
+
+  // Notify any registered connection pool when new streams are available.
+  void OnCanCreateNewOutgoingStream(bool) override;
 
   using quic::QuicSpdyClientSession::PerformActionOnActiveStreams;
 
@@ -95,15 +101,16 @@ protected:
   quic::QuicConnection* quicConnection() override;
 
 private:
+  uint64_t streamsAvailable();
+
   // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
-  // TODO(danzh) deprecate this field once server_id() is made const.
-  const std::string host_name_;
   std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config_;
   EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory_;
   QuicStatNames& quic_stat_names_;
   Stats::Scope& scope_;
+  bool disable_keepalive_{false};
 };
 
 } // namespace Quic

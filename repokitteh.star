@@ -18,14 +18,14 @@ use(
     },
     {
       "owner": "envoyproxy/api-shepherds!",
-      "path": "api/envoy/",
+      "path": "(api/envoy/|docs/root/api-docs/)",
       "label": "api",
       "github_status_label": "any API change",
       "auto_assign": True,
     },
     {
       "owner": "envoyproxy/api-watchers",
-      "path": "api/envoy/",
+      "path": "(api/envoy/|docs/root/api-docs/)",
     },
     {
       "owner": "envoyproxy/dependency-shepherds!",
