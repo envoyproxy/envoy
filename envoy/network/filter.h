@@ -10,6 +10,8 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+#include "address.h"
+
 namespace Envoy {
 
 namespace Event {
@@ -208,6 +210,18 @@ using ReadFilterSharedPtr = std::shared_ptr<ReadFilter>;
  */
 class Filter : public WriteFilter, public ReadFilter {};
 using FilterSharedPtr = std::shared_ptr<Filter>;
+
+class NetworkMatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~NetworkMatchingData() = default;
+
+  virtual OptRef<const Address::Ip> sourceIp() const PURE;
+  virtual OptRef<const Address::Ip> destinationIp() const PURE;
+  virtual absl::optional<uint16_t> sourcePort() const PURE;
+  virtual absl::optional<uint16_t> destinationPort() const PURE;
+};
 
 /**
  * Interface for adding individual network filters to a manager.

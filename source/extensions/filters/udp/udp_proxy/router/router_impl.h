@@ -2,11 +2,11 @@
 
 #include "envoy/extensions/filters/udp/udp_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/common/matcher/validation_visitor.h"
-#include "source/common/network/matching/data.h"
 #include "source/extensions/filters/udp/udp_proxy/router/router.h"
 
 namespace Envoy {
@@ -40,10 +40,10 @@ public:
 };
 
 class RouteActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Network::Matching::NetworkMatchingData> {
+    : public Matcher::MatchTreeValidationVisitor<Network::NetworkMatchingData> {
 public:
   absl::Status performDataInputValidation(
-      const Matcher::DataInputFactory<Network::Matching::NetworkMatchingData>& data_input,
+      const Matcher::DataInputFactory<Network::NetworkMatchingData>& data_input,
       absl::string_view type_url) override;
 };
 
@@ -58,7 +58,7 @@ public:
 
 private:
   absl::optional<std::string> cluster_;
-  Matcher::MatchTreeSharedPtr<Network::Matching::NetworkMatchingData> matcher_;
+  Matcher::MatchTreeSharedPtr<Network::NetworkMatchingData> matcher_;
   std::vector<std::string> entries_;
 };
 
