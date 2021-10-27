@@ -15,7 +15,9 @@ namespace UdpFilters {
 namespace UdpProxy {
 namespace Router {
 
-struct RouteActionContext {};
+struct RouteActionContext {
+  absl::flat_hash_set<std::string> entries_;
+};
 
 class RouteMatchAction
     : public Matcher::ActionBase<envoy::extensions::filters::udp::udp_proxy::v3::Route> {

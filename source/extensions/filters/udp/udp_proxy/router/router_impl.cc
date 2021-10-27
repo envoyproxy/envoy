@@ -15,11 +15,14 @@ namespace UdpProxy {
 namespace Router {
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext&,
+    const Protobuf::Message& config, RouteActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::udp::udp_proxy::v3::Route&>(config, validation_visitor);
   const auto& cluster = route_config.cluster();
+
+  // Emplace cluster to context to get all clusters
+  context.entries_.emplace(cluster);
 
   return [cluster]() { return std::make_unique<RouteMatchAction>(cluster); };
 }
@@ -49,6 +52,8 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
     Matcher::MatchTreeFactory<Network::NetworkMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
     matcher_ = factory.create(config.matcher())();
+    // Copy all clusters to entries
+    entries_.insert(entries_.end(), context.entries_.begin(), context.entries_.end());
   }
 }
 
