@@ -1,10 +1,16 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_proto_grpc//csharp:repositories.bzl", rules_proto_grpc_csharp_repos = "csharp_repos")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
+load("@io_bazel_rules_dotnet//dotnet:deps.bzl", "dotnet_repositories")
+load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_proto_grpc//csharp/nuget:nuget.bzl", "nuget_rules_proto_grpc_packages")
+load("@rules_proto_grpc//csharp:defs.bzl", "csharp_grpc_compile")
+
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -12,11 +18,32 @@ load(
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
 )
 
+load(
+    "@io_bazel_rules_dotnet//dotnet:defs.bzl",
+    "dotnet_register_toolchains",
+    "dotnet_repositories_nugets",
+)
+
+dotnet_register_toolchains()
+
+dotnet_repositories_nugets()
+
+
+
+nuget_rules_proto_grpc_packages()
+
+rules_proto_grpc_csharp_repos()
+
+grpc_deps()
+
+dotnet_repositories()
+
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
 _CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
-_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
+_CSHARP_PROTO_SUFFIX = "_csharp_proto"
+_CSHARP_IMPORTPATH_PREFIX = "github.com/envoyproxy/csharp-control-plane/"
 
 _COMMON_PROTO_DEPS = [
     "@com_google_protobuf//:any_proto",
@@ -42,6 +69,9 @@ def _proto_mapping(dep, proto_dep_map, proto_suffix):
 
 def _go_proto_mapping(dep):
     return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _GO_PROTO_SUFFIX)
+
+def _csharp_proto_mapping(dep):
+    return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _CSHARP_PROTO_SUFFIX)
 
 def _cc_proto_mapping(dep):
     return _proto_mapping(dep, EXTERNAL_PROTO_CC_BAZEL_DEP_MAP, _CC_PROTO_SUFFIX)
@@ -172,17 +202,41 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
+    gocompilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
+        gocompilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
     # Because RBAC proro depends on googleapis syntax.proto and checked.proto,
     # which share the same go proto library, it causes duplicative dependencies.
     # Thus, we use depset().to_list() to remove duplicated depenencies.
     go_proto_library(
         name = name + _GO_PROTO_SUFFIX,
-        compilers = compilers,
+        compilers = gocompilers,
         importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = depset([_go_proto_mapping(dep) for dep in deps] + [
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_github_golang_protobuf//ptypes:go_default_library_gen",
+            "@go_googleapis//google/api:annotations_go_proto",
+            "@go_googleapis//google/rpc:status_go_proto",
+            "@io_bazel_rules_go//proto/wkt:any_go_proto",
+            "@io_bazel_rules_go//proto/wkt:duration_go_proto",
+            "@io_bazel_rules_go//proto/wkt:struct_go_proto",
+            "@io_bazel_rules_go//proto/wkt:timestamp_go_proto",
+            "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
+        ]).to_list(),
+    )
+
+    csharp_grpc_compile(
+      name = "thing_csharp_grpc",
+      protos = ["@rules_proto_grpc//example/proto:thing_proto"],
+    )
+
+
+    csharp_proto_library(
+        name = name + _CSHARP_PROTO_SUFFIX,
+        compilers = compilers,
         proto = name,
         visibility = ["//visibility:public"],
         deps = depset([_go_proto_mapping(dep) for dep in deps] + [
