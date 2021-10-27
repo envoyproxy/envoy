@@ -13,8 +13,8 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http codec: remove redundant Warn log in HTTP codec.
 * listener: fix a crash when updating any listener that does not bind to port.
-* Remove redundant Warn log in HTTP codec. (#18699)
 
 Removed Config or Runtime
 -------------------------
