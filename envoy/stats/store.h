@@ -24,6 +24,7 @@ class Instance;
 namespace Stats {
 
 class Sink;
+class SinkPredicates;
 
 /**
  * A store for all known counters, gauges, and timers.
@@ -65,6 +66,21 @@ public:
 
   virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
                                   std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+
+  virtual void forEachHistogram(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::ParentHistogram&)> f_stat) const PURE;
+  /**
+   * Iterate over all stats that need to be flushed for sink.
+   */
+  virtual void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                    std::function<void(Stats::Counter&)> f_stat) const PURE;
+  virtual void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                  std::function<void(Stats::Gauge&)> f_stat) const PURE;
+  virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                        std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+  virtual void
+  forEachSinkedHistogram(std::function<void(std::size_t)> f_size,
+                         std::function<void(Stats::ParentHistogram&)> f_stat) const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;
@@ -123,6 +139,11 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
+
+  /**
+   * Set the predicates to filter stats for sink.
+   */
+  virtual void setSinkPredicates(const SinkPredicates& sink_predicates) PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

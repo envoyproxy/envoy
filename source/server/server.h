@@ -293,6 +293,11 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
+  void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates> sink_predicates) override {
+    sink_predicates_ = std::move(sink_predicates);
+    stats_store_.setSinkPredicates(*sink_predicates_);
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
@@ -390,6 +395,7 @@ private:
   Quic::QuicStatNames quic_stat_names_;
   ServerFactoryContextImpl server_contexts_;
   absl::optional<ReusePortDefault> enable_reuse_port_default_;
+  std::unique_ptr<Envoy::Stats::SinkPredicates> sink_predicates_;
 
   bool stats_flush_in_progress_ : 1;
 

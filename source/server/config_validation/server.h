@@ -125,6 +125,9 @@ public:
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+  void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates> sink_predicates) override {
+    (void)sink_predicates;
+  }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,

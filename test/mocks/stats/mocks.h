@@ -293,6 +293,9 @@ public:
   MOCK_METHOD(void, forEachTextReadout,
               (std::function<void(std::size_t)>, std::function<void(Stats::TextReadout&)>),
               (const));
+  MOCK_METHOD(void, forEachSinkedHistogram,
+              (std::function<void(std::size_t)>, std::function<void(Stats::ParentHistogram&)>),
+              (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

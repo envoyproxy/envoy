@@ -1801,7 +1801,7 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
                                      2 * NumThreads, ") ")));
 
   // Now clear everything, and synchronize the system by calling mergeHistograms().
-  // THere should be no more ParentHistograms or TlsHistograms.
+  // There should be no more ParentHistograms or TlsHistograms.
   scope2.reset();
   histograms.clear();
   mergeHistograms();

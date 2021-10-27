@@ -18,6 +18,9 @@
 namespace Envoy {
 namespace Stats {
 
+class Sink;
+class SinkPredicates;
+
 /**
  * Abstract interface for allocating statistics. Implementations can
  * be created utilizing a single fixed-size block suitable for
@@ -83,6 +86,18 @@ public:
                             std::function<void(Stats::Gauge&)> f_stat) const PURE;
   virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
                                   std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+
+  virtual void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                    std::function<void(Stats::Counter&)> f_stat) const PURE;
+  virtual void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                  std::function<void(Stats::Gauge&)> f_stat) const PURE;
+  virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                        std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+
+  /**
+   * Set the predicates to filter stats for sink.
+   */
+  virtual void setSinkPredicates(const SinkPredicates& sink_predicates) PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gauges

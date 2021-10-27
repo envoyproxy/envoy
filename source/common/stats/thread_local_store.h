@@ -252,6 +252,8 @@ public:
 
   void forEachTextReadout(std::function<void(std::size_t)> f_size,
                           std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachHistogram(std::function<void(size_t)> f_size,
+                        std::function<void(Stats::ParentHistogram&)> f_stat) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -266,6 +268,17 @@ public:
   void mergeHistograms(PostMergeCb merge_cb) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
+  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Counter&)> f_stat) const override;
+  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::Gauge&)> f_stat) const override;
+  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachSinkedHistogram(std::function<void(size_t)> f_size,
+                              std::function<void(Stats::ParentHistogram&)> f_stat) const override;
+
+  void setSinkPredicates(const SinkPredicates& sink_predicates) override;
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -500,6 +513,7 @@ private:
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
+  const SinkPredicates* sink_predicates_ = nullptr;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
@@ -530,6 +544,7 @@ private:
 
   mutable Thread::MutexBasicLockable hist_mutex_;
   StatSet<ParentHistogramImpl> histogram_set_ ABSL_GUARDED_BY(hist_mutex_);
+  StatSet<ParentHistogramImpl> sinked_histograms_ ABSL_GUARDED_BY(hist_mutex_);
 
   // Retain storage for deleted stats; these are no longer in maps because the
   // matcher-pattern was established after they were created. Since the stats

@@ -49,6 +49,23 @@ public:
 };
 
 /**
+ * A class to define predicates to filter stats for flushing to sinks.
+ */
+class SinkPredicates {
+public:
+  virtual ~SinkPredicates() = default;
+
+  /// @return true if @param counter needs to be flushed to sinks.
+  virtual bool includeCounter(const Counter& counter) const PURE;
+  /// @return true if @param gague needs to be flushed to sinks.
+  virtual bool includeGauge(const Gauge& gauge) const PURE;
+  /// @return true if @param text_readout needs to be flushed to sinks.
+  virtual bool includeTextReadout(const TextReadout& text_readout) const PURE;
+  /// @return true if @param histogram needs to be flushed to sinks.
+  virtual bool includeHistogram(const Histogram& histogram) const PURE;
+};
+
+/**
  * A sink for stats. Each sink is responsible for writing stats to a backing store.
  */
 class Sink {

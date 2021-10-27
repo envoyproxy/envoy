@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "envoy/stats/sink.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
@@ -144,6 +145,7 @@ public:
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.counters_.erase(statName());
     ASSERT(count == 1);
+    alloc_.sinked_counters_.erase(this);
   }
 
   // Stats::Counter
@@ -188,6 +190,7 @@ public:
   void removeFromSetLockHeld() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
     const size_t count = alloc_.gauges_.erase(statName());
     ASSERT(count == 1);
+    alloc_.sinked_gauges_.erase(this);
   }
 
   // Stats::Gauge
@@ -260,6 +263,7 @@ public:
   void removeFromSetLockHeld() ABSL_EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
     const size_t count = alloc_.text_readouts_.erase(statName());
     ASSERT(count == 1);
+    alloc_.sinked_text_readouts_.erase(this);
   }
 
   // Stats::TextReadout
@@ -289,6 +293,11 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, StatName tag_extracte
   }
   auto counter = CounterSharedPtr(makeCounterInternal(name, tag_extracted_name, stat_name_tags));
   counters_.insert(counter.get());
+  // Add counter to sinked_counters_ if it matches the sink predicate.
+  if (sink_predicates_ && sink_predicates_->includeCounter(*counter)) {
+    auto val = sinked_counters_.insert(counter.get());
+    ASSERT(val.second);
+  }
   return counter;
 }
 
@@ -305,6 +314,11 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, StatName tag_extracted_na
   auto gauge =
       GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, stat_name_tags, import_mode));
   gauges_.insert(gauge.get());
+  // Add gauge to sinked_gauges_ if it matches the sink predicate.
+  if (sink_predicates_ && sink_predicates_->includeGauge(*gauge)) {
+    auto val = sinked_gauges_.insert(gauge.get());
+    ASSERT(val.second);
+  }
   return gauge;
 }
 
@@ -320,6 +334,11 @@ TextReadoutSharedPtr AllocatorImpl::makeTextReadout(StatName name, StatName tag_
   auto text_readout =
       TextReadoutSharedPtr(new TextReadoutImpl(name, *this, tag_extracted_name, stat_name_tags));
   text_readouts_.insert(text_readout.get());
+  // Add text_readout to sinked_text_readouts_ if it matches the sink predicate.
+  if (sink_predicates_ && sink_predicates_->includeTextReadout(*text_readout)) {
+    auto val = sinked_text_readouts_.insert(text_readout.get());
+    ASSERT(val.second);
+  }
   return text_readout;
 }
 
@@ -369,6 +388,71 @@ void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
   }
 }
 
+void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                                         std::function<void(Stats::Counter&)> f_stat) const {
+  if (sink_predicates_ != nullptr) {
+    Thread::LockGuard lock(mutex_);
+    f_size(sinked_counters_.size());
+    for (auto counter : sinked_counters_) {
+      f_stat(*counter);
+    }
+  } else {
+    forEachCounter(f_size, f_stat);
+  }
+}
+
+void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                                       std::function<void(Stats::Gauge&)> f_stat) const {
+  if (sink_predicates_ != nullptr) {
+    Thread::LockGuard lock(mutex_);
+    f_size(sinked_gauges_.size());
+    for (auto gauge : sinked_gauges_) {
+      f_stat(*gauge);
+    }
+  } else {
+    forEachGauge(f_size, f_stat);
+  }
+}
+
+void AllocatorImpl::forEachSinkedTextReadout(
+    std::function<void(std::size_t)> f_size,
+    std::function<void(Stats::TextReadout&)> f_stat) const {
+  if (sink_predicates_ != nullptr) {
+    Thread::LockGuard lock(mutex_);
+    f_size(sinked_text_readouts_.size());
+    for (auto text_readout : sinked_text_readouts_) {
+      f_stat(*text_readout);
+    }
+  } else {
+    forEachTextReadout(f_size, f_stat);
+  }
+}
+
+void AllocatorImpl::setSinkPredicates(const SinkPredicates& sink_predicates) {
+  Thread::LockGuard lock(mutex_);
+  ASSERT(sink_predicates_ == nullptr);
+  sink_predicates_ = &sink_predicates;
+
+  // Add counters to the set of sinked counters.
+  for (auto& counter : counters_) {
+    if (sink_predicates_->includeCounter(*counter)) {
+      sinked_counters_.emplace(counter);
+    }
+  }
+  // Add gauges to the set of sinked gauges.
+  for (auto& gauge : gauges_) {
+    if (sink_predicates_->includeGauge(*gauge)) {
+      sinked_gauges_.insert(gauge);
+    }
+  }
+  // Add text_readouts to the set of sinked text readouts.
+  for (auto& text_readout : text_readouts_) {
+    if (sink_predicates_->includeTextReadout(*text_readout)) {
+      sinked_text_readouts_.insert(text_readout);
+    }
+  }
+}
+
 void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
   Thread::LockGuard lock(mutex_);
   auto iter = counters_.find(counter->statName());
@@ -380,6 +464,7 @@ void AllocatorImpl::markCounterForDeletion(const CounterSharedPtr& counter) {
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_counters_.emplace_back(*iter);
   counters_.erase(iter);
+  sinked_counters_.erase(counter.get());
 }
 
 void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
@@ -393,6 +478,7 @@ void AllocatorImpl::markGaugeForDeletion(const GaugeSharedPtr& gauge) {
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_gauges_.emplace_back(*iter);
   gauges_.erase(iter);
+  sinked_gauges_.erase(gauge.get());
 }
 
 void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_readout) {
@@ -406,6 +492,7 @@ void AllocatorImpl::markTextReadoutForDeletion(const TextReadoutSharedPtr& text_
   // Duplicates are ASSERTed in ~AllocatorImpl.
   deleted_text_readouts_.emplace_back(*iter);
   text_readouts_.erase(iter);
+  sinked_text_readouts_.erase(text_readout.get());
 }
 
 } // namespace Stats

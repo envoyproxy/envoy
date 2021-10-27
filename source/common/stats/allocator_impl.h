@@ -15,6 +15,8 @@
 namespace Envoy {
 namespace Stats {
 
+class SinkPredicates;
+
 class AllocatorImpl : public Allocator {
 public:
   static const char DecrementToZeroSyncPoint[];
@@ -42,6 +44,14 @@ public:
   void forEachTextReadout(std::function<void(std::size_t)>,
                           std::function<void(Stats::TextReadout&)>) const override;
 
+  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Counter&)> f_stat) const override;
+  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::Gauge&)> f_stat) const override;
+  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::TextReadout&)> f_stat) const override;
+
+  void setSinkPredicates(SinkPredicates const& sink_predicates) override;
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
@@ -93,6 +103,15 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
+  template <typename StatType>
+  using StatPointerSet = absl::flat_hash_set<StatType*, absl::Hash<StatType*>>;
+  // Stat pointers that participate in the flush to sink process.
+  StatPointerSet<Counter> sinked_counters_ ABSL_GUARDED_BY(mutex_);
+  StatPointerSet<Gauge> sinked_gauges_ ABSL_GUARDED_BY(mutex_);
+  StatPointerSet<TextReadout> sinked_text_readouts_ ABSL_GUARDED_BY(mutex_);
+
+  // Predicates used to filter stats to be flushed.
+  const SinkPredicates* sink_predicates_ = nullptr;
   SymbolTable& symbol_table_;
 
   Thread::ThreadSynchronizer sync_;

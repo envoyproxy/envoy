@@ -103,7 +103,9 @@ public:
 
   void forEachStat(std::function<void(std::size_t)> f_size,
                    std::function<void(Base&)> f_stat) const {
-    f_size(stats_.size());
+    if (f_size != nullptr) {
+      f_size(stats_.size());
+    }
     for (auto const& stat : stats_) {
       f_stat(*stat.second);
     }
@@ -227,6 +229,33 @@ public:
   void forEachTextReadout(std::function<void(std::size_t)> f_size,
                           std::function<void(Stats::TextReadout&)> f_stat) const override {
     text_readouts_.forEachStat(f_size, f_stat);
+  }
+
+  void forEachHistogram(std::function<void(std::size_t)> f_size,
+                        std::function<void(Stats::ParentHistogram&)> f_stat) const override {
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
+  }
+
+  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Counter&)> f_stat) const override {
+    forEachCounter(f_size, f_stat);
+  }
+
+  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::Gauge&)> f_stat) const override {
+    forEachGauge(f_size, f_stat);
+  }
+
+  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::TextReadout&)> f_stat) const override {
+    forEachTextReadout(f_size, f_stat);
+  }
+
+  void forEachSinkedHistogram(std::function<void(std::size_t)> f_size,
+                              std::function<void(Stats::ParentHistogram&)> f_stat) const override {
+    (void)f_size;
+    (void)f_stat;
   }
 
 private:

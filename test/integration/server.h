@@ -9,6 +9,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
@@ -296,6 +297,35 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
+  void forEachHistogram(std::function<void(std::size_t)> f_size,
+                        std::function<void(Stats::ParentHistogram&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachHistogram(f_size, f_stat);
+  }
+  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
+                            std::function<void(Stats::Counter&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedCounter(f_size, f_stat);
+  }
+  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::Gauge&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedGauge(f_size, f_stat);
+  }
+  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
+                                std::function<void(Stats::TextReadout&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedTextReadout(f_size, f_stat);
+  }
+  void forEachSinkedHistogram(std::function<void(std::size_t)> f_size,
+                              std::function<void(Stats::ParentHistogram&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedHistogram(f_size, f_stat);
+  }
+  void setSinkPredicates(const SinkPredicates& sink_predicates) override {
+    UNREFERENCED_PARAMETER(sink_predicates);
+  }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
