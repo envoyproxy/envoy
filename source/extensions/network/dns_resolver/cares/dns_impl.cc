@@ -100,15 +100,6 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
-  // Purely for checking for invalid state. This will change is Auto and V4Preferred are changed to
-  // have concurrent lookups.
-  if (status != ARES_SUCCESS && !pending_response_.address_list_.empty()) {
-    // The only way the resolver would have addresses here is if it is configured to resolve All
-    // families, and the first resolution was successful. In that case, we might as well return
-    // the addresses that resolved.
-    ASSERT(dns_lookup_family_ == DnsLookupFamily::All && !dual_resolution_);
-  }
-
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -119,9 +110,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
                     dns_name_);
 
-    if (pending_response_.address_list_.empty()) {
-      pending_response_.status_ = ResolutionStatus::Failure;
-    }
     // Nothing can follow a call to finishResolve due to the deletion of this object upon
     // finishResolve().
     finishResolve();
@@ -147,6 +135,7 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
   if (status == ARES_SUCCESS) {
     pending_response_.status_ = ResolutionStatus::Success;
+
     if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
       if (addrinfo->nodes->ai_family == AF_INET) {
         for (const ares_addrinfo_node* ai = addrinfo->nodes; ai != nullptr; ai = ai->ai_next) {
@@ -180,10 +169,6 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 
     ASSERT(addrinfo != nullptr);
     ares_freeaddrinfo(addrinfo);
-  } else {
-    if (pending_response_.address_list_.empty()) {
-      pending_response_.status_ = ResolutionStatus::Failure;
-    }
   }
 
   if (timeouts > 0) {
