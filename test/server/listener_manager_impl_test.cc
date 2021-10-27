@@ -519,9 +519,6 @@ filter_chains:
 
 TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
-
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "false"}});
   const std::string yaml = R"EOF(
 address:
   envoy_internal_address:

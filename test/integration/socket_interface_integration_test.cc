@@ -100,8 +100,6 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
 
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.internal_address", "false"}});
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),

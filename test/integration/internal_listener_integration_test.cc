@@ -1,9 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/scoped_route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -11,10 +9,9 @@
 #include "source/common/config/api_version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
-#include "test/config/v2_link_hacks.h"
-#include "test/integration/http_integration.h"
+
+#include "test/integration/base_integration_test.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
 
 #include "absl/strings/str_cat.h"
