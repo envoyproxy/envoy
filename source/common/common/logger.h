@@ -2,7 +2,6 @@
 
 #include <bitset>
 #include <chrono>
-#include <iostream>
 #include <cstdint>
 #include <memory>
 #include <string>
