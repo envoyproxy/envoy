@@ -34,6 +34,7 @@ use(
       "label": "deps",
       "allow_global_approval": False,
       "github_status_label": "any dependency change",
+      "auto_assign": True,
     },
   ],
 )
