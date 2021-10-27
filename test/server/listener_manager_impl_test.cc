@@ -518,16 +518,16 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
-  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
   const std::string yaml = R"EOF(
-address:
-  envoy_internal_address:
-    server_listener_name: a_listener_name
-filter_chains:
-- filters: []
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: a_listener_name
+    filter_chains:
+    - filters: []
   )EOF";
 
-  EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), "");
+  EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), ".*");
 }
 
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
