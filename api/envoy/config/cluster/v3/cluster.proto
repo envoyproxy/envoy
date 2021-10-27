@@ -112,9 +112,9 @@ message Cluster {
 
     // Use the new :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field to determine the LB policy.
-    // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
-    // and instead using the new load_balancing_policy field as the one and only mechanism for
-    // configuring this.]
+    // This has been deprecated in favor of using the :ref:`load_balancing_policy
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
+    // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
   }
 
@@ -1044,9 +1044,8 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // New mechanism for LB policy configuration. Used only if the
-  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>` field has the value
-  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // If this field is set and is supported by the client, it will supersede the value of
+  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
   // [#not-implemented-hide:]

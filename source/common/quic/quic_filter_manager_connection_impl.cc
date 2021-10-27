@@ -3,6 +3,8 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quic_ssl_connection_info.h"
+
 namespace Envoy {
 namespace Quic {
 
@@ -117,8 +119,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  return nullptr;
+  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
@@ -178,9 +179,14 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     // The connection was closed before it could be used. Stats are not recorded.
     return;
   }
-  if (version.transport_version == quic::QUIC_VERSION_IETF_RFC_V1) {
+  switch (version.transport_version) {
+  case quic::QUIC_VERSION_IETF_DRAFT_29:
+    codec_stats_->quic_version_h3_29_.inc();
+    return;
+  case quic::QUIC_VERSION_IETF_RFC_V1:
     codec_stats_->quic_version_rfc_v1_.inc();
-  } else {
+    return;
+  default:
     ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
                                  quic::QuicVersionToString(version.transport_version)));
   }

@@ -397,7 +397,7 @@ protected:
 
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
    * of the slice to the end of the Reservable section. */
-  uint64_t capacity_;
+  uint64_t capacity_ = 0;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
@@ -407,11 +407,11 @@ protected:
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section. */
-  uint64_t data_;
+  uint64_t data_ = 0;
 
   /** Offset in bytes from the start of the slice to the start of the Reservable section which is
    * also the end of the Data section. */
-  uint64_t reservable_;
+  uint64_t reservable_ = 0;
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;

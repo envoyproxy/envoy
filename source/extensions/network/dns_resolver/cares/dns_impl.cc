@@ -13,7 +13,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 

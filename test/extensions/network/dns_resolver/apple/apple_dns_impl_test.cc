@@ -11,7 +11,7 @@
 #include "envoy/network/dns.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"

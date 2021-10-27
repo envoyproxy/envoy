@@ -104,7 +104,15 @@ public:
     Bytes,
     Microseconds,
     Milliseconds,
+    Percent, // A percent value stored as fixed-point, where the stored value is divided by
+             // PercentScale to get the actual value, eg a value of 100% (or 1.0) is encoded as
+             // PercentScale, 50% is encoded as PercentScale * 0.5. Encoding as fixed-point allows
+             // enough dynamic range, without needing to support floating-point values in
+             // histograms.
   };
+
+  // The scaling factor for Unit::Percent.
+  static constexpr uint64_t PercentScale = 1000000;
 
   ~Histogram() override = default;
 
