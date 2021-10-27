@@ -17,13 +17,6 @@
 
 namespace Envoy {
 namespace Network {
-namespace {
-std::string getConnectionInfoString(const ConnectionInfoProvider& conn_info) {
-  std::stringstream out;
-  conn_info.dumpState(out, 0);
-  return out.str();
-}
-} // namespace
 
 class ListenSocketImpl : public SocketImpl {
 protected:

@@ -192,7 +192,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   } else if (address->type() == Network::Address::Type::EnvoyInternal) {
     // Listener manager should have validated that envoy internal address doesn't work with udp
     // listener yet.
-    ASSERT(socket_type != Network::Socket::Type::Stream);
+    ASSERT(socket_type == Network::Socket::Type::Stream);
     return std::make_shared<Network::InternalListenSocket>(address);
   }
 
