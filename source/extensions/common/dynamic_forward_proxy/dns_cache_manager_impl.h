@@ -4,6 +4,7 @@
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
+#include "source/server/factory_context_base_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -31,8 +32,7 @@ private:
     DnsCacheSharedPtr cache_;
   };
 
-  Server::Configuration::FactoryContextBase& context_;
-
+  Server::FactoryContextBaseImpl context_;
   absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
 
@@ -44,7 +44,7 @@ public:
   DnsCacheManagerSharedPtr get() override;
 
 private:
-  Server::Configuration::FactoryContextBase& context_;
+  Server::FactoryContextBaseImpl context_;
 };
 
 } // namespace DynamicForwardProxy

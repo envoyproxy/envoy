@@ -71,6 +71,26 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   return certificate_details;
 }
 
+bool Utility::dnsNameMatch(absl::string_view dns_name, absl::string_view pattern) {
+  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
+  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
+  if (lower_case_dns_name == lower_case_pattern) {
+    return true;
+  }
+
+  size_t pattern_len = lower_case_pattern.length();
+  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
+    if (lower_case_dns_name.length() > pattern_len - 1) {
+      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
+      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
+             lower_case_dns_name.substr(off, pattern_len - 1) ==
+                 lower_case_pattern.substr(1, pattern_len - 1);
+    }
+  }
+
+  return false;
+}
+
 namespace {
 
 enum class CertName { Issuer, Subject };
@@ -329,6 +349,15 @@ absl::string_view Utility::getErrorDescription(int err) {
 #endif
   ENVOY_BUG(false, "Unknown BoringSSL error had occurred");
   return SSL_ERROR_UNKNOWN_ERROR_MESSAGE;
+}
+
+std::string Utility::getX509VerificationErrorInfo(X509_STORE_CTX* ctx) {
+  const int n = X509_STORE_CTX_get_error(ctx);
+  const int depth = X509_STORE_CTX_get_error_depth(ctx);
+  std::string error_details =
+      absl::StrCat("X509_verify_cert: certificate verification error at depth ", depth, ": ",
+                   X509_verify_cert_error_string(n));
+  return error_details;
 }
 
 } // namespace Tls

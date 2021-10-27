@@ -10,13 +10,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode;
 
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::TrailersResponse;
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeadersResponse;
+using envoy::service::ext_proc::v3::TrailersResponse;
 
 void ProcessorState::startMessageTimer(Event::TimerCb cb, std::chrono::milliseconds timeout) {
   if (!message_timer_) {

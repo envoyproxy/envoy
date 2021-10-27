@@ -110,16 +110,9 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-          reason = StreamResetReason::ProtocolError;
-          connection_->streamInfo().setResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError);
-        }
+        reason = StreamResetReason::ProtocolError;
+        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
-    } else {
-      ENVOY_CONN_LOG(warn, "Connection is closed by {} during connecting.", *connection_,
-                     (event == Network::ConnectionEvent::RemoteClose ? "peer" : "self"));
     }
     while (!active_requests_.empty()) {
       // Fake resetting all active streams so that reset() callbacks get invoked.

@@ -15,11 +15,11 @@ using Http::Headers;
 using Http::LowerCaseString;
 
 using envoy::config::core::v3::HeaderValueOption;
-using envoy::service::ext_proc::v3alpha::BodyMutation;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeaderMutation;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
+using envoy::service::ext_proc::v3::BodyMutation;
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeaderMutation;
+using envoy::service::ext_proc::v3::HeadersResponse;
 
 void MutationUtils::headersToProto(const Http::HeaderMap& headers_in,
                                    envoy::config::core::v3::HeaderMap& proto_out) {

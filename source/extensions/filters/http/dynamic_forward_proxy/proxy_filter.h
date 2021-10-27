@@ -20,11 +20,13 @@ public:
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
+  bool saveUpstreamAddress() const { return save_upstream_address_; };
 
 private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   Upstream::ClusterManager& cluster_manager_;
+  const bool save_upstream_address_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -59,6 +61,8 @@ public:
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
 
 private:
+  void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);
+
   const ProxyFilterConfigSharedPtr config_;
   Upstream::ClusterInfoConstSharedPtr cluster_info_;
   Upstream::ResourceAutoIncDecPtr circuit_breaker_;

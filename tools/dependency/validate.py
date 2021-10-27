@@ -219,8 +219,7 @@ class Validator(object):
         # probably have more precise tagging of dataplane/controlplane/other deps in
         # these paths.
         queried_dataplane_core_min_deps = self._build_graph.query_external_deps(
-            '//source/common/api/...', '//source/common/buffer/...',
-            '//source/common/chromium_url/...', '//source/common/crypto/...',
+            '//source/common/api/...', '//source/common/buffer/...', '//source/common/crypto/...',
             '//source/common/conn_pool/...', '//source/common/formatter/...',
             '//source/common/http/...', '//source/common/ssl/...', '//source/common/tcp/...',
             '//source/common/tcp_proxy/...', '//source/common/network/...')
