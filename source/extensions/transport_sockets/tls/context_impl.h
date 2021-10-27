@@ -42,6 +42,8 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
+  bssl::UniquePtr<PKCS12> pfx_file_;
+  std::string pfx_file_path_;
   Ocsp::OcspResponseWrapperPtr ocsp_response_;
   bool is_ecdsa_{};
   bool is_must_staple_{};

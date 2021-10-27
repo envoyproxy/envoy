@@ -36,6 +36,17 @@ public:
   virtual const std::string& privateKeyPath() const PURE;
 
   /**
+   * @return a string of pfx file.
+   */
+  virtual const std::string& pfxFile() const PURE;
+
+  /**
+   * @return path of the pfx file used to identify the local side or "<inline>" if the pfx
+   * file was inlined.
+   */
+  virtual const std::string& pfxFilePath() const PURE;
+
+  /**
    * @return private key method provider.
    */
   virtual Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const PURE;

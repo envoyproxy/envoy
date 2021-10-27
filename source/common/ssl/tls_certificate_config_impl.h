@@ -20,6 +20,8 @@ public:
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
   const std::string& privateKey() const override { return private_key_; }
   const std::string& privateKeyPath() const override { return private_key_path_; }
+  const std::string& pfxFile() const override { return pfx_file_; }
+  const std::string& pfxFilePath() const override { return pfx_file_path_; }
   const std::string& password() const override { return password_; }
   const std::string& passwordPath() const override { return password_path_; }
   const std::vector<uint8_t>& ocspStaple() const override { return ocsp_staple_; }
@@ -33,6 +35,8 @@ private:
   const std::string certificate_chain_path_;
   const std::string private_key_;
   const std::string private_key_path_;
+  const std::string pfx_file_;
+  const std::string pfx_file_path_;
   const std::string password_;
   const std::string password_path_;
   const std::vector<uint8_t> ocsp_staple_;

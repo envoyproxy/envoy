@@ -30,6 +30,7 @@
 #include "absl/strings/str_join.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
+#include "openssl/pkcs12.h"
 #include "openssl/rand.h"
 
 namespace Envoy {
@@ -167,42 +168,110 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       // Load certificate chain.
       const auto& tls_certificate = tls_certificates[i].get();
       ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
-      bssl::UniquePtr<BIO> bio(
-          BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
-                          tls_certificate.certificateChain().size()));
-      RELEASE_ASSERT(bio != nullptr, "");
-      ctx.cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-      if (ctx.cert_chain_ == nullptr ||
-          !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
-        while (uint64_t err = ERR_get_error()) {
-          ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
-                         absl::NullSafeStringView(ERR_lib_error_string(err)),
-                         absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
-                         absl::NullSafeStringView(ERR_reason_error_string(err)));
+      ctx.pfx_file_path_ = tls_certificate.pfxFilePath();
+      bssl::UniquePtr<BIO> bio;
+      if (!tls_certificate.pfxFile().empty()) {
+        bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.pfxFile().data()),
+                                  tls_certificate.pfxFile().size()));
+        RELEASE_ASSERT(bio != nullptr, "");
+        ctx.pfx_file_.reset(d2i_PKCS12_bio(bio.get(), nullptr));
+
+        EVP_PKEY* temp_private_key = nullptr;
+        X509* temp_cert = nullptr;
+        STACK_OF(X509)* ca_certificates = nullptr;
+        if (ctx.pfx_file_ == nullptr ||
+            !PKCS12_parse(ctx.pfx_file_.get(),
+                          !tls_certificate.password().empty()
+                              ? const_cast<char*>(tls_certificate.password().c_str())
+                              : nullptr,
+                          &temp_private_key, &temp_cert, &ca_certificates)) {
+          while (uint64_t err = ERR_get_error()) {
+            ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                           absl::NullSafeStringView(ERR_lib_error_string(err)),
+                           absl::NullSafeStringView(ERR_func_error_string(err)),
+                           ERR_GET_REASON(err),
+                           absl::NullSafeStringView(ERR_reason_error_string(err)));
+          }
+          throw EnvoyException(absl::StrCat("Failed to load pfx file from ", ctx.pfx_file_path_));
         }
-        throw EnvoyException(
-            absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
-      }
-      // Read rest of the certificate chain.
-      while (true) {
-        bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-        if (cert == nullptr) {
-          break;
+        if (ca_certificates) {
+          X509* ca_cert = nullptr;
+          while ((ca_cert = sk_X509_pop(ca_certificates)) != nullptr) {
+            //
+            // This transfers ownership to SSLCtx and ca_cert does not need to be freed.
+            //
+            SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), ca_cert);
+          }
         }
-        if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
+        ctx.cert_chain_.reset(temp_cert);
+        bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
+        if (temp_private_key == nullptr ||
+            !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
+          throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
+                                           tls_certificate.pfxFilePath(),
+                                           Utility::getLastCryptoError().value_or("unknown")));
+        }
+
+#ifdef BORINGSSL_FIPS
+        // Verify that private keys are passing FIPS pairwise consistency tests.
+        switch (pkey_id) {
+        case EVP_PKEY_EC: {
+          const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+          if (!EC_KEY_check_fips(ecdsa_private_key)) {
+            throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             tls_certificate.pfxFilePath()));
+          }
+        } break;
+        case EVP_PKEY_RSA: {
+          RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+          if (!RSA_check_fips(rsa_private_key)) {
+            throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
+                                             "pairwise consistency test required in FIPS mode",
+                                             tls_certificate.pfxFilePath()));
+          }
+        } break;
+        }
+#endif
+
+      } else {
+        bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
+                                  tls_certificate.certificateChain().size()));
+        RELEASE_ASSERT(bio != nullptr, "");
+        ctx.cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+        if (ctx.cert_chain_ == nullptr ||
+            !SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
+          while (uint64_t err = ERR_get_error()) {
+            ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                           absl::NullSafeStringView(ERR_lib_error_string(err)),
+                           absl::NullSafeStringView(ERR_func_error_string(err)),
+                           ERR_GET_REASON(err),
+                           absl::NullSafeStringView(ERR_reason_error_string(err)));
+          }
           throw EnvoyException(
               absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
         }
-        // SSL_CTX_add_extra_chain_cert() takes ownership.
-        cert.release();
-      }
-      // Check for EOF.
-      const uint32_t err = ERR_peek_last_error();
-      if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-        ERR_clear_error();
-      } else {
-        throw EnvoyException(
-            absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
+        // Read rest of the certificate chain.
+        while (true) {
+          bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+          if (cert == nullptr) {
+            break;
+          }
+          if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
+            throw EnvoyException(
+                absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
+          }
+          // SSL_CTX_add_extra_chain_cert() takes ownership.
+          cert.release();
+        }
+        // Check for EOF.
+        const uint32_t err = ERR_peek_last_error();
+        if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+          ERR_clear_error();
+        } else {
+          throw EnvoyException(
+              absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
+        }
       }
 
       // The must staple extension means the certificate promises to carry
@@ -287,7 +356,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
 #endif
         SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
-      } else {
+      } else if (!tls_certificate.privateKey().empty()) {
         // Load private key.
         bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
                                   tls_certificate.privateKey().size()));
