@@ -40,36 +40,9 @@ using EmailSanMatcher = StringSanMatcher<GEN_EMAIL>;
 using UriSanMatcher = StringSanMatcher<GEN_URI>;
 using IpAddSanMatcher = StringSanMatcher<GEN_IPADD>;
 
-class BackwardsCompatibleSanMatcher : public Envoy::Ssl::SanMatcher {
-
-public:
-  bool match(const GENERAL_NAME* general_name) const override;
-
-  ~BackwardsCompatibleSanMatcher() override = default;
-
-  BackwardsCompatibleSanMatcher(envoy::type::matcher::v3::StringMatcher matcher)
-      : matcher_(matcher) {}
-
-private:
-  Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
-};
-
-class BackwardsCompatibleSanMatcherFactory : public Envoy::Ssl::SanMatcherFactory {
-public:
-  ~BackwardsCompatibleSanMatcherFactory() override = default;
-  Envoy::Ssl::SanMatcherPtr
-  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig& config) override;
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
-  }
-  std::string name() const override { return "envoy.san_matchers.backward_compatible_san_matcher"; }
-};
-
-Envoy::Ssl ::SanMatcherPtr createBackwardsCompatibleSanMatcher(
-    envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher);
-
 Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
-    envoy::extensions::transport_sockets::tls::v3::StringSanMatcher const& matcher);
+    const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher);
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

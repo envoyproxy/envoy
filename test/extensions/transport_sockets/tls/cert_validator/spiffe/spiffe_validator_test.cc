@@ -67,9 +67,24 @@ public:
     san_matchers_.clear();
     for (auto& matcher : san_matchers) {
       san_matchers_.emplace_back();
-      san_matchers_.back().mutable_typed_config()->mutable_typed_config()->PackFrom(matcher);
-      san_matchers_.back().mutable_typed_config()->mutable_name()->assign(
-          "envoy.san_matchers.backward_compatible_san_matcher");
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+      *san_matchers_.back().mutable_matcher() = matcher;
+
+      san_matchers_.emplace_back();
+      san_matchers_.back().set_san_type(
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
+      *san_matchers_.back().mutable_matcher() = matcher;
     }
   };
 

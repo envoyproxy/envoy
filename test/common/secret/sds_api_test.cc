@@ -696,12 +696,31 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
-  EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
-  envoy::type::matcher::v3::StringMatcher string_matcher;
-  cvc_config.subjectAltNameMatchers()[0].typed_config().typed_config().UnpackTo(&string_matcher);
-  EXPECT_EQ("first san", string_matcher.exact());
-  cvc_config.subjectAltNameMatchers()[1].typed_config().typed_config().UnpackTo(&string_matcher);
-  EXPECT_EQ("second san", string_matcher.exact());
+  EXPECT_EQ(8, cvc_config.subjectAltNameMatchers().size());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+            cvc_config.subjectAltNameMatchers()[1].san_type());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[2].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+            cvc_config.subjectAltNameMatchers()[2].san_type());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[3].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
+            cvc_config.subjectAltNameMatchers()[3].san_type());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[4].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[4].san_type());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[5].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+            cvc_config.subjectAltNameMatchers()[5].san_type());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[6].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+            cvc_config.subjectAltNameMatchers()[6].san_type());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[7].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
+            cvc_config.subjectAltNameMatchers()[7].san_type());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());

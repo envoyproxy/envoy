@@ -255,25 +255,17 @@ message CertificateProviderPluginInstance {
 }
 
 // String matcher for subject alternative names, to match both type and value of the SAN.
-message StringSanMatcher {
+message SubjectAltNameMatcher {
   enum SanType {
     EMAIL = 0;
     DNS = 1;
     URI = 2;
-    IP_ADD = 3;
+    IP_ADDRESS = 3;
   }
 
   SanType san_type = 1 [(validate.rules).enum = {defined_only: true}];
 
   type.matcher.v3.StringMatcher matcher = 2;
-}
-
-message SubjectAltNameMatcher {
-  oneof matcher {
-    StringSanMatcher string_matcher = 1;
-
-    config.core.v3.TypedExtensionConfig typed_config = 2;
-  }
 }
 
 // [#next-free-field: 15]
@@ -306,8 +298,8 @@ message CertificateValidationContext {
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
-  // :ref:`match_subject_alt_names
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
+  // :ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
@@ -421,21 +413,20 @@ message CertificateValidationContext {
   //
   // .. code-block:: yaml
   //
-  //  match_subject_alt_names_with_type:
-  //    string_matcher:
-  //      san_type: DNS_ID
-  //      matcher:
-  //        exact: "api.example.com"
+  //  match_typed_subject_alt_names:
+  //  - san_type: DNS
+  //    matcher:
+  //      exact: "api.example.com"
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
-  repeated SubjectAltNameMatcher match_subject_alt_names_with_type = 14;
+  repeated SubjectAltNameMatcher match_typed_subject_alt_names = 14;
 
-  // This field is deprecated in favor of ref:`match_subject_alt_names_with_type
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names_with_type>`
+  // This field is deprecated in favor of ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
   repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

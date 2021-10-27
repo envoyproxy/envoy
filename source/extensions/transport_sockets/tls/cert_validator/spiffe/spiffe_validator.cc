@@ -39,20 +39,11 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
-      if (matcher.has_string_matcher() &&
-          matcher.string_matcher().san_type() ==
-              envoy::extensions::transport_sockets::tls::v3::StringSanMatcher::URI) {
+      if (matcher.san_type() ==
+          envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI) {
         // Only match against URI SAN since SPIFFE specification does not restrict values in other
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
-        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher.string_matcher()));
-      } else {
-        auto const factory =
-            Envoy::Config::Utility::getAndCheckFactory<Envoy::Ssl::SanMatcherFactory>(
-                matcher.typed_config(), true);
-        if (factory != nullptr) {
-          subject_alt_name_matchers_.emplace_back(
-              factory->createSanMatcher(matcher.typed_config()));
-        }
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
       }
     }
   }
@@ -240,16 +231,10 @@ bool SPIFFEValidator::matchSubjectAltName(X509& leaf_cert) {
   ASSERT(san_names != nullptr,
          "san_names should have at least one name after SPIFFE cert validation");
 
-  // Only match against URI SAN since SPIFFE specification does not restrict values in other SAN
-  // types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
   for (const GENERAL_NAME* general_name : san_names.get()) {
-    // This check can be removed when match_subject_alt_names is removed from
-    // envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext.
-    if (general_name->type == GEN_URI) {
-      for (const auto& config_san_matcher : subject_alt_name_matchers_) {
-        if (config_san_matcher->match(general_name)) {
-          return true;
-        }
+    for (const auto& config_san_matcher : subject_alt_name_matchers_) {
+      if (config_san_matcher->match(general_name)) {
+        return true;
       }
     }
   }

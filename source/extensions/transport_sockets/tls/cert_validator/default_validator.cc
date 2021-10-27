@@ -148,17 +148,7 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        if (matcher.has_string_matcher()) {
-          subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher.string_matcher()));
-        } else {
-          auto const factory =
-              Envoy::Config::Utility::getAndCheckFactory<Envoy::Ssl::SanMatcherFactory>(
-                  matcher.typed_config(), true);
-          if (factory != nullptr) {
-            subject_alt_name_matchers_.emplace_back(
-                factory->createSanMatcher(matcher.typed_config()));
-          }
-        }
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
       }
       verify_mode = verify_mode_validation_context;
     }

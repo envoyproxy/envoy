@@ -57,22 +57,36 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
 std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
 CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config) {
-  if (!config.match_subject_alt_names_with_type().empty() &&
+  if (!config.match_typed_subject_alt_names().empty() &&
       !config.match_subject_alt_names().empty()) {
-    throw EnvoyException("SAN-based verification using both match_subject_alt_names_with_type and "
+    throw EnvoyException("SAN-based verification using both match_typed_subject_alt_names and "
                          "the deprecated match_subject_alt_names is not allowed");
   }
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-      subject_alt_name_matchers(config.match_subject_alt_names_with_type().begin(),
-                                config.match_subject_alt_names_with_type().end());
+      subject_alt_name_matchers(config.match_typed_subject_alt_names().begin(),
+                                config.match_typed_subject_alt_names().end());
   // Handle deprecated string type san matchers without san type specified, by
-  // creating backwards compatible san matcher configs.
+  // creating a matcher for each supported type.
   for (auto& matcher : config.match_subject_alt_names()) {
     subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().mutable_typed_config()->mutable_typed_config()->PackFrom(
-        matcher);
-    subject_alt_name_matchers.back().mutable_typed_config()->mutable_name()->assign(
-        "envoy.san_matchers.backward_compatible_san_matcher");
+    subject_alt_name_matchers.back().set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
+    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
+
+    subject_alt_name_matchers.emplace_back();
+    subject_alt_name_matchers.back().set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
+    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
+
+    subject_alt_name_matchers.emplace_back();
+    subject_alt_name_matchers.back().set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
+    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
+
+    subject_alt_name_matchers.emplace_back();
+    subject_alt_name_matchers.back().set_san_type(
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
+    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
   }
   return subject_alt_name_matchers;
 }
