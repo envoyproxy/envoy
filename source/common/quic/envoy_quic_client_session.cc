@@ -101,6 +101,7 @@ void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
     return;
   }
   uint32_t streams_available = streamsAvailable();
+  ASSERT(streams_available > 0);
   if (streams_available > 0) {
     http_connection_callbacks_->onMaxStreamsChanged(streams_available);
   }
@@ -136,7 +137,7 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
 
 uint64_t EnvoyQuicClientSession::streamsAvailable() {
   quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
-  ASSERT(manager.outgoing_max_streams() > manager.outgoing_stream_count());
+  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
   uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
   return streams_available;
 }
