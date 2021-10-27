@@ -546,7 +546,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  ASSERT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), "");
+  EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), "");
 }
 
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
