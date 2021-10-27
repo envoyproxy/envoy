@@ -122,7 +122,7 @@ and specify a mutually trusted certificate authority:
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-42
+   :lines: 27-41
    :emphasize-lines: 6, 8-10
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
@@ -135,7 +135,7 @@ similar to validating upstream certificates :ref:`described above <start_quick_s
    :language: yaml
    :linenos:
    :lineno-start: 27
-   :lines: 27-42
+   :lines: 27-41
    :emphasize-lines: 7, 11-12
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
@@ -154,8 +154,8 @@ When connecting to an upstream with client certificates you can set them as foll
 .. literalinclude:: _include/envoy-demo-tls-client-auth.yaml
    :language: yaml
    :linenos:
-   :lineno-start: 47
-   :lines: 47-71
+   :lineno-start: 46
+   :lines: 46-70
    :emphasize-lines: 20-25
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
