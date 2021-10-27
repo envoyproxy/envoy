@@ -53,7 +53,7 @@ public:
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+             Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
              const Server::Options& options);
 
@@ -71,7 +71,7 @@ public:
   void update(Server::Admin& admin, envoy::config::cluster::v3::Cluster cluster,
               ClusterInfoFactory& info_factory, ClusterManager& cm,
               const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+              Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
               AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime);
   // Creates healthcheckers and adds them to the list, then does initial start.
@@ -152,7 +152,7 @@ public:
               Ssl::ContextManager& ssl_context_manager, ClusterInfoFactory& info_factory,
               AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
               const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+              Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
               ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
               const Server::Options& options);
 
@@ -199,7 +199,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Server::Admin& admin_;
   Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
+  ThreadLocal::Instance& tls_;
 
   envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
   uint64_t specifier_hash_;

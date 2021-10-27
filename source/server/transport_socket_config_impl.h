@@ -17,7 +17,7 @@ public:
                                     const LocalInfo::LocalInfo& local_info,
                                     Event::Dispatcher& dispatcher, Stats::Store& stats,
                                     Singleton::Manager& singleton_manager,
-                                    ThreadLocal::SlotAllocator& tls,
+                                    ThreadLocal::Instance& tls,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Api::Api& api, const Server::Options& options)
       : admin_(admin), context_manager_(context_manager), stats_scope_(stats_scope),
@@ -47,7 +47,7 @@ public:
     return *init_manager_;
   }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
+  ThreadLocal::Instance& threadLocal() override { return tls_; }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     return validation_visitor_;
   }
@@ -63,7 +63,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Stats::Store& stats_;
   Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
+  ThreadLocal::Instance& tls_;
   Init::Manager* init_manager_{};
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Api::Api& api_;

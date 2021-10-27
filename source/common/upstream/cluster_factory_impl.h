@@ -52,8 +52,7 @@ class ClusterFactoryContextImpl : public ClusterFactoryContext {
 
 public:
   ClusterFactoryContextImpl(ClusterManager& cluster_manager, Stats::Store& stats,
-                            ThreadLocal::SlotAllocator& tls,
-                            Network::DnsResolverSharedPtr dns_resolver,
+                            ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
                             Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
                             const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
@@ -70,7 +69,7 @@ public:
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
+  ThreadLocal::Instance& threadLocal() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
@@ -90,7 +89,7 @@ public:
 private:
   ClusterManager& cluster_manager_;
   Stats::Store& stats_;
-  ThreadLocal::SlotAllocator& tls_;
+  ThreadLocal::Instance& tls_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::Loader& runtime_;

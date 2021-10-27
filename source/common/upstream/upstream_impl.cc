@@ -690,7 +690,7 @@ public:
   Stats::Scope& scope() override { return stats_scope_; }
   Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
+  ThreadLocal::Instance& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -728,7 +728,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Envoy::Runtime::Loader& runtime_;
   Singleton::Manager& singleton_manager_;
-  ThreadLocal::SlotAllocator& tls_;
+  ThreadLocal::Instance& tls_;
   Api::Api& api_;
   const Server::Options& options_;
   ProtobufMessage::ValidationVisitor& message_validation_visitor_;

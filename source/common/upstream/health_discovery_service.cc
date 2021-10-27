@@ -33,7 +33,7 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
                          ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager, ClusterManager& cm,
                          const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
-                         Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                         Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
                          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                          const Server::Options& options)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
@@ -333,7 +333,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
                        Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                        ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                       Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                        const Server::Options& options)
     : runtime_(runtime), cluster_(std::move(cluster)), bind_config_(bind_config), stats_(stats),
@@ -385,7 +385,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
 void HdsCluster::update(Server::Admin& admin, envoy::config::cluster::v3::Cluster cluster,
                         ClusterInfoFactory& info_factory, ClusterManager& cm,
                         const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                        Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+                        Singleton::Manager& singleton_manager, ThreadLocal::Instance& tls,
                         ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                         AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime) {
 

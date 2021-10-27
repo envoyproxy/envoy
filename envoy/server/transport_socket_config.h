@@ -87,7 +87,7 @@ public:
   /**
    * @return the server's TLS slot allocator.
    */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+  virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for filter configuration

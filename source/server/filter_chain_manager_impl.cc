@@ -43,7 +43,7 @@ Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { retu
 
 Init::Manager& PerFilterChainFactoryContextImpl::initManager() { return init_manager_; }
 
-ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
+ThreadLocal::Instance& PerFilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
@@ -772,7 +772,7 @@ Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime()
 Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
 Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
 OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
-ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
+ThreadLocal::Instance& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
 Admin& FactoryContextImpl::admin() { return server_.admin(); }
 TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
 ProtobufMessage::ValidationContext& FactoryContextImpl::messageValidationContext() {

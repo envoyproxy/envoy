@@ -38,7 +38,7 @@ public:
   };
   Stats::Scope& scope() override { return scope_; };
   Stats::Scope& serverScope() override { return scope_; }
-  ThreadLocal::SlotAllocator& threadLocal() override { return thread_local_; };
+  ThreadLocal::Instance& threadLocal() override { return thread_local_; };
 
 private:
   const Server::Options& options_;
@@ -50,7 +50,7 @@ private:
   Singleton::Manager& singleton_manager_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::Scope& scope_;
-  ThreadLocal::SlotAllocator& thread_local_;
+  ThreadLocal::Instance& thread_local_;
 };
 
 } // namespace Server

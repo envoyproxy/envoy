@@ -16,6 +16,7 @@ public:
   MockInstance();
   ~MockInstance() override;
 
+  MOCK_METHOD(void, postOnAllThreads, (Event::PostCb cb), (const));
   MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb));
   MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb, Event::PostCb main_callback));
 

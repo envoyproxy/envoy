@@ -195,7 +195,8 @@ private:
 template <class T = ThreadLocalObject> using TypedSlotPtr = std::unique_ptr<TypedSlot<T>>;
 
 /**
- * Interface for getting and setting thread local data as well as registering a thread
+ * Interface for getting and setting thread local data as well as registering a thread and
+ * posting callbacks into registered threads.
  */
 class Instance : public SlotAllocator {
 public:
@@ -233,6 +234,12 @@ public:
    * @return true if global threading has been shutdown or false if not.
    */
   virtual bool isShutdown() const PURE;
+
+  /**
+   * Schedule a given callback into all threads registered by registerThread.
+   * @param cb is the callback that will be scheduled *on each thread*.
+   */
+  virtual void postOnAllThreads(Event::PostCb cb) const PURE;
 };
 
 } // namespace ThreadLocal

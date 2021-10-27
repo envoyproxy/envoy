@@ -28,6 +28,7 @@ public:
   void shutdownThread() override;
   Event::Dispatcher& dispatcher() override;
   bool isShutdown() const override { return shutdown_; }
+  void postOnAllThreads(Event::PostCb cb) const override;
 
 private:
   // On destruction returns the slot index to the deferred delete queue (detaches it). This allows

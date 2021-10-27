@@ -34,7 +34,7 @@ public:
   MOCK_METHOD(Stats::Store&, stats, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
-  MOCK_METHOD(ThreadLocal::SlotAllocator&, threadLocal, ());
+  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
 

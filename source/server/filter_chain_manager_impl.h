@@ -70,7 +70,7 @@ public:
   Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
+  ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
   const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
@@ -161,7 +161,7 @@ public:
   Stats::Scope& serverScope() override { return server_.stats(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
-  ThreadLocal::SlotAllocator& threadLocal() override;
+  ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationContext& messageValidationContext() override;

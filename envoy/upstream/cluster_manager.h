@@ -441,7 +441,7 @@ public:
     const LocalInfo::LocalInfo& local_info_;
     Event::Dispatcher& dispatcher_;
     Singleton::Manager& singleton_manager_;
-    ThreadLocal::SlotAllocator& tls_;
+    ThreadLocal::Instance& tls_;
     ProtobufMessage::ValidationVisitor& validation_visitor_;
     Api::Api& api_;
     const Server::Options& options_;

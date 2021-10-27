@@ -145,6 +145,14 @@ void InstanceImpl::removeSlot(uint32_t slot) {
   });
 }
 
+void InstanceImpl::postOnAllThreads(Event::PostCb cb) const {
+  ASSERT(!shutdown_);
+  for (Event::Dispatcher& dispatcher : registered_threads_) {
+    dispatcher.post(cb);
+  }
+  main_thread_dispatcher_->post(cb);
+}
+
 void InstanceImpl::runOnAllThreads(Event::PostCb cb) {
   ASSERT(Thread::MainThread::isMainOrTestThread());
   ASSERT(!shutdown_);
