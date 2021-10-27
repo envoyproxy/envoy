@@ -94,7 +94,7 @@ private:
     const ares_channel channel_;
     const std::string dns_name_;
     const DnsLookupFamily dns_lookup_family_;
-    // Note: pending_reponse_ is constructed with ResolutionStatus::Failure by default and
+    // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
     // __only__ changed to ResolutionStatus::Success if there is an ARES_SUCCESS reply.
     // In the dual_resolution case __any__ ARES_SUCCESS reply will result in a
     // ResolutionStatus::Success callback.
