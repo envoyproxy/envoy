@@ -132,16 +132,34 @@ TEST(HeaderStringTest, All) {
 
   // Inline trim removes leading and trailing whitespace.
   {
+    const std::string only_lws = " \t\f\v";
+    HeaderString string1;
+    string1.append(only_lws.data(), only_lws.size());
+    EXPECT_EQ(only_lws, string1.getStringView());
+    string1.trim();
+    EXPECT_NE(only_lws, string1.getStringView());
+    EXPECT_TRUE(string1.getStringView().empty());
+
     const std::string data_without_leading_and_trailing_lws = "data";
+    const std::string data_with_only_trailing_lws =
+        data_without_leading_and_trailing_lws + " \t\f\v";
+    HeaderString string2;
+    string2.append(data_with_only_trailing_lws.data(),
+                   data_with_only_trailing_lws.size());
+    EXPECT_EQ(data_with_only_trailing_lws, string2.getStringView());
+    string2.trim();
+    EXPECT_NE(data_with_only_trailing_lws, string2.getStringView());
+    EXPECT_EQ(data_without_leading_and_trailing_lws, string2.getStringView());
+
     const std::string data_with_leading_and_trailing_lws =
         " \t\f\v " + data_without_leading_and_trailing_lws + " \t\f\v";
-    HeaderString string;
-    string.append(data_with_leading_and_trailing_lws.data(),
-                  data_with_leading_and_trailing_lws.size());
-    EXPECT_EQ(data_with_leading_and_trailing_lws, string.getStringView());
-    string.trim();
-    EXPECT_NE(data_with_leading_and_trailing_lws, string.getStringView());
-    EXPECT_EQ(data_without_leading_and_trailing_lws, string.getStringView());
+    HeaderString string3;
+    string3.append(data_with_leading_and_trailing_lws.data(),
+                   data_with_leading_and_trailing_lws.size());
+    EXPECT_EQ(data_with_leading_and_trailing_lws, string3.getStringView());
+    string3.trim();
+    EXPECT_NE(data_with_leading_and_trailing_lws, string3.getStringView());
+    EXPECT_EQ(data_without_leading_and_trailing_lws, string3.getStringView());
   }
 
   // Static clear() does nothing.
