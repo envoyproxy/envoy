@@ -97,8 +97,8 @@ public:
               case DnsLookupFamily::V6Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv6());
                 break;
-              // In CI these modes could return either V4 or V6 with the non-mocked API calls. But
-              // regardless of the family all returned addresses need to be one _or_ the other.
+              // In CI these modes could return either IPv4 or IPv6 with the non-mocked API calls.
+              // But regardless of the family all returned addresses need to be one _or_ the other.
               case DnsLookupFamily::V4Preferred:
               case DnsLookupFamily::Auto:
                 // Set the expectation for subsequent responses based on the first one.
@@ -111,6 +111,14 @@ public:
                 }
 
                 if (is_v4.value()) {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv4());
+                } else {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv6());
+                }
+                break;
+              // All could be either IPv4 or IPv6.
+              case DnsLookupFamily::All:
+                if (result.address_->ip()->ipv4()) {
                   EXPECT_NE(nullptr, result.address_->ip()->ipv4());
                 } else {
                   EXPECT_NE(nullptr, result.address_->ip()->ipv6());
@@ -276,6 +284,10 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6Only) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V6Only,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::All,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 // dns_sd is very opaque and does not explicitly call out the state that is kept across queries.
@@ -315,6 +327,10 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionInvalid) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Failure, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -441,7 +457,8 @@ public:
 
   enum AddressType { V4, V6, Both };
 
-  void fallbackWith(DnsLookupFamily dns_lookup_family, AddressType address_type) {
+  void fallbackWith(DnsLookupFamily dns_lookup_family, AddressType address_type,
+                    uint32_t expected_address_size = 1) {
     const std::string hostname = "foo.com";
     sockaddr_in addr4;
     addr4.sin_family = AF_INET;
@@ -468,10 +485,10 @@ public:
 
     auto query = resolver_->resolve(
         hostname, dns_lookup_family,
-        [&dns_callback_executed, dns_lookup_family, address_type](
+        [&dns_callback_executed, dns_lookup_family, address_type, expected_address_size](
             DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          EXPECT_EQ(1, response.size());
+          EXPECT_EQ(expected_address_size, response.size());
 
           if (dns_lookup_family == DnsLookupFamily::Auto) {
             if (address_type == AddressType::V4) {
@@ -486,6 +503,23 @@ public:
               EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
             } else {
               EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+            }
+          }
+
+          if (dns_lookup_family == DnsLookupFamily::All) {
+            switch (address_type) {
+            case AddressType::V4:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+              break;
+            case AddressType::V6:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
+              break;
+            case AddressType::Both:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.back().address_->ip()->ipv6());
+              break;
+            default:
+              NOT_REACHED_GCOVR_EXCL_LINE;
             }
           }
           dns_callback_executed.Notify();
@@ -746,6 +780,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   dns_callback_executed.WaitForNotification();
 }
 
+// TODO: write a TEST_P harness to eliminate duplication.
 TEST_F(AppleDnsImplFakeApiTest, AutoOnlyV6IfBothV6andV4) {
   fallbackWith(DnsLookupFamily::Auto, AddressType::Both);
 }
@@ -768,6 +803,18 @@ TEST_F(AppleDnsImplFakeApiTest, V4PreferredV6IfOnlyV6) {
 
 TEST_F(AppleDnsImplFakeApiTest, V4PreferredV4IfOnlyV4) {
   fallbackWith(DnsLookupFamily::V4Preferred, AddressType::V4);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllIfBothV6andV4) {
+  fallbackWith(DnsLookupFamily::All, AddressType::Both, 2 /* expected_address_size*/);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllV6IfOnlyV6) {
+  fallbackWith(DnsLookupFamily::All, AddressType::V6);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllV4IfOnlyV4) {
+  fallbackWith(DnsLookupFamily::All, AddressType::V4);
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
