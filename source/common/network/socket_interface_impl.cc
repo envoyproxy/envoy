@@ -21,7 +21,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
                                         const SocketCreationOptions& options) const {
   int protocol = 0;
 #if defined(__APPLE__) || defined(WIN32)
-  ASSERT(!mptcp, "MPTCP is only supported on Linux");
+  ASSERT(!options.mptcp_enabled_, "MPTCP is only supported on Linux");
   int flags = 0;
 #else
   int flags = SOCK_NONBLOCK;
