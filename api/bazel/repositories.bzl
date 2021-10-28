@@ -40,6 +40,12 @@ def api_dependencies():
         name = "rules_proto",
     )
     external_http_archive(
+        name = "rules_proto_grpc",
+    )
+    external_http_archive(
+        name = "io_bazel_rules_dotnet",
+    )
+    external_http_archive(
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
     )

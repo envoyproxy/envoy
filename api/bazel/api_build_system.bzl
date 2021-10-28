@@ -1,15 +1,13 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
-load("@rules_proto_grpc//csharp:repositories.bzl", rules_proto_grpc_csharp_repos = "csharp_repos")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
-load("@io_bazel_rules_dotnet//dotnet:deps.bzl", "dotnet_repositories")
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@rules_proto//proto:defs.bzl", "proto_library")
-load("@rules_proto_grpc//csharp/nuget:nuget.bzl", "nuget_rules_proto_grpc_packages")
-load("@rules_proto_grpc//csharp:defs.bzl", "csharp_grpc_compile")
+load("@rules_proto_grpc//csharp:repositories.bzl", rules_proto_grpc_csharp_repos = "csharp_repos")
+load("@io_bazel_rules_dotnet//dotnet:deps.bzl", "dotnet_repositories")
 
 load(
     "//bazel:external_proto_deps.bzl",
