@@ -192,7 +192,7 @@ struct TlsLogSink : SinkDelegate {
   MOCK_METHOD(void, log, (absl::string_view));
   MOCK_METHOD(void, logWithStableName,
               (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
-  void flush() override {}
+  MOCK_METHOD(void, flush, ());
 };
 
 TEST(NamedLogtest, OverrideSink) {
@@ -215,6 +215,13 @@ TEST(NamedLogtest, OverrideSink) {
     // Sanity checking that we're still using the TLS sink.
     EXPECT_CALL(tls_sink, log(_));
     ENVOY_LOG_MISC(info, "hello tls");
+
+    // All the logging functions should be delegated to the TLS override.
+    EXPECT_CALL(tls_sink, flush());
+    Registry::getSink()->flush();
+
+    EXPECT_CALL(tls_sink, logWithStableName(_, _, _, _));
+    Registry::getSink()->logWithStableName("foo", "level", "bar", "msg");
   }
 
   // Now that the TLS sink is out of scope, log calls on this thread should use the global sink
