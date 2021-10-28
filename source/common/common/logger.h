@@ -138,7 +138,7 @@ protected:
 
 private:
   SinkDelegate* previous_delegate_{nullptr};
-  SinkDelegate* previous_tls_delegate_{nullptr}
+  SinkDelegate* previous_tls_delegate_{nullptr};
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
