@@ -11,7 +11,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/json/json_loader.h"
-#include "source/common/router/rds/rds_route_config_provider_impl.h"
+#include "source/common/rds/rds_route_config_provider_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/router/rds_impl.h"
 
 #include "test/mocks/init/mocks.h"
@@ -72,9 +72,6 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
-using RdsRouteConfigProviderImpl = Envoy::Router::Rds::RdsRouteConfigProviderImpl<
-    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration, Config>;
-
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
 public:
   void setup() {
@@ -98,7 +95,7 @@ public:
 
   envoy::extensions::filters::network::thrift_proxy::v3::Trds rds_;
   RouteConfigProviderManagerImplPtr route_config_provider_manager_;
-  RouteConfigProviderSharedPtr provider_;
+  Rds::RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
@@ -138,7 +135,7 @@ routes:
 
   // Only static route.
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
-  RouteConfigProviderPtr static_config =
+  Rds::RouteConfigProviderPtr static_config =
       route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV3Yaml(config_yaml), server_factory_context_);
   message_ptr = server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"](
@@ -284,7 +281,7 @@ routes:
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, "1");
 
-  RouteConfigProviderSharedPtr provider2 =
+  Rds::RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds_, server_factory_context_, "foo_prefix", outer_init_manager_);
 
@@ -294,14 +291,14 @@ routes:
   EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
 
   // So this means that both provider have same subscription.
-  EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
-            &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
+  EXPECT_EQ(&dynamic_cast<Rds::RdsRouteConfigProviderImpl&>(*provider_).subscription(),
+            &dynamic_cast<Rds::RdsRouteConfigProviderImpl&>(*provider2).subscription());
   EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
   envoy::extensions::filters::network::thrift_proxy::v3::Trds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
-  RouteConfigProviderSharedPtr provider3 =
+  Rds::RouteConfigProviderSharedPtr provider3 =
       route_config_provider_manager_->createRdsRouteConfigProvider(
           rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
   EXPECT_NE(provider3, provider_);
@@ -344,7 +341,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   Init::WatcherImpl real_watcher("real", []() {});
   Init::ManagerImpl real_init_manager("real");
 
-  RouteConfigProviderSharedPtr provider2 =
+  Rds::RouteConfigProviderSharedPtr provider2 =
       route_config_provider_manager_->createRdsRouteConfigProvider(rds_, mock_factory_context2,
                                                                    "foo_prefix", real_init_manager);
 

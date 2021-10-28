@@ -4,7 +4,7 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/router/rds/route_config_provider.h"
+#include "envoy/rds/route_config_provider.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -13,9 +13,15 @@ namespace Router {
 /**
  * A provider for constant route configurations.
  */
-class RouteConfigProvider
-    : public Rds::RouteConfigProvider<envoy::config::route::v3::RouteConfiguration, Config> {
+class RouteConfigProvider : public Rds::RouteConfigProvider {
 public:
+  /**
+   * Same purpose as Rds::RouteConfigProvider::config()
+   * but the return is downcasted to proper type.
+   * @return dowcasted ConfigConstSharedPtr from Rds::ConfigConstSharedPtr
+   */
+  virtual ConfigConstSharedPtr configCast() PURE;
+
   /**
    * Callback used to request an update to the route configuration from the management server.
    * @param for_domain supplies the domain name that virtual hosts must match on

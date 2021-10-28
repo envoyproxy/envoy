@@ -3,22 +3,26 @@
 #include <memory>
 
 #include "envoy/common/time.h"
+#include "envoy/rds/config.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Router {
 namespace Rds {
 
 /**
  * A provider for constant route configurations.
  */
-template <class RouteConfiguration, class Config> class RouteConfigProvider {
+class RouteConfigProvider {
 public:
   struct ConfigInfo {
     // A reference to the currently loaded route configuration. Do not hold this reference beyond
     // the caller of configInfo()'s scope.
-    const RouteConfiguration& config_;
+    const Protobuf::Message& config_;
+
+    const std::string& name_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
@@ -28,11 +32,11 @@ public:
   virtual ~RouteConfigProvider() = default;
 
   /**
-   * @return Router::ConfigConstSharedPtr a route configuration for use during a single request. The
+   * @return ConfigConstSharedPtr a route configuration for use during a single request. The
    * returned config may be different on a subsequent call, so a new config should be acquired for
    * each request flow.
    */
-  virtual std::shared_ptr<const Config> config() PURE;
+  virtual ConfigConstSharedPtr config() PURE;
 
   /**
    * @return the configuration information for the currently loaded route configuration. Note that
@@ -50,19 +54,10 @@ public:
    * Callback used to notify RouteConfigProvider about configuration changes.
    */
   virtual void onConfigUpdate() PURE;
-
-  /**
-   * Validate if the route configuration can be applied to the context of the route config provider.
-   */
-  virtual void validateConfig(const RouteConfiguration& config) const PURE;
 };
 
-template <class RouteConfiguration, class Config>
-using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider<RouteConfiguration, Config>>;
-template <class RouteConfiguration, class Config>
-using RouteConfigProviderSharedPtr =
-    std::shared_ptr<RouteConfigProvider<RouteConfiguration, Config>>;
+using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
+using RouteConfigProviderSharedPtr = std::shared_ptr<RouteConfigProvider>;
 
 } // namespace Rds
-} // namespace Router
 } // namespace Envoy

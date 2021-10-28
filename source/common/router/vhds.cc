@@ -33,7 +33,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdateReceiver* config_update_info
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
                    [this]() { subscription_->start({config_update_info_->routeConfigName()}); }),
       route_config_provider_opt_(route_config_provider_opt) {
-  const auto& config_source = config_update_info_->protobufConfiguration()
+  const auto& config_source = config_update_info_->protobufConfigurationCast()
                                   .vhds()
                                   .config_source()
                                   .api_config_source()
@@ -46,7 +46,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdateReceiver* config_update_info
   options.use_namespace_matching_ = true;
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->protobufConfiguration().vhds().config_source(),
+          config_update_info_->protobufConfigurationCast().vhds().config_source(),
           Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
 }
 

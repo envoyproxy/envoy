@@ -5,8 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/router/rds.h"
-#include "envoy/router/rds/route_config_update_receiver.h"
+#include "envoy/rds/route_config_update_receiver.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -19,9 +18,15 @@ namespace Router {
 /**
  * A primitive that keeps track of updates to a RouteConfiguration.
  */
-class RouteConfigUpdateReceiver
-    : public Rds::RouteConfigUpdateReceiver<envoy::config::route::v3::RouteConfiguration, Config> {
+class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
 public:
+  /**
+   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfigurationCast()
+   * but the return is downcasted to proper type.
+   * @return current RouteConfiguration downcasted from Protobuf::Message&
+   */
+  virtual const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() PURE;
+
   using VirtualHostRefVector =
       std::vector<std::reference_wrapper<const envoy::config::route::v3::VirtualHost>>;
 
@@ -54,5 +59,6 @@ public:
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;
+
 } // namespace Router
 } // namespace Envoy

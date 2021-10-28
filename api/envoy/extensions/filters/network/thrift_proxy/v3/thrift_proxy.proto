@@ -60,6 +60,16 @@ enum ProtocolType {
   TWITTER = 4;
 }
 
+message Trds {
+  // Configuration source specifier.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the route configuration. This allows to use different route
+  // configurations. Tells which route config should be fetched
+  //  from the configuration source.
+  string route_config_name = 2;
+}
+
 // [#next-free-field: 9]
 message ThriftProxy {
   option (udpa.annotations.versioning).previous_message_type =
@@ -144,10 +154,4 @@ message ThriftProtocolOptions {
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`,
   // which is the default, causes the proxy to use the same protocol as the downstream connection.
   ProtocolType protocol = 2 [(validate.rules).enum = {defined_only: true}];
-}
-
-message Trds {
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
-
-  string route_config_name = 2;
 }

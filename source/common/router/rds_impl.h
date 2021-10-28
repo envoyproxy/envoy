@@ -31,11 +31,11 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/init/watcher_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/router/rds/rds_route_config_provider_impl.h"
-#include "source/common/router/rds/rds_route_config_subscription.h"
-#include "source/common/router/rds/route_config_provider_manager_impl.h"
-#include "source/common/router/rds/route_config_update_receiver_impl.h"
-#include "source/common/router/rds/static_route_config_provider_impl.h"
+#include "source/common/rds/rds_route_config_provider_impl.h"
+#include "source/common/rds/rds_route_config_subscription.h"
+#include "source/common/rds/route_config_provider_manager_impl.h"
+#include "source/common/rds/route_config_update_receiver_impl.h"
+#include "source/common/rds/static_route_config_provider_impl.h"
 #include "source/common/router/vhds.h"
 
 #include "absl/container/node_hash_map.h"
@@ -64,35 +64,31 @@ public:
       const std::string& stat_prefix, RouteConfigProviderManager& route_config_provider_manager);
 };
 
-class RouteConfigProviderManagerImpl;
-using ConfigFactory = Rds::ConfigFactory<envoy::config::route::v3::RouteConfiguration, Config>;
-
 /**
  * Implementation of RouteConfigProvider that holds a static route configuration.
  */
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::config::route::v3::RouteConfiguration& config,
-                                const RouteConfigProviderManager::OptionalHttpFilters& http_filters,
+                                Rds::ConfigTraits& config_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
-                                ProtobufMessage::ValidationVisitor& validator,
-                                RouteConfigProviderManagerImpl& route_config_provider_manager);
+                                Rds::RouteConfigProviderManager& route_config_provider_manager);
   ~StaticRouteConfigProviderImpl() override;
 
   // Router::RouteConfigProvider
-  Router::ConfigConstSharedPtr config() override { return base_.config(); }
+  Rds::ConfigConstSharedPtr config() override { return base_.config(); }
   absl::optional<ConfigInfo> configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
   void onConfigUpdate() override { base_.onConfigUpdate(); }
-  void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
+  ConfigConstSharedPtr configCast() override;
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                  std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
 private:
-  Rds::StaticRouteConfigProviderImpl<envoy::config::route::v3::RouteConfiguration, Config> base_;
-  RouteConfigProviderManagerImpl& route_config_provider_manager_;
+  Rds::StaticRouteConfigProviderImpl base_;
+  Rds::RouteConfigProviderManager& route_config_provider_manager_;
 };
 
 /**
@@ -100,15 +96,15 @@ private:
  * RDS config providers.
  */
 
-class RdsRouteConfigSubscription
-    : public Rds::RdsRouteConfigSubscription<envoy::config::route::v3::RouteConfiguration, Config> {
+class RdsRouteConfigSubscription : public Rds::RdsRouteConfigSubscription {
 public:
   RdsRouteConfigSubscription(
       RouteConfigUpdateReceiver* config_update,
+      Envoy::Config::OpaqueResourceDecoder* resource_decoder,
       const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-      RouteConfigProviderManagerImpl& route_config_provider_manager);
+      Rds::RouteConfigProviderManager& route_config_provider_manager);
 
   absl::optional<RouteConfigProvider*>& routeConfigProvider() { return route_config_provider_opt_; }
   RouteConfigUpdateReceiver* routeConfigUpdate() { return config_update_info_; }
@@ -152,48 +148,42 @@ struct UpdateOnDemandCallback {
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    Logger::Loggable<Logger::Id::router> {
 public:
-  RdsRouteConfigProviderImpl(
-      RdsRouteConfigSubscription* subscription,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      const RouteConfigProviderManager::OptionalHttpFilters& optional_http_filters);
+  RdsRouteConfigProviderImpl(RdsRouteConfigSubscription* subscription,
+                             Server::Configuration::ServerFactoryContext& factory_context);
 
   ~RdsRouteConfigProviderImpl() override;
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
 
   // Router::RouteConfigProvider
-  Router::ConfigConstSharedPtr config() override { return base_.config(); }
+  Rds::ConfigConstSharedPtr config() override { return base_.config(); }
   absl::optional<ConfigInfo> configInfo() const override { return base_.configInfo(); }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
 
   void onConfigUpdate() override;
+  ConfigConstSharedPtr configCast() override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
-  void validateConfig(const envoy::config::route::v3::RouteConfiguration& config) const override;
 
 private:
-  Rds::RdsRouteConfigProviderImpl<envoy::config::route::v3::RouteConfiguration, Config> base_;
+  Rds::RdsRouteConfigProviderImpl base_;
 
   // The pointer is owned by base_, here it is just stored as raw pointer to avoid downcasting.
   RdsRouteConfigSubscription* subscription_;
   RouteConfigUpdateReceiver* config_update_info_;
   Server::Configuration::ServerFactoryContext& factory_context_;
-  ProtobufMessage::ValidationVisitor& validator_;
   std::list<UpdateOnDemandCallback> config_update_callbacks_;
   // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
-  const RouteConfigProviderManager::OptionalHttpFilters optional_http_filters_;
 };
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
-class RouteConfigProviderManagerImpl
-    : public RouteConfigProviderManager,
-      public Singleton::Instance,
-      public Rds::RouteConfigProviderManagerImpl<envoy::config::route::v3::RouteConfiguration,
-                                                 Config> {
+class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
+                                       public Singleton::Instance,
+                                       public Rds::RouteConfigProviderManagerImpl {
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 

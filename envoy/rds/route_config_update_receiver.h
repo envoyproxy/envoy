@@ -4,18 +4,18 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/router/rds/route_config_provider.h"
+#include "envoy/rds/config_traits.h"
+#include "envoy/rds/route_config_provider.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Router {
 namespace Rds {
 
 /**
  * A primitive that keeps track of updates to a RouteConfiguration.
  */
-template <class RouteConfiguration, class Config> class RouteConfigUpdateReceiver {
+class RouteConfigUpdateReceiver {
 public:
   virtual ~RouteConfigUpdateReceiver() = default;
 
@@ -25,7 +25,7 @@ public:
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
-  virtual bool onRdsUpdate(const RouteConfiguration& rc, const std::string& version_info) PURE;
+  virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
 
   /**
    * @return std::string& the name of RouteConfiguration.
@@ -47,29 +47,28 @@ public:
    * RouteConfigProvider::ConfigInfo if RouteConfiguration has been updated at least once. Otherwise
    * returns an empty absl::optional<RouteConfigProvider::ConfigInfo>.
    */
-  virtual absl::optional<typename RouteConfigProvider<RouteConfiguration, Config>::ConfigInfo>
-  configInfo() const PURE;
+  virtual absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const PURE;
 
   /**
    * @return envoy::config::route::v3::RouteConfiguration& current RouteConfiguration.
    */
-  virtual const RouteConfiguration& protobufConfiguration() PURE;
+  virtual const Protobuf::Message& protobufConfiguration() PURE;
 
   /**
-   * @return Router::ConfigConstSharedPtr a parsed and validated copy of current RouteConfiguration.
+   * @return ConfigConstSharedPtr a parsed and validated copy of current RouteConfiguration.
    * @see protobufConfiguration()
    */
-  virtual std::shared_ptr<const Config> parsedConfiguration() const PURE;
+  virtual ConfigConstSharedPtr parsedConfiguration() const PURE;
 
   /**
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  virtual const ConfigTraits& configTraits() const PURE;
 };
 
-template <class RouteConfiguration, class Config>
-using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver<RouteConfiguration, Config>>;
+using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;
 
 } // namespace Rds
-} // namespace Router
 } // namespace Envoy

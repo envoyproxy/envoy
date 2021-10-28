@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/init/manager.h"
-#include "envoy/router/rds/route_config_provider.h"
+#include "envoy/rds/route_config_provider.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
@@ -15,12 +15,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
-
-using RouteConfigProvider = Envoy::Router::Rds::RouteConfigProvider<
-    envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration, Config>;
-
-using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
-using RouteConfigProviderSharedPtr = std::shared_ptr<RouteConfigProvider>;
 
 /**
  * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
@@ -44,7 +38,7 @@ public:
    * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
    * subscription.
    */
-  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
+  virtual Rds::RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::extensions::filters::network::thrift_proxy::v3::Trds& trds,
       Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;
@@ -57,7 +51,7 @@ public:
    * @param factory_context is the context to use for the route config provider.
    * @param validator is the message validator for route config.
    */
-  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
+  virtual Rds::RouteConfigProviderPtr createStaticRouteConfigProvider(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route_config,
       Server::Configuration::ServerFactoryContext& factory_context) PURE;
 };

@@ -8,23 +8,66 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
+#include "source/common/config/resource_name.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 
 namespace Envoy {
 namespace Router {
 
-bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
-    const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
+std::string ConfigTraitsImpl::resourceType() const {
+  return Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
+}
+
+Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig() const {
+  return std::make_shared<NullConfigImpl>();
+}
+
+ProtobufTypes::MessagePtr ConfigTraitsImpl::createProto() const {
+  return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+}
+
+const Protobuf::Message& ConfigTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
+  return dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
+}
+
+const Protobuf::Message& ConfigTraitsImpl::validateConfig(const Protobuf::Message& rc) const {
+  // TODO(lizan): consider cache the config here until onConfigUpdate.
+  createConfig(rc);
+  return rc;
+}
+
+const std::string& ConfigTraitsImpl::resourceName(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
+}
+
+Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  return std::make_shared<ConfigImpl>(
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), optional_http_filters_,
+      factory_context_, validator_, validate_clusters_default_);
+}
+
+ProtobufTypes::MessagePtr ConfigTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  return std::make_unique<envoy::config::route::v3::RouteConfiguration>(
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
+}
+
+bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
+                                                const std::string& version_info) {
   if (!base_.updateHash(rc)) {
     return false;
   }
-  const uint64_t new_vhds_config_hash = rc.has_vhds() ? MessageUtil::hash(rc.vhds()) : 0ul;
+  auto route_config_proto = std::make_unique<envoy::config::route::v3::RouteConfiguration>(
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
+  const uint64_t new_vhds_config_hash =
+      route_config_proto->has_vhds() ? MessageUtil::hash(route_config_proto->vhds()) : 0ul;
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
-  initializeRdsVhosts(rc);
+  initializeRdsVhosts(*route_config_proto);
 
-  auto route_config_proto = std::make_unique<envoy::config::route::v3::RouteConfiguration>(rc);
   rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto);
   base_.updateConfig(std::move(route_config_proto));
 
@@ -106,17 +149,6 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   for (const auto& vhost : vhds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
-}
-
-ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::ConfigFactoryImpl::createConfig(
-    const envoy::config::route::v3::RouteConfiguration& rc) const {
-  return std::make_shared<ConfigImpl>(
-      rc, optional_http_filters_, factory_context_,
-      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-}
-
-ConfigConstSharedPtr RouteConfigUpdateReceiverImpl::ConfigFactoryImpl::createConfig() const {
-  return std::make_shared<NullConfigImpl>();
 }
 
 } // namespace Router
