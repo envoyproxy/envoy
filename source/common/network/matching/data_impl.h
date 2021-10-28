@@ -13,29 +13,34 @@ class NetworkMatchingDataImpl : public NetworkMatchingData {
 public:
   static absl::string_view name() { return "network"; }
 
-  void onSourceIp(const Address::Ip& source_ip) { source_ip_ = &source_ip; }
+  NetworkMatchingDataImpl(const Address::Ip* source, const Address::Ip* destination)
+      : source_(source), destination_(destination) {}
 
-  void onDestinationIp(const Address::Ip& destination_ip) { destination_ip_ = &destination_ip; }
-
-  void onSourcePort(uint16_t source_port) { source_port_ = source_port; }
-
-  void onDestinationPort(uint16_t destination_port) { destination_port_ = destination_port; }
-
-  OptRef<const Address::Ip> sourceIp() const override { return makeOptRefFromPtr(source_ip_); }
+  OptRef<const Address::Ip> sourceIp() const override { return makeOptRefFromPtr(source_); }
 
   OptRef<const Address::Ip> destinationIp() const override {
-    return makeOptRefFromPtr(destination_ip_);
+    return makeOptRefFromPtr(destination_);
   }
 
-  absl::optional<uint16_t> sourcePort() const override { return source_port_; }
+  absl::optional<uint32_t> sourcePort() const override {
+    if (source_) {
+      return source_->port();
+    }
 
-  absl::optional<uint16_t> destinationPort() const override { return destination_port_; }
+    return absl::nullopt;
+  }
+
+  absl::optional<uint32_t> destinationPort() const override {
+    if (destination_) {
+      return destination_->port();
+    }
+
+    return absl::nullopt;
+  }
 
 private:
-  const Address::Ip* source_ip_{};
-  const Address::Ip* destination_ip_{};
-  absl::optional<uint16_t> source_port_{};
-  absl::optional<uint16_t> destination_port_{};
+  const Address::Ip* const source_{};
+  const Address::Ip* const destination_{};
 };
 } // namespace Matching
 } // namespace Network

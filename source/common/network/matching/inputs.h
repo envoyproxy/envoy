@@ -92,7 +92,7 @@ class PortDataInputBase : public Matcher::DataInput<NetworkMatchingData> {
 public:
   explicit PortDataInputBase() = default;
 
-  virtual absl::optional<uint16_t> select(const NetworkMatchingData& data) const PURE;
+  virtual absl::optional<uint32_t> select(const NetworkMatchingData& data) const PURE;
 
   Matcher::DataInputGetResult get(const NetworkMatchingData& data) const override {
     const auto port = select(data);
@@ -132,7 +132,7 @@ class SourcePortDataInput : public PortDataInputBase {
 public:
   explicit SourcePortDataInput() = default;
 
-  absl::optional<uint16_t> select(const NetworkMatchingData& data) const override {
+  absl::optional<uint32_t> select(const NetworkMatchingData& data) const override {
     return data.sourcePort();
   }
 };
@@ -148,7 +148,7 @@ class DestinationPortDataInput : public PortDataInputBase {
 public:
   explicit DestinationPortDataInput() = default;
 
-  absl::optional<uint16_t> select(const NetworkMatchingData& data) const override {
+  absl::optional<uint32_t> select(const NetworkMatchingData& data) const override {
     return data.destinationPort();
   }
 };

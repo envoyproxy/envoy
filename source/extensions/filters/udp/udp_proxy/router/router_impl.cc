@@ -62,18 +62,19 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
   if (cluster_.has_value()) {
     return cluster_.value();
   } else {
-    Network::Matching::NetworkMatchingDataImpl data;
-    data.onSourceIp(*address->ip());
+    if (address->ip()) {
+      Network::Matching::NetworkMatchingDataImpl data(address->ip(), nullptr);
 
-    auto result = matcher_->match(data);
-    if (result.match_state_ == Matcher::MatchState::MatchComplete) {
-      if (result.on_match_.has_value()) {
-        // Use the cluster name get by callback may cause "use of memory after it is freed", so get
-        // the cluster name in a roundabout way.
-        auto cluster =
-            result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
-        if (entries_set_.contains(cluster)) {
-          return *entries_set_.find(cluster);
+      auto result = matcher_->match(data);
+      if (result.match_state_ == Matcher::MatchState::MatchComplete) {
+        if (result.on_match_.has_value()) {
+          // Use the cluster name get by callback may cause "use of memory after it is freed", so
+          // get the cluster name in a roundabout way.
+          auto cluster =
+              result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
+          if (entries_set_.contains(cluster)) {
+            return *entries_set_.find(cluster);
+          }
         }
       }
     }
