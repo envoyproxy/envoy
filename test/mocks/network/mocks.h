@@ -306,6 +306,7 @@ public:
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(absl::optional<Socket::Option::Details>, getOptionDetails,
               (const Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
+  MOCK_METHOD(bool, isSupported, (), (const));
 };
 
 class MockConnectionSocket : public ConnectionSocket {
