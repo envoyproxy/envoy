@@ -10,6 +10,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/{version}/bazel-skylib-{version}.tar.gz"],
         use_category = ["api"],
     ),
+    rules_dotnet_skylib = dict(
+        project_name = "rules_dotnet_skylib",
+        project_desc = "Common useful functions and rules for Bazel",
+        project_url = "https://github.com/bazelbuild/bazel-skylib",
+        version = "1.0.2",
+        urls = [
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+            "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.2/bazel-skylib-1.0.2.tar.gz",
+        ],
+        release_date = "2019-10-09",
+        sha256 = "97e70364e9249702246c0e9444bccdc4b847bed1eb03c5a3ece4f83dfe6abc44",
+        use_category = ["api"],
+    ),
     com_envoyproxy_protoc_gen_validate = dict(
         project_name = "protoc-gen-validate (PGV)",
         project_desc = "protoc plugin to generate polyglot message validators",
