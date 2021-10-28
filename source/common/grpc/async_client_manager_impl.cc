@@ -151,13 +151,13 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
+  ASSERT(look_up_.find(config) == look_up_.end());
   // Create a new cache entry at the beginning of the list.
-  cache_.emplace_front(config, client);
-  cache_.front().accessed_time_ = dispatcher_.timeSource().monotonicTime();
+  cache_.emplace_front(config, client, dispatcher_.timeSource().monotonicTime());
   look_up_[config] = cache_.begin();
   // If inserting to an empty cache, enable eviction timer.
   if (cache_.size() == 1) {
-    resetEvictionTimer();
+    evictEntriesAndResetEvictionTimer();
   }
 }
 
@@ -167,37 +167,22 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
   if (it != look_up_.end()) {
     auto cache_entry = it->second;
     // Reset the eviction timer if the next entry to expire is accessed.
-    if (cache_entry == --cache_.end()) {
-      resetEvictionTimer();
-    }
+    bool should_reset_timer = (cache_entry == --cache_.end());
     cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
     // Move the cache entry to the beginning of the list upon access.
     cache_.splice(cache_.begin(), cache_, cache_entry);
+    if (should_reset_timer) {
+      evictEntriesAndResetEvictionTimer();
+    }
     return cache_entry->client_;
   }
   return nullptr;
 }
 
-void AsyncClientManagerImpl::RawAsyncClientCache::evictIdleEntries() {
-  std::cerr << "evict entry\n";
+void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTimer() {
   while (!cache_.empty()) {
     MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-    MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
-    // If the oldest cache entry has expired, erase it and continue to the next oldest entry.
-    if (now > next_expire) {
-      look_up_.erase(cache_.back().config_);
-      cache_.pop_back();
-      continue;
-    }
-    break;
-  }
-  resetEvictionTimer();
-}
-
-void AsyncClientManagerImpl::RawAsyncClientCache::resetEvictionTimer() {
-  while (!cache_.empty()) {
-    MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-    MonotonicTime next_expire = cache_.back().accessed_time_ + std::chrono::seconds(50);
+    MonotonicTime next_expire = cache_.back().accessed_time_ + EntryTimeoutInterval;
     if (now >= next_expire) {
       // Erase the expired entry.
       look_up_.erase(cache_.back().config_);

@@ -36,6 +36,8 @@ public:
                                      Event::Dispatcher::RunType::NonBlock);
     }
   }
+
+protected:
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -64,13 +66,13 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     client_cache_.setCache(grpc_service, foo_client);
   }
-  waitForSeconds(21);
+  waitForSeconds(20);
   for (int i = 51; i <= 100; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     client_cache_.setCache(grpc_service, foo_client);
   }
   waitForSeconds(30);
-  // Cache entries created 51s before have expired.
+  // Cache entries created 50s before have expired.
   for (int i = 1; i <= 50; i++) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     EXPECT_EQ(client_cache_.getCache(grpc_service).get(), nullptr);
@@ -80,6 +82,20 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
     grpc_service.mutable_envoy_grpc()->set_cluster_name(std::to_string(i));
     EXPECT_EQ(client_cache_.getCache(grpc_service).get(), foo_client.get());
   }
+}
+
+TEST_F(RawAsyncClientCacheTest, GetTimeoutCache) {
+  envoy::config::core::v3::GrpcService foo_service;
+  foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
+  RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
+  client_cache_.setCache(foo_service, foo_client);
+  time_system_.advanceTimeAsyncImpl(std::chrono::seconds(50));
+  // Cache entry doesn't get evicted because it is accessed before timer fire.
+  EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
+  time_system_.advanceTimeAndRun(std::chrono::seconds(50), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  // Cache entry has been evicted because it is accessed after timer fire.
+  EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
 }
 
 class AsyncClientManagerImplTest : public testing::Test {

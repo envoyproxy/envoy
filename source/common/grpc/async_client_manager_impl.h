@@ -57,7 +57,8 @@ public:
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {
-      cache_eviction_timer_ = dispatcher.createTimer([this] { evictIdleEntries(); });
+      cache_eviction_timer_ =
+          dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
     }
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
@@ -65,12 +66,11 @@ public:
     RawAsyncClientSharedPtr getCache(const envoy::config::core::v3::GrpcService& config);
 
   private:
-    void evictIdleEntries();
-    void resetEvictionTimer();
+    void evictEntriesAndResetEvictionTimer();
     struct CacheEntry {
       CacheEntry(const envoy::config::core::v3::GrpcService& config,
-                 RawAsyncClientSharedPtr const& client)
-          : config_(config), client_(client) {}
+                 RawAsyncClientSharedPtr const& client, MonotonicTime create_time)
+          : config_(config), client_(client), accessed_time_(create_time) {}
       envoy::config::core::v3::GrpcService config_;
       RawAsyncClientSharedPtr client_;
       MonotonicTime accessed_time_;
@@ -80,11 +80,8 @@ public:
         look_up_;
     std::list<CacheEntry> cache_;
     Event::Dispatcher& dispatcher_;
-    // The timer fire every 50s, and clean up cache entries that haven't been accesses since last
-    // eviction. Therefore, any entry that haven't been used for 50s will be evicted when the timer
-    // fires but some entries can linger for up to 100s.
     Envoy::Event::TimerPtr cache_eviction_timer_;
-    static constexpr std::chrono::milliseconds RefreshInterval{50000};
+    static constexpr std::chrono::seconds EntryTimeoutInterval{50};
   };
 
 private:
