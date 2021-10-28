@@ -518,6 +518,11 @@ filter_chains:
 }
 
 TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  // Workaround of triggering death at windows platform.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "false"}});
+
   const std::string yaml = R"EOF(
     name: "foo"
     address:
