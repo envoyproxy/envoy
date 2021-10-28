@@ -201,3 +201,8 @@ def api_proto_package(
             "@io_bazel_rules_go//proto/wkt:wrappers_go_proto",
         ]).to_list(),
     )
+
+#    csharp_proto_library(
+#        name = name + _CSHARP_PROTO_SUFFIX,
+#        protos = [name],
+#    )
