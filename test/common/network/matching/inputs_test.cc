@@ -9,7 +9,7 @@ namespace Network {
 namespace Matching {
 namespace {
 
-// Returns correspoding IPv4 input matching data in network matching data.
+// Returns corresponding IPv4 input matching data in network matching data.
 TEST(IpDataInputBase, Ipv4DataAvailable) {
   auto address = Address::Ipv4Instance("1.2.3.4", 5678);
 
@@ -26,7 +26,7 @@ TEST(IpDataInputBase, Ipv4DataAvailable) {
   EXPECT_EQ("1.2.3.4", destination_data_input.get(data).data_);
 }
 
-// Returns correspoding IPv6 input matching data in network matching data.
+// Returns corresponding IPv6 input matching data in network matching data.
 TEST(IpDataInputBase, Ipv6DataAvailable) {
   auto address = Address::Ipv6Instance("1234:5678:90ab:cdef:1234:5678:90ab:cdef", 1234);
 
@@ -58,7 +58,7 @@ TEST(IpDataInputBase, DataNotAvailable) {
   EXPECT_EQ(absl::nullopt, destination_data_input.get(data).data_);
 }
 
-// Returns correspoding port input matching data in network matching data.
+// Returns corresponding port input matching data in network matching data.
 TEST(PortDataInputBase, DataAvailable) {
   auto address = Address::Ipv4Instance("1.2.3.4", 5678);
 
