@@ -355,6 +355,7 @@ envoy_cc_test(
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -1572,6 +1573,13 @@ envoy_cc_test_library(
 envoy_cc_fuzz_test(
     name = "h2_capture_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_wrapped_capture_fuzz_test",
+    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
     corpus = "h2_corpus",
     deps = [":h2_fuzz_lib"],
 )
