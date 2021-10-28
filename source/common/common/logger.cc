@@ -27,13 +27,14 @@ void SinkDelegate::logWithStableName(absl::string_view, absl::string_view, absl:
 
 SinkDelegate::~SinkDelegate() {
   // The previous delegate should have never been set or should have been reset by now via
-  // restoreDelegate();
+  // restoreDelegate()/restoreTlsDelegate();
   assert(previous_delegate_ == nullptr);
+  assert(previous_tls_delegate_ == nullptr);
 }
 
 void SinkDelegate::setTlsDelegate() {
-  assert(previous_delegate_ == nullptr);
-  previous_delegate_ = log_sink_->tlsDelegate();
+  assert(previous_tls_delegate_ == nullptr);
+  previous_tls_delegate_ = log_sink_->tlsDelegate();
   log_sink_->setTlsDelegate(this);
 }
 
@@ -47,8 +48,8 @@ void SinkDelegate::setDelegate() {
 void SinkDelegate::restoreTlsDelegate() {
   // Ensures stacked allocation of delegates.
   assert(log_sink_->tlsDelegate() == this);
-  log_sink_->setTlsDelegate(previous_delegate_);
-  previous_delegate_ = nullptr;
+  log_sink_->setTlsDelegate(previous_tls_delegate_);
+  previous_tls_delegate_ = nullptr;
 }
 
 void SinkDelegate::restoreDelegate() {

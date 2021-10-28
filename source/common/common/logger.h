@@ -138,6 +138,7 @@ protected:
 
 private:
   SinkDelegate* previous_delegate_{nullptr};
+  SinkDelegate* previous_tls_delegate_{nullptr}
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
@@ -225,16 +226,6 @@ public:
    */
   static std::string escapeLogLine(absl::string_view source);
 
-protected:
-  // This is virtual in order to allow for multiple DelegatingLogSinks to exist and use different
-  // thread local overrides. A base class defining a new thread_local would be necessary for each
-  // DelegatingLogSink that will coexist.
-  virtual SinkDelegate** tlsSink() {
-    static thread_local SinkDelegate* tls_sink = nullptr;
-
-    return &tls_sink;
-  }
-
 private:
   friend class SinkDelegate;
 
@@ -247,6 +238,12 @@ private:
   SinkDelegate* delegate() {
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
+  }
+
+  SinkDelegate** tlsSink() {
+    static thread_local SinkDelegate* tls_sink = nullptr;
+
+    return &tls_sink;
   }
 
   void setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
