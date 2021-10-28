@@ -54,6 +54,7 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
     matcher_ = factory.create(config.matcher())();
     // Copy all clusters to entries
     entries_.insert(entries_.end(), context.entries_.begin(), context.entries_.end());
+    entries_set_ = std::move(context.entries_);
   }
 }
 
@@ -67,7 +68,13 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
     auto result = matcher_->match(data);
     if (result.match_state_ == Matcher::MatchState::MatchComplete) {
       if (result.on_match_.has_value()) {
-        return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
+        // Use the cluster name get by callback may cause "use of memory after it is freed", so get
+        // the cluster name in a roundabout way.
+        auto cluster =
+            result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
+        if (entries_set_.contains(cluster)) {
+          return *entries_set_.find(cluster);
+        }
       }
     }
 

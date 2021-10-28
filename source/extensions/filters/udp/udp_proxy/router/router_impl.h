@@ -62,6 +62,7 @@ private:
   absl::optional<std::string> cluster_;
   Matcher::MatchTreeSharedPtr<Network::NetworkMatchingData> matcher_;
   std::vector<std::string> entries_;
+  absl::flat_hash_set<std::string> entries_set_;
 };
 
 } // namespace Router
