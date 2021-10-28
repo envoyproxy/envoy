@@ -10,7 +10,9 @@ load(
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
     "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
+    "EXTERNAL_PROTO_CSHARP_BAZEL_DEP_MAP",
 )
+load("@rules_proto_grpc//csharp:defs.bzl", "csharp_proto_library")
 
 _PY_PROTO_SUFFIX = "_py_proto"
 _CC_PROTO_SUFFIX = "_cc_proto"
@@ -45,7 +47,7 @@ def _go_proto_mapping(dep):
     return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _GO_PROTO_SUFFIX)
 
 def _csharp_proto_mapping(dep):
-    return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _CSHARP_PROTO_SUFFIX)
+    return _proto_mapping(dep, EXTERNAL_PROTO_CSHARP_BAZEL_DEP_MAP, _CSHARP_PROTO_SUFFIX)
 
 def _cc_proto_mapping(dep):
     return _proto_mapping(dep, EXTERNAL_PROTO_CC_BAZEL_DEP_MAP, _CC_PROTO_SUFFIX)
@@ -202,7 +204,7 @@ def api_proto_package(
         ]).to_list(),
     )
 
-#    csharp_proto_library(
-#        name = name + _CSHARP_PROTO_SUFFIX,
-#        protos = [name],
-#    )
+    csharp_proto_library(
+        name = name + _CSHARP_PROTO_SUFFIX,
+        protos = [name],
+    )

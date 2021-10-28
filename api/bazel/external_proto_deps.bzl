@@ -46,3 +46,8 @@ EXTERNAL_PROTO_PY_BAZEL_DEP_MAP = {
     "@opentelemetry_proto//:logs": "@opentelemetry_proto//:logs_py_proto",
     "@opentelemetry_proto//:common": "@opentelemetry_proto//:common_py_proto",
 }
+
+EXTERNAL_PROTO_CSHARP_BAZEL_DEP_MAP = {
+    "@com_google_googleapis//google/api/expr/v1alpha1:checked_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_csharp_proto",
+    "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto": "@com_google_googleapis//google/api/expr/v1alpha1:expr_csharp_proto",
+}
