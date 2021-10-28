@@ -315,5 +315,7 @@ message Listener {
     InternalListenerConfig internal_listener = 27;
   }
 
-  google.protobuf.BoolValue mptcp_enabled = 30;
+  // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+  // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
+  bool enable_mptcp = 30;
 }

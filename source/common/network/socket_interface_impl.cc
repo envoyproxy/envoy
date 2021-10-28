@@ -18,7 +18,7 @@ IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
                                         Address::IpVersion version, bool socket_v6only,
-                                        bool mptcp) const {
+                                        const SocketCreationOptions& options) const {
   int protocol = 0;
 #if defined(__APPLE__) || defined(WIN32)
   ASSERT(!mptcp, "MPTCP is only supported on Linux");
@@ -26,12 +26,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 #else
   int flags = SOCK_NONBLOCK;
 
-  if (mptcp) {
-#ifndef IPPROTO_MPTCP
-#define IPPROTO_MPTCP 262
-#else
-    static_assert(IPPROTO_MPTCP == 262);
-#endif
+  if (options.mptcp_enabled_) {
     ASSERT(socket_type == Socket::Type::Stream);
     ASSERT(addr_type == Address::Type::Ip);
     protocol = IPPROTO_MPTCP;
@@ -77,7 +72,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
                                         const Address::InstanceConstSharedPtr addr,
-                                        bool mptcp) const {
+                                        const SocketCreationOptions& options) const {
   Address::IpVersion ip_version = addr->ip() ? addr->ip()->version() : Address::IpVersion::v4;
   int v6only = 0;
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
@@ -85,7 +80,7 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type,
   }
 
   IoHandlePtr io_handle =
-      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, mptcp);
+      SocketInterfaceImpl::socket(socket_type, addr->type(), ip_version, v6only, options);
   if (addr->type() == Address::Type::Ip && ip_version == Address::IpVersion::v6) {
     // Setting IPV6_V6ONLY restricts the IPv6 socket to IPv6 connections only.
     const Api::SysCallIntResult result = io_handle->setOption(

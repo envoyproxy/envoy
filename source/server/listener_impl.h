@@ -46,7 +46,8 @@ public:
                           Network::Socket::Type socket_type,
                           const Network::Socket::OptionsSharedPtr& options,
                           const std::string& listener_name, uint32_t tcp_backlog_size,
-                          ListenerComponentFactory::BindType bind_type, bool mptcp_enabled,
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
                           uint32_t num_sockets);
 
   // Network::ListenSocketFactory
@@ -81,7 +82,7 @@ private:
   const std::string listener_name_;
   const uint32_t tcp_backlog_size_;
   ListenerComponentFactory::BindType bind_type_;
-  const bool mptcp_enabled_;
+  const Network::SocketCreationOptions socket_creation_options_;
   // One socket for each worker, pre-created before the workers fetch the sockets. There are
   // 3 different cases:
   // 1) All are null when doing config validation.
@@ -380,6 +381,7 @@ private:
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog();
+  void validateConfig(Network::Socket::Type socket_type);
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);

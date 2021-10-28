@@ -45,8 +45,7 @@ void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& opti
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address, false /* mptcp_enabled */),
-                       address) {
+    : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address, {}), address) {
   RELEASE_ASSERT(io_handle_->isOpen(), "");
   bind(connection_info_provider_->localAddress());
 }

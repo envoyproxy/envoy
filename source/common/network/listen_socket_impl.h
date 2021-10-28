@@ -59,8 +59,8 @@ template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
                       const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                      bool mptcp_enabled = false)
-      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, mptcp_enabled)
+                      const SocketCreationOptions& creation_options = {})
+      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
                                       : nullptr,
                          address) {
     // Prebind is applied if the socket is bind to port.
@@ -161,8 +161,9 @@ public:
       : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
-                       const Address::InstanceConstSharedPtr& remote_address, bool mptcp_enabled)
-      : SocketImpl(type, local_address, remote_address, mptcp_enabled) {
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       const SocketCreationOptions& options)
+      : SocketImpl(type, local_address, remote_address, options) {
     connection_info_provider_->setLocalAddress(local_address);
   }
 
@@ -235,8 +236,7 @@ class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address,
-                                                      false /* mptcp_enabled */),
+      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
                              nullptr, remote_address) {
     if (options) {
       addOptions(options);
