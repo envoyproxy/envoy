@@ -243,13 +243,14 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
 
     buffer.writeBEInt<int32_t>(100);
     buffer.writeBEInt<int16_t>(0x0FFF);
-    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int16_t>(1); // header flags
     buffer.writeBEInt<int32_t>(1); // sequence number
     buffer.writeBEInt<int16_t>(1); // size 4
     addSeq(buffer, {0, 0, 0, 0});  // 0 = binary proto, 0 = num transforms, pad, pad
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
+    EXPECT_THAT(metadata, HasHeaderFlags(1));
     EXPECT_THAT(metadata, HasSequenceId(1));
     EXPECT_THAT(metadata, HasNoHeaders());
     EXPECT_EQ(buffer.length(), 0);
@@ -261,13 +262,14 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
 
     buffer.writeBEInt<int32_t>(101);
     buffer.writeBEInt<int16_t>(0x0FFF);
-    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int16_t>(2); // header flags
     buffer.writeBEInt<int32_t>(2); // sequence number
     buffer.writeBEInt<int16_t>(1); // size 4
     addSeq(buffer, {2, 0, 0, 0});  // 2 = compact proto, 0 = num transforms, pad, pad
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(87U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Compact));
+    EXPECT_THAT(metadata, HasHeaderFlags(2));
     EXPECT_THAT(metadata, HasSequenceId(2));
     EXPECT_THAT(metadata, HasNoHeaders());
   }
@@ -341,7 +343,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
 
     buffer.writeBEInt<int32_t>(100);
     buffer.writeBEInt<int16_t>(0x0FFF);
-    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int16_t>(1); // header flags
     buffer.writeBEInt<int32_t>(1); // sequence number
     buffer.writeBEInt<int16_t>(1); // size 4
     addSeq(buffer, {0, 0, 2, 0});  // 0 = binary proto, 0 = num transforms, 2 = unknown info id, pad
@@ -350,6 +352,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
+    EXPECT_THAT(metadata, HasHeaderFlags(1));
     EXPECT_THAT(metadata, HasSequenceId(1));
     EXPECT_THAT(metadata, HasNoHeaders());
     EXPECT_EQ(buffer.length(), 0);
