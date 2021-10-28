@@ -217,7 +217,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   }
 }
 
-void EnvoyQuicClientConnection::setMigratePortOnPathDegrading(int num_ptos_for_path_degrading) {
+void EnvoyQuicClientConnection::setNumPtosForPortMigration(int num_ptos_for_path_degrading) {
   if (num_ptos_for_path_degrading < 1) {
     return;
   }
