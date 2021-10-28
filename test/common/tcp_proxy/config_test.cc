@@ -1,4 +1,5 @@
 #include "envoy/common/hashable.h"
+
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 
 namespace Envoy {
@@ -598,7 +599,7 @@ TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
   setup(yaml);
   initializeFilter();
 
-  // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash. 
+  // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
@@ -641,8 +642,8 @@ TEST_F(TcpProxyHashingTest, HashWithFilterState) {
 
   // Set filter state, and expect HashableObj's hash is now used.
   connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
-                           StreamInfo::FilterState::StateType::ReadOnly,
-                           StreamInfo::FilterState::LifeSpan::FilterChain);
+                                                  StreamInfo::FilterState::StateType::ReadOnly,
+                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(31337, context->computeHashKey().value());
