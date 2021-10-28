@@ -1,7 +1,6 @@
 #pragma once
 
-#include "envoy/network/address.h"
-#include "envoy/stream_info/filter_state.h"
+#include "envoy/network/connection.h"
 
 #include "absl/types/optional.h"
 
