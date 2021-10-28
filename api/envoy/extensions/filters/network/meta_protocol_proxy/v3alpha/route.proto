@@ -5,6 +5,8 @@ package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 
+import "google/protobuf/wrappers.proto"
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -65,10 +67,8 @@ message Route {
 }
 
 message RouteMatch {
-  // A list of authority value. Used to match request authority of downstream request.
-  // If request authority does not match this rule, the entire request does not match the
-  // current route set.
-  repeated string authorities = 2;
+  // Traget service name of downstream request.
+  google.protobuf.StringValue service = 2;
 
   // Used to match request path of downstream request. If request path does not match
   // this rule, the entire request does not match the current route.
