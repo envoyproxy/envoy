@@ -1,0 +1,101 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
+
+import "google/protobuf/wrappers.proto"
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
+option java_outer_classname = "MetaRouteConfigurationProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Meta Protocol Proxy Route Configuration]
+// Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
+
+// [#next-free-field: 3]
+message RouteConfiguration {
+  //The name of the route configuration. For example, it might match route_config_name in envoy.extensions.filters.network.meta_protocol_proxy.v1alpha.Rds.
+  string name = 1;
+
+  // The list of routes that will be matched, in order, against incoming requests. The first route
+  // that matches will be used.
+  repeated Route routes = 2;
+}
+
+message RetryPolicy {
+  // When certain conditions are met, the upstream request is retried. Supports retry when a
+  // network error occurs or when the response status is a specific status.
+  string retry_on = 1;
+
+  // Maximum number of retries. For a downstream request, envoy may issue `1 + may_retry`
+  // upstream requests.
+  uint32 max_retry = 2;
+
+  // If not specified, then Route.timeout will be used.
+  google.protobuf.Duration per_try_timeout = 3;
+}
+
+message Route {
+  // Name for the route.
+  string name = 1;
+
+  // Route matching parameters.
+  RouteMatch match = 2;
+
+  // Route request to some upstream cluster.
+  RouteAction route = 3 [(validate.rules).message = {required: true}];
+
+  // [#not-implemented-hide:]
+  // Downstream request timeout.
+  google.protobuf.Duration timeout = 4;
+
+  // [#not-implemented-hide:]
+  // Retry policy used by current route.
+  RetryPolicy retry = 5;
+
+  // Route level config for L7 generic filters. The key should always be the generic filter name.
+  map<string, google.protobuf.Any> per_filter_config = 6;
+
+  // Route metadata.
+  config.core.v3.Metadata metadata = 7;
+}
+
+message RouteMatch {
+  // Traget service name of downstream request.
+  google.protobuf.StringValue service = 2;
+
+  // Used to match request path of downstream request. If request path does not match
+  // this rule, the entire request does not match the current route.
+  type.matcher.v3.StringMatcher path = 3;
+
+  // Used to match request method of downstream request. If request method does not match
+  // this rule, the entire request does not match the current route.
+  type.matcher.v3.StringMatcher method = 4;
+
+  // Specifies a set of key:value pairs in th metadata that the route should match on. The router will check the metadata
+  // populated by the codec plugin against all the specified key:value pairs in the route config. A match will happen if all the
+  // key:value pairs in the route are present in the request metadata with the same values (or based on presence if
+  // the value field is not in the config).
+  repeated envoy.config.route.v3.HeaderMatcher metadata = 1;
+}
+
+message RouteAction {
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // Indicates the upstream cluster to which the request should be routed.
+    string cluster = 1;
+
+    // Multiple upstream clusters can be specified for a given route. The
+    // request is routed to one of the upstream clusters based on weights
+    // assigned to each cluster.
+    // Currently ClusterWeight only supports the name and weight fields.
+    envoy.config.route.v3.WeightedCluster weighted_clusters = 2;
+  }
+}
