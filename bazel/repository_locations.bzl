@@ -1078,8 +1078,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "ANTLR Rules for Bazel",
         project_desc = "Bazel rules for ANTLR",
         project_url = "https://github.com/marcohu/rules_antlr",
-        version = "0.5.0",
-        sha256 = "26e6a83c665cf6c1093b628b3a749071322f0f70305d12ede30909695ed85591",
+        # https://github.com/marcohu/rules_antlr/pull/20
+        version = "754a240944f127bcc2b4a3090f228926b768e21f",
+        sha256 = "5b4668a85e74cd0f37bb7d7e255bc415fa151afc6e9d33edeb4009c146c422ba",
         strip_prefix = "rules_antlr-{version}",
         urls = ["https://github.com/marcohu/rules_antlr/archive/{version}.tar.gz"],
         # ANTLR has a runtime component, so is not purely build.
