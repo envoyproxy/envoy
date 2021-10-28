@@ -1,11 +1,11 @@
---- http2/adapter/nghttp2_callbacks.cc
-+++ http2/adapter/nghttp2_callbacks.cc
-@@ -178,6 +178,9 @@ int OnHeader(nghttp2_session* /* session
-       return NGHTTP2_ERR_CALLBACK_FAILURE;
-     case Http2VisitorInterface::HEADER_RST_STREAM:
-       return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+--- http2/adapter/header_validator.cc
++++ http2/adapter/header_validator.cc
+@@ -92,6 +92,8 @@ bool HeaderValidator::FinishHeaderBlock(
+       return ValidateResponseHeaders(pseudo_headers_);
+     case HeaderType::RESPONSE_TRAILER:
+       return ValidateResponseTrailers(pseudo_headers_);
 +    default:
-+      // Unexpected value.
-+      return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
++      return false;
    }
  }
+

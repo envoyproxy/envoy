@@ -48,9 +48,8 @@ struct UserData {
 };
 
 // Nghttp2 callback function for receiving extension frame.
-static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/,
-                                            const nghttp2_frame_hd* hd, const uint8_t* data,
-                                            size_t len, void* user_data) {
+static int onExtensionChunkRecvCallback(nghttp2_session* /*session*/, const nghttp2_frame_hd* hd,
+                                        const uint8_t* data, size_t len, void* user_data) {
   EXPECT_GE(hd->length, len);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
@@ -59,8 +58,8 @@ static int on_extension_chunk_recv_callback(nghttp2_session* /*session*/,
 }
 
 // Nghttp2 callback function for unpack extension frames.
-static int unpack_extension_callback(nghttp2_session* /*session*/, void** payload,
-                                     const nghttp2_frame_hd* hd, void* user_data) {
+static int unpackExtensionCallback(nghttp2_session* /*session*/, void** payload,
+                                   const nghttp2_frame_hd* hd, void* user_data) {
   EXPECT_NE(nullptr, hd);
   EXPECT_NE(nullptr, payload);
 
@@ -96,9 +95,9 @@ public:
     nghttp2_session_callbacks* callbacks;
     nghttp2_session_callbacks_new(&callbacks);
     nghttp2_session_callbacks_set_send_callback(callbacks, sendCallback);
-    nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(
-        callbacks, on_extension_chunk_recv_callback);
-    nghttp2_session_callbacks_set_unpack_extension_callback(callbacks, unpack_extension_callback);
+    nghttp2_session_callbacks_set_on_extension_chunk_recv_callback(callbacks,
+                                                                   onExtensionChunkRecvCallback);
+    nghttp2_session_callbacks_set_unpack_extension_callback(callbacks, unpackExtensionCallback);
 
     // Sets application data to pass to nghttp2 session.
     user_data_.encoder = &encoder_;
