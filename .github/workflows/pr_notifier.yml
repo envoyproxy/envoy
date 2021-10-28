@@ -10,7 +10,7 @@ jobs:
     if: github.repository_owner == 'envoyproxy'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@1e204e9a9253d643386038d443f96446fa156a97
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
