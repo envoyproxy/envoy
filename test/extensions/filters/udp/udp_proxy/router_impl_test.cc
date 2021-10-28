@@ -20,8 +20,6 @@ namespace {
 
 class RouterImplTest : public ::testing::Test {
 public:
-  RouterImplTest() = default;
-
   void setup(const std::string& yaml) {
     auto config = parseUdpProxyConfigFromYaml(yaml);
     router_ = std::make_shared<RouterImpl>(config, factory_context_);
