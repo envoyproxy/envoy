@@ -245,6 +245,9 @@ public:
 // feasible. There is a platform-specific mechanism for determining whether the
 // current thread is from main(), which we call the "test thread", and if that
 // method is not available on the current platform we must skip the assertions.
+//
+// Note that the macros are all no-ops if there are any SkipAsserts instances
+// allocated.
 #ifdef NDEBUG
 
 #define ASSERT_IS_TEST_THREAD()
@@ -284,13 +287,30 @@ public:
     ASSERT_IS_MAIN_OR_TEST_THREAD();
 
 /**
- * RAII class to override thread assertions checks in the above macro.
+ * RAII class to override thread assertions checks in the macros:
+ *
+ *   TRY_ASSERT_MAIN_THREAD
+ *   ASSERT_IS_TEST_THREAD()
+ *   ASSERT_IS_MAIN_OR_TEST_THREAD()
+ *   ASSERT_IS_NOT_TEST_THREAD()
+ *   ASSERT_IS_NOT_MAIN_OR_TEST_THREAD()
+ *
+ * Those macros will be no-ops while there is a SkipAsserts object
+ * alive. SkipAsserts declarations can be nested.
+ *
+ * The state of the assertion-skipping can also be checked by calling static
+ * method SkipAsserts::skip().
+ *
+ * This class is intended to be instantiated on the stack in a limited scope.
  */
 class SkipAsserts {
 public:
   SkipAsserts();
   ~SkipAsserts();
 
+  /**
+   * @return whether thread-related assertions should be skipped.
+   */
   static bool skip();
 };
 

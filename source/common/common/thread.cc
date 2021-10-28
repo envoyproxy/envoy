@@ -60,6 +60,7 @@ struct ThreadIds {
     }
   }
 
+  // Methods to track how many SkipAssert objects are instantiated.
   void incSkipAsserts() { ++skip_asserts_; }
   void decSkipAsserts() { --skip_asserts_; }
   bool skipAsserts() const { return skip_asserts_ > 0; }
