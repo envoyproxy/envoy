@@ -286,7 +286,9 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   stats_.tx_reset_.inc();
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(quicRstErrorToEnvoyLocalResetReason(error.internal_code()));
-  quic::QuicSpdyClientStream::ResetWithError(error);
+  if (session()->connection()->connected()) {
+    quic::QuicSpdyClientStream::ResetWithError(error);
+  }
 }
 
 void EnvoyQuicClientStream::OnConnectionClosed(quic::QuicErrorCode error,

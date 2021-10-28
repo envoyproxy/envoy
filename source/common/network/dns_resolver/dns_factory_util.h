@@ -1,39 +1,17 @@
 #pragma once
 
-#include "envoy/api/api.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/extensions/network/dns_resolver/apple/v3/apple_dns_resolver.pb.h"
 #include "envoy/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.pb.h"
-#include "envoy/network/dns.h"
+#include "envoy/network/dns_resolver.h"
 
-#include "source/common/config/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Network {
-
-constexpr absl::string_view CaresDnsResolver = "envoy.network.dns_resolver.cares";
-constexpr absl::string_view AppleDnsResolver = "envoy.network.dns_resolver.apple";
-constexpr absl::string_view DnsResolverCategory = "envoy.network.dns_resolver";
-
-class DnsResolverFactory : public Config::TypedFactory {
-public:
-  /**
-   * @returns a DnsResolver object.
-   * @param dispatcher: the local dispatcher thread
-   * @param api: API interface to interact with system resources
-   * @param typed_dns_resolver_config: the typed DNS resolver config
-   */
-  virtual DnsResolverSharedPtr createDnsResolver(
-      Event::Dispatcher& dispatcher, Api::Api& api,
-      const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) const PURE;
-
-  std::string category() const override { return std::string(DnsResolverCategory); }
-};
 
 // Create a default c-ares DNS resolver typed config.
 void makeDefaultCaresDnsResolverConfig(

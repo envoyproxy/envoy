@@ -362,6 +362,9 @@ protected:
   void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
     upstream_config_.http2_options_.MergeFrom(options);
   }
+  void mergeOptions(envoy::config::listener::v3::QuicProtocolOptions& options) {
+    upstream_config_.quic_options_.MergeFrom(options);
+  }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 

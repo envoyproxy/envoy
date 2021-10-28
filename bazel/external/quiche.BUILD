@@ -144,7 +144,10 @@ envoy_cc_library(
     hdrs = ["quiche/http2/http2_constants.h"],
     copts = quiche_copts,
     repository = "@envoy",
-    deps = [":http2_platform"],
+    deps = [
+        ":http2_platform",
+        ":quiche_common_text_utils_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -837,6 +840,7 @@ envoy_cc_library(
     deps = [
         ":quiche_common_lib",
         ":quiche_common_platform",
+        ":quiche_common_text_utils_lib",
         ":spdy_core_header_storage_lib",
     ],
 )
@@ -1931,6 +1935,7 @@ envoy_cc_library(
     deps = [
         ":quic_core_clock_lib",
         ":quic_core_crypto_certificate_view_lib",
+        ":quic_core_crypto_client_proof_source_lib",
         ":quic_core_crypto_encryption_lib",
         ":quic_core_crypto_hkdf_lib",
         ":quic_core_crypto_proof_source_lib",
@@ -2077,10 +2082,29 @@ envoy_cc_library(
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
+        ":quic_core_crypto_certificate_view_lib",
         ":quic_core_packets_lib",
         ":quic_core_versions_lib",
         ":quic_platform_base",
         ":quic_platform_export",
+    ],
+)
+
+envoy_cc_library(
+    name = "quic_core_crypto_client_proof_source_lib",
+    srcs = [
+        "quiche/quic/core/crypto/client_proof_source.cc",
+    ],
+    hdrs = [
+        "quiche/quic/core/crypto/client_proof_source.h",
+    ],
+    copts = quiche_copts,
+    repository = "@envoy",
+    tags = ["nofips"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quic_core_crypto_proof_source_lib",
+        ":quic_platform_base",
     ],
 )
 
