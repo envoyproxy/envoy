@@ -13,4 +13,3 @@ api_proto_package(
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
-

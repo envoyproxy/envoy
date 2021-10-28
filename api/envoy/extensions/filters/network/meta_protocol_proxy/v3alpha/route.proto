@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package aeraki.meta_protocol_proxy.config.route.v1alpha;
+package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 
 import "envoy/config/route/v3/route_components.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.config.route.v1alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
 option java_outer_classname = "MetaRouteConfigurationProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -37,7 +37,7 @@ message Route {
 }
 
 message RouteMatch {
-  // Specifies a set of key:value pairs in th metadata that the route should match on. The router will check the metadata 
+  // Specifies a set of key:value pairs in th metadata that the route should match on. The router will check the metadata
   // populated by the codec plugin against all the specified key:value pairs in the route config. A match will happen if all the
   // key:value pairs in the route are present in the request metadata with the same values (or based on presence if
   // the value field is not in the config).
@@ -58,4 +58,3 @@ message RouteAction {
     envoy.config.route.v3.WeightedCluster weighted_clusters = 2;
   }
 }
-

@@ -1,17 +1,17 @@
 syntax = "proto3";
 
-package aeraki.meta_protocol_proxy.v1alpha;
+package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 
 import "envoy/config/core/v3/config_source.proto";
 
-import "envoy/extensions/filters/network/meta_protocol_proxy/config/route/v1alpha/route.proto";
+import "envoy/extensions/filters/network/meta_protocol_proxy/route/v3alpha/route.proto";
 
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v1alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
 option java_outer_classname = "MetaProtocolProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
@@ -77,4 +77,3 @@ message Codec {
   // Codec specific configuration which depends on the codec being instantiated.
   google.protobuf.Any config = 2;
 }
-
