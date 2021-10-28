@@ -50,7 +50,6 @@ def api_dependencies():
     external_http_archive(
         name = "rules_dotnet_skylib",
     )
-    
     external_http_archive(
         name = "com_github_openzipkin_zipkinapi",
         build_file_content = ZIPKINAPI_BUILD_CONTENT,
