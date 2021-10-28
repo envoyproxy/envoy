@@ -126,19 +126,24 @@ typed_config:
 
   bool validateHmac(const Http::ResponseHeaderMap& headers, absl::string_view host,
                     absl::string_view hmac_secret) {
-    std::string expires = Http::Utility::parseSetCookieValue(headers, "OauthExpires");
-    std::string token = Http::Utility::parseSetCookieValue(headers, "BearerToken");
-    std::string hmac = Http::Utility::parseSetCookieValue(headers, "OauthHMAC");
+    std::string expires =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_expires_);
+    std::string token =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.bearer_token_);
+    std::string hmac =
+        Http::Utility::parseSetCookieValue(headers, default_cookie_names_.oauth_hmac_);
 
     Http::TestRequestHeaderMapImpl validate_headers{{":authority", std::string(host)}};
 
-    validate_headers.addReferenceKey(Http::Headers::get().Cookie, absl::StrCat("OauthHMAC=", hmac));
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
-                                     absl::StrCat("OauthExpires=", expires));
+                                     absl::StrCat(default_cookie_names_.oauth_hmac_, "=", hmac));
+    validate_headers.addReferenceKey(
+        Http::Headers::get().Cookie,
+        absl::StrCat(default_cookie_names_.oauth_expires_, "=", expires));
     validate_headers.addReferenceKey(Http::Headers::get().Cookie,
-                                     absl::StrCat("BearerToken=", token));
+                                     absl::StrCat(default_cookie_names_.bearer_token_, "=", token));
 
-    OAuth2CookieValidator validator{api_->timeSource()};
+    OAuth2CookieValidator validator{api_->timeSource(), default_cookie_names_};
     validator.setParams(validate_headers, std::string(hmac_secret));
     return validator.isValid();
   }
@@ -191,6 +196,8 @@ typed_config:
     RELEASE_ASSERT(response->waitForEndStream(), "unexpected timeout");
     codec_client_->close();
   }
+
+  const CookieNames default_cookie_names_{"BearerToken", "OauthHMAC", "OauthExpires"};
 };
 
 // Regular request gets redirected to the login page.

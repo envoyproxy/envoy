@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
@@ -72,6 +73,7 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -88,6 +90,10 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
+  // The scope that has empty prefix.
+  Stats::ScopePtr scope_;
+  // filter_chain_scope_ has the same prefix as listener owners scope.
+  Stats::ScopePtr filter_chain_scope_;
   Init::Manager& init_manager_;
   std::atomic<bool> is_draining_{false};
 };
@@ -166,6 +172,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;

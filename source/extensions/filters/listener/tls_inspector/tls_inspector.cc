@@ -93,12 +93,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     socket.ioHandle().initializeFileEvent(
         cb.dispatcher(),
         [this](uint32_t events) {
-          if (events & Event::FileReadyType::Closed) {
-            config_->stats().connection_closed_.inc();
-            done(false);
-            return;
-          }
-
           ASSERT(events == Event::FileReadyType::Read);
           ParseState parse_state = onRead();
           switch (parse_state) {
@@ -113,8 +107,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             break;
           }
         },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -173,6 +166,11 @@ ParseState Filter::onRead() {
       return ParseState::Continue;
     }
     config_->stats().read_error_.inc();
+    return ParseState::Error;
+  }
+
+  if (result.return_value_ == 0) {
+    config_->stats().connection_closed_.inc();
     return ParseState::Error;
   }
 

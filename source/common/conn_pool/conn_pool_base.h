@@ -56,7 +56,7 @@ public:
   // Returns the application protocol, or absl::nullopt for TCP.
   virtual absl::optional<Http::Protocol> protocol() const PURE;
 
-  int64_t currentUnusedCapacity() const {
+  virtual int64_t currentUnusedCapacity() const {
     int64_t remaining_concurrent_streams =
         static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
 
@@ -102,6 +102,11 @@ public:
   virtual void drain();
 
   ConnPoolImplBase& parent_;
+  // The count of remaining streams allowed for this connection.
+  // This will start out as the total number of streams per connection if capped
+  // by configuration, or it will be set to std::numeric_limits<uint32_t>::max() to be
+  // (functionally) unlimited.
+  // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
@@ -148,6 +153,10 @@ public:
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
+  // By default, the connection pool will track connected and connecting stream
+  // capacity as streams are created and destroyed. QUIC does custom stream
+  // accounting so will override this to false.
+  virtual bool trackStreamCapacity() { return true; }
 
   // A helper function to get the specific context type from the base class context.
   template <class T> T& typedContext(AttachContext& context) {
@@ -234,6 +243,9 @@ public:
   void decrClusterStreamCapacity(uint32_t delta) {
     state_.decrConnectingAndConnectedStreamCapacity(delta);
   }
+  void incrClusterStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
+  }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
@@ -255,6 +267,9 @@ public:
     connecting_stream_capacity_ -= delta;
   }
 
+  // Called when an upstream is ready to serve pending streams.
+  void onUpstreamReady();
+
 protected:
   virtual void onConnected(Envoy::ConnectionPool::ActiveClient&) {}
 
@@ -265,7 +280,6 @@ protected:
     NoConnectionRateLimited,
     CreatedButRateLimited,
   };
-
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
   ConnectionResult tryCreateNewConnections();
@@ -342,7 +356,6 @@ private:
   // True iff this object is in the deferred delete list.
   bool deferred_deleting_{false};
 
-  void onUpstreamReady();
   Event::SchedulableCallbackPtr upstream_ready_cb_;
 };
 

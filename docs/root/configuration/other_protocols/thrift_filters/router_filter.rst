@@ -40,7 +40,10 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_resp_success, Counter, Total Replies that are considered "Successes".
   thrift.upstream_resp_error, Counter, Total Replies that are considered "Errors".
   thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.
+  thrift.upstream_resp_exception_local, Counter, Total responses with the "Exception" message type generated locally.
+  thrift.upstream_resp_exception_remote, Counter, Total responses with the "Exception" message type received from remote.
   thrift.upstream_resp_invalid_type, Counter, Total responses with an unsupported message type.
+  thrift.upstream_resp_decoding_error, Counter, Total responses with an error during decoding.
   thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream

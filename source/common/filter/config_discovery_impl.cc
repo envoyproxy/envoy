@@ -132,19 +132,17 @@ void FilterConfigSubscription::onConfigUpdate(
   for (auto* provider : filter_config_providers_) {
     provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
   }
-  Envoy::Http::FilterFactoryCb factory_callback =
-      factory.createFilterFactoryFromProto(*message, stat_prefix_, factory_context_);
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
 
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&factory_callback, &version_info](DynamicFilterConfigProviderImplBase* provider,
-                                         std::shared_ptr<Cleanup> cleanup) {
-        provider->onConfigUpdate(factory_callback, version_info, [cleanup] {});
+      [&message, &version_info](DynamicFilterConfigProviderImplBase* provider,
+                                std::shared_ptr<Cleanup> cleanup) {
+        provider->onConfigUpdate(*message, version_info, [cleanup] {});
       },
       [this]() { stats_.config_reload_.inc(); });
   last_config_hash_ = new_hash;
-  last_config_ = factory_callback;
+  last_config_ = std::move(message);
   last_type_url_ = type_url;
   last_version_info_ = version_info;
   last_filter_name_ = factory.name();
@@ -165,7 +163,7 @@ void FilterConfigSubscription::onConfigUpdate(
         [this]() { stats_.config_reload_.inc(); });
 
     last_config_hash_ = 0;
-    last_config_ = absl::nullopt;
+    last_config_ = nullptr;
     last_type_url_ = "";
     last_filter_is_terminal_ = false;
     last_filter_name_ = "";
@@ -222,7 +220,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   // update arrives first. In this case, use the default config, increment a metric,
   // and the applied config eventually converges once ECDS update arrives.
   bool last_config_valid = false;
-  if (subscription->lastConfig().has_value()) {
+  if (subscription->lastConfig()) {
     TRY_ASSERT_MAIN_THREAD {
       provider.validateTypeUrl(subscription->lastTypeUrl());
       provider.validateTerminalFilter(filter_config_name, subscription->lastFilterName(),
@@ -235,7 +233,7 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
       subscription->incrementConflictCounter();
     }
     if (last_config_valid) {
-      provider.onConfigUpdate(subscription->lastConfig().value(), subscription->lastVersionInfo(),
+      provider.onConfigUpdate(*subscription->lastConfig(), subscription->lastVersionInfo(),
                               nullptr);
     }
   }
@@ -265,16 +263,20 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
     require_type_urls.emplace(factory_type_url);
   }
 
-  Envoy::Http::FilterFactoryCb default_config = nullptr;
+  ProtobufTypes::MessagePtr default_config;
   if (config_source.has_default_config()) {
-    default_config = getDefaultConfig(config_source.default_config(), filter_config_name,
-                                      factory_context, stat_prefix, last_filter_in_filter_chain,
-                                      filter_chain_type, require_type_urls);
+    default_config =
+        getDefaultConfig(config_source.default_config(), filter_config_name, factory_context,
+                         last_filter_in_filter_chain, filter_chain_type, require_type_urls);
   }
 
   auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      subscription, require_type_urls, factory_context, default_config, last_filter_in_filter_chain,
-      filter_chain_type);
+      subscription, require_type_urls, factory_context, std::move(default_config),
+      last_filter_in_filter_chain, filter_chain_type,
+      [this, stat_prefix,
+       &factory_context](const Protobuf::Message& message) -> Envoy::Http::FilterFactoryCb {
+        return instantiateFilterFactory(message, stat_prefix, factory_context);
+      });
 
   // Ensure the subscription starts if it has not already.
   if (config_source.apply_default_config_without_warming()) {
@@ -284,11 +286,11 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   return provider;
 }
 
-Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
+ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
     const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
-    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
-    const absl::flat_hash_set<std::string> require_type_urls) const {
+    Server::Configuration::FactoryContext& factory_context, bool last_filter_in_filter_chain,
+    const std::string& filter_chain_type,
+    const absl::flat_hash_set<std::string>& require_type_urls) const {
   auto* default_factory =
       Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
           proto_config);
@@ -304,7 +306,15 @@ Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::getDefaultConfig(
       filter_config_name, default_factory->name(), filter_chain_type,
       default_factory->isTerminalFilterByProto(*message, factory_context),
       last_filter_in_filter_chain);
-  return default_factory->createFilterFactoryFromProto(*message, stat_prefix, factory_context);
+  return message;
+}
+
+Http::FilterFactoryCb HttpFilterConfigProviderManagerImpl::instantiateFilterFactory(
+    const Protobuf::Message& message, const std::string& stat_prefix,
+    Server::Configuration::FactoryContext& factory_context) const {
+  auto* factory = Registry::FactoryRegistry<
+      Server::Configuration::NamedHttpFilterConfigFactory>::getFactoryByType(message.GetTypeName());
+  return factory->createFilterFactoryFromProto(message, stat_prefix, factory_context);
 }
 
 } // namespace Filter

@@ -216,6 +216,15 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
+   * Find a histogram in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
+   */
+  static Stats::ParentHistogramSharedPtr findHistogram(Stats::Store& store,
+                                                       const std::string& name);
+
+  /**
    * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
@@ -276,6 +285,17 @@ public:
   waitForGaugeEq(Stats::Store& store, const std::string& name, uint64_t value,
                  Event::TestTimeSystem& time_system,
                  std::chrono::milliseconds timeout = std::chrono::milliseconds::zero());
+
+  /**
+   * Wait for a gauge to be destroyed.
+   * @param store supplies the stats store.
+   * @param name gauge name.
+   * @param time_system the time system to use for waiting.
+   * @return AssertionSuccess() if the gauge is destroyed within a fixed timeout, else
+   * AssertionFailure().
+   */
+  static AssertionResult waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                               Event::TestTimeSystem& time_system);
 
   /**
    * Wait for a histogram to have samples.
