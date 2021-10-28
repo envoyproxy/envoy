@@ -120,7 +120,13 @@ void HeaderString::trim() {
   absl::string_view original = getStringView();
   absl::string_view trimmed = StringUtil::trim(original);
   if (original.size() != trimmed.size()) {
-    getInVec(buffer_).assign(trimmed.begin(), trimmed.end());
+    if (trimmed.empty()) {
+      getInVec(buffer_).clear();
+    } else if (trimmed[0] == original[0]) {
+      getInVec(buffer_).resize(trimmed.size());
+    } else {
+      getInVec(buffer_).assign(trimmed.begin(), trimmed.end());
+    }
   }
 }
 
