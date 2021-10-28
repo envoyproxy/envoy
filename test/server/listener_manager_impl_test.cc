@@ -4346,6 +4346,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+// This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
+#if defined(__linux__)
 TEST_F(ListenerManagerImplWithRealFiltersTest, Mptcp) {
   envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
       name: mptcp-udp
@@ -4394,6 +4396,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Mptcp) {
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   EXPECT_CALL(*listener_foo, onDestroy());
 }
+#endif
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MptcpOnUdp) {
   envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
