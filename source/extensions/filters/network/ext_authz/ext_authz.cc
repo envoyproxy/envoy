@@ -14,13 +14,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtAuthz {
 
-// Response code details when the check method gets a denied response from the external auth
-// service.
-constexpr absl::string_view AuthzDenied = "ext_authz_denied";
-// Response code details when the check method experiences (network) failure in a fail-close
-// (failure_mode_allow is true) setup.
-constexpr absl::string_view AuthzError = "ext_authz_error";
-
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
@@ -104,8 +97,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     filter_callbacks_->connection().streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::UnauthorizedExternalService);
     filter_callbacks_->connection().streamInfo().setResponseCodeDetails(
-        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied ? AuthzDenied
-                                                                           : AuthzError);
+        response->status == Filters::Common::ExtAuthz::CheckStatus::Denied
+            ? Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied
+            : Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
   } else {
     // Let the filter chain continue.
     filter_return_ = FilterReturn::Continue;
