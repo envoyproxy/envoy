@@ -53,7 +53,6 @@ public:
   SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
   bool supportsGetifaddrs() const override { return false; }
   SysCallIntResult getifaddrs(struct ifaddrs** ifap) override;
-  void freeifaddrs(struct ifaddrs* ifp) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

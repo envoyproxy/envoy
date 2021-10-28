@@ -9,6 +9,7 @@
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Api {
@@ -16,6 +17,17 @@ namespace Api {
 struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
 };
+
+// Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the codebase.
+struct InterfaceAddress {
+  InterfaceAddress(absl::string_view ifa_name, unsigned int ifa_flags, Envoy::Network::Address::InstanceConstSharedPtr ifa_addr) : ifa_name_(ifa_name), ifa_flags_(ifa_flags), ifa_addr_(ifa_addr) {}
+
+  const std::string ifa_name_;
+  unsigned int ifa_flags_;
+  Envoy::Network::Address::InstanceConstSharedPtr ifa_addr_;
+};
+
+using InterfaceAddressVector = std::vector<InterfaceAddress>;
 
 class OsSysCalls {
 public:
@@ -199,12 +211,7 @@ public:
   /**
    * @see man getifaddrs
    */
-  virtual SysCallIntResult getifaddrs(ifaddrs** ifap) PURE;
-
-  /**
-   * @see man getifaddrs
-   */
-  virtual void freeifaddrs(ifaddrs* ifp) PURE;
+  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& ifap) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

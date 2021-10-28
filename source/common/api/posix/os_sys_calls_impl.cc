@@ -6,6 +6,7 @@
 #include <string>
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -283,19 +284,51 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 }
 
 bool OsSysCallsImpl::supportsGetifaddrs() const {
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
+// TODO: eliminate this branching by upstreaming an alternative Android imlementation
+// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  return false;
-#endif
+  return false
+#else
   return true;
+#endif
 }
 
-SysCallIntResult OsSysCallsImpl::getifaddrs(struct ifaddrs** ifap) {
-  const int rc = ::getifaddrs(ifap);
-  return {rc, rc != -1 ? 0 : errno};
-}
+SysCallIntResult OsSysCallsImpl::getifaddrs(InterfaceAddressVector&) {
+// TODO: eliminate this branching by upstreaming an alternative Android imlementation
+// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  return {0,0};
+#else
+  struct ifaddrs* ifaddr;
+  struct ifaddrs* ifa;
 
-void OsSysCallsImpl::freeifaddrs(struct ifaddrs* ifp) { ::freeifaddrs(ifp); }
+  const int rc = ::getifaddrs(&ifaddr);
+  if (rc == -1) {
+    return {rc, errno};
+  }
+
+  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == nullptr) {
+      continue;
+    }
+
+    if (ifa->ifa_addr->sa_family == AF_INET ||
+        ifa->ifa_addr->sa_family == AF_INET6) {
+      const struct sockaddr_storage* addr =
+          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
+      interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, Network::Address::addressFromSockAddrOrThrow(*addr, (ifa->ifa_addr->sa_family == AF_INET)
+                                                            ? sizeof(sockaddr_in)
+                                                            : sizeof(sockaddr_in6)));
+    }
+  }
+
+  if (ifaddr) {
+    ::freeifaddrs(ifaddr);
+  }
+
+  return {rc, 0};
+#endif
+}
 
 } // namespace Api
 } // namespace Envoy
