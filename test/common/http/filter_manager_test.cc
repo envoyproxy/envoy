@@ -402,6 +402,8 @@ TEST_F(FilterManagerTest, MatchTreeFilterActionEncodingTrailers) {
   filter_manager_->decodeHeaders(*grpc_headers, true);
   EXPECT_CALL(*filter, onDestroy());
   filter_manager_->destroyFilters();
+  EXPECT_TRUE(filter->decoder_callbacks_->streamInfo().responseCode().has_value() &&
+              filter->decoder_callbacks_->streamInfo().responseCode().value() == 200);
 }
 
 // Verify that we propagate custom match actions exactly once to a dual filter.
