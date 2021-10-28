@@ -87,6 +87,7 @@ envoy_cc_library(
     name = "http2_adapter",
     srcs = [
         "quiche/http2/adapter/callback_visitor.cc",
+        "quiche/http2/adapter/header_validator.cc",
         "quiche/http2/adapter/http2_protocol.cc",
         "quiche/http2/adapter/http2_util.cc",
         "quiche/http2/adapter/nghttp2_adapter.cc",
@@ -102,6 +103,7 @@ envoy_cc_library(
     hdrs = [
         "quiche/http2/adapter/callback_visitor.h",
         "quiche/http2/adapter/data_source.h",
+        "quiche/http2/adapter/header_validator.h",
         "quiche/http2/adapter/http2_adapter.h",
         "quiche/http2/adapter/http2_protocol.h",
         "quiche/http2/adapter/http2_session.h",
