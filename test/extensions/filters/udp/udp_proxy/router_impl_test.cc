@@ -213,6 +213,31 @@ matcher:
               testing::UnorderedElementsAre("udp_service", "udp_service2", "udp_service3"));
 }
 
+// Error on invalid data input.
+TEST_F(RouterImplTest, InvalidDataInput) {
+  const std::string yaml = R"EOF(
+stat_prefix: foo
+matcher:
+  matcher_tree:
+    input:
+      name: destination-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.DestinationIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: udp_service
+  )EOF";
+
+  setup(yaml);
+
+  EXPECT_EQ("", router_->route(parseAddress("10.0.0.1:10000")));
+}
+
 } // namespace
 } // namespace Router
 } // namespace UdpProxy
