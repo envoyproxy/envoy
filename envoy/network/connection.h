@@ -255,7 +255,7 @@ public:
    * are installed.
    * @param data Supplies the data to write to the connection.
    * @param end_stream If true, this indicates that this is the last write to the connection. If
-   *        end_stream is true, the connection is half-closed. This may only be set to true if
+   *        end_stream is false, the connection is half-closed. This may only be set to true if
    *        enableHalfClose(true) has been set on this connection.
    */
   virtual void write(Buffer::Instance& data, bool end_stream) PURE;
