@@ -65,8 +65,7 @@ message Trds {
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This allows to use different route
-  // configurations. Tells which route config should be fetched
-  //  from the configuration source.
+  // configurations. Tells which route configuration should be fetched from the configuration source.
   string route_config_name = 2;
 }
 

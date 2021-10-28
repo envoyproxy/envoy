@@ -45,18 +45,24 @@ const Protobuf::Message& ConfigTraitsImpl::validateConfig(const Protobuf::Messag
 }
 
 const std::string& ConfigTraitsImpl::resourceName(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<
+         const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration*>(&rc));
   return static_cast<
              const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(rc)
       .name();
 }
 
 Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<
+         const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration*>(&rc));
   return std::make_shared<const ConfigImpl>(
       static_cast<const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(
           rc));
 }
 
 ProtobufTypes::MessagePtr ConfigTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<
+         const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration*>(&rc));
   return std::make_unique<
       envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(
       static_cast<const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(

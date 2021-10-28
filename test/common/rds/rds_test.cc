@@ -6,7 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/config/utility.h"
-#include "source/common/router/rds/route_config_update_receiver_impl.h"
+#include "source/common/rds/route_config_update_receiver_impl.h"
 
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -18,7 +18,7 @@
 using testing::ReturnRef;
 
 namespace Envoy {
-namespace Router {
+namespace Rds {
 namespace {
 
 class RdsTestBase : public testing::Test {
@@ -37,10 +37,10 @@ public:
   NiceMock<Stats::MockIsolatedStatsStore> scope_;
 };
 
-class Config {
+class TestConfig : public Config {
 public:
-  Config() = default;
-  Config(const envoy::config::route::v3::RouteConfiguration& rc) : rc_(rc) {}
+  TestConfig() = default;
+  TestConfig(const envoy::config::route::v3::RouteConfiguration& rc) : rc_(rc) {}
   const std::string* route(const std::string& name) const {
     for (const auto& virtual_host_config : rc_.virtual_hosts()) {
       if (virtual_host_config.name() == name) {
@@ -54,45 +54,57 @@ private:
   envoy::config::route::v3::RouteConfiguration rc_;
 };
 
-class ConfigFactory
-    : public Rds::ConfigFactory<envoy::config::route::v3::RouteConfiguration, Config> {
+class TestConfigTraits : public ConfigTraits {
 public:
-  std::shared_ptr<const Config>
-  createConfig(const envoy::config::route::v3::RouteConfiguration& rc) const override {
-    return std::make_shared<const Config>(rc);
+  const envoy::config::route::v3::RouteConfiguration& cast(const Protobuf::Message& rc) const {
+    return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
   }
-  std::shared_ptr<const Config> createConfig() const override {
-    return std::make_shared<const Config>();
+
+  std::string resourceType() const override { return "test"; }
+  ConfigConstSharedPtr createConfig() const override {
+    return std::make_shared<const TestConfig>();
+  }
+  ProtobufTypes::MessagePtr createProto() const override {
+    return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+  }
+  const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override {
+    return rc;
+  }
+  const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const override { return rc; }
+  const std::string& resourceName(const Protobuf::Message& rc) const override {
+    return cast(rc).name();
+  }
+  ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override {
+    return std::make_shared<const TestConfig>(cast(rc));
+  }
+  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override {
+    return std::make_unique<envoy::config::route::v3::RouteConfiguration>(cast(rc));
   }
 };
 
-using RouteConfigUpdatePtr = std::unique_ptr<
-    Rds::RouteConfigUpdateReceiver<envoy::config::route::v3::RouteConfiguration, Config>>;
-using RouteConfigUpdateReceiverImpl =
-    Rds::RouteConfigUpdateReceiverImpl<envoy::config::route::v3::RouteConfiguration, Config>;
-
-class RdsImplTest : public RdsTestBase {
+class RdsTest : public RdsTestBase {
 public:
-  ~RdsImplTest() override { server_factory_context_.thread_local_.shutdownThread(); }
+  ~RdsTest() override { server_factory_context_.thread_local_.shutdownThread(); }
 
   void setup() {
     config_update_ =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(server_factory_context_, config_factory_);
+        std::make_unique<RouteConfigUpdateReceiverImpl>(config_traits_, server_factory_context_);
   }
 
   const std::string* route(const std::string& path) {
-    return config_update_->parsedConfiguration()->route(path);
+    return std::static_pointer_cast<const TestConfig>(config_update_->parsedConfiguration())
+        ->route(path);
   }
 
-  ConfigFactory config_factory_;
+  TestConfigTraits config_traits_;
   RouteConfigUpdatePtr config_update_;
 };
 
-TEST_F(RdsImplTest, Basic) {
+TEST_F(RdsTest, Basic) {
   setup();
 
   EXPECT_TRUE(config_update_->parsedConfiguration());
-  EXPECT_EQ(nullptr, config_update_->parsedConfiguration()->route("foo"));
+  EXPECT_EQ(nullptr, route("foo"));
   EXPECT_FALSE(config_update_->configInfo().has_value());
 
   const std::string response1_json = R"EOF(
@@ -152,5 +164,5 @@ TEST_F(RdsImplTest, Basic) {
 }
 
 } // namespace
-} // namespace Router
+} // namespace Rds
 } // namespace Envoy
