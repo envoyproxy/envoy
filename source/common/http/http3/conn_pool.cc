@@ -37,6 +37,7 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
   } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::READY) {
+    // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
     parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
   }
 }

@@ -400,12 +400,14 @@ void FakeHttpConnection::encodeGoAway() {
 void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
   ASSERT(type_ >= Http::CodecType::HTTP3);
 
+#ifdef ENVOY_ENABLE_QUIC
   postToConnectionThread([this, max_streams]() {
     auto codec = dynamic_cast<Quic::QuicHttpServerConnectionImpl*>(codec_.get());
     quic::test::QuicSessionPeer::SetMaxOpenIncomingBidirectionalStreams(&codec->quicServerSession(),
                                                                         max_streams);
     codec->quicServerSession().SendMaxStreams(1, false);
   });
+#endif
 }
 
 void FakeHttpConnection::encodeProtocolError() {
