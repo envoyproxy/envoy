@@ -18,9 +18,12 @@ struct EnvoyTcpInfo {
   std::chrono::microseconds tcpi_rtt;
 };
 
-// Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the codebase.
+// Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the
+// codebase.
 struct InterfaceAddress {
-  InterfaceAddress(absl::string_view ifa_name, unsigned int ifa_flags, Envoy::Network::Address::InstanceConstSharedPtr ifa_addr) : ifa_name_(ifa_name), ifa_flags_(ifa_flags), ifa_addr_(ifa_addr) {}
+  InterfaceAddress(absl::string_view ifa_name, unsigned int ifa_flags,
+                   Envoy::Network::Address::InstanceConstSharedPtr ifa_addr)
+      : ifa_name_(ifa_name), ifa_flags_(ifa_flags), ifa_addr_(ifa_addr) {}
 
   const std::string ifa_name_;
   unsigned int ifa_flags_;

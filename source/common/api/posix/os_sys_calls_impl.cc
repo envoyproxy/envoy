@@ -297,7 +297,7 @@ SysCallIntResult OsSysCallsImpl::getifaddrs(InterfaceAddressVector&) {
 // TODO: eliminate this branching by upstreaming an alternative Android imlementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  return {0,0};
+  return {0, 0};
 #else
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
@@ -312,13 +312,14 @@ SysCallIntResult OsSysCallsImpl::getifaddrs(InterfaceAddressVector&) {
       continue;
     }
 
-    if (ifa->ifa_addr->sa_family == AF_INET ||
-        ifa->ifa_addr->sa_family == AF_INET6) {
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
       const struct sockaddr_storage* addr =
           reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, Network::Address::addressFromSockAddrOrThrow(*addr, (ifa->ifa_addr->sa_family == AF_INET)
-                                                            ? sizeof(sockaddr_in)
-                                                            : sizeof(sockaddr_in6)));
+      interfaces.emplace_back(
+          ifa->ifa_name, ifa->ifa_flags,
+          Network::Address::addressFromSockAddrOrThrow(*addr, (ifa->ifa_addr->sa_family == AF_INET)
+                                                                  ? sizeof(sockaddr_in)
+                                                                  : sizeof(sockaddr_in6)));
     }
   }
 

@@ -242,15 +242,16 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
     Api::InterfaceAddressVector interface_addresses{};
 
-    const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
+    const Api::SysCallIntResult rc =
+        Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
     RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
-        if (!isLoopbackAddress(*interface_address.ifa_addr_)) {
-          ret = interface_address.ifa_addr_;
-          break;
-        }
+      if (!isLoopbackAddress(*interface_address.ifa_addr_)) {
+        ret = interface_address.ifa_addr_;
+        break;
+      }
     }
   }
 
