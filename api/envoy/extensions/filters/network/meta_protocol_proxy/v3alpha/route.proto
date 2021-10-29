@@ -20,7 +20,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 3]
 message RouteConfiguration {
-  //The name of the route configuration. For example, it might match route_config_name in envoy.extensions.filters.network.meta_protocol_proxy.v1alpha.Rds.
+  // The name of the route configuration. For example, it might match route_config_name in
+  // envoy.extensions.filters.network.meta_protocol_proxy.v1alpha.Rds.
   string name = 1;
 
   // The list of routes that will be matched, in order, against incoming requests. The first route
@@ -33,8 +34,7 @@ message RetryPolicy {
   // network error occurs or when the response status is a specific status.
   string retry_on = 1;
 
-  // Maximum number of retries. For a downstream request, envoy may issue `1 + may_retry`
-  // upstream requests.
+  // Maximum number of retries. For a downstream request, envoy may issue `1 + may_retry` upstream requests.
   uint32 max_retry = 2;
 
   // If not specified, then Route.timeout will be used.
@@ -67,16 +67,19 @@ message Route {
 }
 
 message RouteMatch {
-  // Used to match request service of downstream request. Only relevant when the application protocol is RPC such as Dubbo or Thrifit.
+  // Used to match request service of downstream request. Only relevant when the application
+  // protocol is RPC such as Dubbo or Thrifit.
   google.protobuf.StringValue service = 1;
 
-  // Used to match request method of downstream request. Only relevant when the application protocol is RPC such as Dubbo or Thrifit.
+  // Used to match request method of downstream request. Only relevant when the application
+  // protocol is RPC such as Dubbo or Thrifit.
   type.matcher.v3.StringMatcher method = 2;
 
-  // Specifies a set of key:value pairs in th metadata that the route should match on. The router will check the metadata
-  // populated by the codec plugin against all the specified key:value pairs in the route config. A match will happen if all the
-  // key:value pairs in the route are present in the request metadata with the same values (or based on presence if
-  // the value field is not in the config).
+  // Specifies a set of key:value pairs in th metadata that the route should match on. The router
+  // will check the metadata populated by the codec plugin against all the specified key:value
+  // pairs in the route config. A match will happen if all the key:value pairs in the route are
+  // present in the request metadata with the same values (or based on presence if the value field
+  // is not in the config).
   repeated envoy.config.route.v3.HeaderMatcher metadata = 3;
 }
 
@@ -87,9 +90,8 @@ message RouteAction {
     // Indicates the upstream cluster to which the request should be routed.
     string cluster = 1;
 
-    // Multiple upstream clusters can be specified for a given route. The
-    // request is routed to one of the upstream clusters based on weights
-    // assigned to each cluster.
+    // Multiple upstream clusters can be specified for a given route. The request is routed to one
+    // of the upstream clusters based on weights assigned to each cluster.
     // Currently ClusterWeight only supports the name and weight fields.
     envoy.config.route.v3.WeightedCluster weighted_clusters = 2;
   }

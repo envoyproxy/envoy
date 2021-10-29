@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 
 import "envoy/config/core/v3/config_source.proto";
-
 import "envoy/extensions/filters/network/meta_protocol_proxy/route/v3alpha/route.proto";
+
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";
@@ -40,9 +40,9 @@ message MetaProtocolProxy {
   // The codec which encodes and decodes the application protocol.
   Codec codec = 5;
 
-  // A list of individual Layer-7 filters that make up the filter chain for requests made to
-  // the meta protocol proxy. Order matters as the filters are processed sequentially as
-  // request events happen. If no meta_protocol_filters are specified, a default router filter
+  // A list of individual Layer-7 filters that make up the filter chain for requests made to the
+  // meta protocol proxy. Order matters as the filters are processed sequentially as request events
+  // happen. If no meta_protocol_filters are specified, a default router filter
   // (`aeraki.meta_protocol.filters.router`) is used.
   repeated MetaProtocolFilter meta_protocol_filters = 6;
 }
@@ -51,10 +51,8 @@ message Rds {
   // Configuration source specifier for RDS.
   envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
-  // The name of the route configuration. This name will be passed to the RDS
-  // API. This allows an Envoy configuration with multiple HTTP listeners (and
-  // associated HTTP connection manager filters) to use different route
-  // configurations.
+  // The name of the route configuration. This name will be passed to the RDS API. This allows an
+  // Envoy configuration with multiple MetaProtocol proxies to use different route configurations.
   string route_config_name = 2;
 }
 
@@ -63,8 +61,8 @@ message MetaProtocolFilter {
   // The name of the filter to instantiate. The name must match a supported filter.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
+  // Filter specific configuration which depends on the filter being instantiated. See the
+  // supported filters for further documentation.
   google.protobuf.Any config = 2;
 }
 
