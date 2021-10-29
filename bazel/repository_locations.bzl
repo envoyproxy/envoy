@@ -548,6 +548,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "nlohmann JSON",
         project_desc = "Fast JSON parser/generator for C++",
         project_url = "https://nlohmann.github.io/json",
+        # 3.10.4 introduced incompatible changes with Envoy Mobile. Until Envoy Mobile updates it's
+        # minimum iOS version to 13+ this dependency cannot be updated.
         version = "3.10.2",
         sha256 = "081ed0f9f89805c2d96335c3acfa993b39a0a5b4b4cef7edb68dd2210a13458c",
         strip_prefix = "json-{version}",
