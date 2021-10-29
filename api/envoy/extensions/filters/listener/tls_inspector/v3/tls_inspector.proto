@@ -18,6 +18,6 @@ message TlsInspector {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
 
-  // Populate ja3 fingerprint hash using data from the SSL Client Hello packet
+  // Populate JA3 fingerprint hash using data from the TLS Client Hello packet.
   bool enable_tls_ja3_fingerprinting = 1;
 }

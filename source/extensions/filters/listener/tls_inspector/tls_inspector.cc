@@ -1,9 +1,9 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <cstdint>
+#include <iomanip>
 #include <string>
 #include <vector>
-#include <iomanip>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -15,8 +15,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 
-#include "absl/strings/str_join.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_join.h"
 #include "openssl/md5.h"
 #include "openssl/ssl.h"
 
@@ -30,9 +30,9 @@ const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
 const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
 Config::Config(
-  Stats::Scope& scope,
-  const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-  uint32_t max_client_hello_size)
+    Stats::Scope& scope,
+    const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
+    uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       enable_ja3_fingerprinting_(proto_config.enable_tls_ja3_fingerprinting()),
@@ -246,22 +246,8 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
 
 // Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)
 static const uint16_t GREASE[] = {
-    0x0a0a,
-    0x1a1a,
-    0x2a2a,
-    0x3a3a,
-    0x4a4a,
-    0x5a5a,
-    0x6a6a,
-    0x7a7a,
-    0x8a8a,
-    0x9a9a,
-    0xaaaa,
-    0xbaba,
-    0xcaca,
-    0xdada,
-    0xeaea,
-    0xfafa,
+    0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
+    0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa,
 };
 
 bool isNotGrease(uint16_t id) {
@@ -319,8 +305,8 @@ void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fing
 void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
   const uint8_t* ec_data;
   size_t ec_len;
-  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
-                                            &ec_data, &ec_len)) {
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups, &ec_data,
+                                           &ec_len)) {
     CBS ec;
     CBS_init(&ec, ec_data, ec_len);
 
@@ -344,11 +330,12 @@ void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& 
   }
 }
 
-void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
+void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello,
+                                    std::string& fingerprint) {
   const uint8_t* ecpf_data;
   size_t ecpf_len;
   if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_ec_point_formats,
-                                            &ecpf_data, &ecpf_len)) {
+                                           &ecpf_data, &ecpf_len)) {
     CBS ecpf;
     CBS_init(&ecpf, ecpf_data, ecpf_len);
 

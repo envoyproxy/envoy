@@ -170,9 +170,7 @@ public:
     upstream_filter_state_ = filter_state;
   }
 
-  void setJA3Hash(const absl::string_view ja3_hash) override {
-    ja3_hash_ = std::string(ja3_hash);
-  }
+  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
   const std::string& ja3Hash() const override { return ja3_hash_; }
 

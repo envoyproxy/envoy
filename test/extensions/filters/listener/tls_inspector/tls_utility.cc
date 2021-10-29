@@ -2,8 +2,8 @@
 
 #include "source/common/common/assert.h"
 
-#include "openssl/ssl.h"
 #include "absl/strings/str_split.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Tls {
@@ -68,14 +68,12 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
   values = absl::StrSplit(fingerprint[3], '-', absl::SkipEmpty());
   uint16_t length = values.size() * 2;
   uint16_t ext_length = length + 2;
-  std::vector<uint8_t> elliptic_curves = {
-    (elliptic_curves_id & 0xff00) >> 8,
-    elliptic_curves_id & 0xff,
-    static_cast<uint8_t>((ext_length & 0xff00) >> 8),
-    static_cast<uint8_t>(ext_length & 0xff),
-    static_cast<uint8_t>((length & 0xff00) >> 8),
-    static_cast<uint8_t>(length & 0xff)
-  };
+  std::vector<uint8_t> elliptic_curves = {(elliptic_curves_id & 0xff00) >> 8,
+                                          elliptic_curves_id & 0xff,
+                                          static_cast<uint8_t>((ext_length & 0xff00) >> 8),
+                                          static_cast<uint8_t>(ext_length & 0xff),
+                                          static_cast<uint8_t>((length & 0xff00) >> 8),
+                                          static_cast<uint8_t>(length & 0xff)};
   for (const std::string& v : values) {
     uint16_t elliptic_curve = std::stoi(v, nullptr);
     elliptic_curves.push_back((elliptic_curve & 0xff00) >> 8);
@@ -87,12 +85,9 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
   values = absl::StrSplit(fingerprint[4], '-', absl::SkipEmpty());
   ext_length = values.size() + 1;
   std::vector<uint8_t> elliptic_curve_point_formats = {
-    (elliptic_curve_point_formats_id & 0xff00) >> 8,
-    elliptic_curve_point_formats_id & 0xff,
-    static_cast<uint8_t>((ext_length & 0xff00) >> 8),
-    static_cast<uint8_t>(ext_length & 0xff),
-    static_cast<uint8_t>(values.size())
-  };
+      (elliptic_curve_point_formats_id & 0xff00) >> 8, elliptic_curve_point_formats_id & 0xff,
+      static_cast<uint8_t>((ext_length & 0xff00) >> 8), static_cast<uint8_t>(ext_length & 0xff),
+      static_cast<uint8_t>(values.size())};
   for (const std::string& v : values) {
     uint8_t elliptic_curve_point_format = std::stoi(v, nullptr);
     elliptic_curve_point_formats.push_back(elliptic_curve_point_format);
@@ -100,60 +95,57 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
 
   // server name extension
   const uint16_t server_name_id = 0x0;
-  std::vector<uint8_t> server_name = {
-    (server_name_id & 0xff00) >> 8,
-    server_name_id & 0xff,
-    // length
-    0x00, 0x16,
-    // list length
-    0x00, 0x14,
-    // hostname type
-    0x00,
-    // name length
-    0x00, 0x11,
-    // name (www.envoyproxy.io)
-    'w', 'w', 'w', '.', 'e', 'n', 'v', 'o', 'y', 'p', 'r', 'o', 'x', 'y', '.', 'i', 'o'
-  };
+  std::vector<uint8_t> server_name = {(server_name_id & 0xff00) >> 8, server_name_id & 0xff,
+                                      // length
+                                      0x00, 0x16,
+                                      // list length
+                                      0x00, 0x14,
+                                      // hostname type
+                                      0x00,
+                                      // name length
+                                      0x00, 0x11,
+                                      // name (www.envoyproxy.io)
+                                      'w', 'w', 'w', '.', 'e', 'n', 'v', 'o', 'y', 'p', 'r', 'o',
+                                      'x', 'y', '.', 'i', 'o'};
 
   // extensions
   values = absl::StrSplit(fingerprint[2], '-', absl::SkipEmpty());
   std::vector<uint8_t> extensions;
   for (const std::string& v : values) {
     switch (std::stoi(v, nullptr)) {
-      case elliptic_curves_id: {
-        extensions.insert(std::end(extensions), std::begin(elliptic_curves), std::end(elliptic_curves));
-        break;
-      }
-      case elliptic_curve_point_formats_id: {
-        extensions.insert(std::end(extensions), std::begin(elliptic_curve_point_formats), std::end(elliptic_curve_point_formats));
-        break;
-      }
-      case server_name_id: {
-        extensions.insert(std::end(extensions), std::begin(server_name), std::end(server_name));
-        break;
-      }
-      default: {
-        uint16_t extension_id = std::stoi(v, nullptr);
-        extensions.push_back((extension_id & 0xff00) >> 8);
-        extensions.push_back(extension_id & 0xff);
-        extensions.push_back(0);
-        extensions.push_back(0);
-      }
+    case elliptic_curves_id: {
+      extensions.insert(std::end(extensions), std::begin(elliptic_curves),
+                        std::end(elliptic_curves));
+      break;
+    }
+    case elliptic_curve_point_formats_id: {
+      extensions.insert(std::end(extensions), std::begin(elliptic_curve_point_formats),
+                        std::end(elliptic_curve_point_formats));
+      break;
+    }
+    case server_name_id: {
+      extensions.insert(std::end(extensions), std::begin(server_name), std::end(server_name));
+      break;
+    }
+    default: {
+      uint16_t extension_id = std::stoi(v, nullptr);
+      extensions.push_back((extension_id & 0xff00) >> 8);
+      extensions.push_back(extension_id & 0xff);
+      extensions.push_back(0);
+      extensions.push_back(0);
+    }
     }
   }
 
   // client hello message
-  std::vector<uint8_t> clienthello = {
-    // client version
-    static_cast<uint8_t>((tls_version & 0xff00) >> 8), static_cast<uint8_t>(tls_version & 0xff),
-    // client random (32 bytes)
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    // session id
-    0
-  };
+  std::vector<uint8_t> clienthello = {// client version
+                                      static_cast<uint8_t>((tls_version & 0xff00) >> 8),
+                                      static_cast<uint8_t>(tls_version & 0xff),
+                                      // client random (32 bytes)
+                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                      // session id
+                                      0};
   // cipher suite length and ciphers
   uint16_t ciphers_length = ciphers.size();
   clienthello.push_back((ciphers_length & 0xff00) >> 8);
@@ -172,19 +164,19 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
   uint32_t clienthello_bytes = clienthello.size();
   uint16_t handshake_bytes = clienthello.size() + 4;
   std::vector<uint8_t> clienthello_message = {
-    // record header
-    0x16, 0x03, 0x01,
-    // handshake bytes
-    static_cast<uint8_t>((handshake_bytes & 0xff00) >> 8),
-    static_cast<uint8_t>(handshake_bytes & 0xff),
-    // handshake header
-    0x01,
-    // clienthello bytes
-    static_cast<uint8_t>((clienthello_bytes & 0xff0000) >> 16),
-    static_cast<uint8_t>((clienthello_bytes & 0xff00) >> 8),
-    static_cast<uint8_t>(clienthello_bytes & 0xff)
-  };
-  clienthello_message.insert(std::end(clienthello_message), std::begin(clienthello), std::end(clienthello));
+      // record header
+      0x16, 0x03, 0x01,
+      // handshake bytes
+      static_cast<uint8_t>((handshake_bytes & 0xff00) >> 8),
+      static_cast<uint8_t>(handshake_bytes & 0xff),
+      // handshake header
+      0x01,
+      // clienthello bytes
+      static_cast<uint8_t>((clienthello_bytes & 0xff0000) >> 16),
+      static_cast<uint8_t>((clienthello_bytes & 0xff00) >> 8),
+      static_cast<uint8_t>(clienthello_bytes & 0xff)};
+  clienthello_message.insert(std::end(clienthello_message), std::begin(clienthello),
+                             std::end(clienthello));
 
   return clienthello_message;
 }

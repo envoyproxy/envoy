@@ -273,9 +273,7 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
-  void setJA3Hash(absl::string_view ja3_hash) override {
-    ja3_hash_ = std::string(ja3_hash);
-  }
+  void setJA3Hash(absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
   const std::string& ja3Hash() const override { return ja3_hash_; }
 

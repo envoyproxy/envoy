@@ -191,9 +191,7 @@ public:
     return connectionInfoProvider().requestedServerName();
   }
 
-  void setJA3Hash(absl::string_view ja3_hash) override {
-    ja3_hash_ = std::string(ja3_hash);
-  }
+  void setJA3Hash(absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
