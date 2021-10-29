@@ -207,4 +207,5 @@ def api_proto_package(
     csharp_proto_library(
         name = name + _CSHARP_PROTO_SUFFIX,
         protos = [name],
+        visibility = ["//visibility:public"],
     )
