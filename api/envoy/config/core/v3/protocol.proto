@@ -8,6 +8,8 @@ import "envoy/type/v3/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -102,6 +104,12 @@ message AlternateProtocolsCacheOptions {
   //   it is possible for the maximum entries in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
   google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
+
+  // Allows configuring a persistent
+  // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
+  // alternate protocols entries to disk.
+  // This function is currently only supported if concurrency is 1
+  TypedExtensionConfig key_value_store_config = 3;
 }
 
 // [#next-free-field: 7]
@@ -149,10 +157,11 @@ message HttpProtocolOptions {
 
   // The maximum duration of a connection. The duration is defined as a period since a connection
   // was established. If not set, there is no max duration. When max_connection_duration is reached
-  // the connection will be closed. Drain sequence will occur prior to closing the connection if
-  // if's applicable. See :ref:`drain_timeout
+  // and if there are no active streams, the connection will be closed. If there are any active streams,
+  // the drain sequence will kick-in, and the connection will be force-closed after the drain period.
+  // See :ref:`drain_timeout
   // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.drain_timeout>`.
-  // Note: not implemented for upstream connections.
+  // Note: This feature is not yet implemented for the upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
   // The maximum number of headers. If unconfigured, the default
@@ -501,8 +510,8 @@ message Http3ProtocolOptions {
   // <https://datatracker.ietf.org/doc/html/rfc8441>`_
   // and settings `proposed for HTTP/3
   // <https://datatracker.ietf.org/doc/draft-ietf-httpbis-h3-websockets/>`_
-  // [#alpha:] as HTTP/3 CONNECT is not yet an RFC.
-  bool allow_extended_connect = 5;
+  // Note that HTTP/3 CONNECT is not yet an RFC.
+  bool allow_extended_connect = 5 [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // A message to control transformations to the :scheme header

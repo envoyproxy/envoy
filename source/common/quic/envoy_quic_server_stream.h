@@ -48,9 +48,9 @@ public:
 
   // quic::QuicSpdyStream
   void OnBodyAvailable() override;
-  bool OnStopSending(quic::QuicRstStreamErrorCode error) override;
+  bool OnStopSending(quic::QuicResetStreamError error) override;
   void OnStreamReset(const quic::QuicRstStreamFrame& frame) override;
-  void Reset(quic::QuicRstStreamErrorCode error) override;
+  void ResetWithError(quic::QuicResetStreamError error) override;
   void OnClose() override;
   void OnCanWrite() override;
   // quic::QuicSpdyServerStreamBase

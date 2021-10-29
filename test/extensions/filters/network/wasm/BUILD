@@ -28,7 +28,6 @@ envoy_extension_cc_test(
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
         "//source/common/crypto:utility_lib",
-        "//source/extensions/common/crypto:utility_lib",
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/network/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
