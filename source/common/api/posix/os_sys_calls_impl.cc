@@ -284,7 +284,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 }
 
 bool OsSysCallsImpl::supportsGetifaddrs() const {
-// TODO: eliminate this branching by upstreaming an alternative Android imlementation
+// TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   return false
@@ -293,8 +293,8 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
 #endif
 }
 
-SysCallIntResult OsSysCallsImpl::getifaddrs(InterfaceAddressVector&) {
-// TODO: eliminate this branching by upstreaming an alternative Android imlementation
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+// TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   return {0, 0};
