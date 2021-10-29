@@ -239,48 +239,6 @@ void FilterConfigProviderManagerImplBase::applyLastOrDefaultConfig(
   }
 }
 
-DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFilterConfigProvider(
-    const envoy::config::core::v3::ExtensionConfigSource& config_source,
-    const std::string& filter_config_name, Server::Configuration::FactoryContext& factory_context,
-    const std::string& stat_prefix, bool last_filter_in_filter_chain,
-    const std::string& filter_chain_type) {
-  auto subscription = getSubscription(config_source.config_source(), filter_config_name,
-                                      factory_context, stat_prefix);
-  // For warming, wait until the subscription receives the first response to indicate readiness.
-  // Otherwise, mark ready immediately and start the subscription on initialization. A default
-  // config is expected in the latter case.
-  if (!config_source.apply_default_config_without_warming()) {
-    factory_context.initManager().add(subscription->initTarget());
-  }
-  absl::flat_hash_set<std::string> require_type_urls;
-  for (const auto& type_url : config_source.type_urls()) {
-    auto factory_type_url = TypeUtil::typeUrlToDescriptorFullName(type_url);
-    require_type_urls.emplace(factory_type_url);
-  }
-
-  ProtobufTypes::MessagePtr default_config;
-  if (config_source.has_default_config()) {
-    default_config =
-        getDefaultConfig(config_source.default_config(), filter_config_name, factory_context,
-                         last_filter_in_filter_chain, filter_chain_type, require_type_urls);
-  }
-
-  auto provider = std::make_unique<DynamicFilterConfigProviderImpl>(
-      subscription, require_type_urls, factory_context, std::move(default_config),
-      last_filter_in_filter_chain, filter_chain_type,
-      [this, stat_prefix,
-       &factory_context](const Protobuf::Message& message) -> Envoy::Http::FilterFactoryCb {
-        return instantiateFilterFactory(message, stat_prefix, factory_context);
-      });
-
-  // Ensure the subscription starts if it has not already.
-  if (config_source.apply_default_config_without_warming()) {
-    factory_context.initManager().add(provider->initTarget());
-  }
-  applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
-  return provider;
-}
-
 std::tuple<ProtobufTypes::MessagePtr, std::string, bool>
 HttpFilterConfigProviderManagerImpl::getMessage(
     const envoy::config::core::v3::TypedExtensionConfig& filter_config,
