@@ -13,6 +13,7 @@ Bug Fixes
 ---------
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
+* http: remove redundant Warn log in HTTP codec.
 * listener: fix a crash when updating any listener that does not bind to port.
 * listener: listener add can reuse the listener socket of a draining filter chain listener and fix the request lost.
 
