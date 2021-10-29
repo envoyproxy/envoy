@@ -199,7 +199,6 @@ private:
   std::string last_filter_name_;
   bool last_filter_is_terminal_;
   Server::Configuration::FactoryContext& factory_context_;
-  ProtobufMessage::ValidationVisitor& validator_;
 
   Init::SharedTargetImpl init_target_;
   bool started_{false};
@@ -241,6 +240,13 @@ private:
  * Base class for a FilterConfigProviderManager.
  */
 class FilterConfigProviderManagerImplBase : Logger::Loggable<Logger::Id::filter> {
+public:
+  virtual ~FilterConfigProviderManagerImplBase() = default;
+
+  virtual std::tuple<ProtobufTypes::MessagePtr, std::string, bool>
+  getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
+             Server::Configuration::FactoryContext& factory_context) const PURE;
+
 protected:
   std::shared_ptr<FilterConfigSubscription>
   getSubscription(const envoy::config::core::v3::ConfigSource& config_source,
@@ -287,6 +293,11 @@ protected:
 };
 
 class HttpFilterConfigProviderManagerImpl : public FilterConfigProviderManagerImpl {
+public:
+  std::tuple<ProtobufTypes::MessagePtr, std::string, bool>
+  getMessage(const envoy::config::core::v3::TypedExtensionConfig& filter_config,
+             Server::Configuration::FactoryContext& factory_context) const override;
+
 protected:
   ProtobufTypes::MessagePtr
   getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,

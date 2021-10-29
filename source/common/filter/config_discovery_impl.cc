@@ -73,7 +73,6 @@ FilterConfigSubscription::FilterConfigSubscription(
     : Config::SubscriptionBase<envoy::config::core::v3::TypedExtensionConfig>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       filter_config_name_(filter_config_name), factory_context_(factory_context),
-      validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       init_target_(fmt::format("FilterConfigSubscription init {}", filter_config_name_),
                    [this]() { start(); }),
       scope_(factory_context.scope().createScope(stat_prefix + "extension_config_discovery." +
@@ -116,9 +115,6 @@ void FilterConfigSubscription::onConfigUpdate(
   if (new_hash == last_config_hash_) {
     return;
   }
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          filter_config);
   // Ensure that the filter config is valid in the filter chain context once the proto is processed.
   // Validation happens before updating to prevent a partial update application. It might be
   // possible that the providers have distinct type URL constraints.
@@ -126,18 +122,17 @@ void FilterConfigSubscription::onConfigUpdate(
   for (auto* provider : filter_config_providers_) {
     provider->validateTypeUrl(type_url);
   }
-  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-      filter_config.typed_config(), validator_, factory);
-  bool is_terminal_filter = factory.isTerminalFilterByProto(*message, factory_context_);
+  auto [message, factory_name, is_terminal_filter] =
+      filter_config_provider_manager_.getMessage(filter_config, factory_context_);
   for (auto* provider : filter_config_providers_) {
-    provider->validateTerminalFilter(filter_config_name_, factory.name(), is_terminal_filter);
+    provider->validateTerminalFilter(filter_config_name_, factory_name, is_terminal_filter);
   }
   ENVOY_LOG(debug, "Updating filter config {}", filter_config_name_);
 
   Common::applyToAllWithCleanup<DynamicFilterConfigProviderImplBase*>(
       filter_config_providers_,
-      [&message, &version_info](DynamicFilterConfigProviderImplBase* provider,
-                                std::shared_ptr<Cleanup> cleanup) {
+      [&message = message, &version_info](DynamicFilterConfigProviderImplBase* provider,
+                                          std::shared_ptr<Cleanup> cleanup) {
         provider->onConfigUpdate(*message, version_info, [cleanup] {});
       },
       [this]() { stats_.config_reload_.inc(); });
@@ -145,7 +140,7 @@ void FilterConfigSubscription::onConfigUpdate(
   last_config_ = std::move(message);
   last_type_url_ = type_url;
   last_version_info_ = version_info;
-  last_filter_name_ = factory.name();
+  last_filter_name_ = factory_name;
   last_filter_is_terminal_ = is_terminal_filter;
 }
 
@@ -284,6 +279,20 @@ DynamicFilterConfigProviderPtr FilterConfigProviderManagerImpl::createDynamicFil
   }
   applyLastOrDefaultConfig(subscription, *provider, filter_config_name);
   return provider;
+}
+
+std::tuple<ProtobufTypes::MessagePtr, std::string, bool>
+HttpFilterConfigProviderManagerImpl::getMessage(
+    const envoy::config::core::v3::TypedExtensionConfig& filter_config,
+    Server::Configuration::FactoryContext& factory_context) const {
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+          filter_config);
+  ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+      filter_config.typed_config(),
+      factory_context.messageValidationContext().dynamicValidationVisitor(), factory);
+  bool is_terminal_filter = factory.isTerminalFilterByProto(*message, factory_context);
+  return {std::move(message), factory.name(), is_terminal_filter};
 }
 
 ProtobufTypes::MessagePtr HttpFilterConfigProviderManagerImpl::getDefaultConfig(
