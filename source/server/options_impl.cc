@@ -304,7 +304,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       std::string value = std::string(splitted_tag_pair_tokens[1]);
 
       for (const auto& token : name) {
-        if (isspace(token)) {
+        if (absl::ascii_isspace(token)) {
           throw MalformedArgvException(fmt::format(
               "error: misformatted stats-tag '{}' contains whitespace char '{}' in the name",
               cli_tag_pair));
@@ -312,7 +312,7 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
       }
 
       for (const auto& token : value) {
-        if (isspace(token) || token == '.') {
+        if (absl::ascii_isspace(token) || token == '.') {
           throw MalformedArgvException(
               fmt::format("error: misformatted stats-tag '{}' contains invalid char '{}'",
                           cli_tag_pair, token));
