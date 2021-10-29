@@ -41,11 +41,9 @@ def api_dependencies():
     )
     external_http_archive(
         name = "rules_proto_grpc",
-        workspace_file_content = PROTO_GRPC_BUILD_CONTENT,
     )
     external_http_archive(
         name = "io_bazel_rules_dotnet",
-        workspace_file_content = DOTNET_RULES_BUILD_CONTENT,
     )
     external_http_archive(
         name = "rules_dotnet_skylib",
@@ -63,31 +61,6 @@ def api_dependencies():
         build_file_content = BUF_BUILD_CONTENT,
         tags = ["manual"],
     )
-
-DOTNET_RULES_BUILD_CONTENT="""
-load("@io_bazel_rules_dotnet//dotnet:deps.bzl", "dotnet_repositories")
-
-dotnet_repositories()
-
-load(
-    "@io_bazel_rules_dotnet//dotnet:defs.bzl",
-    "dotnet_register_toolchains",
-    "dotnet_repositories_nugets",
-)
-dotnet_register_toolchains()
-
-dotnet_repositories_nugets()
-"""
-
-PROTO_GRPC_BUILD_CONTENT="""
-load("@rules_proto_grpc//csharp:repositories.bzl", rules_proto_grpc_csharp_repos = "csharp_repos")
-
-rules_proto_grpc_csharp_repos()
-
-load("@rules_proto_grpc//csharp/nuget:nuget.bzl", "nuget_rules_proto_grpc_packages")
-
-nuget_rules_proto_grpc_packages()
-"""
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
