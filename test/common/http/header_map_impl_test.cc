@@ -130,7 +130,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(data_with_leading_lws, string.getStringView());
   }
 
-    // Inline trim, only whitespace
+  // Inline trim, only whitespace
   {
     const std::string only_lws = " \t\f\v";
     HeaderString string;
@@ -147,8 +147,7 @@ TEST(HeaderStringTest, All) {
     const std::string data_with_only_trailing_lws =
         data_without_leading_and_trailing_lws + " \t\f\v";
     HeaderString string;
-    string.append(data_with_only_trailing_lws.data(),
-                  data_with_only_trailing_lws.size());
+    string.append(data_with_only_trailing_lws.data(), data_with_only_trailing_lws.size());
     EXPECT_EQ(data_with_only_trailing_lws, string.getStringView());
     string.trim();
     EXPECT_NE(data_with_only_trailing_lws, string.getStringView());
