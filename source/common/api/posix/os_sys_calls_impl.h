@@ -50,7 +50,7 @@ public:
   SysCallSocketResult accept(os_fd_t socket, sockaddr* addr, socklen_t* addrlen) override;
   SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) override;
   bool supportsGetifaddrs() const override;
-  SysCallIntResult getifaddrs(InterfaceAddressVector& ifap) override;
+  SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;
