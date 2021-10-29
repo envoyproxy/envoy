@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/extensions/filters/network/meta_protocol_proxy/route/v3alpha/route.proto";
+import "envoy/extensions/filters/network/meta_protocol_proxy/v3alpha/route.proto";
 
 import "google/protobuf/any.proto";
 
@@ -35,7 +35,7 @@ message MetaProtocolProxy {
     Rds rds = 3;
 
     // The route table for the meta protocol proxy is static and is specified in this property.
-    config.route.v1alpha.RouteConfiguration route_config = 4;
+    RouteConfiguration route_config = 4;
   }
 
   // The codec which encodes and decodes the application protocol.
