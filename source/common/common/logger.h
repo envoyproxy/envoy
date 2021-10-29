@@ -184,15 +184,7 @@ public:
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override {
-    auto* tls_sink = tlsDelegate();
-    if (tls_sink != nullptr) {
-      tls_sink->flush();
-      return;
-    }
-    absl::ReaderMutexLock lock(&sink_mutex_);
-    sink_->flush();
-  }
+  void flush() override;
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
@@ -239,16 +231,9 @@ private:
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
   }
-
-  SinkDelegate** tlsSink() {
-    static thread_local SinkDelegate* tls_sink = nullptr;
-
-    return &tls_sink;
-  }
-
-  void setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
-
-  SinkDelegate* tlsDelegate() { return *tlsSink(); }
+  SinkDelegate** tlsSink();
+  void setTlsDelegate(SinkDelegate* sink);
+  SinkDelegate* tlsDelegate();
 
   SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
   absl::Mutex sink_mutex_;

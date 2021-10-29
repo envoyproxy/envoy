@@ -134,6 +134,26 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
   return delegating_sink;
 }
 
+void DelegatingLogSink::flush() {
+  auto* tls_sink = tlsDelegate();
+  if (tls_sink != nullptr) {
+    tls_sink->flush();
+    return;
+  }
+  absl::ReaderMutexLock lock(&sink_mutex_);
+  sink_->flush();
+}
+
+SinkDelegate** DelegatingLogSink::tlsSink() {
+  static thread_local SinkDelegate* tls_sink = nullptr;
+
+  return &tls_sink;
+}
+
+void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
+
+SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
+
 static Context* current_context = nullptr;
 
 Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
