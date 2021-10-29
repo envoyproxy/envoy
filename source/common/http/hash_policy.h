@@ -8,8 +8,7 @@ namespace Envoy {
 namespace Http {
 
 /**
- * Implementation of HashPolicy that reads from the proto route config and only currently supports
- * hashing on an HTTP header.
+ * Implementation of HashPolicy that reads from the proto route config.
  */
 class HashPolicyImpl : public HashPolicy {
 public:

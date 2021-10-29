@@ -205,7 +205,6 @@ TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
 void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes,
                                                             uint32_t max_response_bytes,
                                                             uint32_t num_requests) {
-  autonomous_allow_incomplete_streams_ = true;
   TestRandomGenerator rand;
   std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
@@ -236,11 +235,8 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
     ASSERT_TRUE(responses[i]->waitForEndStream());
     if (i % 2 != 0) {
       EXPECT_TRUE(responses[i]->complete());
-      // TODO(18160) remove this if and always check for 200 and body length.
-      if (num_requests <= 100 || upstreamProtocol() != Http::CodecType::HTTP3) {
-        EXPECT_EQ("200", responses[i]->headers().getStatusValue());
-        EXPECT_EQ(response_bytes[i], responses[i]->body().length());
-      }
+      EXPECT_EQ("200", responses[i]->headers().getStatusValue());
+      EXPECT_EQ(response_bytes[i], responses[i]->body().length());
     } else {
       // Upstream stream reset.
       EXPECT_EQ("503", responses[i]->headers().getStatusValue());
@@ -255,13 +251,23 @@ TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
   manySimultaneousRequests(1024, 1024, 100);
 }
 
-#ifdef NDEBUG
-// TODO(alyssawilk) this causes crashes in debug mode for QUIC due to a race
-// condition between Envoy's stream accounting and QUICE's. Debug and fix.
 TEST_P(Http2UpstreamIntegrationTest, TooManySimultaneousRequests) {
   manySimultaneousRequests(1024, 1024, 200);
 }
-#endif
+
+TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequestsTightUpstreamLimits) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(config);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(options);
+
+  manySimultaneousRequests(1024, 1024, 10);
+}
 
 TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
