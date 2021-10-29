@@ -508,8 +508,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   codec_client_ = makeHttpConnection(old_port);
 
   // Make sure that the port migration config is plumbed through.
-  EXPECT_EQ(2, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
-                   &quic_connection_->sent_packet_manager()));
+  EXPECT_EQ(2u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
+                    &quic_connection_->sent_packet_manager()));
 
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},

@@ -76,7 +76,7 @@ public:
   // and be destructed.
   void onPathValidationFailure(std::unique_ptr<quic::QuicPathValidationContext> context);
 
-  void setNumPtosForPortMigration(int num_ptos_for_path_degrading);
+  void setNumPtosForPortMigration(uint32_t num_ptos_for_path_degrading);
 
 private:
   // Holds all components needed for a QUIC connection probing/migration.
