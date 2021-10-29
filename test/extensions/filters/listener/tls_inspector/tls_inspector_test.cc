@@ -323,7 +323,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
   file_event_callback_(Event::FileReadyType::Read);
 }
 
-// Test that the filter sets the correct ja3 hash with no elliptic curves or ec point formats in
+// Test that the filter sets the correct ja3 hash with no elliptic curves or elliptic curve point formats in
 // ClientHello message. Fingerprint and hash are from ja3er.com/getAllHashesJson.
 TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
