@@ -297,7 +297,7 @@ def generate_current_api_dir(api_dir, dst_dir):
     shutil.copytree(str(api_dir.joinpath("contrib")), str(contrib_dst))
 
     dst = dst_dir.joinpath("envoy")
-    shutil.copytree(str(api_dir.joinpath("envoy")), str(dst)) #, ignore=ignore_v2_protos)
+    shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 
     # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
     # so we ignore it here.
