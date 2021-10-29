@@ -160,6 +160,13 @@ public:
   static envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                     const std::string& leds_collection_name);
+
+  static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(const std::string& address,
+                                                                 uint32_t port);
+
   static envoy::config::listener::v3::Listener
   buildBaseListener(const std::string& name, const std::string& address,
                     const std::string& filter_chains = "");
@@ -296,7 +303,8 @@ public:
 
   // Configure Envoy to do TLS to upstream.
   void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
-                            bool use_alternate_protocols_cache = false);
+                            absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+                                alternate_protocol_cache_config = {});
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -305,8 +313,8 @@ public:
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
 
-  // Enable deprecated v2 API resources via the runtime.
-  void enableDeprecatedV2Api();
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

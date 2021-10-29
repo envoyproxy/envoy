@@ -196,6 +196,7 @@ On the upstream side all http3 statistics are rooted at *cluster.<name>.http3.*
    rx_reset, Counter, Total number of reset stream frames received by Envoy
    tx_reset, Counter, Total number of reset stream frames transmitted by Envoy
    metadata_not_supported_error, Counter, Total number of metadata dropped during HTTP/3 encoding
+   quic_version_h3_29, Counter, Total number of quic connections that use transport version h3-29. QUIC h3-29 is unsupported by default and this counter will be removed when h3-29 support is completely removed.
    quic_version_rfc_v1, Counter, Total number of quic connections that use transport version rfc-v1.
 
 

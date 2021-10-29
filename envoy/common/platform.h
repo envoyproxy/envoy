@@ -178,7 +178,9 @@ constexpr bool win32SupportsOriginalDestination() {
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#if !defined(DO_NOT_INCLUDE_NETINET_TCP_H)
 #include <netinet/tcp.h>
+#endif
 #include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
@@ -302,6 +304,14 @@ struct mmsghdr {
 #ifdef __ANDROID_API__
 #if __ANDROID_API__ < 24
 #undef SUPPORTS_GETIFADDRS
+#endif // __ANDROID_API__ < 24
+#endif // ifdef __ANDROID_API__
+
+// TODO: Remove once bazel supports NDKs > 21
+#define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
+#ifdef __ANDROID_API__
+#if __ANDROID_API__ < 24
+#undef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #endif // __ANDROID_API__ < 24
 #endif // ifdef __ANDROID_API__
 

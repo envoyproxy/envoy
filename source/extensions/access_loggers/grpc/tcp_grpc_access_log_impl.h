@@ -30,8 +30,7 @@ class TcpGrpcAccessLog : public Common::ImplBase {
 public:
   TcpGrpcAccessLog(AccessLog::FilterPtr&& filter, const TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
-                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-                   Stats::Scope& scope);
+                   GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:
   /**
@@ -49,7 +48,6 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  Stats::Scope& scope_;
   const TcpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;

@@ -25,10 +25,8 @@ public:
    */
   CidrRange();
 
-  /**
-   * Copies an existing CidrRange.
-   */
-  CidrRange(const CidrRange& other);
+  CidrRange(const CidrRange& other) = default;
+  CidrRange(CidrRange&& other) = default;
 
   /**
    * Overwrites this with other.
@@ -129,7 +127,6 @@ public:
   IpList() = default;
 
   bool contains(const Instance& address) const;
-  bool empty() const { return ip_list_.empty(); }
 
 private:
   std::vector<CidrRange> ip_list_;

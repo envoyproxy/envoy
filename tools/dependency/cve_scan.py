@@ -72,9 +72,25 @@ IGNORES_CVES = set([
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
     'CVE-2021-22918',
     'CVE-2021-22921',
+    'CVE-2021-22930',
     'CVE-2021-22931',
     'CVE-2021-22939',
     'CVE-2021-22940',
+    #
+    # Currently, cvescan does not respect/understand versions (see #18354).
+    #
+    # The following CVEs target versions that are not currently used in the Envoy repo.
+    #
+    # libcurl
+    "CVE-2021-22945",
+    #
+    # kafka
+    'CVE-2021-38153',
+    #
+    # wasmtime
+    "CVE-2021-39216",
+    "CVE-2021-39218",
+    "CVE-2021-39219",
 ])
 
 # Subset of CVE fields that are useful below.

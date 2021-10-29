@@ -23,7 +23,6 @@
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/common/network/dns_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -32,10 +31,6 @@
 
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "source/common/signal/signal_action.h"
-#endif
-
-#ifdef __APPLE__
-#include "source/common/network/apple_dns_impl.h"
 #endif
 
 namespace Envoy {
@@ -155,30 +150,6 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
   ASSERT(isThreadSafe());
   return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
                                                          std::move(transport_socket), options);
-}
-
-Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) {
-  ASSERT(isThreadSafe());
-#ifdef __APPLE__
-  static bool use_apple_api_for_dns_lookups =
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.use_apple_api_for_dns_lookups");
-  if (use_apple_api_for_dns_lookups) {
-    RELEASE_ASSERT(
-        resolvers.empty(),
-        "defining custom resolvers is not possible when using Apple APIs for DNS resolution. "
-        "Apple's API only allows overriding DNS resolvers via system settings. Delete resolvers "
-        "config or disable the envoy.restart_features.use_apple_api_for_dns_lookups runtime "
-        "feature.");
-    RELEASE_ASSERT(!dns_resolver_options.use_tcp_for_dns_lookups(),
-                   "using TCP for DNS lookups is not possible when using Apple APIs for DNS "
-                   "resolution. Apple' API only uses UDP for DNS resolution. Use UDP or disable "
-                   "the envoy.restart_features.use_apple_api_for_dns_lookups runtime feature.");
-    return std::make_shared<Network::AppleDnsResolverImpl>(*this, api_.rootScope());
-  }
-#endif
-  return std::make_shared<Network::DnsResolverImpl>(*this, resolvers, dns_resolver_options);
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,

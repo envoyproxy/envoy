@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
@@ -18,7 +19,8 @@ namespace Tracers {
 namespace XRay {
 
 namespace {
-constexpr auto XRaySerializationVersion = "1";
+constexpr absl::string_view XRaySerializationVersion = "1";
+constexpr absl::string_view DirectionKey = "direction";
 
 // X-Ray Trace ID Format
 //
@@ -35,19 +37,14 @@ constexpr auto XRaySerializationVersion = "1";
 std::string generateTraceId(SystemTime point_in_time, Random::RandomGenerator& random) {
   using std::chrono::seconds;
   using std::chrono::time_point_cast;
-  const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
-  std::string out;
-  out.reserve(35);
-  out += XRaySerializationVersion;
-  out.push_back('-');
   // epoch in seconds represented as 8 hexadecimal characters
-  out += Hex::uint32ToHex(epoch);
-  out.push_back('-');
+  const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
   std::string uuid = random.uuid();
   // unique id represented as 24 hexadecimal digits and no dashes
   uuid.erase(std::remove(uuid.begin(), uuid.end(), '-'), uuid.end());
   ASSERT(uuid.length() >= 24);
-  out += uuid.substr(0, 24);
+  const std::string out =
+      absl::StrCat(XRaySerializationVersion, "-", Hex::uint32ToHex(epoch), "-", uuid.substr(0, 24));
   return out;
 }
 
@@ -93,6 +90,8 @@ void Span::finishSpan() {
   for (const auto& item : custom_annotations_) {
     s.mutable_annotations()->insert({item.first, item.second});
   }
+  // `direction` will be either "ingress" or "egress"
+  s.mutable_annotations()->insert({std::string(DirectionKey), direction()});
 
   const std::string json = MessageUtil::getJsonStringFromMessageOrDie(
       s, false /* pretty_print  */, false /* always_print_primitive_fields */);
@@ -106,11 +105,12 @@ void Span::injectContext(Tracing::TraceContext& trace_context) {
   trace_context.setByReferenceKey(XRayTraceHeader, xray_header_value);
 }
 
-Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& operation_name,
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,
                                   Envoy::SystemTime start_time) {
   auto child_span = std::make_unique<XRay::Span>(time_source_, random_, broker_);
   child_span->setName(name());
   child_span->setOperation(operation_name);
+  child_span->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
   child_span->setStartTime(start_time);
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
@@ -118,12 +118,14 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& ope
   return child_span;
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
+Tracing::SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& operation_name,
+                                   Envoy::SystemTime start_time,
                                    const absl::optional<XRayHeader>& xray_header) {
 
   auto span_ptr = std::make_unique<XRay::Span>(time_source_, random_, *daemon_broker_);
   span_ptr->setName(segment_name_);
   span_ptr->setOperation(operation_name);
+  span_ptr->setDirection(Tracing::HttpTracerUtility::toString(config.operationName()));
   // Even though we have a TimeSource member in the tracer, we assume the start_time argument has a
   // more precise value than calling the systemTime() at this point in time.
   span_ptr->setStartTime(start_time);

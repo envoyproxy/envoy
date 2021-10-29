@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
+#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -16,14 +16,14 @@ namespace {
 const std::string MaxDefaultConfig = R"EOF(
 name: envoy.filters.http.cdn_loop
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
   cdn_id: cdn
 )EOF";
 
 const std::string MaxOf2Config = R"EOF(
 name: envoy.filters.http.cdn_loop
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
   cdn_id: cdn
   max_allowed_occurrences: 2
 )EOF";

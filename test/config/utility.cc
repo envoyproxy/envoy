@@ -508,6 +508,39 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
   return cluster_load_assignment;
 }
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                 const std::string& leds_collection_name) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+        leds_cluster_locality_config:
+          leds_config:
+            resource_api_version: V3
+            ads: {{}}
+          leds_collection_name: {}
+    )EOF",
+                                        name, leds_collection_name),
+                            cluster_load_assignment);
+  return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::LbEndpoint ConfigHelper::buildLbEndpoint(const std::string& address,
+                                                                      uint32_t port) {
+  API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      endpoint:
+        address:
+          socket_address:
+            address: {}
+            port_value: {}
+    )EOF",
+                                        address, port),
+                            lb_endpoint);
+  return lb_endpoint;
+}
+
 envoy::config::listener::v3::Listener
 ConfigHelper::buildBaseListener(const std::string& name, const std::string& address,
                                 const std::string& filter_chains) {
@@ -620,6 +653,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  ASSERT_TRUE(static_resources->listeners_size() > 0);
+  auto* listener = static_resources->mutable_listeners(0);
+  auto* map = listener->mutable_metadata()->mutable_typed_filter_metadata();
+  (*map)[std::string(key)] = packed_value;
+};
+
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
   RELEASE_ASSERT(!finalized_, "");
@@ -683,9 +725,11 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
-                                        bool use_alternate_protocols_cache) {
-  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+void ConfigHelper::configureUpstreamTls(
+    bool use_alpn, bool http3,
+    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+        alternate_protocol_cache_config) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -716,10 +760,13 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
       }
-      if (use_alternate_protocols_cache) {
+      if (alternate_protocol_cache_config.has_value()) {
         new_protocol_options.mutable_auto_config()
             ->mutable_alternate_protocols_cache_options()
             ->set_name("default_alternate_protocols_cache");
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->CopyFrom(alternate_protocol_cache_config.value());
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -748,11 +795,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
-}
-
-void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
-  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,

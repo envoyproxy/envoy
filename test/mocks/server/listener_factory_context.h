@@ -35,6 +35,7 @@ public:
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, serverScope, ());
   MOCK_METHOD(Singleton::Manager&, singletonManager, ());
   MOCK_METHOD(OverloadManager&, overloadManager, ());
   MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
@@ -43,6 +44,7 @@ public:
   MOCK_METHOD(bool, isQuicListener, (), (const));
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, listenerMetadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, listenerTypedMetadata, (), (const));
   MOCK_METHOD(envoy::config::core::v3::TrafficDirection, direction, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, ());
   Event::TestTimeSystem& timeSystem() { return time_system_; }

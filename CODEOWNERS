@@ -40,6 +40,8 @@ extensions/filters/common/original_src @snowp @klarose
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
 /*/extensions/transport_sockets/alts @antoniovicente @asraa @yangminzhu
+# tcp_stats transport socket extension
+/*/extensions/transport_sockets/tcp_stats @ggreenway @mattklein123
 # tls transport socket extension
 /*/extensions/transport_sockets/tls @lizan @asraa @ggreenway
 # tls SPIFFE certificate validator extension
@@ -192,6 +194,9 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /*/extensions/matching/input_matchers/ip @aguinet @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
+# DNS Resolver
+/*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
+/*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan
@@ -204,3 +209,4 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 /contrib/sxg/ @cpapazian @rgs1 @alyssawilk
 /contrib/sip_proxy/ @durd07 @nearbyfly @dorisd0102
 /contrib/cryptomb/ @rojkov @ipuustin
+/contrib/vcl/ @florincoras @rojkov

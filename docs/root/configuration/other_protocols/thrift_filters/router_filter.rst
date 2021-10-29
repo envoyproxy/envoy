@@ -40,10 +40,24 @@ Since these stats utilize the underlying cluster scope, we prefix with the ``thr
   thrift.upstream_resp_success, Counter, Total Replies that are considered "Successes".
   thrift.upstream_resp_error, Counter, Total Replies that are considered "Errors".
   thrift.upstream_resp_exception, Counter, Total responses with the "Exception" message type.
+  thrift.upstream_resp_exception_local, Counter, Total responses with the "Exception" message type generated locally.
+  thrift.upstream_resp_exception_remote, Counter, Total responses with the "Exception" message type received from remote.
   thrift.upstream_resp_invalid_type, Counter, Total responses with an unsupported message type.
+  thrift.upstream_resp_decoding_error, Counter, Total responses with an error during decoding.
   thrift.upstream_rq_time, Histogram, total rq time from rq complete to resp complete; includes oneway messages.
   thrift.upstream_rq_size, Histogram, Request message size in bytes per upstream
   thrift.upstream_resp_size, Histogram, Response message size in bytes per upstream
+
+If the service zone is available for both the local service (via :option:`--service-zone`)
+and the :ref:`upstream cluster <arch_overview_service_discovery_types_eds>`,
+Envoy will track the following statistics in *cluster.<name>.zone.<from_zone>.<to_zone>.* namespace.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  thrift.upstream_resp_<\*>, Counter, "Total responses of each type (e.g., reply, success, etc.)"
+  thrift.upstream_rq_time, Histogram, Request time milliseconds
 
 .. note::
 

@@ -143,7 +143,7 @@ public:
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  ListenerImpl& getDrainingListener() { return *draining_listener_; }
+  ListenerImpl& getDrainingListener() const { return *draining_listener_; }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.
