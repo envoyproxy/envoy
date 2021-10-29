@@ -68,14 +68,14 @@ message Route {
 
 message RouteMatch {
   // Used to match request service of downstream request. Only relevant when the application
-  // protocol is RPC such as Dubbo or Thrifit.
+  // protocol is RPC such as Dubbo or Thrift.
   google.protobuf.StringValue service = 1;
 
   // Used to match request method of downstream request. Only relevant when the application
-  // protocol is RPC such as Dubbo or Thrifit.
+  // protocol is RPC such as Dubbo or Thrift.
   type.matcher.v3.StringMatcher method = 2;
 
-  // Specifies a set of key:value pairs in th metadata that the route should match on. The router
+  // Specifies a set of key:value pairs in the metadata that the route should match on. The router
   // will check the metadata populated by the codec plugin against all the specified key:value
   // pairs in the route config. A match will happen if all the key:value pairs in the route are
   // present in the request metadata with the same values (or based on presence if the value field
