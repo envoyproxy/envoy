@@ -45,6 +45,7 @@ using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Not;
 using testing::Return;
+using testing::UnorderedElementsAreArray;
 
 namespace Envoy {
 namespace Network {
@@ -656,7 +657,7 @@ public:
           if (address == "localhost" && lookup_family == DnsLookupFamily::V4Only) {
             EXPECT_THAT(address_as_string_list, IsSupersetOf(expected_results));
           } else {
-            EXPECT_EQ(expected_results, address_as_string_list);
+            EXPECT_THAT(address_as_string_list, UnorderedElementsAreArray(expected_results));
           }
 
           for (const auto& expected_absent_result : expected_absent_results) {
@@ -999,6 +1000,33 @@ TEST_P(DnsImplTest, V4PreferredV6IfOnlyV6) {
 TEST_P(DnsImplTest, V4PreferredV4IfOnlyV4) {
   server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
   EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, AllIfBothV6andV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
+                                             DnsResolver::ResolutionStatus::Success,
+                                             {{"201.134.56.7"}, {"1::2"}}, {}, absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, AllV6IfOnlyV6) {
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
+                                             DnsResolver::ResolutionStatus::Success, {{"1::2"}}, {},
+                                             absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(DnsImplTest, AllV4IfOnlyV4) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  EXPECT_NE(nullptr, resolveWithExpectations("some.good.domain", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Success,
                                              {{"201.134.56.7"}}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
