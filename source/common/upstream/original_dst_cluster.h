@@ -56,6 +56,17 @@ public:
     HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
     // Preconnecting is not implemented for OriginalDstCluster
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
+    // Pool selection not implemented for OriginalDstCluster
+    absl::optional<Upstream::SelectedPoolAndConnection>
+    selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                             const Upstream::Host& /*host*/,
+                             std::vector<uint8_t>& /*hash_key*/) override {
+      return absl::nullopt;
+    }
+    // Lifetime tracking not implemented for OriginalDstCluster
+    OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+      return {};
+    }
 
   private:
     Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);

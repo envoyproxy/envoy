@@ -11,9 +11,9 @@ cc_library(
     ],
     hdrs =
         glob([
-            "wee8/include/**/*.h",
-            "wee8/src/**/*.h",
-            "wee8/third_party/wasm-api/wasm.hh",
+            "include/**/*.h",
+            "src/**/*.h",
+            "third_party/wasm-api/wasm.hh",
         ]),
     copts = [
         "-Wno-range-loop-analysis",
@@ -22,9 +22,9 @@ cc_library(
         "V8_ENABLE_WEBASSEMBLY",
     ],
     includes = [
-        "wee8",
-        "wee8/include",
-        "wee8/third_party",
+        ".",
+        "include",
+        "third_party",
     ],
     tags = ["skip_on_windows"],
     visibility = ["//visibility:public"],
@@ -33,8 +33,8 @@ cc_library(
 genrule(
     name = "build",
     srcs = glob(
-        ["wee8/**"],
-        exclude = ["wee8/out/**"],
+        ["**"],
+        exclude = ["out/**"],
     ),
     outs = [
         "libwee8.a",

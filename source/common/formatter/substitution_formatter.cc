@@ -716,6 +716,26 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
+  } else if (field_name == "UPSTREAM_WIRE_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
+        });
+  } else if (field_name == "UPSTREAM_HEADER_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->headerBytesReceived();
+        });
+  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->wireBytesReceived();
+        });
+  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->headerBytesReceived();
+        });
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -739,6 +759,26 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+  } else if (field_name == "UPSTREAM_WIRE_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->wireBytesSent();
+        });
+  } else if (field_name == "UPSTREAM_HEADER_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+        });
+  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->wireBytesSent();
+        });
+  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->headerBytesSent();
+        });
   } else if (field_name == "DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });

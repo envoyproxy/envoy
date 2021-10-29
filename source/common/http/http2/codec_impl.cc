@@ -449,12 +449,11 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   // In this callback we are writing out a raw DATA frame without copying. nghttp2 assumes that we
   // "just know" that the frame header is 9 bytes.
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
-  static const uint64_t FRAME_HEADER_SIZE = 9;
 
   parent_.protocol_constraints_.incrementOutboundDataFrameCount();
 
   Buffer::OwnedImpl output;
-  parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE);
+  parent_.addOutboundFrameFragment(output, framehd, H2_FRAME_HEADER_SIZE);
   if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
@@ -812,7 +811,6 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
          connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = hd->stream_id;
-
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
@@ -877,6 +875,14 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
+  }
+
+  // Track bytes sent and received.
+  if (frame->hd.type != METADATA_FRAME_TYPE) {
+    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  }
+  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {
@@ -944,7 +950,17 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // data from our peer. Sometimes it raises the invalid frame callback, and sometimes it does not.
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
-  ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
+  ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
+                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
+  StreamImpl* stream = getStream(frame->hd.stream_id);
+  if (stream != nullptr) {
+    if (frame->hd.type != METADATA_FRAME_TYPE) {
+      stream->bytes_meter_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+      stream->bytes_meter_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+  }
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);

@@ -120,6 +120,8 @@ public:
 
   absl::string_view responseDetails() override { return details_; }
 
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+
 protected:
   virtual void switchStreamBlockState() PURE;
 
@@ -183,6 +185,8 @@ private:
   // state change in its own call stack. And Envoy upstream doesn't like quic stream to be unblocked
   // in its callstack either because the stream will push data right away.
   Event::SchedulableCallbackPtr async_stream_blockage_change_;
+
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
   absl::optional<size_t> content_length_;
   size_t received_content_bytes_{0};
 };
