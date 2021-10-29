@@ -404,7 +404,7 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
-SysCallIntResult OsSysCallsImpl::getifaddrs(InterfaceAddressVector&) {
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
