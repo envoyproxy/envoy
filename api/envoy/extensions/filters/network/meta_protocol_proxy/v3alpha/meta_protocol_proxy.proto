@@ -5,7 +5,6 @@ package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
 import "envoy/config/core/v3/config_source.proto";
 
 import "envoy/extensions/filters/network/meta_protocol_proxy/route/v3alpha/route.proto";
-
 import "google/protobuf/any.proto";
 
 import "udpa/annotations/status.proto";

@@ -67,22 +67,17 @@ message Route {
 }
 
 message RouteMatch {
-  // Traget service name of downstream request.
-  google.protobuf.StringValue service = 2;
+  // Used to match request service of downstream request. Only relevant when the application protocol is RPC such as Dubbo or Thrifit.
+  google.protobuf.StringValue service = 1;
 
-  // Used to match request path of downstream request. If request path does not match
-  // this rule, the entire request does not match the current route.
-  type.matcher.v3.StringMatcher path = 3;
-
-  // Used to match request method of downstream request. If request method does not match
-  // this rule, the entire request does not match the current route.
-  type.matcher.v3.StringMatcher method = 4;
+  // Used to match request method of downstream request. Only relevant when the application protocol is RPC such as Dubbo or Thrifit.
+  type.matcher.v3.StringMatcher method = 2;
 
   // Specifies a set of key:value pairs in th metadata that the route should match on. The router will check the metadata
   // populated by the codec plugin against all the specified key:value pairs in the route config. A match will happen if all the
   // key:value pairs in the route are present in the request metadata with the same values (or based on presence if
   // the value field is not in the config).
-  repeated envoy.config.route.v3.HeaderMatcher metadata = 1;
+  repeated envoy.config.route.v3.HeaderMatcher metadata = 3;
 }
 
 message RouteAction {
