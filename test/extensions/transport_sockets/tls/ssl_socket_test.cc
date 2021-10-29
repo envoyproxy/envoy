@@ -4611,7 +4611,7 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
 }
 
 TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
-  // The test checks that revoked certificate will makes the validation fails even if we set
+  // The test checks that revoked certificate will makes the validation success even if we set
   // only_verify_leaf_cert_crl to true.
   //
   // Trust chain contains:
