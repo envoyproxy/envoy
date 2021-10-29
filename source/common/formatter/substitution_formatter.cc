@@ -952,6 +952,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return absl::nullopt;
         });
+  } else if (field_name == "JA3_TLS_FINGERPRINT_HASH") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.ja3Hash();
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

@@ -82,6 +82,8 @@ public:
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
+  MOCK_METHOD(void, setJA3Hash, (const absl::string_view));
+  MOCK_METHOD(const std::string&, ja3Hash, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
@@ -136,6 +138,7 @@ public:
   BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
+  std::string ja3_hash_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
   std::string filter_chain_name_;

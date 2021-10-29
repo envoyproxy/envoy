@@ -273,6 +273,12 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_cluster_info_;
   }
 
+  void setJA3Hash(absl::string_view ja3_hash) override {
+    ja3_hash_ = std::string(ja3_hash);
+  }
+
+  const std::string& ja3Hash() const override { return ja3_hash_; }
+
   void setFilterChainName(absl::string_view filter_chain_name) override {
     filter_chain_name_ = std::string(filter_chain_name);
   }
@@ -368,6 +374,7 @@ private:
   // Default construct the object because upstream stream is not constructed in some cases.
   BytesMeterSharedPtr upstream_bytes_meter_{std::make_shared<BytesMeter>()};
   BytesMeterSharedPtr downstream_bytes_meter_;
+  std::string ja3_hash_;
 };
 
 } // namespace StreamInfo

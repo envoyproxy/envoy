@@ -1,5 +1,6 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
+#include "source/common/common/empty_string.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 
@@ -45,6 +46,8 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 }
 
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
+
+absl::string_view EnvoyQuicClientSession::ja3Hash() const { return EMPTY_STRING; }
 
 void EnvoyQuicClientSession::connect() {
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)

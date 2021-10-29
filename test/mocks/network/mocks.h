@@ -330,6 +330,8 @@ public:
   MOCK_METHOD(const std::vector<std::string>&, requestedApplicationProtocols, (), (const));
   MOCK_METHOD(void, setRequestedServerName, (absl::string_view));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
+  MOCK_METHOD(void, setJA3Hash, (absl::string_view));
+  MOCK_METHOD(absl::string_view, ja3Hash, (), (const));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));

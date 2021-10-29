@@ -651,6 +651,16 @@ public:
     downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
     upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
   }
+
+  /**
+   * @return Connection ja3 fingerprint hash of the downstream connection, if any.
+   */
+  virtual const std::string& ja3Hash() const PURE;
+
+  /**
+   * @param ja3_hash JA3 fingerprint hash of the downstream connection.
+   */
+  virtual void setJA3Hash(absl::string_view ja3_hash) PURE;
 };
 
 } // namespace StreamInfo

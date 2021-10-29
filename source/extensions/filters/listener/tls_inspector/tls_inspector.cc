@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <iomanip>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -12,8 +13,11 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_format.h"
+#include "openssl/md5.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -25,9 +29,13 @@ namespace TlsInspector {
 const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
 const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
+Config::Config(
+  Stats::Scope& scope,
+  const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
+  uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      enable_ja3_fingerprinting_(proto_config.enable_tls_ja3_fingerprinting()),
       max_client_hello_size_(max_client_hello_size) {
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
@@ -41,6 +49,9 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   SSL_CTX_set_select_certificate_cb(
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+        Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
+        filter->createJA3Hash(client_hello);
+
         const uint8_t* data;
         size_t len;
         if (SSL_early_callback_ctx_extension_get(
@@ -230,6 +241,158 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
     return ParseState::Done;
   default:
     return ParseState::Error;
+  }
+}
+
+// Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)
+static const uint16_t GREASE[] = {
+    0x0a0a,
+    0x1a1a,
+    0x2a2a,
+    0x3a3a,
+    0x4a4a,
+    0x5a5a,
+    0x6a6a,
+    0x7a7a,
+    0x8a8a,
+    0x9a9a,
+    0xaaaa,
+    0xbaba,
+    0xcaca,
+    0xdada,
+    0xeaea,
+    0xfafa,
+};
+
+bool isNotGrease(uint16_t id) {
+  for (size_t i = 0; i < (sizeof(GREASE) / sizeof(GREASE[0])); ++i) {
+    if (id == GREASE[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
+  CBS cipher_suites;
+  CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
+
+  bool first = true;
+  while (CBS_len(&cipher_suites) > 0) {
+    uint16_t id;
+    if (!CBS_get_u16(&cipher_suites, &id)) {
+      return;
+    }
+
+    if (isNotGrease(id)) {
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
+      }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
+    }
+  }
+}
+
+void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
+  CBS extensions;
+  CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
+
+  bool first = true;
+  while (CBS_len(&extensions) > 0) {
+    uint16_t id;
+    CBS extension;
+
+    if (!CBS_get_u16(&extensions, &id) || !CBS_get_u16_length_prefixed(&extensions, &extension)) {
+      return;
+    }
+    if (isNotGrease(id)) {
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
+      }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
+    }
+  }
+}
+
+void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
+  const uint8_t* ec_data;
+  size_t ec_len;
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_supported_groups,
+                                            &ec_data, &ec_len)) {
+    CBS ec;
+    CBS_init(&ec, ec_data, ec_len);
+
+    // skip list length
+    uint16_t id;
+    if (!CBS_get_u16(&ec, &id)) {
+      return;
+    }
+
+    bool first = true;
+    while (CBS_len(&ec) > 0) {
+      if (!CBS_get_u16(&ec, &id)) {
+        return;
+      }
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
+      }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
+    }
+  }
+}
+
+void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
+  const uint8_t* ecpf_data;
+  size_t ecpf_len;
+  if (SSL_early_callback_ctx_extension_get(ssl_client_hello, TLSEXT_TYPE_ec_point_formats,
+                                            &ecpf_data, &ecpf_len)) {
+    CBS ecpf;
+    CBS_init(&ecpf, ecpf_data, ecpf_len);
+
+    // skip list length
+    uint8_t id;
+    if (!CBS_get_u8(&ecpf, &id)) {
+      return;
+    }
+
+    bool first = true;
+    while (CBS_len(&ecpf) > 0) {
+      if (!CBS_get_u8(&ecpf, &id)) {
+        return;
+      }
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
+      }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
+    }
+  }
+}
+
+void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  if (config_->enableJA3Fingerprinting()) {
+    std::string fingerprint;
+    const uint16_t client_version = ssl_client_hello->version;
+    absl::StrAppendFormat(&fingerprint, "%d,", client_version);
+    writeCipherSuites(ssl_client_hello, fingerprint);
+    absl::StrAppend(&fingerprint, ",");
+    writeExtensions(ssl_client_hello, fingerprint);
+    absl::StrAppend(&fingerprint, ",");
+    writeEllipticCurves(ssl_client_hello, fingerprint);
+    absl::StrAppend(&fingerprint, ",");
+    writeEllipticCurvePointFormats(ssl_client_hello, fingerprint);
+
+    ENVOY_LOG(debug, "tls:createJA3Hash(), fingerprint: {}", fingerprint);
+
+    uint8_t buf[MD5_DIGEST_LENGTH];
+    MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
+    std::string md5 = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
+    ENVOY_LOG(debug, "tls:createJA3Hash(), hash: {}", md5);
+
+    cb_->socket().setJA3Hash(md5);
   }
 }
 
