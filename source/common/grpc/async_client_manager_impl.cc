@@ -149,44 +149,51 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
+AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {
+  cache_eviction_timer_ = dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
+}
+
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  ASSERT(look_up_.find(config) == look_up_.end());
+  ASSERT(lru_map_.find(config) == lru_map_.end());
   // Create a new cache entry at the beginning of the list.
-  cache_.emplace_front(config, client, dispatcher_.timeSource().monotonicTime());
-  look_up_[config] = cache_.begin();
+  lru_list_.emplace_front(config, client, dispatcher_.timeSource().monotonicTime());
+  lru_map_[config] = lru_list_.begin();
   // If inserting to an empty cache, enable eviction timer.
-  if (cache_.size() == 1) {
+  if (lru_list_.size() == 1) {
     evictEntriesAndResetEvictionTimer();
   }
 }
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) {
-  auto it = look_up_.find(config);
-  if (it != look_up_.end()) {
+  RawAsyncClientSharedPtr client;
+  auto it = lru_map_.find(config);
+  if (it != lru_map_.end()) {
     auto cache_entry = it->second;
     // Reset the eviction timer if the next entry to expire is accessed.
-    bool should_reset_timer = (cache_entry == --cache_.end());
+    bool should_reset_timer = (cache_entry == --lru_list_.end());
     cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
     // Move the cache entry to the beginning of the list upon access.
-    cache_.splice(cache_.begin(), cache_, cache_entry);
+    lru_list_.splice(lru_list_.begin(), lru_list_, cache_entry);
+    // Get the cached async client before any cache eviction.
+    client = cache_entry->client_;
     if (should_reset_timer) {
       evictEntriesAndResetEvictionTimer();
     }
-    return cache_entry->client_;
   }
-  return nullptr;
+  return client;
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTimer() {
-  while (!cache_.empty()) {
-    MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-    MonotonicTime next_expire = cache_.back().accessed_time_ + EntryTimeoutInterval;
+  MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+  while (!lru_list_.empty()) {
+    MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
     if (now >= next_expire) {
       // Erase the expired entry.
-      look_up_.erase(cache_.back().config_);
-      cache_.pop_back();
+      lru_map_.erase(lru_list_.back().config_);
+      lru_list_.pop_back();
     } else {
       // Evict in a while loop because now timestamp keep changing, make sure next_expire > now
       cache_eviction_timer_->enableTimer(

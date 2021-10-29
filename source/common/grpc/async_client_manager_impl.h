@@ -56,10 +56,7 @@ public:
                                               bool skip_cluster_check) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
-    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {
-      cache_eviction_timer_ =
-          dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
-    }
+    explicit RawAsyncClientCache(Event::Dispatcher& dispatcher);
     void setCache(const envoy::config::core::v3::GrpcService& config,
                   const RawAsyncClientSharedPtr& client);
 
@@ -75,10 +72,11 @@ public:
       RawAsyncClientSharedPtr client_;
       MonotonicTime accessed_time_;
     };
-    absl::flat_hash_map<envoy::config::core::v3::GrpcService, std::list<CacheEntry>::iterator,
-                        MessageUtil, MessageUtil>
-        look_up_;
-    std::list<CacheEntry> cache_;
+    using LruList = std::list<CacheEntry>;
+    absl::flat_hash_map<envoy::config::core::v3::GrpcService, LruList::iterator, MessageUtil,
+                        MessageUtil>
+        lru_map_;
+    LruList lru_list_;
     Event::Dispatcher& dispatcher_;
     Envoy::Event::TimerPtr cache_eviction_timer_;
     static constexpr std::chrono::seconds EntryTimeoutInterval{50};
