@@ -141,7 +141,7 @@ public:
   virtual HostConstSharedPtr peekAnotherHost(LoadBalancerContext* context) PURE;
 
   /**
-   * Returns connnection lifetime callbacks that may be used to inform the load balancer of
+   * Returns connection lifetime callbacks that may be used to inform the load balancer of
    * connection events. Load balancers which do not intend to track connection lifetime events
    * will return nullopt.
    * @return optional lifetime callbacks for this load balancer.
