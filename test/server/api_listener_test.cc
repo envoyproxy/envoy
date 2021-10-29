@@ -123,7 +123,8 @@ api_listener:
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
       "Unable to unpack as "
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager: "
-      "[type.googleapis.com/envoy.config.cluster.v3.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "
+      "[type.googleapis.com/envoy.config.cluster.v3.Cluster] {\n  name: \"cluster1\"\n  type: "
+      "EDS\n  "
       "eds_cluster_config {\n    eds_config {\n      path: \"eds path\"\n    }\n  }\n}\n");
 }
 
