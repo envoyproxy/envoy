@@ -13,12 +13,12 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
 option java_outer_classname = "MetaRouteConfigurationProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol Proxy Route Configuration]
 // Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
+// [#not-implemented-hide:]
 
-// [#next-free-field: 3]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match route_config_name in
   // envoy.extensions.filters.network.meta_protocol_proxy.v1alpha.Rds.

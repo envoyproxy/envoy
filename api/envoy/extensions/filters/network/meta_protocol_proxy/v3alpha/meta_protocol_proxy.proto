@@ -13,11 +13,12 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
 option java_outer_classname = "MetaProtocolProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol proxy]
 // Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
 // [#extension: envoy.filters.network.meta_protocol_proxy]
+// [#not-implemented-hide:]
 
 // [#next-free-field: 7]
 message MetaProtocolProxy {

@@ -7,10 +7,11 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.router.v3alpha";
 option java_outer_classname = "RouterProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Router]
 // MetaProtocol router :ref:`configuration overview <config_meta_protocol_filters_router>`.
+// [#not-implemented-hide:]
 
 message Router {
 }
