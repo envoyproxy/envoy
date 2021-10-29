@@ -130,7 +130,7 @@ TEST(HeaderStringTest, All) {
     EXPECT_EQ(data_with_leading_lws, string.getStringView());
   }
 
-    // Inline trim, only whitespace
+  // Inline trim, only whitespace
   {
     const std::string only_lws = " \t\f\v";
     HeaderString string;
