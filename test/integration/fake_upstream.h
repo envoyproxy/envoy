@@ -212,7 +212,7 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
-  const StreamInfo::StreamInfo& streamInfo() const override {
+  StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;
   }
@@ -579,6 +579,7 @@ struct FakeUpstreamConfig {
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -723,8 +724,12 @@ private:
         : UdpListenerReadFilter(callbacks), parent_(parent) {}
 
     // Network::UdpListenerReadFilter
-    void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
-    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    Network::FilterStatus onData(Network::UdpRecvData& data) override {
+      return parent_.onRecvDatagram(data);
+    }
+    Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    }
 
   private:
     FakeUpstream& parent_;
@@ -756,7 +761,9 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_);
+        // Initialize QUICHE flags.
+        quiche::FlagRegistry::getInstance();
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -810,13 +817,14 @@ private:
 
   void threadRoutine();
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  void onRecvDatagram(Network::UdpRecvData& data);
+  Network::FilterStatus onRecvDatagram(Network::UdpRecvData& data);
   AssertionResult
   runOnDispatcherThreadAndWait(std::function<AssertionResult()> cb,
                                std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactoryPtr socket_factory_;
   ConditionalInitializer server_initialized_;

@@ -177,7 +177,12 @@ protected:
     absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
   };
 
-  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {}
+  ScopedRdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, ipVersion()) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
+  }
 
   ~ScopedRdsIntegrationTest() override { resetConnections(); }
 
@@ -397,7 +402,10 @@ fragments:
         response);
   }
 
-  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
+  bool isDelta() {
+    return sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+           sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta;
+  }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;

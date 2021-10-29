@@ -89,15 +89,6 @@ public:
   static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
 
   /**
-   * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
-   * NOTE:  public for testing
-   * @param dns_name the DNS name to match
-   * @param pattern the pattern to match against (*.example.com)
-   * @return true if the san matches pattern
-   */
-  static bool dnsNameMatch(const absl::string_view dns_name, const absl::string_view pattern);
-
-  /**
    * Performs subjectAltName matching with the provided matchers.
    * @param ssl the certificate to verify
    * @param subject_alt_name_matchers the configured matchers to match

@@ -31,6 +31,7 @@ CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -128,6 +129,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -145,7 +148,6 @@ GSS
 GTEST
 GURL
 Grabbit
-Hashable
 HC
 HCM
 HDS
@@ -636,6 +638,7 @@ evbuffer
 evbuffers
 evconnlistener
 evented
+eventfd
 evwatch
 exe
 execlp
@@ -700,6 +703,7 @@ handshaker
 hardcoded
 hardcodes
 hardcoding
+hashable
 hasher
 hashtagging
 hd

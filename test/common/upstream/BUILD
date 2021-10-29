@@ -35,6 +35,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_impl_test",
     srcs = ["cluster_manager_impl_test.cc"],
+    args = [
+        # Force creation of c-ares DnsResolverImpl when running test on macOS.
+        "--runtime-feature-disable-for-tests=envoy.restart_features.use_apple_api_for_dns_lookups",
+    ],
     external_deps = [
         "abseil_optional",
     ],
@@ -42,6 +46,7 @@ envoy_cc_test(
         ":test_cluster_manager",
         "//source/common/router:context_lib",
         "//source/common/upstream:load_balancer_factory_base_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//test/config:v2_link_hacks",
         "//test/integration/load_balancers:custom_lb_policy",
@@ -141,6 +146,7 @@ envoy_cc_benchmark_binary(
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:utility_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
@@ -666,6 +672,8 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:priority_set_mocks",
+        "//test/mocks/upstream:thread_aware_load_balancer_mocks",
+        "//test/mocks/upstream:typed_load_balancer_factory_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

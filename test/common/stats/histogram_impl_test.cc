@@ -95,5 +95,17 @@ TEST_F(HistogramSettingsImplTest, Priority) {
   EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({1, 2}));
 }
 
+TEST_F(HistogramSettingsImplTest, ScaledPercent) {
+  envoy::config::metrics::v3::HistogramBucketSettings setting;
+  setting.mutable_match()->set_prefix("a");
+  setting.mutable_buckets()->Add(0.1);
+  setting.mutable_buckets()->Add(2);
+  buckets_configs_.push_back(setting);
+
+  initialize();
+  EXPECT_EQ(settings_->buckets("test"), settings_->defaultBuckets());
+  EXPECT_EQ(settings_->buckets("abcd"), ConstSupportedBuckets({0.1, 2}));
+}
+
 } // namespace Stats
 } // namespace Envoy

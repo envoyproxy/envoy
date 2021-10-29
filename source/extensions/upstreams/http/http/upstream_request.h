@@ -80,8 +80,9 @@ public:
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 
   void resetStream() override {
-    request_encoder_->getStream().removeCallbacks(*this);
-    request_encoder_->getStream().resetStream(Envoy::Http::StreamResetReason::LocalReset);
+    auto& stream = request_encoder_->getStream();
+    stream.removeCallbacks(*this);
+    stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
   }
 
   void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
@@ -100,6 +101,10 @@ public:
 
   void onBelowWriteBufferLowWatermark() override {
     upstream_request_.onBelowWriteBufferLowWatermark();
+  }
+
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override {
+    return request_encoder_->getStream().bytesMeter();
   }
 
 private:

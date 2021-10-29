@@ -368,7 +368,7 @@ envoy_cc_test(
         "multiplexed_integration_test.cc",
         "multiplexed_integration_test.h",
     ],
-    shard_count = 4,
+    shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/buffer:buffer_lib",
@@ -760,6 +760,7 @@ envoy_cc_test_library(
         ":utility_lib",
         "//source/common/common:thread_lib",
         "//source/common/config:api_version_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:context_config_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
@@ -778,7 +779,10 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
+    ] + select({
+        "//bazel:apple": ["//source/extensions/network/dns_resolver/apple:config"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_test_library(
@@ -1850,5 +1854,19 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "typed_metadata_integration_test",
+    srcs = [
+        "typed_metadata_integration_test.cc",
+    ],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/common/protobuf",
+        "//test/integration/filters:listener_typed_metadata_filter_lib",
+        "//test/server:utility_lib",
+        "//test/test_common:utility_lib",
     ],
 )
