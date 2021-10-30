@@ -139,6 +139,9 @@ rm -f san_dns3_cert.cfg
 # Concatenate san_dns3_cert.pem and Test Intermediate CA (intermediate_ca_cert.pem) to create valid certificate chain.
 cat san_dns3_cert.pem intermediate_ca_cert.pem > san_dns3_chain.pem
 
+# Generate san_dns3_certkeychain.p12 with no password
+openssl pkcs12 -export -out san_dns3_certkeychain.p12 -inkey san_dns3_key.pem -in san_dns3_cert.pem -certfile san_dns3_chain.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
+
 # Generate san_dns4_cert.pm (signed by intermediate_ca_cert.pem).
 cp -f san_dns_cert.cfg san_dns4_cert.cfg
 generate_rsa_key san_dns4
@@ -173,6 +176,9 @@ cp -f san_uri_cert.cfg password_protected_cert.cfg
 generate_rsa_key password_protected "" "p4ssw0rd"
 generate_x509_cert password_protected ca
 rm -f password_protected_cert.cfg
+
+# Generate password_protected_certkey.p12
+openssl pkcs12 -export -out password_protected_certkey.p12 -inkey password_protected_key.pem -in password_protected_cert.pem -passout "file:password_protected_password.txt" -passin "pass:p4ssw0rd"
 
 # Generate selfsigned*_cert.pem.
 generate_rsa_key selfsigned

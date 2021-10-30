@@ -167,20 +167,19 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       auto& ctx = tls_contexts_[i];
       // Load certificate chain.
       const auto& tls_certificate = tls_certificates[i].get();
-      ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
-      ctx.pfx_file_path_ = tls_certificate.pfxFilePath();
       bssl::UniquePtr<BIO> bio;
-      if (!tls_certificate.pfxFile().empty()) {
-        bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.pfxFile().data()),
-                                  tls_certificate.pfxFile().size()));
+      if (!tls_certificate.pkcs12().empty()) {
+        ctx.cert_chain_file_path_ = tls_certificate.pkcs12Path();
+        bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.pkcs12().data()),
+                                  tls_certificate.pkcs12().size()));
         RELEASE_ASSERT(bio != nullptr, "");
-        ctx.pfx_file_.reset(d2i_PKCS12_bio(bio.get(), nullptr));
+        bssl::UniquePtr<PKCS12> pkcs12(d2i_PKCS12_bio(bio.get(), nullptr));
 
         EVP_PKEY* temp_private_key = nullptr;
         X509* temp_cert = nullptr;
         STACK_OF(X509)* ca_certificates = nullptr;
-        if (ctx.pfx_file_ == nullptr ||
-            !PKCS12_parse(ctx.pfx_file_.get(),
+        if (pkcs12 == nullptr ||
+            !PKCS12_parse(pkcs12.get(),
                           !tls_certificate.password().empty()
                               ? const_cast<char*>(tls_certificate.password().c_str())
                               : nullptr,
@@ -192,23 +191,35 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                            ERR_GET_REASON(err),
                            absl::NullSafeStringView(ERR_reason_error_string(err)));
           }
-          throw EnvoyException(absl::StrCat("Failed to load pfx file from ", ctx.pfx_file_path_));
+          throw EnvoyException(
+              absl::StrCat("Failed to load pkcs12 from ", tls_certificate.pkcs12Path()));
         }
         if (ca_certificates) {
           X509* ca_cert = nullptr;
           while ((ca_cert = sk_X509_pop(ca_certificates)) != nullptr) {
             //
-            // This transfers ownership to SSLCtx and ca_cert does not need to be freed.
+            // This transfers ownership to ssl_ctx therefore ca_cert does not need to be freed.
             //
             SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), ca_cert);
           }
         }
         ctx.cert_chain_.reset(temp_cert);
         bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
+        if (!SSL_CTX_use_certificate(ctx.ssl_ctx_.get(), ctx.cert_chain_.get())) {
+          while (uint64_t err = ERR_get_error()) {
+            ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                           absl::NullSafeStringView(ERR_lib_error_string(err)),
+                           absl::NullSafeStringView(ERR_func_error_string(err)),
+                           ERR_GET_REASON(err),
+                           absl::NullSafeStringView(ERR_reason_error_string(err)));
+          }
+          throw EnvoyException(
+              absl::StrCat("Failed to load certificate from ", tls_certificate.pkcs12Path()));
+        }
         if (temp_private_key == nullptr ||
             !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
           throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}",
-                                           tls_certificate.pfxFilePath(),
+                                           tls_certificate.pkcs12Path(),
                                            Utility::getLastCryptoError().value_or("unknown")));
         }
 
@@ -220,7 +231,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
           if (!EC_KEY_check_fips(ecdsa_private_key)) {
             throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
                                              "pairwise consistency test required in FIPS mode",
-                                             tls_certificate.pfxFilePath()));
+                                             tls_certificate.pkcs12Path()));
           }
         } break;
         case EVP_PKEY_RSA: {
@@ -228,13 +239,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
           if (!RSA_check_fips(rsa_private_key)) {
             throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
                                              "pairwise consistency test required in FIPS mode",
-                                             tls_certificate.pfxFilePath()));
+                                             tls_certificate.pkcs12Path()));
           }
         } break;
         }
 #endif
 
       } else {
+        ctx.cert_chain_file_path_ = tls_certificate.certificateChainPath();
         bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
                                   tls_certificate.certificateChain().size()));
         RELEASE_ASSERT(bio != nullptr, "");

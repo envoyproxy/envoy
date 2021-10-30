@@ -36,9 +36,9 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       private_key_(Config::DataSource::read(config.private_key(), true, api)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
                             .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      pfx_file_(Config::DataSource::read(config.pfx_file(), true, api)),
-      pfx_file_path_(Config::DataSource::getPath(config.pfx_file()))
-                            .value_or(pfx_file_.empty() ? EMPTY_STRING : INLINE_STRING)),
+      pkcs12_(Config::DataSource::read(config.pkcs12(), true, api)),
+      pkcs12_path_(Config::DataSource::getPath(config.pkcs12())
+                            .value_or(pkcs12_.empty() ? EMPTY_STRING : INLINE_STRING)),
       password_(Config::DataSource::read(config.password(), true, api)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
@@ -50,18 +50,18 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     throw EnvoyException(fmt::format(
         "Certificate configuration can't have both private_key and private_key_provider"));
   }
-  if (config.has_pfx_file()) {
+  if (config.has_pkcs12()) {
     if (config.has_private_key()) {
       throw EnvoyException(
-          fmt::format("Certificate configuration can't have both private_key and pfx_file"));
+          fmt::format("Certificate configuration can't have both pkcs12 and private_key"));
     }
     if (config.has_certificate_chain()) {
       throw EnvoyException(
-          fmt::format("Certificate configuration can't have both certificate_chain and pfx_file"));
+          fmt::format("Certificate configuration can't have both pkcs12 and certificate_chain"));
     }
-    if (config.has_private_key_provider) {
+    if (config.has_private_key_provider()) {
       throw EnvoyException(fmt::format(
-          "Certificate configuration can't have both private_key_provider and pfx_file"));
+          "Certificate configuration can't have both pkcs12 and private_key_provider"));
     }
   } else {
     if (config.has_private_key_provider()) {
