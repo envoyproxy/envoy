@@ -133,6 +133,8 @@ envoy_cc_library(
     srcs = ["hash_policy.cc"],
     hdrs = ["hash_policy.h"],
     deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/network:connection_interface",
         "//envoy/network:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

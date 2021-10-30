@@ -68,9 +68,10 @@ message DnsFilterConfig {
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // DNS resolution configuration which includes the underlying dns resolver addresses and options.
-    // This field will be deprecated in favor of
+    // This field is deprecated in favor of
     // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.ClientContextConfig.typed_dns_resolver_config>`.
-    config.core.v3.DnsResolutionConfig dns_resolution_config = 5;
+    config.core.v3.DnsResolutionConfig dns_resolution_config = 5
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
     // or any other DNS resolver types and the related parameters.

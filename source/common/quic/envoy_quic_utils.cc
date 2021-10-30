@@ -127,7 +127,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 }
 
 Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   if (local_addr == nullptr) {
@@ -235,6 +235,14 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
   connection_socket->setRequestedServerName(hostname);
   connection_socket->setRequestedApplicationProtocols({alpn});
   return connection_socket;
+}
+
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config) {
+  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
+  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
+  configQuicInitialFlowControlWindow(config, quic_config);
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

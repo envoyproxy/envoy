@@ -5,7 +5,7 @@
 
 #include "source/common/config/datasource.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
@@ -255,7 +255,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
       config->api());
 }
 
-void DnsFilter::onData(Network::UdpRecvData& client_request) {
+Network::FilterStatus DnsFilter::onData(Network::UdpRecvData& client_request) {
   config_->stats().downstream_rx_bytes_.recordValue(client_request.buffer_->length());
   config_->stats().downstream_rx_queries_.inc();
 
@@ -271,17 +271,19 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
   if (!query_context->parse_status_) {
     config_->stats().downstream_rx_invalid_queries_.inc();
     sendDnsResponse(std::move(query_context));
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
   // Resolve the requested name and respond to the client. If the return code is
   // External, we will respond to the client when the upstream resolver returns
   if (getResponseForQuery(query_context) == DnsLookupResponseCode::External) {
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
   // We have an answer, it might be "No Answer". Send it to the client
   sendDnsResponse(std::move(query_context));
+
+  return Network::FilterStatus::StopIteration;
 }
 
 void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
@@ -589,9 +591,11 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
   return (targets_discovered != 0);
 }
 
-void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
+Network::FilterStatus DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
   config_->stats().downstream_rx_errors_.inc();
   UNREFERENCED_PARAMETER(error_code);
+
+  return Network::FilterStatus::StopIteration;
 }
 
 } // namespace DnsFilter

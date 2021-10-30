@@ -188,6 +188,12 @@ TEST_F(OriginalDstClusterTest, NoContext) {
     EXPECT_CALL(dispatcher_, post(_)).Times(0);
     HostConstSharedPtr host = lb.chooseHost(&lb_context);
     EXPECT_EQ(host, nullptr);
+
+    EXPECT_EQ(nullptr, lb.peekAnotherHost(nullptr));
+    EXPECT_FALSE(lb.lifetimeCallbacks().has_value());
+    std::vector<uint8_t> hash_key;
+    auto mock_host = std::make_shared<NiceMock<MockHost>>();
+    EXPECT_FALSE(lb.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
   }
 
   // Downstream connection is not using original dst => no host.

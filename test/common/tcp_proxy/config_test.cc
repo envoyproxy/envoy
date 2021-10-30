@@ -1,3 +1,5 @@
+#include "envoy/common/hashable.h"
+
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 
 namespace Envoy {
@@ -454,7 +456,22 @@ TEST(ConfigTest, HashWithSourceIpConfig) {
   EXPECT_NE(nullptr, config_obj.hashPolicy());
 }
 
-TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
+TEST(ConfigTest, HashWithFilterStateConfig) {
+  const std::string yaml = R"EOF(
+  stat_prefix: name
+  cluster: foo
+  hash_policy:
+  - filter_state: {
+      key: foo
+    }
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
+  EXPECT_NE(nullptr, config_obj.hashPolicy());
+}
+
+TEST(ConfigTest, HashWithDefaultConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
   cluster: foo
@@ -545,14 +562,7 @@ TEST_F(TcpProxyNonDeprecatedConfigRoutingTest, ClusterNameSet) {
 
 class TcpProxyHashingTest : public testing::Test {
 public:
-  void setup() {
-    const std::string yaml = R"EOF(
-    stat_prefix: name
-    cluster: fake_cluster
-    hash_policy:
-    - source_ip: {}
-    )EOF";
-
+  void setup(const std::string& yaml) {
     factory_context_.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
     config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
   }
@@ -571,23 +581,74 @@ public:
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   std::unique_ptr<Filter> filter_;
+
+  class HashableObj : public StreamInfo::FilterState::Object, public Hashable {
+  public:
+    absl::optional<uint64_t> hash() const override { return 31337; }
+  };
 };
 
-// Test TCP proxy use source IP to hash.
+// Test TCP proxy using source IP to hash.
 TEST_F(TcpProxyHashingTest, HashWithSourceIp) {
-  setup();
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - source_ip: {}
+    )EOF";
+  setup(yaml);
   initializeFilter();
+
+  // Ensure there is no remote address (MockStreamInfo sets one by default), and expect no hash.
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        EXPECT_FALSE(context->computeHashKey().has_value());
+        return absl::nullopt;
+      }));
+  filter_->onNewConnection();
+
+  // Set remote address, and expect a hash.
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
         EXPECT_TRUE(context->computeHashKey().has_value());
         return absl::nullopt;
       }));
+  filter_->onNewConnection();
+}
 
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111));
-  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
-      std::make_shared<Network::Address::Ipv4Instance>("2.3.4.5", 2222));
+// Test TCP proxy using filter state to hash.
+TEST_F(TcpProxyHashingTest, HashWithFilterState) {
+  const std::string yaml = R"EOF(
+    stat_prefix: name
+    cluster: fake_cluster
+    hash_policy:
+    - filter_state: {
+        key: foo
+      }
+    )EOF";
+  setup(yaml);
+  initializeFilter();
 
+  // Expect no hash when filter state is unset.
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        EXPECT_FALSE(context->computeHashKey().has_value());
+        return absl::nullopt;
+      }));
+  filter_->onNewConnection();
+
+  // Set filter state, and expect HashableObj's hash is now used.
+  connection_.stream_info_.filter_state_->setData("foo", std::make_unique<HashableObj>(),
+                                                  StreamInfo::FilterState::StateType::ReadOnly,
+                                                  StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
+      .WillOnce(Invoke([](Upstream::ResourcePriority, Upstream::LoadBalancerContext* context) {
+        EXPECT_EQ(31337, context->computeHashKey().value());
+        return absl::nullopt;
+      }));
   filter_->onNewConnection();
 }
 
