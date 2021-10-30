@@ -106,6 +106,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
                                               source_address, quic_stat_names, scope);
         if (data.connection_ == nullptr) {
+          ENVOY_LOG_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
+              "Failed to create Http/3 client. Failed to create quic network connection.");
           return nullptr;
         }
         // Store a handle to connection as it will be moved during client construction.
