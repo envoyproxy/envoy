@@ -389,10 +389,6 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
                               const bool append_xfh) {
-  if (hostname.empty()) {
-    return;
-  }
-
   if (append_xfh && !headers.getHostValue().empty()) {
     headers.appendForwardedHost(headers.getHostValue(), ",");
   }

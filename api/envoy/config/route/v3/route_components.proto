@@ -1038,9 +1038,13 @@ message RouteAction {
     type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
 
-  // If set, then a :ref:`host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`
-  // action causes the original value of the host header, if any, to be appended to
-  // the :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
+  // If set, then a host rewrite action (one of
+  // :ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+  // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+  // :ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+  // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+  // causes the original value of the host header, if any, to be appended to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
   bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
