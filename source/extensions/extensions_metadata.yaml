@@ -343,11 +343,6 @@ envoy.filters.network.local_ratelimit:
   - envoy.filters.network
   security_posture: robust_to_untrusted_downstream
   status: stable
-envoy.filters.network.meta_protocol_proxy:
-  categories:
-  - envoy.filters.network
-  security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
 envoy.filters.network.mongo_proxy:
   categories:
   - envoy.filters.network

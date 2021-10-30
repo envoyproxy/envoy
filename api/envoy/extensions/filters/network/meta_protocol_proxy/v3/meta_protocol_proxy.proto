@@ -1,25 +1,27 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
+package envoy.extensions.filters.network.meta_protocol_proxy.v3;
 
 import "envoy/config/core/v3/config_source.proto";
-import "envoy/extensions/filters/network/meta_protocol_proxy/v3alpha/route.proto";
+import "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
+
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3";
 option java_outer_classname = "MetaProtocolProxyProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol proxy]
-// Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
-// [#extension: envoy.filters.network.meta_protocol_proxy]
-// [#not-implemented-hide:]
+// Meta Protocol proxy.
 
+// [#not-implemented-hide:]
 // [#next-free-field: 7]
 message MetaProtocolProxy {
   // The human readable prefix to use when emitting statistics.
@@ -48,15 +50,17 @@ message MetaProtocolProxy {
   repeated MetaProtocolFilter meta_protocol_filters = 6;
 }
 
+// [#not-implemented-hide:]
 message Rds {
   // Configuration source specifier for RDS.
-  envoy.config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This name will be passed to the RDS API. This allows an
   // Envoy configuration with multiple MetaProtocol proxies to use different route configurations.
   string route_config_name = 2;
 }
 
+// [#not-implemented-hide:]
 // MetaProtocolFilter configures a MetaProtocol filter.
 message MetaProtocolFilter {
   // The name of the filter to instantiate. The name must match a supported filter.
@@ -67,6 +71,7 @@ message MetaProtocolFilter {
   google.protobuf.Any config = 2;
 }
 
+// [#not-implemented-hide:]
 message Codec {
   // The name of the codec configuration.
   string name = 1 [(validate.rules).string = {min_len: 1}];

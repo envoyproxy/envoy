@@ -1,31 +1,32 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.meta_protocol_proxy.v3alpha;
+package envoy.extensions.filters.network.meta_protocol_proxy.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
-import "envoy/type/v3/percent.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3alpha";
-option java_outer_classname = "MetaRouteConfigurationProto";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3";
+option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_status).work_in_progress = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol Proxy Route Configuration]
-// Meta Protocol proxy :ref:`configuration overview <config_meta_protocol_proxy>`.
-// [#not-implemented-hide:]
 
+// [#not-implemented-hide:]
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match route_config_name in
-  // envoy.extensions.filters.network.meta_protocol_proxy.v1alpha.Rds.
+  // envoy.extensions.filters.network.meta_protocol_proxy.v3.Rds.
   string name = 1;
 
   // The list of routes that will be matched, in order, against incoming requests. The first route
@@ -33,6 +34,7 @@ message RouteConfiguration {
   repeated Route routes = 2;
 }
 
+// [#not-implemented-hide:]
 message RetryPolicy {
   // When certain conditions are met, the upstream request is retried. Supports retry when a
   // network error occurs or when the response status is a specific status.
@@ -45,6 +47,8 @@ message RetryPolicy {
   google.protobuf.Duration per_try_timeout = 3;
 }
 
+// [#not-implemented-hide:]
+// [#next-free-field: 8]
 message Route {
   // Name for the route.
   string name = 1;
@@ -70,6 +74,7 @@ message Route {
   config.core.v3.Metadata metadata = 7;
 }
 
+// [#not-implemented-hide:]
 message RouteMatch {
   // Used to match request service of downstream request. Only relevant when the application
   // protocol is RPC such as Dubbo or Thrift.
@@ -84,9 +89,10 @@ message RouteMatch {
   // pairs in the route config. A match will happen if all the key:value pairs in the route are
   // present in the request metadata with the same values (or based on presence if the value field
   // is not in the config).
-  repeated envoy.config.route.v3.HeaderMatcher metadata = 3;
+  repeated config.route.v3.HeaderMatcher metadata = 3;
 }
 
+// [#not-implemented-hide:]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -97,6 +103,6 @@ message RouteAction {
     // Multiple upstream clusters can be specified for a given route. The request is routed to one
     // of the upstream clusters based on weights assigned to each cluster.
     // Currently ClusterWeight only supports the name and weight fields.
-    envoy.config.route.v3.WeightedCluster weighted_clusters = 2;
+    config.route.v3.WeightedCluster weighted_clusters = 2;
   }
 }
