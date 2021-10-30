@@ -1,7 +1,6 @@
 /docs/root/version_history/current.rst merge=union
 /generated_api_shadow/envoy/** linguist-generated=true
 /generated_api_shadow/bazel/** linguist-generated=true
-*.pfx binary
 *.svg binary
 /test/extensions/transport_sockets/tls/test_data/aes_128_key binary
 /test/extensions/transport_sockets/tls/test_data/ticket_key_* binary
