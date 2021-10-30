@@ -30,17 +30,21 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
                                   parent.host()->cluster().stats().upstream_cx_http3_total_, data) {
 }
 
+void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
+  updateCapacity(num_streams);
+  if (state() == ActiveClient::State::BUSY && currentUnusedCapacity() != 0) {
+    parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
+    // If there's waiting streams, make sure the pool will now serve them.
+    parent_.onUpstreamReady();
+  }
+}
+
 void Http3ConnPoolImpl::setQuicConfigFromClusterConfig(const Upstream::ClusterInfo& cluster,
                                                        quic::QuicConfig& quic_config) {
-  // TODO(alyssawilk) use and test other defaults.
+  Quic::convertQuicConfig(cluster.http3Options().quic_protocol_options(), quic_config);
   quic::QuicTime::Delta crypto_timeout =
       quic::QuicTime::Delta::FromMilliseconds(cluster.connectTimeout().count());
   quic_config.set_max_time_before_crypto_handshake(crypto_timeout);
-  int32_t max_streams = getMaxStreams(cluster);
-  quic_config.SetMaxBidirectionalStreamsToSend(max_streams);
-  quic_config.SetMaxUnidirectionalStreamsToSend(max_streams);
-  Quic::configQuicInitialFlowControlWindow(cluster.http3Options().quic_protocol_options(),
-                                           quic_config);
 }
 
 Http3ConnPoolImpl::Http3ConnPoolImpl(
