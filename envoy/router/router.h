@@ -1096,8 +1096,6 @@ using RouteCallback = std::function<RouteMatchStatus(RouteConstSharedPtr, RouteE
  */
 class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming HTTP request headers, determine the target route (containing either a
    * route entry or a direct response entry) for the request.

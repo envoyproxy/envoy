@@ -88,8 +88,6 @@ using RouteConstSharedPtr = std::shared_ptr<const Route>;
  */
 class Config : public Rds::Config {
 public:
-  virtual ~Config() = default;
-
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
    * route for the request.
