@@ -10,7 +10,6 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/grpc/common.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"

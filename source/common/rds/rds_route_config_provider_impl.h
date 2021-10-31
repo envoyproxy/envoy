@@ -8,7 +8,6 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/rds/rds_route_config_subscription.h"
 
 namespace Envoy {

@@ -1,5 +1,7 @@
 #include "source/common/rds/rds_route_config_subscription.h"
 
+#include "source/common/common/logger.h"
+
 namespace Envoy {
 namespace Rds {
 

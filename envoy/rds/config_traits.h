@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/subscription.h"
 #include "envoy/rds/config.h"
 
 #include "source/common/protobuf/protobuf.h"
