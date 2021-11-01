@@ -55,7 +55,6 @@ private:
                                           SymbolTable& symbol_table);
 };
 
-
 bool isTagNameValid(absl::string_view name);
 
 bool isTagValueValid(absl::string_view value);
