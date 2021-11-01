@@ -45,6 +45,10 @@ public:
       copy->setMethodName(methodName());
     }
 
+    if (hasHeaderFlags()) {
+      copy->setHeaderFlags(headerFlags());
+    }
+
     if (hasSequenceId()) {
       copy->setSequenceId(sequenceId());
     }
