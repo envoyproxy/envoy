@@ -234,9 +234,11 @@ matcher:
               cluster: udp_service
   )EOF";
 
-  setup(yaml);
-
-  EXPECT_EQ("", router_->route(parseAddress("10.0.0.1:10000")));
+  EXPECT_THROW_WITH_MESSAGE(
+      setup(yaml), EnvoyException,
+      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
+      "only match on source IP, saw "
+      "type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput");
 }
 
 } // namespace
