@@ -1786,6 +1786,8 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::Auto;
   case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
     return Network::DnsLookupFamily::V4Preferred;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
