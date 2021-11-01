@@ -221,9 +221,9 @@ stat_prefix: foo
 matcher:
   matcher_tree:
     input:
-      name: destination-ip
+      name: source-ip
       typed_config:
-        '@type': type.googleapis.com/envoy.type.matcher.v3.DestinationIpMatchInput
+        '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
     exact_match_map:
       map:
         "10.0.0.1":

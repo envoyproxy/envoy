@@ -64,7 +64,7 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
     return cluster_.value();
   } else {
     if (address->ip()) {
-      Network::Matching::NetworkMatchingDataImpl data(address->ip(), nullptr);
+      Network::Matching::NetworkMatchingDataImpl data(address->ip());
 
       auto result = matcher_->match(data);
       if (result.match_state_ == Matcher::MatchState::MatchComplete) {

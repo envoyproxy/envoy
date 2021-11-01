@@ -218,9 +218,6 @@ public:
   virtual ~NetworkMatchingData() = default;
 
   virtual OptRef<const Address::Ip> sourceIp() const PURE;
-  virtual OptRef<const Address::Ip> destinationIp() const PURE;
-  virtual absl::optional<uint32_t> sourcePort() const PURE;
-  virtual absl::optional<uint32_t> destinationPort() const PURE;
 };
 
 /**

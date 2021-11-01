@@ -15,18 +15,3 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#comment:TODO(snowp): Link to unified matching docs.]
 message SourceIpMatchInput {
 }
-
-// Match input indicates that matching should be done on a specific destination IP.
-// [#comment:TODO(snowp): Link to unified matching docs.]
-message DestinationIpMatchInput {
-}
-
-// Match input indicates that matching should be done on a specific source port.
-// [#comment:TODO(snowp): Link to unified matching docs.]
-message SourcePortMatchInput {
-}
-
-// Match input indicates that matching should be done on a specific destination port.
-// [#comment:TODO(snowp): Link to unified matching docs.]
-message DestinationPortMatchInput {
-}
