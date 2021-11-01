@@ -52,10 +52,14 @@ public:
     void setRejectFraction(UnitFloat) override {}
   };
 
+  // ActiveListenerImplBase
   Network::Listener* listener() override { return listener_.get(); }
 
+  // Network::TcpConnectionHandler
   Network::BalancedConnectionHandlerOptRef
   getBalancedHandlerByAddress(const Network::Address::Instance&) override {
+    // Internal listener doesn't support migrate connection to another worker.
+    // TODO(lambdai): implement the function of handling off to another listener of the same worker.
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -74,6 +78,7 @@ public:
   // Network::InternalListenerCallbacks
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
 
+  // Network::BalancedConnectionHandler
   void incNumConnections() override { config_->openConnections().inc(); }
   void decNumConnections() override { config_->openConnections().dec(); }
 

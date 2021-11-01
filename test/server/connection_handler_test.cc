@@ -1586,16 +1586,16 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
       .WillOnce(ReturnRef(local_address));
   handler_->addListener(absl::nullopt, *internal_listener);
   auto internal_listener_cb = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb.has_value());
+  ASSERT_TRUE(internal_listener_cb.has_value());
 
   handler_->disableListeners();
   auto internal_listener_cb_disabled = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb_disabled.has_value());
+  ASSERT_TURE(internal_listener_cb_disabled.has_value());
   ASSERT_EQ(&internal_listener_cb_disabled.value().get(), &internal_listener_cb.value().get());
 
   handler_->enableListeners();
   auto internal_listener_cb_enabled = handler_->findByAddress(local_address);
-  ASSERT(internal_listener_cb_enabled.has_value());
+  ASSERT_TRUE(internal_listener_cb_enabled.has_value());
   ASSERT_EQ(&internal_listener_cb_enabled.value().get(), &internal_listener_cb.value().get());
 }
 

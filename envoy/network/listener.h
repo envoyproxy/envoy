@@ -472,7 +472,7 @@ public:
   virtual ~InternalListenerManager() = default;
 
   /**
-   * Return the internal listener binding the listener address.
+   * Return the internal listener callbacks binding the listener address.
    *
    * @param listen_address the internal address of the expected internal listener.
    */
