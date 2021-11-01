@@ -54,6 +54,7 @@ namespace Envoy {
 namespace Network {
 
 using DnsCacheManagerSharedPtr = Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr;
+using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedPtr>;
 
 /**
  * Object responsible for tracking network state, especially with respect to multiple interfaces,
@@ -68,12 +69,12 @@ public:
   /**
    * @returns a list of local network interfaces supporting IPv4.
    */
-  std::vector<std::string> enumerateV4Interfaces();
+  std::vector<InterfacePair> enumerateV4Interfaces();
 
   /**
    * @returns a list of local network interfaces supporting IPv6.
    */
-  std::vector<std::string> enumerateV6Interfaces();
+  std::vector<InterfacePair> enumerateV6Interfaces();
 
   /**
    * @param family, network family of the interface.
@@ -81,8 +82,8 @@ public:
    * @param reject_flags, flags which MUST NOT be set for any returned interface.
    * @returns a list of local network interfaces filtered by the providered flags.
    */
-  std::vector<std::string> enumerateInterfaces(unsigned short family, unsigned int select_flags,
-                                               unsigned int reject_flags);
+  std::vector<InterfacePair> enumerateInterfaces(unsigned short family, unsigned int select_flags,
+                                                 unsigned int reject_flags);
 
   /**
    * @returns the current OS default/preferred network class.
@@ -149,7 +150,7 @@ private:
     Thread::MutexBasicLockable mutex_;
   };
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(envoy_network_t network);
-  const std::string getActiveAlternateInterface(envoy_network_t network, unsigned short family);
+  InterfacePair getActiveAlternateInterface(envoy_network_t network, unsigned short family);
 
   bool enable_interface_binding_;
   DnsCacheManagerSharedPtr dns_cache_manager_;

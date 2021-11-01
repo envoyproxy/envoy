@@ -129,7 +129,8 @@ public:
 
 private:
   envoy_status_t main(std::string config, std::string log_level);
-  void logInterfaces();
+  static void logInterfaces(absl::string_view event,
+                            std::vector<Network::InterfacePair>& interfaces);
 
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopePtr client_scope_;

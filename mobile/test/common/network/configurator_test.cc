@@ -124,12 +124,12 @@ TEST_F(ConfiguratorTest, ReportNetworkUsageDisregardsCallsWithStaleConfiguration
 TEST_F(ConfiguratorTest, EnumerateInterfacesFiltersByFlags) {
   // Select loopback.
   auto loopbacks = configurator_->enumerateInterfaces(AF_INET, IFF_LOOPBACK, 0);
-  EXPECT_EQ(loopbacks[0].rfind("lo", 0), 0);
+  EXPECT_EQ(std::get<const std::string>(loopbacks[0]).rfind("lo", 0), 0);
 
   // Reject loopback.
   auto nonloopbacks = configurator_->enumerateInterfaces(AF_INET, 0, IFF_LOOPBACK);
   for (const auto& interface : nonloopbacks) {
-    EXPECT_NE(interface.rfind("lo", 0), 0);
+    EXPECT_NE(std::get<const std::string>(interface).rfind("lo", 0), 0);
   }
 
   // Select AND reject loopback.
