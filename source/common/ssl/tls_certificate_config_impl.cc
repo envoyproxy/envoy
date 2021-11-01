@@ -38,7 +38,7 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
                             .value_or(private_key_.empty() ? EMPTY_STRING : INLINE_STRING)),
       pkcs12_(Config::DataSource::read(config.pkcs12(), true, api)),
       pkcs12_path_(Config::DataSource::getPath(config.pkcs12())
-                            .value_or(pkcs12_.empty() ? EMPTY_STRING : INLINE_STRING)),
+                       .value_or(pkcs12_.empty() ? EMPTY_STRING : INLINE_STRING)),
       password_(Config::DataSource::read(config.password(), true, api)),
       password_path_(Config::DataSource::getPath(config.password())
                          .value_or(password_.empty() ? EMPTY_STRING : INLINE_STRING)),
@@ -60,8 +60,8 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
           fmt::format("Certificate configuration can't have both pkcs12 and certificate_chain"));
     }
     if (config.has_private_key_provider()) {
-      throw EnvoyException(fmt::format(
-          "Certificate configuration can't have both pkcs12 and private_key_provider"));
+      throw EnvoyException(
+          fmt::format("Certificate configuration can't have both pkcs12 and private_key_provider"));
     }
   } else {
     if (config.has_private_key_provider()) {
