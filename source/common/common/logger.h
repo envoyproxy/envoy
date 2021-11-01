@@ -109,9 +109,26 @@ public:
   explicit SinkDelegate(DelegatingLogSinkSharedPtr log_sink);
   virtual ~SinkDelegate();
 
-  virtual void log(absl::string_view msg) PURE;
+  /**
+   * Called to log a single log line.
+   * @param formatted_msg The final, formatted message.
+   * @param the original log message, including additional metadata.
+   */
+  virtual void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) PURE;
+
+  /**
+   * Called to log a single log line with a stable name.
+   * @param stable_name stable name of this log line.
+   * @param level the string representation of the log level for this log line.
+   * @param component the component this log was logged via.
+   * @param msg the log line to log.
+   */
   virtual void logWithStableName(absl::string_view stable_name, absl::string_view level,
                                  absl::string_view component, absl::string_view msg);
+
+  /**
+   * Called to flush the log sink.
+   */
   virtual void flush() PURE;
 
 protected:
@@ -151,7 +168,7 @@ public:
   ~StderrSinkDelegate() override;
 
   // SinkDelegate
-  void log(absl::string_view msg) override;
+  void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   void flush() override;
 
   bool hasLock() const { return lock_ != nullptr; }
