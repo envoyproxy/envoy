@@ -132,7 +132,7 @@ matcher:
   EXPECT_EQ("udp_service3", router_->route(parseAddress("[fc00::1]:10000")));
 }
 
-// Entries in the router with a single cluster.
+// All cluster names in the router with a single cluster.
 TEST_F(RouterImplTest, SingleClusterEntry) {
   const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -141,10 +141,10 @@ cluster: udp_service
 
   setup(yaml);
 
-  ASSERT_THAT(router_->entries(), testing::UnorderedElementsAre("udp_service"));
+  ASSERT_THAT(router_->allClusterNames(), testing::UnorderedElementsAre("udp_service"));
 }
 
-// Entries in the router with multiple cluster.
+// All cluster names in the router with multiple cluster.
 TEST_F(RouterImplTest, MultipleClusterEntry) {
   const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -172,10 +172,11 @@ matcher:
 
   setup(yaml);
 
-  ASSERT_THAT(router_->entries(), testing::UnorderedElementsAre("udp_service", "udp_service2"));
+  ASSERT_THAT(router_->allClusterNames(),
+              testing::UnorderedElementsAre("udp_service", "udp_service2"));
 }
 
-// Entries in the router with multiple cluster and on_no_match set.
+// All cluster names in the router with multiple cluster and on_no_match set.
 TEST_F(RouterImplTest, OnNoMatchEntry) {
   const std::string yaml = R"EOF(
 stat_prefix: foo
@@ -209,7 +210,7 @@ matcher:
 
   setup(yaml);
 
-  ASSERT_THAT(router_->entries(),
+  ASSERT_THAT(router_->allClusterNames(),
               testing::UnorderedElementsAre("udp_service", "udp_service2", "udp_service3"));
 }
 

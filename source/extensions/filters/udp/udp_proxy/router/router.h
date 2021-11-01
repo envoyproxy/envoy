@@ -21,7 +21,7 @@ public:
   virtual ~Router() = default;
 
   virtual const std::string& route(Network::Address::InstanceConstSharedPtr address) const PURE;
-  virtual const std::vector<std::string>& entries() const PURE;
+  virtual const std::vector<std::string>& allClusterNames() const PURE;
 };
 
 using RouterConstSharedPtr = std::shared_ptr<const Router>;

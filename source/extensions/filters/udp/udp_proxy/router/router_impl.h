@@ -16,7 +16,7 @@ namespace UdpProxy {
 namespace Router {
 
 struct RouteActionContext {
-  absl::flat_hash_set<std::string> entries_;
+  absl::flat_hash_set<std::string> cluster_name_set_;
 };
 
 class RouteMatchAction
@@ -56,13 +56,13 @@ public:
 
   // Router::Router
   const std::string& route(Network::Address::InstanceConstSharedPtr address) const override;
-  const std::vector<std::string>& entries() const override;
+  const std::vector<std::string>& allClusterNames() const override;
 
 private:
   absl::optional<std::string> cluster_;
   Matcher::MatchTreeSharedPtr<Network::NetworkMatchingData> matcher_;
-  std::vector<std::string> entries_;
-  absl::flat_hash_set<std::string> entries_set_;
+  std::vector<std::string> cluster_names_;
+  absl::flat_hash_set<std::string> cluster_name_set_;
 };
 
 } // namespace Router

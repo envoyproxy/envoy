@@ -93,7 +93,7 @@ public:
   const std::string& cluster(Network::Address::InstanceConstSharedPtr address) const {
     return router_->route(address);
   }
-  const std::vector<std::string>& entries() const { return router_->entries(); }
+  const std::vector<std::string>& allClusterNames() const { return router_->allClusterNames(); }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   std::chrono::milliseconds sessionTimeout() const { return session_timeout_; }
   bool usingOriginalSrcIp() const { return use_original_src_ip_; }

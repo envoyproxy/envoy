@@ -21,8 +21,8 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
       const envoy::extensions::filters::udp::udp_proxy::v3::Route&>(config, validation_visitor);
   const auto& cluster = route_config.cluster();
 
-  // Emplace cluster to context to get all clusters
-  context.entries_.emplace(cluster);
+  // Emplace cluster names to context to get all cluster names
+  context.cluster_name_set_.emplace(cluster);
 
   return [cluster]() { return std::make_unique<RouteMatchAction>(cluster); };
 }
@@ -45,16 +45,17 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
                        Server::Configuration::ServerFactoryContext& factory_context) {
   if (config.has_cluster()) {
     cluster_ = config.cluster();
-    entries_.push_back(config.cluster());
+    cluster_names_.push_back(config.cluster());
   } else {
     RouteActionContext context{};
     RouteActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Network::NetworkMatchingData, RouteActionContext> factory(
         context, factory_context, validation_visitor);
     matcher_ = factory.create(config.matcher())();
-    // Copy all clusters to entries
-    entries_.insert(entries_.end(), context.entries_.begin(), context.entries_.end());
-    entries_set_ = std::move(context.entries_);
+    // Copy all clusters names
+    cluster_names_.insert(cluster_names_.end(), context.cluster_name_set_.begin(),
+                          context.cluster_name_set_.end());
+    cluster_name_set_ = std::move(context.cluster_name_set_);
   }
 }
 
@@ -72,8 +73,8 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
           // get the cluster name in a roundabout way.
           auto cluster =
               result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
-          if (entries_set_.contains(cluster)) {
-            return *entries_set_.find(cluster);
+          if (cluster_name_set_.contains(cluster)) {
+            return *cluster_name_set_.find(cluster);
           }
         }
       }
@@ -83,7 +84,7 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
   }
 }
 
-const std::vector<std::string>& RouterImpl::entries() const { return entries_; }
+const std::vector<std::string>& RouterImpl::allClusterNames() const { return cluster_names_; }
 
 } // namespace Router
 } // namespace UdpProxy
