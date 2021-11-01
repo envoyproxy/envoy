@@ -61,7 +61,7 @@ New Features
 * thrift_proxy: add upstream response zone metrics in the form ``cluster.cluster_name.zone.local_zone.upstream_zone.thrift.upstream_resp_success``.
 * thrift_proxy: add upstream metrics to show decoding errors and whether exception is from local or remote, e.g. ``cluster.cluster_name.thrift.upstream_resp_exception_remote``.
 * thrift_proxy: add host level success/error metrics where success is a reply of type success and error is any other response to a call.
-* thrift_proxy: support header flags
+* thrift_proxy: support header flags.
 * thrift_proxy: support subset lb when using request or route metadata.
 * transport_socket: added :ref:`envoy.transport_sockets.tcp_stats <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>` which generates additional statistics gathered from the OS TCP stack.
 * udp: add support for multiple listener filters.
