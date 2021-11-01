@@ -12,8 +12,6 @@ EXTENSIONS = {
     "envoy.transport_sockets.tls": "//source/extensions/transport_sockets/tls:config",
     "envoy.network.dns_resolver.cares": "//source/extensions/network/dns_resolver/cares:config",
     "envoy.network.dns_resolver.apple": "//source/extensions/network/dns_resolver/apple:config",
-    "envoy.filters.listener.tls_inspector": "//source/extensions/filters/listener/tls_inspector:config",
-    "envoy.filters.network.tcp_proxy": "//source/extensions/filters/network/tcp_proxy:config",
 }
 WINDOWS_EXTENSIONS = {}
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
