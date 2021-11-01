@@ -1,5 +1,8 @@
 #include "source/common/stats/tag_utility.h"
 
+#include <regex>
+
+#include "source/common/config/well_known_names.h"
 #include "source/common/stats/symbol_table_impl.h"
 
 namespace Envoy {
@@ -48,6 +51,29 @@ SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,
 
   return symbol_table.join(stat_names);
 }
+
+bool isTagValueValid(absl::string_view name) {
+  std::regex regex{Config::NAME_REGEX, std::regex::optimize};
+  int cntr = 0;
+  for (auto i = std::regex_iterator<absl::string_view::iterator>(name.begin(), name.end(), regex);
+       i != std::regex_iterator<absl::string_view::iterator>(); ++i) {
+    cntr++;
+    if (cntr > 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool isTagNameValid(absl::string_view value) {
+  for (const auto& token : value) {
+    if (!absl::ascii_isalnum(token)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace TagUtility
 } // namespace Stats
 } // namespace Envoy

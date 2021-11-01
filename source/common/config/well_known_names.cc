@@ -18,7 +18,7 @@ std::string expandRegex(const std::string& regex) {
               // underscores.
               {"<CIPHER>", R"([\w-]+)"},
               // A generic name can contain any character except dots.
-              {"<NAME>", R"([^\.]+)"},
+              {"<NAME>", NAME_REGEX},
               // Route names may contain dots in addition to alphanumerics and
               // dashes with underscores.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});

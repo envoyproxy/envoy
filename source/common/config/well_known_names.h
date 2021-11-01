@@ -12,6 +12,8 @@
 namespace Envoy {
 namespace Config {
 
+const std::string NAME_REGEX = R"([^\.]+)";
+
 /**
  * Well-known address resolver names.
  */

@@ -388,6 +388,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
     ],
 )

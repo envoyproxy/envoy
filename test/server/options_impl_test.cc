@@ -405,14 +405,31 @@ TEST_F(OptionsImplTest, InvalidStatsTags) {
 }
 
 TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag foo:b.ar"), MalformedArgvException,
-                          "error: misformatted stats-tag 'foo:b.ar' contains invalid char '.'");
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.ar"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.ar' contains invalid char in 'b.ar'");
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --stats-tag foo:b.a.r"), MalformedArgvException,
+      "error: misformatted stats-tag 'foo:b.a.r' contains invalid char in 'b.a.r'");
+  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --stats-tag f_o:bar"), MalformedArgvException,
+                          "error: misformatted stats-tag 'f_o:bar' contains invalid char in 'f_o'");
 }
 
 TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:bar"));
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b:ar"));
-  EXPECT_NO_THROW(createOptionsImpl("envoy --stats-tag foo:b_-ar"));
+
+  Stats::TagVector test_tags{
+      Stats::Tag{"foo", "bar"},
+      Stats::Tag{"foo", "b:ar"},
+      Stats::Tag{"foo", "b_-ar"},
+  };
+
+  for (const auto& tag : test_tags) {
+    std::unique_ptr<OptionsImpl> options =
+        createOptionsImpl(fmt::format("envoy --stats-tag {}:{}", tag.name_, tag.value_));
+    EXPECT_EQ(options->statsTags().size(), 1);
+    EXPECT_EQ(options->statsTags()[0].name_, tag.name_);
+    EXPECT_EQ(options->statsTags()[0].value_, tag.value_);
+  }
 }
 
 // Test that the test constructor comes up with the same default values as the main constructor.
