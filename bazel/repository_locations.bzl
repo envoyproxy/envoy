@@ -1131,4 +1131,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-09-13",
         cpe = "N/A",
     ),
+    io_bazel_stardoc = dict(
+        project_name = "Stardoc - Starlark Documentation Generator",
+        project_desc = "Stardoc is a documentation generator for Bazel build rules written in Starlark.",
+        project_url = "https://github.com/bazelbuild/stardoc",
+        version = "0.5.0",
+        sha256 = "c9794dcc8026a30ff67cf7cf91ebe245ca294b20b071845d12c192afe243ad72",
+        strip_prefix = "stardoc",
+        urls = ["https://github.com/bazelbuild/stardoc/releases/download/{version}/stardoc-{version}.tar.gz"],
+        use_category = ["other"],
+        release_date = "2021-10-06",
+    ),
 )

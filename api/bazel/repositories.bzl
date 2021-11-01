@@ -46,6 +46,9 @@ def api_dependencies():
         name = "io_bazel_rules_dotnet",
     )
     external_http_archive(
+        name = "io_bazel_stardoc",
+    )
+    external_http_archive(
         name = "rules_dotnet_skylib",
     )
     external_http_archive(
