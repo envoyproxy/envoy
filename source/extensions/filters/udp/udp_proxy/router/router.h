@@ -21,6 +21,12 @@ public:
   virtual ~Router() = default;
 
   virtual const std::string& route(Network::Address::InstanceConstSharedPtr address) const PURE;
+
+  /**
+   * Returns all cluster names in the router. The UDP proxy filter requires every cluster names for
+   * initialization which will call this method on construction.
+   * @return vector of all cluster names.
+   */
   virtual const std::vector<std::string>& allClusterNames() const PURE;
 };
 
