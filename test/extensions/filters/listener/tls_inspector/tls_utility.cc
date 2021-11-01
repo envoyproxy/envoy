@@ -171,7 +171,7 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
       static_cast<uint8_t>(handshake_bytes & 0xff),
       // handshake header
       0x01,
-      // clienthello bytes
+      // client hello bytes
       static_cast<uint8_t>((clienthello_bytes & 0xff0000) >> 16),
       static_cast<uint8_t>((clienthello_bytes & 0xff00) >> 8),
       static_cast<uint8_t>(clienthello_bytes & 0xff)};
