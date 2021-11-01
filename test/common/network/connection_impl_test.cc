@@ -132,7 +132,7 @@ protected:
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
   ~ConnectionImplTest() override {
-    EXPECT_TRUE(timer_destroyed_);
+    EXPECT_TRUE(timer_destroyed_ || timer_ == nullptr);
     if (!timer_destroyed_) {
       delete timer_;
     }
@@ -475,7 +475,9 @@ TEST_P(ConnectionImplTest, ServerTransportSocketTimeoutDisabledOnConnect) {
 
   transport_socket->callbacks_->raiseEvent(ConnectionEvent::Connected);
   EXPECT_TRUE(timer_destroyed);
-
+  if (!timer_destroyed) {
+    delete mock_timer;
+  }
   server_connection->close(ConnectionCloseType::NoFlush);
 }
 
