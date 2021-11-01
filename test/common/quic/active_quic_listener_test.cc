@@ -200,8 +200,9 @@ protected:
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                                    local_address_, nullptr));
+    client_sockets_.push_back(
+        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
+                                              nullptr, Network::SocketCreationOptions{}));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();

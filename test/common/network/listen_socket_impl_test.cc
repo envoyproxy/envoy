@@ -28,7 +28,7 @@ TEST(ConnectionSocketImplTest, LowerCaseRequestedServerName) {
   absl::string_view serverName("www.EXAMPLE.com");
   absl::string_view expectedServerName("www.example.com");
   auto loopback_addr = Network::Test::getCanonicalLoopbackAddress(Address::IpVersion::v4);
-  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr);
+  auto conn_socket_ = ConnectionSocketImpl(Socket::Type::Stream, loopback_addr, loopback_addr, {});
   conn_socket_.setRequestedServerName(serverName);
   EXPECT_EQ(expectedServerName, conn_socket_.requestedServerName());
 }
@@ -221,8 +221,8 @@ TEST_P(ListenSocketImplTestTcp, SupportedIpFamilyVirtualSocketIsCreatedWithNoBsd
   StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
 
   {
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _, _)).Times(0);
     TcpListenSocket virtual_listener_socket(any_address, nullptr,
                                             /*bind_to_port*/ false);
   }
@@ -236,8 +236,8 @@ TEST_P(ListenSocketImplTestTcp, DeathAtUnSupportedIpFamilyListenSocket) {
                                                               : Utility::getIpv4AnyAddress();
   StackedScopedInjectableLoader<SocketInterface> new_interface(std::move(mock_interface));
   {
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _)).Times(0);
-    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _)).Times(0);
+    EXPECT_CALL(*mock_interface_ptr, socket(_, _, _, _, _)).Times(0);
     EXPECT_DEATH(
         {
           TcpListenSocket virtual_listener_socket(the_other_address, nullptr,
