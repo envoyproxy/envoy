@@ -19,5 +19,5 @@ message TlsInspector {
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
 
   // Populate JA3 fingerprint hash using data from the TLS Client Hello packet.
-  bool enable_tls_ja3_fingerprinting = 1;
+  bool enable_ja3_fingerprinting = 1;
 }

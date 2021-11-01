@@ -240,11 +240,6 @@ public:
   virtual absl::string_view requestedServerName() const PURE;
 
   /**
-   * @return ja3 fingerprint hash of the downstream connection, if any.
-   */
-  virtual absl::string_view ja3Hash() const PURE;
-
-  /**
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;

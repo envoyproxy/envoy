@@ -952,7 +952,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return absl::nullopt;
         });
-  } else if (field_name == "JA3_TLS_FINGERPRINT_HASH") {
+  } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.ja3Hash(); });
   } else {

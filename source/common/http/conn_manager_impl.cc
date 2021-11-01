@@ -694,9 +694,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
   }
-
-  filter_manager_.streamInfo().setJA3Hash(
-      connection_manager_.read_callbacks_->connection().ja3Hash());
 }
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {

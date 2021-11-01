@@ -240,7 +240,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
 // Test that the filter sets the ja3 hash
 TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello =
       Tls::Test::generateClientHello(std::get<0>(GetParam()), std::get<1>(GetParam()), "", "");
@@ -264,7 +264,7 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
 // Fingerprint created with User-Agent "curl/7.64.1" and a request to ja3er.com/json.
 TEST_P(TlsInspectorTest, ConnectionJA3Hash) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "771,49200-49196-49192-49188-49172-49162-159-107-57-52393-52392-52394-65413-196-136-"
@@ -289,7 +289,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3Hash) {
 // Fingerprint created with User-Agent "curl/7.64.1" and a request to ja3er.com/json.
 TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::string grease;
   for (uint32_t i = 0x0a0a; i < 0xfafa; i += 0x1010) {
@@ -327,7 +327,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
 // formats in ClientHello message. Fingerprint and hash are from ja3er.com/getAllHashesJson.
 TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "771,4865-4866-4867-4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-"
@@ -352,7 +352,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
 // message. Fingerprint and hash are from ja3er.com/getAllHashesJson.
 TEST_P(TlsInspectorTest, ConnectionJA3HashTls10NoExtensions) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "769,49162-49157-49161-49156-49159-49154-49160-49155-49172-49167-49171-49166-49169-49164-"
@@ -377,7 +377,7 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashTls10NoExtensions) {
 // Fingerprint and hash are from ja3er.com/getAllHashesJson.
 TEST_P(TlsInspectorTest, ConnectionJA3HashTls11) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.set_enable_tls_ja3_fingerprinting(true);
+  proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "770,49162-49172-49161-49171-57-51-53-47-255,0-11-10-13172-16-22-23,18,0-1-2");

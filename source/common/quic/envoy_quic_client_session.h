@@ -42,7 +42,6 @@ public:
 
   // Network::Connection
   absl::string_view requestedServerName() const override;
-  absl::string_view ja3Hash() const override;
   void dumpState(std::ostream&, int) const override {
     // TODO(kbaichoo): Implement dumpState for H3.
   }

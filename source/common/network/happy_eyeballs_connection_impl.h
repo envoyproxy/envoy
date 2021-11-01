@@ -85,7 +85,6 @@ public:
   uint32_t bufferLimit() const override;
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override;
   absl::string_view requestedServerName() const override;
-  absl::string_view ja3Hash() const override;
   StreamInfo::StreamInfo& streamInfo() override;
   const StreamInfo::StreamInfo& streamInfo() const override;
   absl::string_view transportFailureReason() const override;

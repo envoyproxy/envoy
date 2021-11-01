@@ -35,7 +35,7 @@ Config::Config(
     uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
-      enable_ja3_fingerprinting_(proto_config.enable_tls_ja3_fingerprinting()),
+      enable_ja3_fingerprinting_(proto_config.enable_ja3_fingerprinting()),
       max_client_hello_size_(max_client_hello_size) {
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {

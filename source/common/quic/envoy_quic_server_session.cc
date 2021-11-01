@@ -38,8 +38,6 @@ absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
 }
 
-absl::string_view EnvoyQuicServerSession::ja3Hash() const { return EMPTY_STRING; }
-
 std::unique_ptr<quic::QuicCryptoServerStreamBase>
 EnvoyQuicServerSession::CreateQuicCryptoServerStream(
     const quic::QuicCryptoServerConfig* crypto_config,

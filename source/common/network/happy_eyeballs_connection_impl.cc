@@ -248,11 +248,6 @@ absl::string_view HappyEyeballsConnectionImpl::requestedServerName() const {
   return connections_[0]->requestedServerName();
 }
 
-absl::string_view HappyEyeballsConnectionImpl::ja3Hash() const {
-  // Note, this might change before connect finishes.
-  return connections_[0]->ja3Hash();
-}
-
 StreamInfo::StreamInfo& HappyEyeballsConnectionImpl::streamInfo() {
   // Note, this might change before connect finishes.
   return connections_[0]->streamInfo();
