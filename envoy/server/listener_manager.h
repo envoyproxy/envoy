@@ -9,6 +9,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/socket_interface.h"
 #include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -64,14 +65,14 @@ public:
    * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
    * @param bind_type supplies the bind type of the listen socket.
+   * @param creation_options additional options for how to create the socket.
    * @param worker_index supplies the socket/worker index of the new socket.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
-  virtual Network::SocketSharedPtr
-  createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                     Network::Socket::Type socket_type,
-                     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
-                     uint32_t worker_index) PURE;
+  virtual Network::SocketSharedPtr createListenSocket(
+      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t worker_index) PURE;
 
   /**
    * Creates a list of filter factories.

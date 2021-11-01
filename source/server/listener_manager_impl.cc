@@ -168,7 +168,8 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -215,11 +216,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Socket::Type::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::TcpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::UdpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   }
 }
 
@@ -334,8 +335,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
     RELEASE_ASSERT(
         !config.address().has_envoy_internal_address(),
-        fmt::format("listener {} has envoy internal address {}. Internal address cannot be used by "
-                    "listener yet",
+        fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
                     config.name(), config.address().envoy_internal_address().DebugString()));
   }
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
@@ -1022,9 +1022,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
                                      : ListenerComponentFactory::BindType::NoReusePort;
   }
   TRY_ASSERT_MAIN_THREAD {
+    Network::SocketCreationOptions creation_options;
+    creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     return std::make_unique<ListenSocketFactoryImpl>(
         factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, server_.options().concurrency());
+        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {

@@ -63,7 +63,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address, nullptr);
+  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address, nullptr, {});
   RELEASE_ASSERT(sock.setBlockingForTest(false).return_value_ != -1, "");
   sock.bind(uds_address);
 

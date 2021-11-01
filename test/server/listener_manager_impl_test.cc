@@ -115,7 +115,7 @@ public:
 
   void expectAddListener(const envoy::config::listener::v3::Listener& listener_proto,
                          ListenerHandle*) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
     EXPECT_CALL(*worker_, addListener(_, _, _));
     manager_->addOrUpdateListener(listener_proto, "", true);
     worker_->callAddCompletion();
@@ -135,7 +135,7 @@ public:
           .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(new_socket))));
     } else {
       new_socket = listener_factory_.socket_.get();
-      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, 0));
+      EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, 0));
     }
     EXPECT_CALL(*worker_, addListener(_, _, _));
     EXPECT_CALL(*worker_, stopListener(_, _));
@@ -183,7 +183,7 @@ filter_chains:
   )EOF";
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(&manager_->httpContext(), &server_.httpContext());
   EXPECT_EQ(1U, manager_->listeners().size());
@@ -201,7 +201,7 @@ filter_chains:
 - filters: []
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1024 * 1024U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -217,7 +217,7 @@ filter_chains:
 per_connection_buffer_limit_bytes: 8192
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
@@ -249,7 +249,7 @@ filter_chains:
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -269,7 +269,7 @@ filter_chains:
   transport_socket_connect_timeout: 3s
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
   ASSERT_NE(filter_chain, nullptr);
@@ -305,10 +305,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Datagram, _,
-                                 ListenerComponentFactory::BindType::ReusePort, 0))
+                                 ListenerComponentFactory::BindType::ReusePort, _, 0))
       .WillOnce(Invoke(
           [this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                  const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
+                 const Network::SocketCreationOptions&,
                  uint32_t) -> Network::SocketSharedPtr { return listener_factory_.socket_; }));
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
@@ -509,7 +510,7 @@ filter_chains:
   )EOF";
 
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0));
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   manager_->listeners().front().get().listenerScope().counterFromString("foo").inc();
 
@@ -545,7 +546,7 @@ TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
     listener_filters_timeout: 0s
   )EOF";
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true));
   EXPECT_EQ(std::chrono::milliseconds(),
             manager_->listeners().front().get().listenerFiltersTimeout());
@@ -566,7 +567,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
 
   ListenerHandle* listener_foo =
       expectListenerCreate(false, true, envoy::config::listener::v3::Listener::MODIFY_ONLY);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
 
@@ -594,7 +595,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -633,7 +634,7 @@ filter_chains: {}
 
   ListenerHandle* listener_foo_different_address = expectListenerCreate(false, true);
   // Another socket should be created.
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(manager_->addOrUpdateListener(
       parseListenerFromV3Yaml(listener_foo_different_address_yaml), "version2", true));
@@ -677,7 +678,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_baz = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_baz->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "version3", true));
@@ -730,7 +731,7 @@ filter_chains: {}
   // Modify the address of a warming listener.
   ListenerHandle* listener_baz_different_address = expectListenerCreate(true, true);
   // Another socket should be created.
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
     listener_baz->target_.ready();
   }));
@@ -805,7 +806,7 @@ drain_type: default
       .WillByDefault(Return(Api::SysCallSocketResult{INVALID_SOCKET, 0}));
   ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -837,7 +838,7 @@ drain_type: default
       .WillByDefault(Return(Api::SysCallSocketResult{5, 0}));
   ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
 
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -862,7 +863,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, false);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", false));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
   checkConfigDump(R"EOF(
@@ -942,7 +943,7 @@ filter_chains: {}
   { // Add and remove a listener before starting workers.
     ListenerHandle* listener_foo = expectListenerCreate(true, true);
     EXPECT_CALL(server_, initManager()).WillOnce(ReturnRef(server_init_mgr));
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
     EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml),
                                               "version1", true));
     checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -993,7 +994,7 @@ static_listeners:
   server_init_watcher.expectReady().Times(0);
   {
     ListenerHandle* listener_foo2 = expectListenerCreate(true, true);
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
     // Version 2 listener will be initialized by listener manager directly.
     EXPECT_CALL(listener_foo2->target_, initialize());
     EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml),
@@ -1047,7 +1048,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -1128,7 +1129,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "version1", true));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -1317,7 +1318,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_bar = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_yaml), "version4", true));
@@ -1338,7 +1339,7 @@ filter_chains: {}
   )EOF";
 
   ListenerHandle* listener_baz = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_baz->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_yaml), "version5", true));
@@ -1458,7 +1459,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -1524,7 +1525,7 @@ filter_chains:
   listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion();
@@ -1584,7 +1585,7 @@ filter_chains:
   listener_factory_.socket_->connection_info_provider_->setLocalAddress(local_address);
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion();
@@ -1602,7 +1603,7 @@ filter_chains:
 
   // Add foo again. We should use the socket from draining.
   ListenerHandle* listener_foo2 = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion();
@@ -1637,17 +1638,18 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0))
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
           [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
                                          Network::Socket::Type socket_type,
                                          const Network::Socket::OptionsSharedPtr& options,
                                          ListenerComponentFactory::BindType bind_type,
+                                         const Network::SocketCreationOptions& creation_options,
                                          uint32_t worker_index) -> Network::SocketSharedPtr {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-            return real_listener_factory.createListenSocket(address, socket_type, options,
-                                                            bind_type, worker_index);
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
           }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -1676,17 +1678,18 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0))
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke(
           [this, &real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
                                          Network::Socket::Type socket_type,
                                          const Network::Socket::OptionsSharedPtr& options,
                                          ListenerComponentFactory::BindType bind_type,
+                                         const Network::SocketCreationOptions& creation_options,
                                          uint32_t worker_index) -> Network::SocketSharedPtr {
             // When bind_to_port is equal to false, the BSD socket is not created at main thread.
             EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-            return real_listener_factory.createListenSocket(address, socket_type, options,
-                                                            bind_type, worker_index);
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
           }));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
@@ -1731,19 +1734,20 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0))
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
                            Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            ListenerComponentFactory::BindType bind_type,
+                           const Network::SocketCreationOptions& creation_options,
                            uint32_t worker_index) -> Network::SocketSharedPtr {
         EXPECT_CALL(server_, hotRestart).Times(0);
         // When bind_to_port is equal to false, create socket fd directly, and do not get socket
         // fd through hot restart.
         ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
         return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        worker_index);
+                                                        creation_options, worker_index);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -1779,16 +1783,17 @@ filter_chains:
             return result;
           }));
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0))
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
       .WillOnce(Invoke([this, &syscall_result, &real_listener_factory](
                            const Network::Address::InstanceConstSharedPtr& address,
                            Network::Socket::Type socket_type,
                            const Network::Socket::OptionsSharedPtr& options,
                            ListenerComponentFactory::BindType bind_type,
+                           const Network::SocketCreationOptions& creation_options,
                            uint32_t worker_index) -> Network::SocketSharedPtr {
         ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
         return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
-                                                        worker_index);
+                                                        creation_options, worker_index);
       }));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -1799,7 +1804,7 @@ TEST_F(ListenerManagerImplTest, NotSupportedDatagramUds) {
   ProdListenerComponentFactory real_listener_factory(server_);
   EXPECT_THROW_WITH_MESSAGE(real_listener_factory.createListenSocket(
                                 std::make_shared<Network::Address::PipeInstance>("/foo"),
-                                Network::Socket::Type::Datagram, nullptr, default_bind_type, 0),
+                                Network::Socket::Type::Datagram, nullptr, default_bind_type, {}, 0),
                             EnvoyException,
                             "socket type SocketType::Datagram not supported for pipes");
 }
@@ -1821,7 +1826,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true);
 
@@ -1855,7 +1860,7 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, 0))
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
       .WillOnce(Throw(EnvoyException("can't bind")));
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_THROW(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true),
@@ -1948,7 +1953,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   worker_->callAddCompletion();
@@ -2002,7 +2007,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0UL, manager_->listeners().size());
@@ -2016,7 +2021,7 @@ filter_chains:
 
   // Add foo again and initialize it.
   listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 2, 0, 1, 1, 0, 0, 0);
@@ -2083,7 +2088,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   auto foo_inbound_proto = parseListenerFromV3Yaml(listener_foo_yaml);
   EXPECT_TRUE(manager_->addOrUpdateListener(foo_inbound_proto, "", true));
@@ -2107,7 +2112,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo_outbound = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo_outbound->target_, initialize());
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_outbound_yaml), "", true));
@@ -2135,7 +2140,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_bar_outbound = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(*worker_, addListener(_, _, _));
   EXPECT_TRUE(
       manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_bar_outbound_yaml), "", true));
@@ -2187,7 +2192,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -2236,7 +2241,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -2328,7 +2333,7 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, 0));
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
 
@@ -2395,7 +2400,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationP
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2441,7 +2446,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDirectSource
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2486,7 +2491,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDestinationI
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2531,7 +2536,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithServerNamesM
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2577,7 +2582,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithTransportPro
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2619,7 +2624,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithApplicationP
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2664,7 +2669,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceTypeMa
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2724,7 +2729,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpMatc
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2783,7 +2788,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourceIpv6Ma
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2821,7 +2826,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithSourcePortMa
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2887,7 +2892,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainWithSourceType
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -2973,7 +2978,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3058,7 +3063,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDestinati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3153,7 +3158,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDirectSou
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3247,7 +3252,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithServerNam
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3318,7 +3323,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithTransport
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3362,7 +3367,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithApplicati
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3411,7 +3416,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithMultipleR
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3485,7 +3490,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithDifferent
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -3525,7 +3530,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest,
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -3656,7 +3661,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
   )EOF");
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -3681,7 +3686,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateChainInlinePrivateK
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -3913,7 +3918,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -3997,7 +4002,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -4052,7 +4057,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -4102,7 +4107,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -4183,7 +4188,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
                                                        Network::Address::IpVersion::v6);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 
@@ -4228,11 +4233,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
   )EOF",
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_,
-              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, 0))
-      .WillOnce(
-          Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
-                     const Network::Socket::OptionsSharedPtr& options,
-                     ListenerComponentFactory::BindType, uint32_t) -> Network::SocketSharedPtr {
+              createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
+      .WillOnce(Invoke(
+          [&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+              const Network::Socket::OptionsSharedPtr& options, ListenerComponentFactory::BindType,
+              const Network::SocketCreationOptions&, uint32_t) -> Network::SocketSharedPtr {
             EXPECT_EQ(options, nullptr);
             return listener_factory_.socket_;
           }));
@@ -4347,6 +4352,105 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
+// This test relies on linux-only code, and a linux-only name IPPROTO_MPTCP
+#if defined(__linux__)
+TEST_F(ListenerManagerImplWithRealFiltersTest, Mptcp) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: mptcp-udp
+      enable_mptcp: true
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+      filter_chains:
+      - filters:
+    )EOF");
+
+  ListenerHandle* listener_foo = expectListenerCreate(false, true);
+
+  EXPECT_CALL(os_sys_calls_, supportsMptcp()).WillOnce(Return(true));
+
+  // Filter chain check for supported IP family.
+  EXPECT_CALL(os_sys_calls_, socket(_, _, 0))
+      .WillRepeatedly(Return(Api::SysCallSocketResult{5, 0}));
+
+  // Actual creation of the listening socket.
+  EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, IPPROTO_MPTCP))
+      .WillOnce(Return(Api::SysCallSocketResult{5, 0}));
+
+  ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
+
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::SocketCreationOptions creation_options;
+  creation_options.mptcp_enabled_ = true;
+
+  EXPECT_CALL(listener_factory_,
+              createListenSocket(_, _, _, default_bind_type, creation_options, 0))
+      .WillOnce(
+          Invoke([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                          Network::Socket::Type socket_type,
+                                          const Network::Socket::OptionsSharedPtr& options,
+                                          ListenerComponentFactory::BindType bind_type,
+                                          const Network::SocketCreationOptions& creation_options,
+                                          uint32_t worker_index) -> Network::SocketSharedPtr {
+            return real_listener_factory.createListenSocket(
+                address, socket_type, options, bind_type, creation_options, worker_index);
+          }));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(listener, "", true));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+#endif
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MptcpOnUdp) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: mptcp-udp
+      enable_mptcp: true
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+          protocol: UDP
+      filter_chains:
+      - filters:
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+                            "listener mptcp-udp: enable_mptcp can only be used with TCP listeners");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MptcpOnUnixDomainSocket) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: mptcp-udp
+      enable_mptcp: true
+      address:
+        pipe:
+          path: /path
+      filter_chains:
+      - filters:
+    )EOF");
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+                            "listener mptcp-udp: enable_mptcp can only be used with IP addresses");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, MptcpNotSupported) {
+  envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
+      name: mptcp-udp
+      enable_mptcp: true
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1111
+      filter_chains:
+      - filters:
+    )EOF");
+  EXPECT_CALL(os_sys_calls_, supportsMptcp()).WillOnce(Return(false));
+  EXPECT_THROW_WITH_MESSAGE(
+      manager_->addOrUpdateListener(listener, "", true), EnvoyException,
+      "listener mptcp-udp: enable_mptcp is set but MPTCP is not supported by the operating system");
+}
+
 // Set the resolver to the default IP resolver. The address resolver logic is unit tested in
 // resolver_impl_test.cc.
 TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
@@ -4365,7 +4469,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddressResolver) {
       .WillRepeatedly(Return(Network::Utility::parseInternetAddress("127.0.0.1", 1111, false)));
   Registry::InjectFactory<Network::Address::Resolver> register_resolver(mock_resolver);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -4390,7 +4494,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLFilename) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -4418,7 +4522,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLInline) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_CALL(server_.api_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -4993,7 +5097,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5056,7 +5160,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5126,7 +5230,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   EXPECT_EQ(0, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
@@ -5190,7 +5294,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -5276,7 +5380,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -5347,7 +5451,7 @@ filter_chains:
   )EOF";
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true));
   checkStats(__LINE__, 1, 0, 0, 1, 0, 0, 0);
@@ -5413,7 +5517,7 @@ filter_chains:
   // The next step is to add a listener on the same socket address and the listen socket of
   // listener_foo will be duplicated.
   auto listener_foo_expect_reuse_socket = expectListenerCreate(true, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(0);
   EXPECT_CALL(*listener_factory_.socket_, duplicate());
   EXPECT_CALL(listener_foo_expect_reuse_socket->target_, initialize());
   EXPECT_TRUE(
@@ -5487,7 +5591,7 @@ TEST_F(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfWo
   // Worker is not started yet.
   auto listener_proto = createDefaultListener();
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, 0));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());
 
@@ -5638,7 +5742,7 @@ TEST_F(ListenerManagerImplTest, TcpBacklogCustomConfig) {
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _));
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _));
   manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
   EXPECT_EQ(100U, manager_->listeners().back().get().tcpBacklogSize());

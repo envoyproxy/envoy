@@ -89,7 +89,13 @@ function run_clang_tidy() {
 }
 
 function run_clang_tidy_diff() {
-  git diff "$1" | filter_excludes | \
+  local diff
+  diff="$(git diff "${1}")"
+  if [[ -z "$diff" ]]; then
+    echo "No changes detected, skipping clang_tidy_diff"
+    return 0
+  fi
+  echo "$diff" | filter_excludes | \
     python3 "${LLVM_PREFIX}/share/clang/clang-tidy-diff.py" \
       -clang-tidy-binary="${CLANG_TIDY}" \
       -export-fixes="${FIX_YAML}" -j "${NUM_CPUS:-0}" -p 1 -quiet

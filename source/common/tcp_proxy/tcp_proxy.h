@@ -259,9 +259,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(
-          downstreamConnection()->connectionInfoProvider().remoteAddress().get(),
-          downstreamConnection()->connectionInfoProvider().localAddress().get());
+      return hash_policy->generateHash(*downstreamConnection());
     }
 
     return {};
