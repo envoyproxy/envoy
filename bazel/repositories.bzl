@@ -147,6 +147,11 @@ def _go_deps(skip_targets):
 def _rust_deps():
     external_http_archive("rules_rust")
 
+def _csharp_deps():
+    external_http_archive("io_bazel_stardoc")
+    external_http_archive("io_bazel_rules_dotnet")
+    external_http_archive("rules_proto_grpc")    
+
 def envoy_dependencies(skip_targets = []):
     # Add a binding for repository variables.
     envoy_repo()
@@ -243,6 +248,7 @@ def envoy_dependencies(skip_targets = []):
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
+    _csharp_deps()
     _kafka_deps()
 
     _org_llvm_llvm()
