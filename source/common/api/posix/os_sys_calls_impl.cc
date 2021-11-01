@@ -151,6 +151,20 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsMptcp() const {
+#if !defined(__linux__)
+  return false;
+#else
+  int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (fd < 0) {
+    return false;
+  }
+
+  ::close(fd);
+  return true;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};
