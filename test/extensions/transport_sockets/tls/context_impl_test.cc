@@ -1344,7 +1344,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
 }
 
 // Validate that client context config with password-protected TLS certificates loaded from
-// PKCS12 is created successfully.
+// `PKCS12` is created successfully.
 TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
   envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
   secret_config.set_name("abc.com");
@@ -1378,7 +1378,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
             client_context_config.tlsCertificates()[0].get().password());
 }
 
-// Validate that not supplying a passphrase for password-protected PKCS12
+// Validate that not supplying a passphrase for password-protected `PKCS12`
 // triggers a failure loading the private key.
 TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
   envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
