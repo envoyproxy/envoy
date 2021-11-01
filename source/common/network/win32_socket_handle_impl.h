@@ -42,9 +42,6 @@ public:
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
-  IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
-  IoHandlePtr duplicate() override;
-
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 };

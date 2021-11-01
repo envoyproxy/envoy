@@ -6,6 +6,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -460,8 +461,8 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
   if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
-
-  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -495,7 +496,8 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
   RELEASE_ASSERT(result.return_value_ != -1,
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
-  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }

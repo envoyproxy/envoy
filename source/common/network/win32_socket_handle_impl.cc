@@ -77,23 +77,6 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length,
   return result;
 }
 
-IoHandlePtr Win32SocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen) {
-  auto result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
-  if (SOCKET_INVALID(result.return_value_)) {
-    return nullptr;
-  }
-
-  return std::make_unique<Win32SocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
-}
-
-IoHandlePtr Win32SocketHandleImpl::duplicate() {
-  auto result = Api::OsSysCallsSingleton::get().duplicate(fd_);
-  RELEASE_ASSERT(result.return_value_ != -1,
-                 fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
-                             errorDetails(result.errno_)));
-  return std::make_unique<Win32SocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
-}
-
 void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result,
                                                          uint32_t event) {
   if (result.wouldBlock() && file_event_) {

@@ -132,6 +132,7 @@ protected:
       : api_(Api::createApiForTest(time_system_)), stream_info_(time_system_, nullptr) {}
 
   ~ConnectionImplTest() override {
+    EXPECT_TRUE(timer_destroyed_);
     if (!timer_destroyed_) {
       delete timer_;
     }

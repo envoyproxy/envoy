@@ -12,12 +12,17 @@
 namespace Envoy {
 namespace Network {
 
-IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
-                                            absl::optional<int> domain) const {
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                            absl::optional<int> domain) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
   return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+}
+
+IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
+                                            absl::optional<int> domain) const {
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,
