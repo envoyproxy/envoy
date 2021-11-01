@@ -10,6 +10,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/rds_impl.h"
+#include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/server/admin/admin.h"
 
 #include "test/mocks/config/mocks.h"
@@ -96,7 +97,8 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_));
+  EXPECT_NO_THROW(
+      VhdsSubscription(config_update_info.get(), factory_context_, context_, provider_));
 }
 
 // verify that api_type: GRPC fails validation
@@ -114,7 +116,7 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_THROW(VhdsSubscription(config_update_info, factory_context_, context_, provider_),
+  EXPECT_THROW(VhdsSubscription(config_update_info.get(), factory_context_, context_, provider_),
                EnvoyException);
 }
 
@@ -124,8 +126,8 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
-  EXPECT_EQ(0UL, config_update_info->protobufConfiguration().virtual_hosts_size());
+  VhdsSubscription subscription(config_update_info.get(), factory_context_, context_, provider_);
+  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
@@ -135,9 +137,9 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1");
 
-  EXPECT_EQ(1UL, config_update_info->protobufConfiguration().virtual_hosts_size());
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
   EXPECT_TRUE(messageDifferencer_.Equals(
-      vhost, config_update_info->protobufConfiguration().virtual_hosts(0)));
+      vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
 }
 
 // verify that an RDS update of virtual hosts leaves VHDS virtual hosts intact
@@ -183,9 +185,9 @@ vhds:
   )EOF");
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  VhdsSubscription subscription(config_update_info, factory_context_, context_, provider_);
-  EXPECT_EQ(1UL, config_update_info->protobufConfiguration().virtual_hosts_size());
-  EXPECT_EQ("vhost_rds1", config_update_info->protobufConfiguration().virtual_hosts(0).name());
+  VhdsSubscription subscription(config_update_info.get(), factory_context_, context_, provider_);
+  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ("vhost_rds1", config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
 
   auto vhost = buildVirtualHost("vhost_vhds1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
@@ -194,14 +196,14 @@ vhds:
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1");
-  EXPECT_EQ(2UL, config_update_info->protobufConfiguration().virtual_hosts_size());
+  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
 
   config_update_info->onRdsUpdate(updated_route_config, "2");
 
-  EXPECT_EQ(3UL, config_update_info->protobufConfiguration().virtual_hosts_size());
-  auto actual_vhost_0 = config_update_info->protobufConfiguration().virtual_hosts(0);
-  auto actual_vhost_1 = config_update_info->protobufConfiguration().virtual_hosts(1);
-  auto actual_vhost_2 = config_update_info->protobufConfiguration().virtual_hosts(2);
+  EXPECT_EQ(3UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  auto actual_vhost_0 = config_update_info->protobufConfigurationCast().virtual_hosts(0);
+  auto actual_vhost_1 = config_update_info->protobufConfigurationCast().virtual_hosts(1);
+  auto actual_vhost_2 = config_update_info->protobufConfigurationCast().virtual_hosts(2);
   EXPECT_TRUE("vhost_rds1" == actual_vhost_0.name() || "vhost_rds1" == actual_vhost_1.name() ||
               "vhost_rds1" == actual_vhost_2.name());
   EXPECT_TRUE("vhost_rds2" == actual_vhost_0.name() || "vhost_rds2" == actual_vhost_1.name() ||

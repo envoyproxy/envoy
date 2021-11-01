@@ -19,6 +19,7 @@ envoy_cc_library(
     deps = [
         ":router_interface",
         "//envoy/http:filter_interface",
+        "//envoy/rds:rds_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -70,6 +71,7 @@ envoy_cc_library(
         "//envoy/http:conn_pool_interface",
         "//envoy/http:hash_policy_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/rds:rds_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:http_tracer_interface",
         "//envoy/upstream:resource_manager_interface",

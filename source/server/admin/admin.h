@@ -226,11 +226,11 @@ private:
     NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
-    Router::ConfigConstSharedPtr config() override { return config_; }
+    Rds::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
+    Router::ConfigConstSharedPtr configCast() override { return config_; }
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
