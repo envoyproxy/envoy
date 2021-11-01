@@ -59,7 +59,7 @@ message QuicKeepAliveSettings {
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
-  google.protobuf.UInt32Value max_concurrent_streams = 1;
+  google.protobuf.UInt32Value max_concurrent_streams = 1 [(validate.rules).uint32 = {gte: 1}];
 
   // `Initial stream-level flow-control receive window
   // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from

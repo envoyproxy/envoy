@@ -1,4 +1,4 @@
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 
 namespace Envoy {
 namespace Network {
