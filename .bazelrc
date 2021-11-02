@@ -47,6 +47,7 @@ build:sanitizer --test_tag_filters=-no_san
 
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --action_env=CC=clang --action_env=CXX=clang++
 build:clang --linkopt=-fuse-ld=lld
 
 # Flags for Clang + PCH

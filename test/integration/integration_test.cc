@@ -429,7 +429,6 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -496,7 +495,6 @@ typed_config:
 // that we are able to skip filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -561,8 +559,6 @@ typed_config:
 
 // Verifies routing via the match tree API.
 TEST_P(IntegrationTest, MatchTreeRouting) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
-
   const std::string vhost_yaml = R"EOF(
     name: vhost
     domains: ["matcher.com"]

@@ -42,11 +42,13 @@ The HTTP bandwidth limit filter outputs statistics in the ``<stat_prefix>.http_b
   :widths: 1, 1, 2
 
   request_enabled, Counter, Total number of request streams for which the bandwidth limiter was consulted
+  request_enforced, Counter, Total number of request streams for which the bandwidth limiter was enforced
   request_pending, GAUGE, Number of request streams which are currently pending transfer in bandwidth limiter
   request_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth limiter
   request_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth limiter
   request_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the request stream transfer
   response_enabled, Counter, Total number of response streams for which the bandwidth limiter was consulted
+  response_enforced, Counter, Total number of response streams for which the bandwidth limiter was enforced
   response_pending, GAUGE, Number of response streams which are currently pending transfer in bandwidth limiter
   response_incoming_size, GAUGE, Size in bytes of incoming response data to bandwidth limiter
   response_allowed_size, GAUGE, Size in bytes of outgoing response data from bandwidth limiter

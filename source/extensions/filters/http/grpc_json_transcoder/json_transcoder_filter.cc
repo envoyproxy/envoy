@@ -62,9 +62,6 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
 
-constexpr absl::string_view buffer_limits_runtime_feature =
-    "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits";
-
 const Http::LowerCaseString& trailerHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "trailer");
 }
@@ -893,10 +890,6 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
 }
 
 bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
-  if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
-    return false;
-  }
-
   if (buffer_length > decoder_callbacks_->decoderBufferLimit()) {
     ENVOY_LOG(debug,
               "Request rejected because the transcoder's internal buffer size exceeds the "
@@ -915,10 +908,6 @@ bool JsonTranscoderFilter::decoderBufferLimitReached(uint64_t buffer_length) {
 }
 
 bool JsonTranscoderFilter::encoderBufferLimitReached(uint64_t buffer_length) {
-  if (!Runtime::runtimeFeatureEnabled(buffer_limits_runtime_feature)) {
-    return false;
-  }
-
   if (buffer_length > encoder_callbacks_->encoderBufferLimit()) {
     ENVOY_LOG(debug,
               "Response not transcoded because the transcoder's internal buffer size exceeds the "
