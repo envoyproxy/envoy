@@ -1590,7 +1590,7 @@ TEST_F(ConnectionHandlerTest, DisableInternalListener) {
 
   handler_->disableListeners();
   auto internal_listener_cb_disabled = handler_->findByAddress(local_address);
-  ASSERT_TURE(internal_listener_cb_disabled.has_value());
+  ASSERT_TRUE(internal_listener_cb_disabled.has_value());
   ASSERT_EQ(&internal_listener_cb_disabled.value().get(), &internal_listener_cb.value().get());
 
   handler_->enableListeners();

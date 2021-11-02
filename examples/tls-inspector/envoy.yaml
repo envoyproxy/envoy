@@ -5,40 +5,34 @@ admin:
       port_value: 12345
 static_resources:
   listeners:
-  - address:
+  - name: listener_inbound
+    address:
       socket_address:
         address: 0.0.0.0
-        port_value: 10000
-    listener_filters:
-    - name: "envoy.filters.listener.tls_inspector"
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+        port_value: 16000
+    traffic_direction: INBOUND
     filter_chains:
-    - filter_chain_match:
-        transport_protocol: tls
-        application_protocols: [h2]
-      filters:
-      - name: envoy.filters.network.tcp_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          cluster: service-https-http2
-          stat_prefix: https_passthrough
-    - filter_chain_match:
-        transport_protocol: tls
-        application_protocols: [http/1.1]
-      filters:
-      - name: envoy.filters.network.tcp_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          cluster: service-https-http1.1
-          stat_prefix: https_passthrough
-    - filter_chain_match:
-      filters:
-      - name: envoy.filters.network.tcp_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          cluster: service-http
-          stat_prefix: ingress_http
+      - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              codec_type: AUTO
+              stat_prefix: ingress_http
+              route_config:
+                name: ingress
+                virtual_hosts:
+                  - name: ingress
+                    domains:
+                      - "*"
+                    routes:
+                      - match:
+                          prefix: "/"
+                        direct_response:
+                          status: 503
+                          body:
+                            inline_string: "{'message': 'FAILURE INJECTOIN!'}"
+              http_filters:
+                - name: envoy.filters.http.router
 
   clusters:
   - name: service-https-http2
