@@ -73,8 +73,6 @@ public:
 } // namespace
 
 int TestRunner::RunTests(int argc, char** argv) {
-  Thread::TestThread test_thread;
-
   ::testing::InitGoogleMock(&argc, argv);
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
