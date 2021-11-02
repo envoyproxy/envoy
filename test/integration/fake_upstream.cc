@@ -407,6 +407,8 @@ void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
                                                                         max_streams);
     codec->quicServerSession().SendMaxStreams(1, false);
   });
+#else
+  UNREFERENCED_PARAMETER(max_streams);
 #endif
 }
 
