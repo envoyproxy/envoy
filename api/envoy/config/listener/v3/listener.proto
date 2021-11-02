@@ -148,7 +148,7 @@ message Listener {
   // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourcePort>`.
   //
   // Filter chain match conditions that are not in the matching order list are
-  // ignored. Filter chains without a match condition for the specificed
+  // ignored. Filter chains without a match condition for the specified
   // predicate type URL are assumed to match all.
   // [#not-implemented-hide:]
   repeated string matching_order = 31;

@@ -301,8 +301,11 @@ message FilterChainMatch {
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
 
-  // Specifies the filter chain matching predicates to be used in the matching order.
-  // Each predicate extension must be specified at most once.
+  // Specifies the filter chain matching predicates to be used in the matching
+  // order. Each predicate extension must be specified at most once. For
+  // backwards compatibility, the existing fields in the filter chain match, if
+  // specified, are converted to their corresponding filter chain matching
+  // predicates in this list.
   // [#not-implemented-hide:]
   repeated core.v3.TypedExtensionConfig predicates = 14;
 }
