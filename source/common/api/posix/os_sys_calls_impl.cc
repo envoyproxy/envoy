@@ -151,6 +151,20 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
 #endif
 }
 
+bool OsSysCallsImpl::supportsMptcp() const {
+#if !defined(__linux__)
+  return false;
+#else
+  int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (fd < 0) {
+    return false;
+  }
+
+  ::close(fd);
+  return true;
+#endif
+}
+
 SysCallIntResult OsSysCallsImpl::ftruncate(int fd, off_t length) {
   const int rc = ::ftruncate(fd, length);
   return {rc, rc != -1 ? 0 : errno};
@@ -281,21 +295,6 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 
   return {false, EOPNOTSUPP};
 }
-
-bool OsSysCallsImpl::supportsGetifaddrs() const {
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  return false;
-#endif
-  return true;
-}
-
-SysCallIntResult OsSysCallsImpl::getifaddrs(struct ifaddrs** ifap) {
-  const int rc = ::getifaddrs(ifap);
-  return {rc, rc != -1 ? 0 : errno};
-}
-
-void OsSysCallsImpl::freeifaddrs(struct ifaddrs* ifp) { ::freeifaddrs(ifp); }
 
 } // namespace Api
 } // namespace Envoy

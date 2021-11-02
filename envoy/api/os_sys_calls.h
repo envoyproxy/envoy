@@ -88,6 +88,11 @@ public:
   virtual bool supportsIpTransparent() const PURE;
 
   /**
+   * return true if the OS supports multi-path TCP
+   */
+  virtual bool supportsMptcp() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */
@@ -190,21 +195,6 @@ public:
    * @see man TCP_INFO. Get the tcp info for the socket.
    */
   virtual SysCallBoolResult socketTcpInfo(os_fd_t sockfd, EnvoyTcpInfo* tcp_info) PURE;
-
-  /**
-   * return true if the OS supports getifaddrs.
-   */
-  virtual bool supportsGetifaddrs() const PURE;
-
-  /**
-   * @see man getifaddrs
-   */
-  virtual SysCallIntResult getifaddrs(ifaddrs** ifap) PURE;
-
-  /**
-   * @see man getifaddrs
-   */
-  virtual void freeifaddrs(ifaddrs* ifp) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

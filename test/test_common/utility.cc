@@ -168,6 +168,11 @@ Stats::TextReadoutSharedPtr TestUtility::findTextReadout(Stats::Store& store,
   return findByName(store.textReadouts(), name);
 }
 
+Stats::ParentHistogramSharedPtr TestUtility::findHistogram(Stats::Store& store,
+                                                           const std::string& name) {
+  return findByName(store.histograms(), name);
+}
+
 AssertionResult TestUtility::waitForCounterEq(Stats::Store& store, const std::string& name,
                                               uint64_t value, Event::TestTimeSystem& time_system,
                                               std::chrono::milliseconds timeout,
@@ -234,6 +239,14 @@ AssertionResult TestUtility::waitForGaugeEq(Stats::Store& store, const std::stri
       return AssertionFailure() << fmt::format(
                  "timed out waiting for {} to be {}, current value {}", name, value, current_value);
     }
+  }
+  return AssertionSuccess();
+}
+
+AssertionResult TestUtility::waitForGaugeDestroyed(Stats::Store& store, const std::string& name,
+                                                   Event::TestTimeSystem& time_system) {
+  while (findGauge(store, name) != nullptr) {
+    time_system.advanceTimeWait(std::chrono::milliseconds(10));
   }
   return AssertionSuccess();
 }

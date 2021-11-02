@@ -42,6 +42,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_connect_fail, Counter, Total connection failures
   upstream_cx_connect_timeout, Counter, Total connection connect timeouts
   upstream_cx_idle_timeout, Counter, Total connection idle timeouts
+  upstream_cx_max_duration_reached, Counter, Total connections closed due to max duration reached
   upstream_cx_connect_attempts_exceeded, Counter, Total consecutive connection failures exceeding configured connection attempts
   upstream_cx_overflow, Counter, Total times that the cluster's connection circuit breaker overflowed
   upstream_cx_connect_ms, Histogram, Connection establishment milliseconds
@@ -243,6 +244,16 @@ TLS statistics
 If TLS is used by the cluster the following statistics are rooted at *cluster.<name>.ssl.*:
 
 .. include:: ../../../_include/ssl_stats.rst
+
+.. _config_cluster_manager_cluster_stats_tcp:
+
+TCP statistics
+--------------
+
+The following TCP statistics, which are available when using the :ref:`TCP stats transport socket <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`,
+are rooted at *cluster.<name>.tcp_stats.*:
+
+.. include:: ../../../_include/tcp_stats.rst
 
 .. _config_cluster_manager_cluster_stats_alt_tree:
 

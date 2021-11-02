@@ -200,8 +200,9 @@ protected:
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                                    local_address_, nullptr));
+    client_sockets_.push_back(
+        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
+                                              nullptr, Network::SocketCreationOptions{}));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -217,7 +218,7 @@ protected:
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
-    ::usleep(1000);
+    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
 #endif
   }
 
