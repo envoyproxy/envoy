@@ -3493,6 +3493,7 @@ envoy_cc_library(
         ":quic_core_time_lib",
         ":quic_platform_base",
         ":quiche_common_endian_lib",
+        ":quiche_common_print_elements_lib",
     ],
 )
 
