@@ -44,7 +44,7 @@ protected:
 };
 
 // Basic UDP proxy flow to a single cluster.
-TEST_F(RouterImplTest, DEPRECATED_FEATURE_TEST(RouteToSingleCluster)) {
+TEST_F(RouterImplTest, RouteToSingleCluster) {
   const std::string yaml = R"EOF(
 stat_prefix: foo
 cluster: udp_service
@@ -133,7 +133,7 @@ matcher:
 }
 
 // All cluster names in the router with a single cluster.
-TEST_F(RouterImplTest, DEPRECATED_FEATURE_TEST(SingleClusterEntry)) {
+TEST_F(RouterImplTest, SingleClusterEntry) {
   const std::string yaml = R"EOF(
 stat_prefix: foo
 cluster: udp_service
