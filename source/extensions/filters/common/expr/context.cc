@@ -139,7 +139,15 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == Code) {
-    auto code = info_.responseCode();
+    // Usually stream info's responseCode() returns empty,
+    // so we first try to use the actual header value in the map.
+    absl::optional<uint64_t> code = absl::nullopt;
+    if (headers_.value_) {
+      code = Http::Utility::getResponseStatusNoThrow(*headers_.value_);
+    }
+    if (!code.has_value()) {
+      code = info_.responseCode();
+    }
     if (code.has_value()) {
       return CelValue::CreateInt64(code.value());
     }

@@ -244,13 +244,12 @@ TEST(Context, ResponseAttributes) {
   const std::string header_name = "test-header";
   const std::string trailer_name = "test-trailer";
   const std::string grpc_status = "grpc-status";
-  Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
+  Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}, {":status", "404"}};
   Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
   Protobuf::Arena arena;
   ResponseWrapper response(arena, &header_map, &trailer_map, info);
   ResponseWrapper empty_response(arena, nullptr, nullptr, empty_info);
 
-  EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
   EXPECT_CALL(info, bytesSent()).WillRepeatedly(Return(123));
   EXPECT_CALL(info, responseFlags()).WillRepeatedly(Return(0x1));
 
@@ -278,7 +277,7 @@ TEST(Context, ResponseAttributes) {
     auto value = response[CelValue::CreateStringView(TotalSize)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(160, value.value().Int64OrDie());
+    EXPECT_EQ(170, value.value().Int64OrDie());
   }
 
   {
@@ -308,7 +307,7 @@ TEST(Context, ResponseAttributes) {
     ASSERT_TRUE(value.value().IsMap());
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
-    EXPECT_EQ(1, map.size());
+    EXPECT_EQ(2, map.size());
 
     auto header = map[CelValue::CreateStringView(header_name)];
     EXPECT_TRUE(header.has_value());
@@ -376,6 +375,7 @@ TEST(Context, ResponseAttributes) {
     Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
     Http::TestResponseTrailerMapImpl trailer_map{{trailer_name, "b"}};
     Protobuf::Arena arena;
+    EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
     ResponseWrapper response_no_status(arena, &header_map, &trailer_map, info);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
@@ -390,6 +390,17 @@ TEST(Context, ResponseAttributes) {
     ResponseWrapper response_no_status(arena, &header_map, &trailer_map, info_without_code);
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_FALSE(value.has_value());
+  }
+  {
+    // The response header doesn't contain :status but the streamInfo has one.
+    NiceMock<StreamInfo::MockStreamInfo> info_with_status_code;
+    Http::TestResponseHeaderMapImpl header_map{{header_name, "a"}};
+    EXPECT_CALL(info_with_status_code, responseCode()).WillRepeatedly(Return(404));
+    ResponseWrapper response(arena, &header_map, nullptr, info_with_status_code);
+    const auto value = response[CelValue::CreateStringView(Code)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(404, value.value().Int64OrDie());
   }
 }
 
