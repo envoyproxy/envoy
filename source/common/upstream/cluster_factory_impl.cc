@@ -5,6 +5,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/upstream/health_checker_impl.h"
@@ -88,32 +89,17 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   // where 'dns_resolvers' is specified, we have per-cluster DNS
   // resolvers that are created here but ownership resides with
   // StrictDnsClusterImpl/LogicalDnsCluster.
-  if ((cluster.has_dns_resolution_config() &&
+  if ((cluster.has_typed_dns_resolver_config() &&
+       !(cluster.typed_dns_resolver_config().typed_config().type_url().empty())) ||
+      (cluster.has_dns_resolution_config() &&
        !cluster.dns_resolution_config().resolvers().empty()) ||
       !cluster.dns_resolvers().empty()) {
-    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-    std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::Address> resolver_addrs;
-    if (cluster.has_dns_resolution_config()) {
-      dns_resolver_options.CopyFrom(cluster.dns_resolution_config().dns_resolver_options());
-      resolver_addrs.CopyFrom(cluster.dns_resolution_config().resolvers());
-    } else {
-      /* if `cluster.dns_resolution_config` is not set. */
-      // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward
-      // compatible utilize cluster.use_tcp_for_dns_lookups().
-      dns_resolver_options.set_use_tcp_for_dns_lookups(cluster.use_tcp_for_dns_lookups());
-      // Field repeated Address `dns_resolvers` will be deprecated in future. To be backward
-      // compatible utilize cluster.dns_resolvers().
-      resolver_addrs.CopyFrom(cluster.dns_resolvers());
-    }
 
-    if (!resolver_addrs.empty()) {
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
-    return context.mainThreadDispatcher().createDnsResolver(resolvers, dns_resolver_options);
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromProto(cluster, typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(context.mainThreadDispatcher(), context.api(),
+                                                  typed_dns_resolver_config);
   }
 
   return context.dnsResolver();

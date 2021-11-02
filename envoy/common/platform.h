@@ -178,7 +178,9 @@ constexpr bool win32SupportsOriginalDestination() {
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#if !defined(DO_NOT_INCLUDE_NETINET_TCP_H)
 #include <netinet/tcp.h>
+#endif
 #include <netinet/udp.h> // for UDP_GRO
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
@@ -228,6 +230,10 @@ constexpr bool win32SupportsOriginalDestination() {
 
 #ifndef UDP_SEGMENT
 #define UDP_SEGMENT 103
+#endif
+
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP 262
 #endif
 
 typedef int os_fd_t;            // NOLINT(modernize-use-using)

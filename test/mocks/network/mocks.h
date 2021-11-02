@@ -18,6 +18,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
@@ -62,6 +63,22 @@ public:
               (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
+};
+
+class MockDnsResolverFactory : public DnsResolverFactory {
+public:
+  MockDnsResolverFactory() = default;
+  ~MockDnsResolverFactory() override = default;
+
+  MOCK_METHOD(DnsResolverSharedPtr, createDnsResolver,
+              (Event::Dispatcher & dispatcher, Api::Api& api,
+               const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config),
+              (const, override));
+  std::string name() const override { return std::string(CaresDnsResolver); };
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{
+        new envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig()};
+  }
 };
 
 class MockAddressResolver : public Address::Resolver {
@@ -289,6 +306,7 @@ public:
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&), (const));
   MOCK_METHOD(absl::optional<Socket::Option::Details>, getOptionDetails,
               (const Socket&, envoy::config::core::v3::SocketOption::SocketState state), (const));
+  MOCK_METHOD(bool, isSupported, (), (const));
 };
 
 class MockConnectionSocket : public ConnectionSocket {
@@ -577,7 +595,8 @@ public:
   MockUdpListenerReadFilter(UdpReadFilterCallbacks& callbacks);
   ~MockUdpListenerReadFilter() override;
 
-  MOCK_METHOD(void, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onData, (UdpRecvData&));
+  MOCK_METHOD(Network::FilterStatus, onReceiveError, (Api::IoError::IoErrorCode));
 };
 
 class MockUdpListenerFilterManager : public UdpListenerFilterManager {
@@ -623,9 +642,12 @@ class MockSocketInterface : public SocketInterfaceImpl {
 public:
   explicit MockSocketInterface(const std::vector<Address::IpVersion>& versions)
       : versions_(versions.begin(), versions.end()) {}
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
+  MOCK_METHOD(IoHandlePtr, socket,
+              (Socket::Type, Address::Type, Address::IpVersion, bool, const SocketCreationOptions&),
               (const));
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
+  MOCK_METHOD(IoHandlePtr, socket,
+              (Socket::Type, const Address::InstanceConstSharedPtr, const SocketCreationOptions&),
+              (const));
   bool ipFamilySupported(int domain) override {
     const auto to_version = domain == AF_INET ? Address::IpVersion::v4 : Address::IpVersion::v6;
     return std::any_of(versions_.begin(), versions_.end(),

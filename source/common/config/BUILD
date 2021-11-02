@@ -86,8 +86,16 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "delta_subscription_state_lib",
-    srcs = ["delta_subscription_state.cc"],
-    hdrs = ["delta_subscription_state.h"],
+    srcs = [
+        "delta_subscription_state.cc",
+        "new_delta_subscription_state.cc",
+        "old_delta_subscription_state.cc",
+    ],
+    hdrs = [
+        "delta_subscription_state.h",
+        "new_delta_subscription_state.h",
+        "old_delta_subscription_state.h",
+    ],
     deps = [
         ":api_version_lib",
         ":pausable_ack_queue_lib",
@@ -316,6 +324,7 @@ envoy_cc_library(
         "//envoy/config:subscription_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
@@ -401,6 +410,7 @@ envoy_cc_library(
     hdrs = ["watch_map.h"],
     deps = [
         ":decoded_resource_lib",
+        ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
