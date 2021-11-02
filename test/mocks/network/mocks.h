@@ -642,9 +642,12 @@ class MockSocketInterface : public SocketInterfaceImpl {
 public:
   explicit MockSocketInterface(const std::vector<Address::IpVersion>& versions)
       : versions_(versions.begin(), versions.end()) {}
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, Address::Type, Address::IpVersion, bool),
+  MOCK_METHOD(IoHandlePtr, socket,
+              (Socket::Type, Address::Type, Address::IpVersion, bool, const SocketCreationOptions&),
               (const));
-  MOCK_METHOD(IoHandlePtr, socket, (Socket::Type, const Address::InstanceConstSharedPtr), (const));
+  MOCK_METHOD(IoHandlePtr, socket,
+              (Socket::Type, const Address::InstanceConstSharedPtr, const SocketCreationOptions&),
+              (const));
   bool ipFamilySupported(int domain) override {
     const auto to_version = domain == AF_INET ? Address::IpVersion::v4 : Address::IpVersion::v6;
     return std::any_of(versions_.begin(), versions_.end(),

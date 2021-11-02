@@ -72,9 +72,11 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
     Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
     const std::string& listener_name, uint32_t tcp_backlog_size,
-    ListenerComponentFactory::BindType bind_type, uint32_t num_sockets)
+    ListenerComponentFactory::BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t num_sockets)
     : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
-      listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type) {
+      listener_name_(listener_name), tcp_backlog_size_(tcp_backlog_size), bind_type_(bind_type),
+      socket_creation_options_(creation_options) {
 
   if (local_address_->type() == Network::Address::Type::Ip) {
     if (socket_type == Network::Socket::Type::Datagram) {
@@ -114,7 +116,8 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(const ListenSocketFactoryImpl& 
       socket_type_(factory_to_clone.socket_type_), options_(factory_to_clone.options_),
       listener_name_(factory_to_clone.listener_name_),
       tcp_backlog_size_(factory_to_clone.tcp_backlog_size_),
-      bind_type_(factory_to_clone.bind_type_) {
+      bind_type_(factory_to_clone.bind_type_),
+      socket_creation_options_(factory_to_clone.socket_creation_options_) {
   for (auto& socket : factory_to_clone.sockets_) {
     // In the cloning case we always duplicate() the socket. This makes sure that during listener
     // update/drain we don't lose any incoming connections when using reuse_port. Specifically on
@@ -137,8 +140,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
   // Socket might be nullptr when doing server validation.
   // TODO(mattklein123): See the comment in the validation code. Make that code not return nullptr
   // so this code can be simpler.
-  Network::SocketSharedPtr socket =
-      factory.createListenSocket(local_address_, socket_type, options_, bind_type_, worker_index);
+  Network::SocketSharedPtr socket = factory.createListenSocket(
+      local_address_, socket_type, options_, bind_type_, socket_creation_options_, worker_index);
 
   // Binding is done by now.
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
@@ -290,7 +293,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      bind_to_port_(shouldBindToPort(config)),
+      bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -351,6 +354,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
 
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  validateConfig(socket_type);
   // buildUdpListenerFactory() must come before buildListenSocketOptions() because the UDP
   // listener factory can provide additional options.
   buildUdpListenerFactory(socket_type, concurrency);
@@ -378,6 +382,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash)
     : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
+      mptcp_enabled_(config.enable_mptcp()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -413,6 +418,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       quic_stat_names_(parent_.quicStatNames()) {
   buildAccessLog();
   auto socket_type = Network::Utility::protobufAddressSocketType(config.address());
+  validateConfig(socket_type);
   buildListenSocketOptions(socket_type);
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
@@ -424,6 +430,24 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
     open_connections_ = origin.open_connections_;
+  }
+}
+
+void ListenerImpl::validateConfig(Network::Socket::Type socket_type) {
+  if (mptcp_enabled_) {
+    if (socket_type != Network::Socket::Type::Stream) {
+      throw EnvoyException(
+          fmt::format("listener {}: enable_mptcp can only be used with TCP listeners", name_));
+    }
+    if (address_->type() != Network::Address::Type::Ip) {
+      throw EnvoyException(
+          fmt::format("listener {}: enable_mptcp can only be used with IP addresses", name_));
+    }
+    if (!Api::OsSysCallsSingleton::get().supportsMptcp()) {
+      throw EnvoyException(fmt::format(
+          "listener {}: enable_mptcp is set but MPTCP is not supported by the operating system",
+          name_));
+    }
   }
 }
 
@@ -790,8 +814,8 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // Full listener update currently rejects tcp listener having 0 filter chain.
-  // In place filter chain update could survive under zero filter chain but we should keep the same
-  // behavior for now. This also guards the below filter chain access.
+  // In place filter chain update could survive under zero filter chain but we should keep the
+  // same behavior for now. This also guards the below filter chain access.
   if (config.filter_chains_size() == 0) {
     return false;
   }

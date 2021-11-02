@@ -46,7 +46,9 @@ public:
                           Network::Socket::Type socket_type,
                           const Network::Socket::OptionsSharedPtr& options,
                           const std::string& listener_name, uint32_t tcp_backlog_size,
-                          ListenerComponentFactory::BindType bind_type, uint32_t num_sockets);
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
+                          uint32_t num_sockets);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
@@ -80,6 +82,7 @@ private:
   const std::string listener_name_;
   const uint32_t tcp_backlog_size_;
   ListenerComponentFactory::BindType bind_type_;
+  const Network::SocketCreationOptions socket_creation_options_;
   // One socket for each worker, pre-created before the workers fetch the sockets. There are
   // 3 different cases:
   // 1) All are null when doing config validation.
@@ -303,6 +306,7 @@ public:
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
   Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
+  bool mptcpEnabled() { return mptcp_enabled_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
   }
@@ -377,6 +381,7 @@ private:
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
   // Helpers for constructor.
   void buildAccessLog();
+  void validateConfig(Network::Socket::Type socket_type);
   void buildUdpListenerFactory(Network::Socket::Type socket_type, uint32_t concurrency);
   void buildListenSocketOptions(Network::Socket::Type socket_type);
   void createListenerFilterFactories(Network::Socket::Type socket_type);
@@ -396,6 +401,7 @@ private:
 
   Network::ListenSocketFactoryPtr socket_factory_;
   const bool bind_to_port_;
+  const bool mptcp_enabled_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;
