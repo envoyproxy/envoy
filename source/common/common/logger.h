@@ -115,21 +115,30 @@ public:
   virtual void flush() PURE;
 
 protected:
-  // Swap the current log sink delegate for this one. This should be called by the derived class
-  // constructor immediately before returning. This is required to match restoreDelegate(),
-  // otherwise it's possible for the previous delegate to get set in the base class constructor,
-  // the derived class constructor throws, and cleanup becomes broken.
+  // Swap the current thread local log sink delegate for this one. This should be called by the
+  // derived class constructor immediately before returning. This is required to match
+  // restoreTlsDelegate(), otherwise it's possible for the previous delegate to get set in the base
+  // class constructor, the derived class constructor throws, and cleanup becomes broken.
+  void setTlsDelegate();
+
+  // Swap the current *global* log sink delegate for this one. This behaves as setTlsDelegate, but
+  // operates on the global log sink instead of the thread local one.
   void setDelegate();
 
-  // Swap the current log sink (this) for the previous one. This should be called by the derived
-  // class destructor in the body. This is critical as otherwise it's possible for a log message
-  // to get routed to a partially destructed sink.
+  // Swap the current thread local log sink (this) for the previous one. This should be called by
+  // the derived class destructor in the body. This is critical as otherwise it's possible for a log
+  // message to get routed to a partially destructed sink.
+  void restoreTlsDelegate();
+
+  // Swap the current *global* log sink delegate for the previous one. This behaves as
+  // restoreTlsDelegate, but operates on the global sink instead of the thread local one.
   void restoreDelegate();
 
   SinkDelegate* previousDelegate() { return previous_delegate_; }
 
 private:
   SinkDelegate* previous_delegate_{nullptr};
+  SinkDelegate* previous_tls_delegate_{nullptr};
   DelegatingLogSinkSharedPtr log_sink_;
 };
 
@@ -165,15 +174,17 @@ public:
   template <class... Args>
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
                          absl::string_view component, Args... msg) {
+    auto tls_sink = tlsDelegate();
+    if (tls_sink != nullptr) {
+      tls_sink->logWithStableName(stable_name, level, component, fmt::format(msg...));
+      return;
+    }
     absl::ReaderMutexLock sink_lock(&sink_mutex_);
     sink_->logWithStableName(stable_name, level, component, fmt::format(msg...));
   }
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
-  void flush() override {
-    absl::ReaderMutexLock lock(&sink_mutex_);
-    sink_->flush();
-  }
+  void flush() override;
   void set_pattern(const std::string& pattern) override {
     set_formatter(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
   }
@@ -220,6 +231,9 @@ private:
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
   }
+  SinkDelegate** tlsSink();
+  void setTlsDelegate(SinkDelegate* sink);
+  SinkDelegate* tlsDelegate();
 
   SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
   absl::Mutex sink_mutex_;
