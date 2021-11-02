@@ -47,6 +47,9 @@ IGNORES_CVES = set([
     'CVE-2020-8169',
     'CVE-2020-8177',
     'CVE-2020-8284',
+    # Low severity Curl issue with incorrect re-use of connections due to case
+    # in/sensitivity
+    'CVE-2021-22924',
     # Node.js issue unrelated to http-parser (Node TLS).
     'CVE-2020-8265',
     # Node.js request smuggling.
@@ -64,8 +67,30 @@ IGNORES_CVES = set([
     # Node.js issues unrelated to http-parser.
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
     # See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22931
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22939
+    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
     'CVE-2021-22918',
     'CVE-2021-22921',
+    'CVE-2021-22930',
+    'CVE-2021-22931',
+    'CVE-2021-22939',
+    'CVE-2021-22940',
+    #
+    # Currently, cvescan does not respect/understand versions (see #18354).
+    #
+    # The following CVEs target versions that are not currently used in the Envoy repo.
+    #
+    # libcurl
+    "CVE-2021-22945",
+    #
+    # kafka
+    'CVE-2021-38153',
+    #
+    # wasmtime
+    "CVE-2021-39216",
+    "CVE-2021-39218",
+    "CVE-2021-39219",
 ])
 
 # Subset of CVE fields that are useful below.
@@ -119,6 +144,11 @@ def parse_cve_json(cve_json, cves, cpe_revmap):
         gather_cpes(cve['configurations']['nodes'], cpe_set)
         if len(cpe_set) == 0:
             continue
+
+        if not "baseMetricV3" in cve['impact']:
+            print(f"WARNING: ignoring v2 metric for {cve['cve']['CVE_data_meta']['ID']}")
+            continue
+
         cvss_v3_score = cve['impact']['baseMetricV3']['cvssV3']['baseScore']
         cvss_v3_severity = cve['impact']['baseMetricV3']['cvssV3']['baseSeverity']
 

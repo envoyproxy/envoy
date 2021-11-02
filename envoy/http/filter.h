@@ -1043,6 +1043,12 @@ public:
    * @param handler supplies the handler to add.
    */
   virtual void addAccessLogHandler(AccessLog::InstanceSharedPtr handler) PURE;
+
+  /**
+   * Allows filters to access the thread local dispatcher.
+   * @param return the worker thread's dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
 };
 
 /**

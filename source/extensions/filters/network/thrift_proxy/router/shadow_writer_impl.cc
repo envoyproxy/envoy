@@ -21,7 +21,7 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
                                                           original_transport, original_protocol);
   const bool created = shadow_router->createUpstreamRequest();
   if (!created) {
-    stats_.shadow_request_submit_failure_.inc();
+    stats_.named_.shadow_request_submit_failure_.inc();
     return absl::nullopt;
   }
 
@@ -34,7 +34,7 @@ ShadowWriterImpl::submit(const std::string& cluster_name, MessageMetadataSharedP
 ShadowRouterImpl::ShadowRouterImpl(ShadowWriterImpl& parent, const std::string& cluster_name,
                                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
                                    ProtocolType protocol_type)
-    : RequestOwner(parent.clusterManager(), parent.statPrefix(), parent.scope()), parent_(parent),
+    : RequestOwner(parent.clusterManager(), parent.stats()), parent_(parent),
       cluster_name_(cluster_name), metadata_(metadata->clone()), transport_type_(transport_type),
       protocol_type_(protocol_type),
       transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
@@ -224,7 +224,7 @@ FilterStatus ShadowRouterImpl::messageEnd() {
     ProtocolConverter::messageEnd();
     const auto encode_size = upstream_request_->encodeAndWrite(upstream_request_buffer_);
     addSize(encode_size);
-    recordUpstreamRequestSize(*cluster_, request_size_);
+    stats().recordUpstreamRequestSize(*cluster_, request_size_);
 
     request_sent_ = true;
 

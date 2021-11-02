@@ -22,6 +22,7 @@ AWS
 BACKTRACE
 BSON
 BPF
+Repick
 btree
 CAS
 CB
@@ -30,6 +31,7 @@ CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -127,6 +129,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -144,7 +148,6 @@ GSS
 GTEST
 GURL
 Grabbit
-Hashable
 HC
 HCM
 HDS
@@ -202,6 +205,7 @@ MD
 MERCHANTABILITY
 Merkle
 MGET
+MPTCP
 MQ
 MSDN
 MSET
@@ -365,6 +369,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -480,6 +485,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -496,6 +502,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -632,6 +639,7 @@ evbuffer
 evbuffers
 evconnlistener
 evented
+eventfd
 evwatch
 exe
 execlp
@@ -696,6 +704,7 @@ handshaker
 hardcoded
 hardcodes
 hardcoding
+hashable
 hasher
 hashtagging
 hd
@@ -851,6 +860,7 @@ namespaced
 namespaces
 namespacing
 nan
+nanos
 natively
 ndk
 netblock
@@ -1082,11 +1092,13 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
 sigaction
 sigactions
+sigaltstack
 siginfo
 signalstack
 siloed
@@ -1291,3 +1303,11 @@ zlib
 OBQ
 SemVer
 SCM
+SCTP
+CRLF
+clen
+crlf
+ep
+suri
+transid
+routable

@@ -12,6 +12,7 @@
 #include "envoy/tracing/http_tracer.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
@@ -31,6 +32,17 @@ struct TracingConstantValues {
 };
 
 using TracingConstants = ConstSingleton<TracingConstantValues>;
+
+/**
+ * Possible constant response code details values for a check call.
+ */
+struct ResponseCodeDetailsValues {
+  // The ext_authz filter denied the downstream request/connection.
+  const std::string AuthzDenied = "ext_authz_denied";
+  // The ext_authz filter encountered a failure, and was configured to fail-closed.
+  const std::string AuthzError = "ext_authz_error";
+};
+using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailsValues>;
 
 /**
  * Constant auth related HTTP headers. All lower case. This group of headers can
@@ -78,9 +90,17 @@ struct Response {
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
   Http::HeaderVector response_headers_to_add;
+  // A set of HTTP headers returned by the authorization server, will be optionally set (using
+  // "setCopy") to the response sent back to the downstream client on OK auth responses.
+  Http::HeaderVector response_headers_to_set;
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
   std::vector<Envoy::Http::LowerCaseString> headers_to_remove;
+  // A set of query string parameters to be set (possibly overwritten) on the
+  // request to the upstream server.
+  Http::Utility::QueryParamsVector query_parameters_to_set;
+  // A set of query string parameters to remove from the request to the upstream server.
+  std::vector<std::string> query_parameters_to_remove;
   // Optional http body used only on denied response.
   std::string body;
   // Optional http status used only on denied response.

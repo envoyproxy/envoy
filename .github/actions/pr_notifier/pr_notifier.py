@@ -30,6 +30,7 @@ MAINTAINERS = {
     'asraa': 'UKZKCFRTP',
     'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
+    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # First pass reviewers who are not maintainers should get
@@ -43,7 +44,6 @@ FIRST_PASS = {
     'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
-    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # Only notify API reviewers who aren't maintainers.
@@ -67,6 +67,10 @@ def is_waiting(labels):
         if label.name == 'waiting' or label.name == 'waiting:any':
             return True
     return False
+
+
+def is_contrib(labels):
+    return any(label.name == "contrib" for label in labels)
 
 
 # Return true if the PR has an API tag, false otherwise.
@@ -174,7 +178,7 @@ def track_prs():
             pr_info.assignees, maintainers_and_prs, message, MAINTAINERS, FIRST_PASS)
 
         # If there was no maintainer, track it as unassigned.
-        if not has_maintainer_assignee:
+        if not has_maintainer_assignee and not is_contrib(labels):
             maintainers_and_prs['unassigned'] = maintainers_and_prs['unassigned'] + message
 
     # Return the dict of {maintainers : PR notifications},

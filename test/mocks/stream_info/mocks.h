@@ -48,6 +48,8 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
+  MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
@@ -57,6 +59,8 @@ public:
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
+  MOCK_METHOD(void, addWireBytesSent, (uint64_t));
+  MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
   MOCK_METHOD(uint64_t, responseFlags, (), (const));
@@ -98,7 +102,10 @@ public:
   MOCK_METHOD(absl::optional<uint64_t>, upstreamConnectionId, (), (const));
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
-
+  MOCK_METHOD(const BytesMeterSharedPtr&, getUpstreamBytesMeter, (), (const));
+  MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
+  MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   Envoy::Event::SimulatedTimeSystem ts_;
@@ -125,6 +132,8 @@ public:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> downstream_connection_info_provider_;
+  BytesMeterSharedPtr upstream_bytes_meter_;
+  BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   std::string route_name_;

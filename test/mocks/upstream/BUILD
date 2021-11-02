@@ -93,6 +93,7 @@ envoy_cc_mock(
         ":thread_aware_load_balancer_mocks",
         ":thread_local_cluster_mocks",
         ":transport_socket_match_mocks",
+        ":typed_load_balancer_factory_mocks",
         "//envoy/http:async_client_interface",
         "//envoy/upstream:cluster_factory_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -205,6 +206,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "typed_load_balancer_factory_mocks",
+    srcs = ["typed_load_balancer_factory.cc"],
+    hdrs = ["typed_load_balancer_factory.h"],
+    deps = [
+        "//envoy/upstream:load_balancer_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "thread_local_cluster_mocks",
     srcs = ["thread_local_cluster.cc"],
     hdrs = ["thread_local_cluster.h"],
@@ -224,7 +234,9 @@ envoy_cc_mock(
     hdrs = ["cluster_manager_factory.h"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/singleton:manager_impl_lib",
         "//test/mocks/secret:secret_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 

@@ -57,8 +57,7 @@ createQuicNetworkConnection(Http::PersistentQuicInfo& info, Event::Dispatcher& d
                             Network::Address::InstanceConstSharedPtr server_addr,
                             Network::Address::InstanceConstSharedPtr local_addr,
                             QuicStatNames& quic_stat_names, Stats::Scope& scope) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   PersistentQuicInfoImpl* info_impl = reinterpret_cast<PersistentQuicInfoImpl*>(&info);
   auto config = info_impl->cryptoConfig();
   if (config == nullptr) {

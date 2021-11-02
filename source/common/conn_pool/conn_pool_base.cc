@@ -175,18 +175,23 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
   }
   ENVOY_CONN_LOG(debug, "creating stream", client);
 
+  // Latch capacity before updating remaining streams.
+  uint64_t capacity = client.currentUnusedCapacity();
   client.remaining_streams_--;
   if (client.remaining_streams_ == 0) {
     ENVOY_CONN_LOG(debug, "maximum streams per connection, DRAINING", client);
     host_->cluster().stats().upstream_cx_max_requests_.inc();
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
-  } else if (client.numActiveStreams() + 1 >= client.concurrent_stream_limit_) {
+  } else if (capacity == 1) {
     // As soon as the new stream is created, the client will be maxed out.
     transitionActiveClientState(client, Envoy::ConnectionPool::ActiveClient::State::BUSY);
   }
 
   // Decrement the capacity, as there's one less stream available for serving.
-  state_.decrConnectingAndConnectedStreamCapacity(1);
+  // For HTTP/3, the capacity is updated in newStreamEncoder.
+  if (trackStreamCapacity()) {
+    state_.decrConnectingAndConnectedStreamCapacity(1);
+  }
   // Track the new active stream.
   state_.incrActiveStreams(1);
   num_active_streams_++;
@@ -213,14 +218,17 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // If the effective client capacity was limited by concurrency, increase connecting capacity.
   // If the effective client capacity was limited by max total streams, this will not result in an
   // increment as no capacity is freed up.
-  if (client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1 ||
-      had_negative_capacity) {
+  // We don't update the capacity for HTTP/3 as the stream count should only
+  // increase when a MAX_STREAMS frame is received.
+  if (trackStreamCapacity() && (client.remaining_streams_ > client.concurrent_stream_limit_ -
+                                                                client.numActiveStreams() - 1 ||
+                                had_negative_capacity)) {
     state_.incrConnectingAndConnectedStreamCapacity(1);
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
-  } else if (client.state() == ActiveClient::State::BUSY) {
+  } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() != 0) {
     transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_stream) {
       onUpstreamReady();
@@ -229,6 +237,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
 }
 
 ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& context) {
+  ASSERT(!is_draining_for_deletion_);
   ASSERT(!deferred_deleting_);
 
   ASSERT(static_cast<ssize_t>(connecting_stream_capacity_) ==
@@ -295,6 +304,9 @@ void ConnPoolImplBase::onUpstreamReady() {
     state_.decrPendingStreams(1);
     pending_streams_.pop_back();
   }
+  if (!pending_streams_.empty()) {
+    tryCreateNewConnections();
+  }
 }
 
 std::list<ActiveClientPtr>& ConnPoolImplBase::owningList(ActiveClient::State state) {
@@ -331,11 +343,6 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 
 void ConnPoolImplBase::addIdleCallbackImpl(Instance::IdleCb cb) { idle_callbacks_.push_back(cb); }
 
-void ConnPoolImplBase::startDrainImpl() {
-  is_draining_ = true;
-  checkForIdleAndCloseIdleConnsIfDraining();
-}
-
 void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
   std::list<ActiveClient*> to_close;
@@ -359,7 +366,12 @@ void ConnPoolImplBase::closeIdleConnectionsForDrainingPool() {
   }
 }
 
-void ConnPoolImplBase::drainConnectionsImpl() {
+void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
+  if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+    is_draining_for_deletion_ = true;
+    checkForIdleAndCloseIdleConnsIfDraining();
+    return;
+  }
   closeIdleConnectionsForDrainingPool();
 
   // closeIdleConnections() closes all connections in ready_clients_ with no active streams,
@@ -387,12 +399,13 @@ bool ConnPoolImplBase::isIdleImpl() const {
 }
 
 void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
-  if (is_draining_) {
+  if (is_draining_for_deletion_) {
     closeIdleConnectionsForDrainingPool();
   }
 
   if (isIdleImpl()) {
-    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_={}", is_draining_);
+    ENVOY_LOG(debug, "invoking idle callbacks - is_draining_for_deletion_={}",
+              is_draining_for_deletion_);
     for (const Instance::IdleCb& cb : idle_callbacks_) {
       cb();
     }
@@ -455,6 +468,16 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // this forces part of its cleanup to happen now.
     client.releaseResources();
 
+    // Again, since we know this object is going to be deferredDelete'd(), we take
+    // this opportunity to disable and reset the connection duration timer so that
+    // it doesn't trigger while on the deferred delete list. In theory it is safe
+    // to handle the CLOSED state in onConnectionDurationTimeout, but we handle
+    // it here for simplicity and safety anyway.
+    if (client.connection_duration_timer_) {
+      client.connection_duration_timer_->disableTimer();
+      client.connection_duration_timer_.reset();
+    }
+
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state())));
 
     checkForIdleAndCloseIdleConnsIfDraining();
@@ -470,6 +493,15 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     client.conn_connect_ms_.reset();
     ASSERT(client.state() == ActiveClient::State::CONNECTING);
     transitionActiveClientState(client, ActiveClient::State::READY);
+
+    // Now that the active client is ready, set up a timer for max connection duration.
+    const absl::optional<std::chrono::milliseconds> max_connection_duration =
+        client.parent_.host()->cluster().maxConnectionDuration();
+    if (max_connection_duration.has_value()) {
+      client.connection_duration_timer_ = client.parent_.dispatcher().createTimer(
+          [&client]() { client.onConnectionDurationTimeout(); });
+      client.connection_duration_timer_->enableTimer(max_connection_duration.value());
+    }
 
     // At this point, for the mixed ALPN pool, the client may be deleted. Do not
     // refer to client after this point.
@@ -560,7 +592,7 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
                            uint32_t concurrent_stream_limit)
     : parent_(parent), remaining_streams_(translateZeroToUnlimited(lifetime_stream_limit)),
       concurrent_stream_limit_(translateZeroToUnlimited(concurrent_stream_limit)),
-      connect_timer_(parent_.dispatcher().createTimer([this]() -> void { onConnectTimeout(); })) {
+      connect_timer_(parent_.dispatcher().createTimer([this]() { onConnectTimeout(); })) {
   conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       parent_.host()->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher().timeSource());
   conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
@@ -574,10 +606,6 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
 }
 
 ActiveClient::~ActiveClient() { releaseResourcesBase(); }
-
-void ActiveClient::onEvent(Network::ConnectionEvent event) {
-  parent_.onConnectionEvent(*this, "", event);
-}
 
 void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
@@ -596,6 +624,34 @@ void ActiveClient::onConnectTimeout() {
   parent_.host()->cluster().stats().upstream_cx_connect_timeout_.inc();
   timed_out_ = true;
   close();
+}
+
+void ActiveClient::onConnectionDurationTimeout() {
+  // The connection duration timer should only have started after we left the CONNECTING state.
+  ENVOY_BUG(state_ != ActiveClient::State::CONNECTING,
+            "max connection duration reached while connecting");
+
+  // The connection duration timer should have been disabled and reset in onConnectionEvent
+  // for closing connections.
+  ENVOY_BUG(state_ != ActiveClient::State::CLOSED, "max connection duration reached while closed");
+
+  // There's nothing to do if the client is connecting, closed or draining.
+  // Two of these cases are bugs (see above), but it is safe to no-op either way.
+  if (state_ == ActiveClient::State::CONNECTING || state_ == ActiveClient::State::CLOSED ||
+      state_ == ActiveClient::State::DRAINING) {
+    return;
+  }
+
+  ENVOY_CONN_LOG(debug, "max connection duration reached, DRAINING", *this);
+  parent_.host()->cluster().stats().upstream_cx_max_duration_reached_.inc();
+  parent_.transitionActiveClientState(*this, Envoy::ConnectionPool::ActiveClient::State::DRAINING);
+
+  // Close out the draining client if we no longer have active streams.
+  // We have to do this here because there won't be an onStreamClosed (because there are
+  // no active streams) to do it for us later.
+  if (numActiveStreams() == 0) {
+    close();
+  }
 }
 
 void ActiveClient::drain() {

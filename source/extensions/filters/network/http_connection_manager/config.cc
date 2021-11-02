@@ -151,8 +151,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(
+                context.mainThreadDispatcher(), context.threadLocal());
           });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
@@ -227,7 +227,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -826,7 +826,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

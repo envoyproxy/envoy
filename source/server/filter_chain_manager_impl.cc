@@ -52,6 +52,11 @@ PerFilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
 }
 
+const Envoy::Config::TypedMetadata&
+PerFilterChainFactoryContextImpl::listenerTypedMetadata() const {
+  return parent_context_.listenerTypedMetadata();
+}
+
 envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
   return parent_context_.direction();
 }
@@ -71,8 +76,8 @@ Upstream::ClusterManager& PerFilterChainFactoryContextImpl::clusterManager() {
   return parent_context_.clusterManager();
 }
 
-Event::Dispatcher& PerFilterChainFactoryContextImpl::dispatcher() {
-  return parent_context_.dispatcher();
+Event::Dispatcher& PerFilterChainFactoryContextImpl::mainThreadDispatcher() {
+  return parent_context_.mainThreadDispatcher();
 }
 
 const Server::Options& PerFilterChainFactoryContextImpl::options() {
@@ -755,7 +760,7 @@ AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
   return server_.accessLogManager();
 }
 Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
-Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+Event::Dispatcher& FactoryContextImpl::mainThreadDispatcher() { return server_.dispatcher(); }
 const Server::Options& FactoryContextImpl::options() { return server_.options(); }
 Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
 Router::Context& FactoryContextImpl::routerContext() { return server_.routerContext(); }
@@ -790,6 +795,10 @@ FactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();
+}
+const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
+  // TODO(nareddyt): Needs an implementation for this context. Currently not used.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
   return config_.traffic_direction();

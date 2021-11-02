@@ -150,7 +150,7 @@ Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uin
   }
   if (is_input_empty) {
     return Api::ioCallUint64ResultNoError();
-  };
+  }
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_BADF),
                                Network::IoSocketError::deleteIoError)};

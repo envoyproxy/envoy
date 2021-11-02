@@ -415,7 +415,7 @@ public:
   static IntegrationTestServerPtr create(
       const std::string& config_path, const Network::Address::IpVersion version,
       std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
+      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
       Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
       ProcessObjectOptRef process_object = absl::nullopt,
       Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
@@ -445,10 +445,11 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function,
+             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+             uint32_t concurrency, std::chrono::seconds drain_time,
+             Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
@@ -499,6 +500,10 @@ public:
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(statStore(), name);
+  }
+
+  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
+    return TestUtility::findHistogram(statStore(), name);
   }
 
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
@@ -558,7 +563,8 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
+  void threadRoutine(const Network::Address::IpVersion version,
+                     absl::optional<uint64_t> deterministic_value,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,

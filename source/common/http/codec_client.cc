@@ -110,12 +110,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-          reason = StreamResetReason::ProtocolError;
-          connection_->streamInfo().setResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError);
-        }
+        reason = StreamResetReason::ProtocolError;
+        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
     }
     while (!active_requests_.empty()) {

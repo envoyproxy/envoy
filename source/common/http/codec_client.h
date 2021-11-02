@@ -158,6 +158,11 @@ protected:
       codec_callbacks_->onSettings(settings);
     }
   }
+  void onMaxStreamsChanged(uint32_t num_streams) override {
+    if (codec_callbacks_) {
+      codec_callbacks_->onMaxStreamsChanged(num_streams);
+    }
+  }
 
   void onIdleTimeout() {
     host_->cluster().stats().upstream_cx_idle_timeout_.inc();
