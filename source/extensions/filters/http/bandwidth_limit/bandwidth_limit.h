@@ -32,6 +32,8 @@ namespace BandwidthLimitFilter {
 #define ALL_BANDWIDTH_LIMIT_STATS(COUNTER, GAUGE, HISTOGRAM)                                       \
   COUNTER(request_enabled)                                                                         \
   COUNTER(response_enabled)                                                                        \
+  COUNTER(request_enforced)                                                                        \
+  COUNTER(response_enforced)                                                                       \
   GAUGE(request_pending, Accumulate)                                                               \
   GAUGE(response_pending, Accumulate)                                                              \
   GAUGE(request_incoming_size, Accumulate)                                                         \
@@ -70,6 +72,9 @@ public:
   EnableMode enableMode() const { return enable_mode_; };
   const std::shared_ptr<SharedTokenBucketImpl> tokenBucket() const { return token_bucket_; }
   std::chrono::milliseconds fillInterval() const { return fill_interval_; }
+  const Http::LowerCaseString& requestDelayTrailer() const { return request_delay_trailer_; }
+  const Http::LowerCaseString& responseDelayTrailer() const { return response_delay_trailer_; }
+  bool enableResponseTrailers() const { return enable_response_trailers_; }
 
 private:
   friend class FilterTest;
@@ -85,6 +90,9 @@ private:
   mutable BandwidthLimitStats stats_;
   // Filter chain's shared token bucket
   std::shared_ptr<SharedTokenBucketImpl> token_bucket_;
+  const Http::LowerCaseString request_delay_trailer_;
+  const Http::LowerCaseString response_delay_trailer_;
+  const bool enable_response_trailers_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -141,6 +149,8 @@ private:
   std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   Stats::TimespanPtr request_latency_;
   Stats::TimespanPtr response_latency_;
+  std::chrono::milliseconds request_duration_;
+  Http::ResponseTrailerMap* trailers_;
 };
 
 } // namespace BandwidthLimitFilter
