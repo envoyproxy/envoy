@@ -407,10 +407,6 @@ ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() const {
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                                               absl::string_view details) {
-  const absl::optional<int64_t> status = Utility::getResponseStatusNoThrow(*headers);
-  if (status.has_value()) {
-    parent_.stream_info_.setResponseCode(status.value());
-  }
   parent_.stream_info_.setResponseCodeDetails(details);
   parent_.filter_manager_callbacks_.setResponseHeaders(std::move(headers));
   parent_.encodeHeaders(nullptr, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
