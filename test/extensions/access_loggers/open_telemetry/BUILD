@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.access_loggers.open_telemetry"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/protobuf",
         "//source/extensions/access_loggers/open_telemetry:grpc_access_log_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/local_info:local_info_mocks",
