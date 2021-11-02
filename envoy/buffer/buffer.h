@@ -123,6 +123,16 @@ public:
    * should trigger a reset of the corresponding upstream stream if it exists.
    */
   virtual void resetDownstream() PURE;
+
+  /**
+   * Should be invoked when the Envoy level stream is complete.
+   */
+  virtual void onEnvoyStreamComplete() PURE;
+
+  /**
+   * Whether the Envoy level stream was complete.
+   */
+  virtual bool sawEnvoyStreamComplete() PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;

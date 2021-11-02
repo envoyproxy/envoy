@@ -274,6 +274,25 @@ bool TrackedWatermarkBufferFactory::waitUntilExpectedNumberOfAccountsAndBoundBuf
   return mutex_.AwaitWithTimeout(absl::Condition(&predicate), absl::FromChrono(timeout));
 }
 
+bool TrackedWatermarkBufferFactory::
+    waitUntilExpectedNumberOfActiveAccountsThatSawEnvoyStreamComplete(
+        uint32_t expected_num_accounts, std::chrono::milliseconds timeout) {
+  absl::MutexLock lock(&mutex_);
+  auto predicate = [this, expected_num_accounts]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
+    mutex_.AssertHeld();
+    // Remove non-active accounts
+    removeDanglingAccounts();
+    uint32_t num_accounts_seen_envoy_stream_complete = 0;
+    for (auto& entry : account_infos_) {
+      if (entry.first->sawEnvoyStreamComplete()) {
+        ++num_accounts_seen_envoy_stream_complete;
+      }
+    }
+    return num_accounts_seen_envoy_stream_complete == expected_num_accounts;
+  };
+  return mutex_.AwaitWithTimeout(absl::Condition(&predicate), absl::FromChrono(timeout));
+}
+
 void TrackedWatermarkBufferFactory::checkIfExpectedBalancesMet() {
   if (!expected_balances_ || expected_balances_met_.HasBeenNotified()) {
     return;

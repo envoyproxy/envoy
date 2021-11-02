@@ -611,4 +611,89 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
 }
 
+TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Set 10MiB receive window for the client.
+  const int downstream_window_size = 10 * 1024 * 1024;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(downstream_window_size);
+  http2_options.mutable_initial_connection_window_size()->set_value(downstream_window_size);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  writev_matcher_->setSourcePort(lookupPort("http"));
+  writev_matcher_->setWritevReturnsEgain();
+
+  // Send a request
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-length", "10"},
+  });
+  auto& encoder = encoder_decoder.first;
+  const std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_response = std::move(upstream_request_);
+
+  // Send the responses back. It is larger than the downstream's receive window
+  // size. Thus, the codec will not end the stream, but the Envoy level stream
+  // should.
+  upstream_request_for_response->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                               false);
+  const int response_size = downstream_window_size + 1024; // Slightly over the window size.
+  upstream_request_for_response->encodeData(response_size, true);
+
+  // Wait for the stream to have seen complete.
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(
+        buffer_factory_->waitUntilExpectedNumberOfActiveAccountsThatSawEnvoyStreamComplete(1));
+  }
+
+  // Set the pressure so the overload action kills the response if doing stream
+  // accounting
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to downstream.
+  writev_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(response->waitForReset());
+    EXPECT_TRUE(response->reset());
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting the
+    // streams.
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->headers().getStatusValue(), "200");
+  }
+}
+
 } // namespace Envoy

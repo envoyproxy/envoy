@@ -123,6 +123,9 @@ public:
     }
   }
 
+  void onEnvoyStreamComplete() override { saw_envoy_stream_complete_ = true; }
+  bool sawEnvoyStreamComplete() override { return saw_envoy_stream_complete_; }
+
   // The number of memory classes the Account expects to exists. See
   // *WatermarkBufferFactory* for details on the memory classes.
   static constexpr uint32_t NUM_MEMORY_CLASSES_ = 8;
@@ -143,7 +146,7 @@ private:
   absl::optional<uint32_t> current_bucket_idx_{};
 
   WatermarkBufferFactory* factory_ = nullptr;
-
+  bool saw_envoy_stream_complete_ = false;
   OptRef<Http::StreamResetHandler> reset_handler_;
   // Keep a copy of the shared_ptr pointing to this account. We opted to go this
   // route rather than enable_shared_from_this to avoid wasteful atomic

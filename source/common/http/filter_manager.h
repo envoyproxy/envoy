@@ -777,6 +777,10 @@ public:
         filter->handle_->onStreamComplete();
       }
     }
+
+    if (account_) {
+      account_->onEnvoyStreamComplete();
+    }
   }
 
   void destroyFilters() {
