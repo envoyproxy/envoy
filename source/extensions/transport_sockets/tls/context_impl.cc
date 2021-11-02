@@ -1229,7 +1229,8 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
   checkPrivateKey(pkey, dataPath);
 }
 
-void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& keyPath) {
+void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
+                                 const std::string& keyPath) {
 #ifdef BORINGSSL_FIPS
   // Verify that private keys are passing FIPS pairwise consistency tests.
   switch (pkey_id) {
