@@ -30,8 +30,11 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
-  void waitForSeconds(size_t seconds) {
-    for (size_t i = 0; i < seconds; i++) {
+  // Because advanceTimeAndRun simply increase the time system timestamp without interuption and
+  // then run the event loop, advance time in small steps so that the cache eviction timer can fire
+  // in correct timestamps.
+  void waitForSeconds(int seconds) {
+    for (int i = 0; i < seconds; i++) {
       time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                      Event::Dispatcher::RunType::NonBlock);
     }
@@ -84,7 +87,7 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
   }
 }
 
-TEST_F(RawAsyncClientCacheTest, GetTimeoutCache) {
+TEST_F(RawAsyncClientCacheTest, GetTimeoutButNotEvictedCacheEntry) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
