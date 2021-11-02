@@ -416,7 +416,6 @@ TEST_F(OptionsImplTest, InvalidCharsInStatsTags) {
 }
 
 TEST_F(OptionsImplTest, ValidStatsTagsCharacters) {
-
   Stats::TagVector test_tags{
       Stats::Tag{"foo", "bar"},
       Stats::Tag{"foo", "b:ar"},

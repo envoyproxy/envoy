@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-const std::string NAME_REGEX = R"([^\.]+)";
+const Regex::CompiledGoogleReMatcher& validTagValue();
 
 /**
  * Well-known address resolver names.

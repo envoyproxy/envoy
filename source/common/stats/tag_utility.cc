@@ -53,16 +53,16 @@ SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,
 }
 
 bool isTagValueValid(absl::string_view name) {
-  std::regex regex{Config::NAME_REGEX, std::regex::optimize};
-  int cntr = 0;
-  for (auto i = std::regex_iterator<absl::string_view::iterator>(name.begin(), name.end(), regex);
-       i != std::regex_iterator<absl::string_view::iterator>(); ++i) {
-    cntr++;
-    if (cntr > 1) {
-      return false;
-    }
-  }
-  return true;
+  // std::regex regex{Config::NAME_REGEX, std::regex::optimize};
+  // int cntr = 0;
+  // for (auto i = std::regex_iterator<absl::string_view::iterator>(name.begin(), name.end(), regex);
+  //      i != std::regex_iterator<absl::string_view::iterator>(); ++i) {
+  //   cntr++;
+  //   if (cntr > 1) {
+  //     return false;
+  //   }
+  // }
+  return Config::validTagValue().match(name);
 }
 
 bool isTagNameValid(absl::string_view value) {

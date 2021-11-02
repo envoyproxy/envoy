@@ -7,6 +7,8 @@ namespace Config {
 
 namespace {
 
+const absl::string_view NAME_REGEX = R"([^\.]+)";
+
 // To allow for more readable regular expressions to be declared below, and to
 // reduce duplication, define a few common pattern substitutions for regex
 // segments.
@@ -25,6 +27,10 @@ std::string expandRegex(const std::string& regex) {
 }
 
 } // namespace
+
+const Regex::CompiledGoogleReMatcher& validTagValue() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, std::string(NAME_REGEX) + "$", false);
+}
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched
