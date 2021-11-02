@@ -30,7 +30,7 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
-  // Because advanceTimeAndRun moves the current time as requested, and then executes
+  // advanceTimeAndRun moves the current time as requested, and then executes
   // all runnable timers in a non-deterministic order. This mimics real-time behavior in
   // libevent if there is a long delay between libevent regaining control. Here we want to
   // test behavior with a specific sequence of events, where each timer fires within a
