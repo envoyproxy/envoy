@@ -26,6 +26,10 @@ static_resources:
           cluster: "cluster_0"
           tunneling_config:
             hostname: host.com:443
+            headers_to_add:
+            - header:
+                key: original_dst_port
+                value: "%DOWNSTREAM_LOCAL_PORT%"
   clusters:
   - name: cluster_0
     connect_timeout: 5s
