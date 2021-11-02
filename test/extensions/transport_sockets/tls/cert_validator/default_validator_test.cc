@@ -176,6 +176,17 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
             0);
 }
 
+TEST(DefaultCertValidatorTest, NoSanInCert) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"));
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.MergeFrom(TestUtility::createRegexMatcher(R"raw([^.]*\.example\.net)raw"));
+  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(
+      Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher)});
+  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

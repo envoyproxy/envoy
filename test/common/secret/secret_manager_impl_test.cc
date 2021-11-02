@@ -1128,6 +1128,36 @@ tls_certificate:
       EnvoyException, "Failed to load private key provider: test");
 }
 
+// Test that we don't allow specification of both typed and untyped matchers for
+// sans.
+TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  const std::string yaml =
+      R"EOF(
+      name: "abc.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+        match_typed_subject_alt_names:
+        - san_type: DNS
+          matcher:
+            exact: "foo.example"
+        match_subject_alt_names:
+          exact: "foo.example"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  secret_manager->addStaticSecret(secret_config);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      Ssl::CertificateValidationContextConfigImpl cvc_config(
+          *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
+          *api_),
+      EnvoyException,
+      "SAN-based verification using both match_typed_subject_alt_names and "
+      "the deprecated match_subject_alt_names is not allowed");
+}
+
 } // namespace
 } // namespace Secret
 } // namespace Envoy
