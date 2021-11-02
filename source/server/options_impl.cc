@@ -295,20 +295,21 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
   if (!stats_tag.getValue().empty()) {
     for (const auto& cli_tag_pair : stats_tag.getValue()) {
 
-      absl::string_view::size_type colon = cli_tag_pair.find(':');
-      if (colon == absl::string_view::npos) {
+      std::vector<absl::string_view> cli_tag_pair_tokens =
+          absl::StrSplit(cli_tag_pair, absl::MaxSplits(':', 1));
+      if (cli_tag_pair_tokens.size() != 2) {
         throw MalformedArgvException(
             fmt::format("error: misformatted stats-tag '{}'", cli_tag_pair));
       }
 
-      auto name = cli_tag_pair.substr(0, colon);
+      auto name = cli_tag_pair_tokens[0];
       if (!Stats::TagUtility::isTagNameValid(name)) {
         throw MalformedArgvException(
             fmt::format("error: misformatted stats-tag '{}' contains invalid char in '{}'",
                         cli_tag_pair, name));
       }
 
-      auto value = cli_tag_pair.substr(colon + 1);
+      auto value = cli_tag_pair_tokens[1];
       if (!Stats::TagUtility::isTagValueValid(value)) {
         throw MalformedArgvException(
             fmt::format("error: misformatted stats-tag '{}' contains invalid char in '{}'",
