@@ -111,8 +111,6 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.remove_legacy_json",
     // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
-    // Allows the use of ExtensionWithMatcher to wrap a HTTP filter with a match tree.
-    "envoy.reloadable_features.experimental_matching_api",
     // When the runtime is flipped to true, use shared cache in getOrCreateRawAsyncClient method if
     // CacheOption is CacheWhenRuntimeEnabled.
     // Caller that use AlwaysCache option will always cache, unaffected by this runtime.
