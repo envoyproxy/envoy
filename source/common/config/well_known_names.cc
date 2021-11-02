@@ -7,7 +7,7 @@ namespace Config {
 
 namespace {
 
-const absl::string_view NAME_REGEX = R"([^\.]+)";
+const absl::string_view TAG_VALUE_REGEX = R"([^\.]+)";
 
 // To allow for more readable regular expressions to be declared below, and to
 // reduce duplication, define a few common pattern substitutions for regex
@@ -20,7 +20,7 @@ std::string expandRegex(const std::string& regex) {
               // underscores.
               {"<CIPHER>", R"([\w-]+)"},
               // A generic name can contain any character except dots.
-              {"<NAME>", NAME_REGEX},
+              {"<NAME>", TAG_VALUE_REGEX},
               // Route names may contain dots in addition to alphanumerics and
               // dashes with underscores.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
@@ -28,9 +28,14 @@ std::string expandRegex(const std::string& regex) {
 
 } // namespace
 
-const Regex::CompiledGoogleReMatcher& validTagValue() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, std::string(NAME_REGEX) + "$", false);
+const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"), false);
 }
+
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name) {
+  return validTagValueRegex().match(name);
+}
+
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched

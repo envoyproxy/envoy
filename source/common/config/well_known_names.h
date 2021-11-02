@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Config {
 
-const Regex::CompiledGoogleReMatcher& validTagValue();
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name);
 
 /**
  * Well-known address resolver names.
