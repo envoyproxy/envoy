@@ -57,6 +57,7 @@ struct TlsContext {
                       const std::string& password);
   void loadPkcs12(const std::string& data, const std::string& dataPath,
                   const std::string& password);
+  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& keyPath);
 };
 
 class ContextImpl : public virtual Envoy::Ssl::Context {

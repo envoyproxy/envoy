@@ -1177,27 +1177,7 @@ void TlsContext::loadPrivateKey(const std::string& data, const std::string& data
                                      Utility::getLastCryptoError().value_or("unknown")));
   }
 
-#ifdef BORINGSSL_FIPS
-  // Verify that private keys are passing FIPS pairwise consistency tests.
-  switch (pkey_id) {
-  case EVP_PKEY_EC: {
-    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-    if (!EC_KEY_check_fips(ecdsa_private_key)) {
-      throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
-                                       "pairwise consistency test required in FIPS mode",
-                                       dataPath));
-    }
-  } break;
-  case EVP_PKEY_RSA: {
-    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-    if (!RSA_check_fips(rsa_private_key)) {
-      throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
-                                       "pairwise consistency test required in FIPS mode",
-                                       dataPath));
-    }
-  } break;
-  }
-#endif
+  checkPrivateKey(pkey, dataPath);
 }
 
 void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath,
@@ -1246,6 +1226,10 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
                                      Utility::getLastCryptoError().value_or("unknown")));
   }
 
+  checkPrivateKey(pkey, dataPath);
+}
+
+void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& keyPath) {
 #ifdef BORINGSSL_FIPS
   // Verify that private keys are passing FIPS pairwise consistency tests.
   switch (pkey_id) {
@@ -1254,7 +1238,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
     if (!EC_KEY_check_fips(ecdsa_private_key)) {
       throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
                                        "pairwise consistency test required in FIPS mode",
-                                       dataPath));
+                                       keyPath));
     }
   } break;
   case EVP_PKEY_RSA: {
@@ -1262,7 +1246,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
     if (!RSA_check_fips(rsa_private_key)) {
       throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
                                        "pairwise consistency test required in FIPS mode",
-                                       dataPath));
+                                       keyPath));
     }
   } break;
   }

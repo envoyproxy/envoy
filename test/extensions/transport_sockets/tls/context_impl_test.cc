@@ -1096,6 +1096,32 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
                           EnvoyException, error_msg);
 }
 
+// Validate that 1024-bit RSA certificates are rejected from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  pkcs12:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_rsa_1024_certkey.p12"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+
+  std::string error_msg(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, only RSA certificates "
+#ifdef BORINGSSL_FIPS
+      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+#else
+      "with 2048-bit or larger keys are supported"
+#endif
+  );
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException, error_msg);
+}
+
 // Validate that 3072-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -1168,6 +1194,25 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
                           EnvoyException,
                           "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
+                          "only P-256 ECDSA certificates are supported");
+}
+
+// Validate that non-P256 ECDSA certs are rejected loaded from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  pkcs12:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p384_certkey.p12"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException,
+                          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
                           "only P-256 ECDSA certificates are supported");
 }
 
