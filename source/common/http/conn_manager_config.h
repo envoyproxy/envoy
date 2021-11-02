@@ -133,6 +133,7 @@ struct TracingConnectionManagerConfig {
   envoy::type::v3::FractionalPercent overall_sampling_;
   bool verbose_;
   uint32_t max_path_tag_length_;
+  bool dump_tracing_span_into_accesslog_;
 };
 
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;

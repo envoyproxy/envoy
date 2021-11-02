@@ -16,6 +16,8 @@ MockConfig::MockConfig() {
   ON_CALL(*this, customTags()).WillByDefault(Return(&custom_tags_));
   ON_CALL(*this, verbose()).WillByDefault(Return(verbose_));
   ON_CALL(*this, maxPathTagLength()).WillByDefault(Return(uint32_t(256)));
+  ON_CALL(*this, dumpTracingSpanIntoAccesslog())
+      .WillByDefault(Return(dump_tracing_span_into_accesslog_));
 }
 MockConfig::~MockConfig() = default;
 

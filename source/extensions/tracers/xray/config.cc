@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-XRayTracerFactory::XRayTracerFactory() : FactoryBase("envoy.tracers.xray") {}
+XRayTracerFactory::XRayTracerFactory() : FactoryBase(kXrayTracerName.data()) {}
 
 Tracing::DriverSharedPtr
 XRayTracerFactory::createTracerDriverTyped(const envoy::config::trace::v3::XRayConfig& proto_config,

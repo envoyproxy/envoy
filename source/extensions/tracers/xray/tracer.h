@@ -25,6 +25,7 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
+constexpr absl::string_view kXrayTracerName = "envoy.tracers.xray";
 constexpr auto XRayTraceHeader = "x-amzn-trace-id";
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
@@ -194,6 +195,10 @@ public:
 
   // TODO: This method is unimplemented for X-Ray.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+
+  void dumpToStruct(ProtobufWkt::Struct&) const override {}
+
+  absl::string_view tracerName() const override { return kXrayTracerName; }
 
   /**
    * Creates a child span.

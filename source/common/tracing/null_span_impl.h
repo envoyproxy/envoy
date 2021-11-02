@@ -7,6 +7,8 @@
 namespace Envoy {
 namespace Tracing {
 
+constexpr absl::string_view kNullTracerName = "envoy.tracers.null";
+
 /**
  * Null implementation of Span.
  */
@@ -26,6 +28,8 @@ public:
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  void dumpToStruct(ProtobufWkt::Struct&) const override {}
+  absl::string_view tracerName() const override { return kNullTracerName; }
   SpanPtr spawnChild(const Config&, const std::string&, SystemTime) override {
     return SpanPtr{new NullSpan()};
   }

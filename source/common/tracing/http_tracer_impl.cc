@@ -1,5 +1,7 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include <google/protobuf/struct.pb.h>
+
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -136,7 +138,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
                                                const Http::RequestHeaderMap* request_headers,
                                                const Http::ResponseHeaderMap* response_headers,
                                                const Http::ResponseTrailerMap* response_trailers,
-                                               const StreamInfo::StreamInfo& stream_info,
+                                               StreamInfo::StreamInfo& stream_info,
                                                const Config& tracing_config) {
   // Pre response data.
   if (request_headers) {
@@ -185,13 +187,19 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
+  if (tracing_config.dumpTracingSpanIntoAccesslog()) {
+    ProtobufWkt::Struct span_info;
+    span.dumpToStruct(span_info);
+    stream_info.setDynamicMetadata(std::string(span.tracerName()), span_info);
+  }
+
   span.finishSpan();
 }
 
 void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
                                              const Http::ResponseHeaderMap* response_headers,
                                              const Http::ResponseTrailerMap* response_trailers,
-                                             const StreamInfo::StreamInfo& stream_info,
+                                             StreamInfo::StreamInfo& stream_info,
                                              const Config& tracing_config) {
   span.setTag(
       Tracing::Tags::get().HttpProtocol,
@@ -204,6 +212,11 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
 
+  if (tracing_config.dumpTracingSpanIntoAccesslog()) {
+    ProtobufWkt::Struct span_info;
+    span.dumpToStruct(span_info);
+    stream_info.setDynamicMetadata(std::string(span.tracerName()), span_info);
+  }
   span.finishSpan();
 }
 

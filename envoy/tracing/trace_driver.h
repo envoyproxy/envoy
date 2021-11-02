@@ -78,6 +78,12 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+  /**
+   * @return whether or not dumping span info provided by tracing provider into access log through
+   * metadata.
+   */
+  virtual bool dumpTracingSpanIntoAccesslog() const PURE;
 };
 
 /**
@@ -160,6 +166,18 @@ public:
    * @return trace ID as a hex string
    */
   virtual std::string getTraceIdAsHex() const PURE;
+
+  /**
+   * Dump trace context as metadata which depends on tracing provider.
+   * @param protobuf struct which should have information related with this span.
+   */
+  virtual void dumpToStruct(ProtobufWkt::Struct& proto) const PURE;
+
+  /**
+   * Tracer name which created this span.
+   * @return tracer name
+   */
+  virtual absl::string_view tracerName() const PURE;
 };
 
 /**

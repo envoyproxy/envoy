@@ -172,6 +172,15 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
 
     second_child_span->finishSpan();
     EXPECT_NE(0, second_child_span->spanEntity()->endTime());
+
+    ProtobufWkt::Struct dumped_struct;
+    org_second_child_span->dumpToStruct(dumped_struct);
+    EXPECT_EQ(dumped_struct.fields().at("componentId").number_value(), 9000);
+    EXPECT_EQ(dumped_struct.fields().at("operationName").string_value(), "TestChild");
+    EXPECT_TRUE(dumped_struct.fields().at("skipAnalysis").bool_value());
+    EXPECT_EQ(dumped_struct.fields().at("spanId").number_value(), 2);
+    EXPECT_EQ(dumped_struct.fields().at("spanLayer").string_value(), "Http");
+    EXPECT_EQ(dumped_struct.fields().at("spanType").string_value(), "Exit");
   }
 
   // When the child span ends, the data is not reported immediately, but the end time is set.

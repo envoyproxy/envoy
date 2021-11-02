@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase("envoy.tracers.zipkin") {}
+ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase(kZipkinTracerName.data()) {}
 
 Tracing::DriverSharedPtr ZipkinTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::ZipkinConfig& proto_config,

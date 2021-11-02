@@ -28,6 +28,8 @@ struct OpenTracingTracerStats {
 
 class OpenTracingDriver;
 
+constexpr absl::string_view kOpenTracingTracerName = "envoy.tracers.opentracing";
+
 class OpenTracingSpan : public Tracing::Span, Logger::Loggable<Logger::Id::tracing> {
 public:
   OpenTracingSpan(OpenTracingDriver& driver, std::unique_ptr<opentracing::Span>&& span);
@@ -46,6 +48,8 @@ public:
 
   // TODO: This method is unimplemented for OpenTracing.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+  void dumpToStruct(ProtobufWkt::Struct&) const override {}
+  absl::string_view tracerName() const override { return kOpenTracingTracerName; }
 
 private:
   OpenTracingDriver& driver_;

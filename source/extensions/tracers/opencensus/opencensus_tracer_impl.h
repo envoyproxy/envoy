@@ -12,6 +12,8 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
+constexpr absl::string_view kOpenCensusTracerName = "envoy.tracers.opencensus";
+
 /**
  * OpenCensus tracing driver.
  */

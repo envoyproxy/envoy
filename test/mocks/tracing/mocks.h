@@ -1,5 +1,7 @@
 #pragma once
 
+#include <google/protobuf/struct.pb.h>
+
 #include <string>
 #include <vector>
 
@@ -21,10 +23,12 @@ public:
   MOCK_METHOD(const CustomTagMap*, customTags, (), (const));
   MOCK_METHOD(bool, verbose, (), (const));
   MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
+  MOCK_METHOD(bool, dumpTracingSpanIntoAccesslog, (), (const));
 
   OperationName operation_name_{OperationName::Ingress};
   CustomTagMap custom_tags_;
   bool verbose_{false};
+  bool dump_tracing_span_into_accesslog_{true};
 };
 
 class MockSpan : public Span {
@@ -41,6 +45,8 @@ public:
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
   MOCK_METHOD(std::string, getTraceIdAsHex, (), (const));
+  MOCK_METHOD(void, dumpToStruct, (ProtobufWkt::Struct&), (const));
+  MOCK_METHOD(absl::string_view, tracerName, (), (const));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {

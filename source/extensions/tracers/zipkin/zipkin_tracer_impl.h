@@ -32,6 +32,8 @@ namespace Zipkin {
   COUNTER(reports_dropped)                                                                         \
   COUNTER(reports_failed)
 
+constexpr absl::string_view kZipkinTracerName = "envoy.tracers.zipkin";
+
 struct ZipkinTracerStats {
   ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
@@ -84,6 +86,10 @@ public:
 
   // TODO: This method is unimplemented for Zipkin.
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; };
+
+  void dumpToStruct(ProtobufWkt::Struct&) const override {}
+
+  absl::string_view tracerName() const override { return kZipkinTracerName; }
 
   /**
    * @return a reference to the Zipkin::Span object.

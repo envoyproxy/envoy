@@ -12,7 +12,7 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-SkyWalkingTracerFactory::SkyWalkingTracerFactory() : FactoryBase("envoy.tracers.skywalking") {}
+SkyWalkingTracerFactory::SkyWalkingTracerFactory() : FactoryBase(kSkywalkingTracerName.data()) {}
 
 Tracing::DriverSharedPtr SkyWalkingTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::SkyWalkingConfig& proto_config,

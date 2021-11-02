@@ -11,7 +11,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase("envoy.tracers.opencensus") {}
+OpenCensusTracerFactory::OpenCensusTracerFactory() : FactoryBase(kOpenCensusTracerName.data()) {}
 
 Tracing::DriverSharedPtr OpenCensusTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::OpenCensusConfig& proto_config,

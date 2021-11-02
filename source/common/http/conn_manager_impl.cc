@@ -1561,6 +1561,10 @@ uint32_t ConnectionManagerImpl::ActiveStream::maxPathTagLength() const {
   return connection_manager_.config_.tracingConfig()->max_path_tag_length_;
 }
 
+bool ConnectionManagerImpl::ActiveStream::dumpTracingSpanIntoAccesslog() const {
+  return connection_manager_.config_.tracingConfig()->dump_tracing_span_into_accesslog_;
+}
+
 const Router::RouteEntry::UpgradeMap* ConnectionManagerImpl::ActiveStream::upgradeMap() {
   // We must check if the 'cached_route_' optional is populated since this function can be called
   // early via sendLocalReply(), before the cached route is populated.

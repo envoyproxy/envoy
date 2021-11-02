@@ -46,7 +46,7 @@ public:
   static void finalizeDownstreamSpan(Span& span, const Http::RequestHeaderMap* request_headers,
                                      const Http::ResponseHeaderMap* response_headers,
                                      const Http::ResponseTrailerMap* response_trailers,
-                                     const StreamInfo::StreamInfo& stream_info,
+                                     StreamInfo::StreamInfo& stream_info,
                                      const Config& tracing_config);
 
   /**
@@ -55,7 +55,7 @@ public:
    */
   static void finalizeUpstreamSpan(Span& span, const Http::ResponseHeaderMap* response_headers,
                                    const Http::ResponseTrailerMap* response_trailers,
-                                   const StreamInfo::StreamInfo& stream_info,
+                                   StreamInfo::StreamInfo& stream_info,
                                    const Config& tracing_config);
 
   /**
@@ -81,6 +81,7 @@ public:
   const CustomTagMap* customTags() const override { return nullptr; }
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
+  bool dumpTracingSpanIntoAccesslog() const override { return false; }
 };
 
 using EgressConfig = ConstSingleton<EgressConfigImpl>;

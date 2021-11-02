@@ -1,5 +1,7 @@
 #pragma once
 
+#include <google/protobuf/struct.pb.h>
+
 #include <memory>
 
 #include "envoy/tracing/trace_driver.h"
@@ -18,6 +20,8 @@ namespace SkyWalking {
 
 using cpp2sky::TracingContextPtr;
 using cpp2sky::TracingSpanPtr;
+
+constexpr absl::string_view kSkywalkingTracerName = "envoy.tracers.skywalking";
 
 const Http::LowerCaseString& skywalkingPropagationHeaderKey();
 
@@ -73,6 +77,8 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceIdAsHex() const override { return EMPTY_STRING; }
+  void dumpToStruct(ProtobufWkt::Struct&) const override;
+  absl::string_view tracerName() const override { return kSkywalkingTracerName; }
 
   const TracingContextPtr tracingContext() { return tracing_context_; }
   const TracingSpanPtr spanEntity() { return span_entity_; }

@@ -1,5 +1,7 @@
 #include "source/extensions/tracers/skywalking/tracer.h"
 
+#include <google/protobuf/struct.pb.h>
+
 #include <string>
 
 namespace Envoy {
@@ -60,6 +62,10 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   auto child_span = tracing_context_->createExitSpan(span_entity_);
   child_span->startSpan(name);
   return std::make_unique<Span>(child_span, tracing_context_, parent_tracer_);
+}
+
+void Span::dumpToStruct(ProtobufWkt::Struct& proto) const {
+  MessageUtil::jsonConvert(span_entity_->createSpanObject(), proto);
 }
 
 Tracer::Tracer(TraceSegmentReporterPtr reporter) : reporter_(std::move(reporter)) {}

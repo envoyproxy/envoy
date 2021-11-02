@@ -79,6 +79,8 @@ public:
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; };
 
   std::string getTraceIdAsHex() const override;
+  void dumpToStruct(ProtobufWkt::Struct&) const override {}
+  absl::string_view tracerName() const override { return kOpenCensusTracerName; }
 
 private:
   ::opencensus::trace::Span span_;
