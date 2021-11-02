@@ -35,7 +35,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -118,6 +118,40 @@ message Listener {
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
   repeated FilterChain filter_chains = 3;
+
+  // A list of filter chain matching predicate extension type URLs specifying
+  // the order of selection for the most specific filter chain. At each step,
+  // the predicate is evaluated for each filter chain. If the predicate returns
+  // false, the filter chain is eliminated from subsequent consideration. If
+  // the predicate returns true, but there is a more specific match, it is also
+  // eliminated.
+  //
+  // For example, for SNI ``www.example.com`` the filter chain with the
+  // predicate ```*.example.com``` remains and the filter chain with the
+  // predicate ```*.com``` is eliminated, assuming there is no filter chain
+  // with the exact SNI match. In general, the order of specificity is domain
+  // specific as defined by the predicate extension.
+  //
+  // In case, there is more than one filter chain candidates remaining after
+  // the process completes, the first of the filter chains in the order of
+  // their declaration is selected.
+  //
+  // If left unspecified, the following default matching order is applied:
+  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationPort>`.
+  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationIP>`.
+  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SNI>`.
+  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.TransportProtocol>`.
+  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.ApplicationProtocol>`.
+  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DirectSourceIP>`.
+  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceType>`.
+  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceIP>`.
+  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourcePort>`.
+  //
+  // Filter chain match conditions that are not in the matching order list are
+  // ignored. Filter chains without a match condition for the specificed
+  // predicate type URL are assumed to match all.
+  // [#not-implemented-hide:]
+  repeated string matching_order = 31;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
