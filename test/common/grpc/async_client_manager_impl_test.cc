@@ -30,9 +30,11 @@ public:
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
-  // Because advanceTimeAndRun simply increase the time system timestamp without interuption and
-  // then run the event loop, advance time in small steps so that the cache eviction timer can fire
-  // in correct timestamps.
+  // Because advanceTimeAndRun moves the current time as requested, and then executes
+  // all runnable timers in a non-deterministic order. This mimics real-time behavior in
+  // libevent if there is a long delay between libevent regaining control. Here we want to
+  // test behavior with a specific sequence of events, where each timer fires within a
+  // simulated second of what was programmed.
   void waitForSeconds(int seconds) {
     for (int i = 0; i < seconds; i++) {
       time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
