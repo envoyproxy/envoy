@@ -52,7 +52,9 @@ SymbolTable::StoragePtr TagStatNameJoiner::joinNameAndTags(StatName name,
   return symbol_table.join(stat_names);
 }
 
-bool isTagValueValid(absl::string_view name) { return  Config::doesTagNameValueMatchInvalidCharRegex(name);}
+bool isTagValueValid(absl::string_view name) {
+  return Config::doesTagNameValueMatchInvalidCharRegex(name);
+}
 
 bool isTagNameValid(absl::string_view value) {
   for (const auto& token : value) {

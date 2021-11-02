@@ -29,13 +29,13 @@ std::string expandRegex(const std::string& regex) {
 } // namespace
 
 const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"), false);
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"),
+                         false);
 }
 
 bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name) {
   return validTagValueRegex().match(name);
 }
-
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched
