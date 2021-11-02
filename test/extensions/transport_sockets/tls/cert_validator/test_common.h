@@ -73,6 +73,7 @@ public:
   }
 
   Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
 private:
   bool allow_expired_certificate_{false};

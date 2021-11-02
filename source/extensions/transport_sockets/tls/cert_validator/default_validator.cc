@@ -102,7 +102,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
             absl::StrCat("Failed to load trusted CA certificates from ", config_->caCertPath()));
       }
       if (has_crl) {
-        X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+        X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
+                                        ? X509_V_FLAG_CRL_CHECK
+                                        : X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
       }
       verify_mode = SSL_VERIFY_PEER;
       verify_trusted_ca_ = true;
@@ -138,8 +140,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
           X509_STORE_add_crl(store, item->crl);
         }
       }
-
-      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+      X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
+                                      ? X509_V_FLAG_CRL_CHECK
+                                      : X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
   }
 
