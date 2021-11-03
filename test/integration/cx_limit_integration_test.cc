@@ -39,14 +39,14 @@ public:
   void setGlobalLimitOptOut() {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      listener->mutable_limit_connections()->set_value(false);
+      listener->set_ignore_global_conn_limit(true);
     });
   }
 
   void setAdminGlobalLimitOptOut() {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* admin = bootstrap.mutable_admin();
-      admin->mutable_limit_connections()->set_value(false);
+      admin->set_ignore_global_conn_limit(true);
     });
   }
 
