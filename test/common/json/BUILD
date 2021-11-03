@@ -37,6 +37,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "json_loader_legacy_test",
     srcs = ["json_loader_test.cc"],
-    deps = JSON_TEST_DEPS,
     args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_legacy_json"],
+    deps = JSON_TEST_DEPS,
 )
