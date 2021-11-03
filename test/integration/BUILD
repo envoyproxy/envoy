@@ -368,6 +368,7 @@ envoy_cc_test(
         "multiplexed_integration_test.cc",
         "multiplexed_integration_test.h",
     ],
+    coverage = False,
     shard_count = 8,
     deps = [
         ":http_protocol_integration_lib",
