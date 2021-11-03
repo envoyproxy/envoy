@@ -1859,7 +1859,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   }
 }
 
-// Disabled for coverge temporarily see #18881
+// Disabled for coverage temporarily see #18881
 #if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(Http2IntegrationTest, InvalidTrailers) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
