@@ -48,8 +48,7 @@ filter_disabled:
     }
   }
 
-  void initializeWithListenerFilter(bool ssl_client,
-                                    const std::string& log_format,
+  void initializeWithListenerFilter(bool ssl_client, const std::string& log_format,
                                     absl::optional<bool> listener_filter_disabled = absl::nullopt) {
     config_helper_.renameListener("echo");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
@@ -85,8 +84,8 @@ filter_disabled:
         std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   }
 
-  void setupConnections(bool listener_filter_disabled, bool expect_connection_open,
-                        bool ssl_client, const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
+  void setupConnections(bool listener_filter_disabled, bool expect_connection_open, bool ssl_client,
+                        const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
                         const Ssl::ClientSslTransportOptions& ssl_options = {}) {
     initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled);
 
@@ -161,7 +160,7 @@ TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
 
 // The JA3 fingerprint is correct in the access log.
 TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
-  // These TLS options will create a client hello message with 
+  // These TLS options will create a client hello message with
   // JA3 fingerprint:
   //   `771,49199,23-65281-10-11-35-16-13,29-23,0`
   // MD5 hash:
@@ -173,7 +172,8 @@ TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
                    /*ssl_client=*/true, /*log_format=*/"%TLS_JA3_FINGERPRINT%",
                    /*ssl_options=*/ssl_options);
   client_->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("714198b884d1202ccc10aff641b5ec38"));
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::HasSubstr("714198b884d1202ccc10aff641b5ec38"));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
