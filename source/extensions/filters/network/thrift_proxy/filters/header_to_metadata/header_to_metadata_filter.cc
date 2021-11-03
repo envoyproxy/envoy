@@ -1,9 +1,9 @@
+#include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/header_to_metadata_filter.h"
+
 #include "source/common/common/base64.h"
 #include "source/common/common/regex.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
-
-#include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/header_to_metadata_filter.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -8,8 +8,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 
-#include "gtest/gtest.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {

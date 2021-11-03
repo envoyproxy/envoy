@@ -4,13 +4,13 @@
 #include <tuple>
 #include <vector>
 
-#include "absl/strings/string_view.h"
-
 #include "envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {

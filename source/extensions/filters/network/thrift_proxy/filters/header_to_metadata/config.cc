@@ -1,6 +1,7 @@
+#include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/config.h"
+
 #include <string>
 
-#include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/config.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/header_to_metadata_filter.h"
 
 namespace Envoy {
@@ -16,9 +17,10 @@ HeaderToMetadataFilterConfig::createFilterFactoryFromProtoTyped(
         HeaderToMetadata& proto_config,
     const std::string&, Server::Configuration::FactoryContext&) {
   ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
-  return [filter_config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addDecoderFilter(std::make_shared<HeaderToMetadataFilter>(filter_config));
-  };
+  return
+      [filter_config](ThriftProxy::ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+        callbacks.addDecoderFilter(std::make_shared<HeaderToMetadataFilter>(filter_config));
+      };
 }
 
 /**
