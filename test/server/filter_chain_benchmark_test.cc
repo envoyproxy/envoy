@@ -135,6 +135,7 @@ private:
   OptionsSharedPtr options_;
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
   std::string server_name_;
+  std::string ja3_hash_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
 };
