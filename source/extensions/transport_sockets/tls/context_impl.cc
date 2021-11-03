@@ -176,7 +176,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       auto& ctx = tls_contexts_[i];
       // Load certificate chain.
       const auto& tls_certificate = tls_certificates[i].get();
-      bssl::UniquePtr<BIO> bio;
       if (!tls_certificate.pkcs12().empty()) {
         ctx.loadPkcs12(tls_certificate.pkcs12(), tls_certificate.pkcs12Path(),
                        tls_certificate.password());
