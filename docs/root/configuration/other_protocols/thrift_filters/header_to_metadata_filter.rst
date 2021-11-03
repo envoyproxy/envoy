@@ -1,4 +1,4 @@
-.. _config_http_filters_header_to_metadata:
+.. _config_thrift_filters_header_to_metadata:
 
 Envoy Header-To-Metadata Filter
 ===============================
