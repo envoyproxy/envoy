@@ -426,7 +426,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
 
   test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
 
-  // Start a third connection.
+  // Start the third connection.
   codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
                                          /*wait_for_1rtt_key*/ false);
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -435,6 +435,26 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
   upstream_request_->encodeHeaders(response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
+  // Without retry, 425 should be forwarded back to the client.
+  EXPECT_EQ("425", response3->headers().getStatusValue());
+  codec_client_->close();
+
+  // Start the fourth connection.
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"Early-Data", "2"}};
+  auto response4 = codec_client_->makeHeaderOnlyRequest(request);
+  waitForNextUpstreamRequest(0);
+  // If the request already has Early-Data header, no additional Early-Data header should be added
+  // and the header should be forwarded as is.
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  // 425 response should be forwarded back to the client.
   EXPECT_EQ("425", response3->headers().getStatusValue());
   codec_client_->close();
 }
