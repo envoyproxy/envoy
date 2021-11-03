@@ -88,6 +88,11 @@ public:
   virtual bool supportsIpTransparent() const PURE;
 
   /**
+   * return true if the OS supports multi-path TCP
+   */
+  virtual bool supportsMptcp() const PURE;
+
+  /**
    * Release all resources allocated for fd.
    * @return zero on success, -1 returned otherwise.
    */

@@ -249,6 +249,7 @@ envoy_cc_library(
         ":guarddog_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/network:socket_interface_interface",
         "//envoy/ssl:context_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
