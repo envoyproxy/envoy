@@ -119,7 +119,7 @@ protected:
       auto socket_result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
       EXPECT_TRUE(SOCKET_VALID(socket_result.return_value_));
       Network::IoHandlePtr io_handle =
-          std::make_unique<IoSocketHandleImpl>(socket_result.return_value_);
+          std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(socket_result.return_value_);
       auto socket3 = createListenSocketPtr(std::move(io_handle), addr, nullptr);
       EXPECT_EQ(socket3->connectionInfoProvider().localAddress()->asString(), addr->asString());
 
@@ -173,7 +173,7 @@ TEST_P(ListenSocketImplTestTcp, BindSpecificPort) { testBindSpecificPort(); }
 class TestListenSocket : public ListenSocketImpl {
 public:
   TestListenSocket(Address::InstanceConstSharedPtr address)
-      : ListenSocketImpl(std::make_unique<Network::IoSocketHandleImpl>(), address) {}
+      : ListenSocketImpl(std::make_unique<Network::Test::IoSocketHandlePlatformImpl>(), address) {}
 
   TestListenSocket(Address::IpVersion ip_version)
       : ListenSocketImpl(/*io_handle=*/nullptr, ip_version == Address::IpVersion::v4
