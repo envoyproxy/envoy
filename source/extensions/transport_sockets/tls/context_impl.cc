@@ -1251,6 +1251,9 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
     }
   } break;
   }
+#else
+  UNREFERENCED_PARAMETER(pkey);
+  UNREFERENCED_PARAMETER(keyPath);
 #endif
 }
 

@@ -1110,12 +1110,12 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg(
-      "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, only RSA certificates "
+  std::string error_msg("Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
+                        "only RSA certificates "
 #ifdef BORINGSSL_FIPS
-      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                        "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
 #else
-      "with 2048-bit or larger keys are supported"
+                        "with 2048-bit or larger keys are supported"
 #endif
   );
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
@@ -1210,10 +1210,10 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(time_system);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
-                          EnvoyException,
-                          "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
-                          "only P-256 ECDSA certificates are supported");
+  EXPECT_THROW_WITH_REGEX(
+      manager.createSslClientContext(store, client_context_config, nullptr), EnvoyException,
+      "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
+      "only P-256 ECDSA certificates are supported");
 }
 
 // Multiple TLS certificates are not yet supported.
