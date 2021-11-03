@@ -229,7 +229,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
 
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
-  // listner_0 does not hit any connection limits
+  // listener_0 does not hit any connection limits
   test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
   test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 0);
   test_server_->waitForCounterEq("listener.admin.downstream_global_cx_overflow", 0);
@@ -284,7 +284,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestListenerLimitWithGlobalOptOut) {
 
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
-  // listner_0 does hits the listener connection limit
+  // listener_0 does hits the listener connection limit
   test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
   test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 1);
 
