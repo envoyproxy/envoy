@@ -24,7 +24,7 @@ public:
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
-                                      bool bind_to_port, bool limit_connections) override;
+                                      bool bind_to_port, bool ignore_global_conn_limit) override;
 };
 
 } // namespace Event

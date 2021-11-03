@@ -171,10 +171,11 @@ Filesystem::WatcherPtr DispatcherImpl::createFilesystemWatcher() {
 
 Network::ListenerPtr DispatcherImpl::createListener(Network::SocketSharedPtr&& socket,
                                                     Network::TcpListenerCallbacks& cb,
-                                                    bool bind_to_port, bool limit_connections) {
+                                                    bool bind_to_port,
+                                                    bool ignore_global_conn_limit) {
   ASSERT(isThreadSafe());
   return std::make_unique<Network::TcpListenerImpl>(
-      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, limit_connections);
+      *this, api_.randomGenerator(), std::move(socket), cb, bind_to_port, ignore_global_conn_limit);
 }
 
 Network::UdpListenerPtr

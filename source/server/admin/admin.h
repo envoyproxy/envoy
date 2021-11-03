@@ -68,7 +68,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& profile_path, Server::Instance& server, bool limit_connections);
+  AdminImpl(const std::string& profile_path, Server::Instance& server,
+            bool ignore_global_conn_limit);
 
   Http::Code runCallback(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,

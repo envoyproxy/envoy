@@ -18,7 +18,7 @@ class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
                   SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
-                  bool limit_connections);
+                  bool ignore_global_conn_limit);
   ~TcpListenerImpl() override {
     if (bind_to_port_) {
       socket_->ioHandle().resetFileEvents();
