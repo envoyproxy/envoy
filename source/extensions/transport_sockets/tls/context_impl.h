@@ -52,12 +52,12 @@ struct TlsContext {
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr getPrivateKeyMethodProvider() {
     return private_key_method_provider_;
   }
-  void loadCertificateChain(const std::string& data, const std::string& dataPath);
-  void loadPrivateKey(const std::string& data, const std::string& dataPath,
+  void loadCertificateChain(const std::string& data, const std::string& data_path);
+  void loadPrivateKey(const std::string& data, const std::string& data_path,
                       const std::string& password);
-  void loadPkcs12(const std::string& data, const std::string& dataPath,
+  void loadPkcs12(const std::string& data, const std::string& data_path,
                   const std::string& password);
-  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& keyPath);
+  void checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path);
 };
 
 class ContextImpl : public virtual Envoy::Ssl::Context {

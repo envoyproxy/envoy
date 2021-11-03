@@ -1126,8 +1126,8 @@ bool ContextImpl::verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediate
   return true;
 }
 
-void TlsContext::loadCertificateChain(const std::string& data, const std::string& dataPath) {
-  cert_chain_file_path_ = dataPath;
+void TlsContext::loadCertificateChain(const std::string& data, const std::string& data_path) {
+  cert_chain_file_path_ = data_path;
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
   cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
@@ -1164,7 +1164,7 @@ void TlsContext::loadCertificateChain(const std::string& data, const std::string
   }
 }
 
-void TlsContext::loadPrivateKey(const std::string& data, const std::string& dataPath,
+void TlsContext::loadPrivateKey(const std::string& data, const std::string& data_path,
                                 const std::string& password) {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
@@ -1173,16 +1173,16 @@ void TlsContext::loadPrivateKey(const std::string& data, const std::string& data
                               !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
 
   if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", dataPath,
+    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", data_path,
                                      Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  checkPrivateKey(pkey, dataPath);
+  checkPrivateKey(pkey, data_path);
 }
 
-void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath,
+void TlsContext::loadPkcs12(const std::string& data, const std::string& data_path,
                             const std::string& password) {
-  cert_chain_file_path_ = dataPath;
+  cert_chain_file_path_ = data_path;
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
   bssl::UniquePtr<PKCS12> pkcs12(d2i_PKCS12_bio(bio.get(), nullptr));
@@ -1199,7 +1199,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
                      absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
                      absl::NullSafeStringView(ERR_reason_error_string(err)));
     }
-    throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", dataPath));
+    throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", data_path));
   }
   if (ca_certificates) {
     X509* ca_cert = nullptr;
@@ -1210,6 +1210,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
       SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), ca_cert);
     }
   }
+  sk_X509_free(ca_certificates);
   cert_chain_.reset(temp_cert);
   bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
   if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
@@ -1219,27 +1220,27 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& dataPath
                      absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
                      absl::NullSafeStringView(ERR_reason_error_string(err)));
     }
-    throw EnvoyException(absl::StrCat("Failed to load certificate from ", dataPath));
+    throw EnvoyException(absl::StrCat("Failed to load certificate from ", data_path));
   }
   if (temp_private_key == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
-    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", dataPath,
+    throw EnvoyException(fmt::format("Failed to load private key from {}, Cause: {}", data_path,
                                      Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  checkPrivateKey(pkey, dataPath);
+  checkPrivateKey(pkey, data_path);
 }
 
 void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
-                                 const std::string& keyPath) {
+                                 const std::string& key_path) {
 #ifdef BORINGSSL_FIPS
   // Verify that private keys are passing FIPS pairwise consistency tests.
-  switch (pkey_id) {
+  switch (EVP_PKEY_id(pkey.get())) {
   case EVP_PKEY_EC: {
     const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
     if (!EC_KEY_check_fips(ecdsa_private_key)) {
       throw EnvoyException(fmt::format("Failed to load private key from {}, ECDSA key failed "
                                        "pairwise consistency test required in FIPS mode",
-                                       keyPath));
+                                       key_path));
     }
   } break;
   case EVP_PKEY_RSA: {
@@ -1247,13 +1248,13 @@ void TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
     if (!RSA_check_fips(rsa_private_key)) {
       throw EnvoyException(fmt::format("Failed to load private key from {}, RSA key failed "
                                        "pairwise consistency test required in FIPS mode",
-                                       keyPath));
+                                       key_path));
     }
   } break;
   }
 #else
   UNREFERENCED_PARAMETER(pkey);
-  UNREFERENCED_PARAMETER(keyPath);
+  UNREFERENCED_PARAMETER(key_path);
 #endif
 }
 
