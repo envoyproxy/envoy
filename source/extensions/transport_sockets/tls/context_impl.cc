@@ -54,6 +54,15 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
   return false;
 }
 
+void logSslErrorChain() {
+  while (uint64_t err = ERR_get_error()) {
+    ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
+                   absl::NullSafeStringView(ERR_lib_error_string(err)),
+                   absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
+                   absl::NullSafeStringView(ERR_reason_error_string(err)));
+  }
+}
+
 } // namespace
 
 int ContextImpl::sslExtendedSocketInfoIndex() {
@@ -1132,12 +1141,7 @@ void TlsContext::loadCertificateChain(const std::string& data, const std::string
   RELEASE_ASSERT(bio != nullptr, "");
   cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
   if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
-    while (uint64_t err = ERR_get_error()) {
-      ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
-                     absl::NullSafeStringView(ERR_lib_error_string(err)),
-                     absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
-                     absl::NullSafeStringView(ERR_reason_error_string(err)));
-    }
+    logSslErrorChain();
     throw EnvoyException(
         absl::StrCat("Failed to load certificate chain from ", cert_chain_file_path_));
   }
@@ -1193,12 +1197,7 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
   if (pkcs12 == nullptr ||
       !PKCS12_parse(pkcs12.get(), !password.empty() ? const_cast<char*>(password.c_str()) : nullptr,
                     &temp_private_key, &temp_cert, &ca_certificates)) {
-    while (uint64_t err = ERR_get_error()) {
-      ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
-                     absl::NullSafeStringView(ERR_lib_error_string(err)),
-                     absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
-                     absl::NullSafeStringView(ERR_reason_error_string(err)));
-    }
+    logSslErrorChain();
     throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", data_path));
   }
   if (ca_certificates) {
@@ -1209,17 +1208,12 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
       //
       SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), ca_cert);
     }
+    sk_X509_free(ca_certificates);
   }
-  sk_X509_free(ca_certificates);
   cert_chain_.reset(temp_cert);
   bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
   if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
-    while (uint64_t err = ERR_get_error()) {
-      ENVOY_LOG_MISC(debug, "SSL error: {}:{}:{}:{}", err,
-                     absl::NullSafeStringView(ERR_lib_error_string(err)),
-                     absl::NullSafeStringView(ERR_func_error_string(err)), ERR_GET_REASON(err),
-                     absl::NullSafeStringView(ERR_reason_error_string(err)));
-    }
+    logSslErrorChain();
     throw EnvoyException(absl::StrCat("Failed to load certificate from ", data_path));
   }
   if (temp_private_key == nullptr || !SSL_CTX_use_PrivateKey(ssl_ctx_.get(), pkey.get())) {
