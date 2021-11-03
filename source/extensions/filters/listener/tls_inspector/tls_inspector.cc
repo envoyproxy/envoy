@@ -251,8 +251,8 @@ static const uint16_t GREASE[] = {
 };
 
 bool isNotGrease(uint16_t id) {
-  for (size_t i = 0; i < (sizeof(GREASE) / sizeof(GREASE[0])); ++i) {
-    if (id == GREASE[i]) {
+  for (size_t grease_id : GREASE) {
+    if (id == grease_id) {
       return false;
     }
   }
