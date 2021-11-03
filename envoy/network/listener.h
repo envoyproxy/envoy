@@ -215,6 +215,12 @@ public:
    * @return init manager of the listener.
    */
   virtual Init::Manager& initManager() PURE;
+
+  /**
+   * @return bool whether the listener should block connections or not based on the globally set
+   * limit
+   */
+  virtual bool ignoreGlobalConnLimit() const PURE;
 };
 
 /**

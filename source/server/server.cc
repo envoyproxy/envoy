@@ -487,7 +487,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     // This is needed so that we don't read the value until runtime is fully initialized.
     enable_reuse_port_default_ = ReusePortDefault::Runtime;
   }
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+                                       initial_config.admin().ignoreGlobalConnLimit());
 
   loadServerFlags(initial_config.flagsPath());
 
