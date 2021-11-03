@@ -425,6 +425,7 @@ void UpstreamRequest::onPoolReady(
 
   if (protocol) {
     stream_info_.protocol(protocol.value());
+    stream_info_.upstreamProtocol(protocol.value());
   }
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
