@@ -57,3 +57,13 @@ envoy_cc_test_library(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "san_matcher_config_test",
+    srcs = [
+        "san_matcher_config_test.cc",
+    ],
+    deps = [
+        "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
+    ],
+)
