@@ -15,7 +15,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -211,11 +211,15 @@ message GrpcJsonTranscoder {
   bool convert_grpc_status = 9;
 
   // URL unescaping policy.
-  // This spec is only applied when extracting variable with multiple segments.
+  // This spec is only applied when extracting variable with multiple segments in the URL path.
   // For example, in case of `/foo/{x=*}/bar/{y=prefix/*}/{z=**}` `x` variable is single segment and `y` and `z` are multiple segments.
   // For a path with `/foo/first/bar/prefix/second/third/fourth`, `x=first`, `y=prefix/second`, `z=third/fourth`.
   // If this setting is not specified, the value defaults to :ref:`ALL_CHARACTERS_EXCEPT_RESERVED<envoy_v3_api_enum_value_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder.UrlUnescapeSpec.ALL_CHARACTERS_EXCEPT_RESERVED>`.
   UrlUnescapeSpec url_unescape_spec = 10 [(validate.rules).enum = {defined_only: true}];
+
+  // If true, unescape '+' to space when extracting variables in query parameters.
+  // This is to support `HTML 2.0 <https://tools.ietf.org/html/rfc1866#section-8.2.1>`_
+  bool query_param_unescape_plus = 12;
 
   // Configure the behavior when handling requests that cannot be transcoded.
   //

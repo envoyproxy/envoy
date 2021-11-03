@@ -33,7 +33,7 @@ public:
   }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addFilter(config);
+    config_helper_.prependFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
@@ -86,9 +86,9 @@ public:
   const std::string default_config{R"EOF(
     name: "envoy.filters.http.cache"
     typed_config:
-        "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.CacheConfig"
+        "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
 };

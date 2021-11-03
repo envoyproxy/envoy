@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/cdn_loop/v3alpha/cdn_loop.pb.h"
+#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/utility.h"
@@ -16,14 +16,14 @@ namespace {
 const std::string MaxDefaultConfig = R"EOF(
 name: envoy.filters.http.cdn_loop
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
   cdn_id: cdn
 )EOF";
 
 const std::string MaxOf2Config = R"EOF(
 name: envoy.filters.http.cdn_loop
 typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3alpha.CdnLoopConfig
+  "@type": type.googleapis.com/envoy.extensions.filters.http.cdn_loop.v3.CdnLoopConfig
   cdn_id: cdn
   max_allowed_occurrences: 2
 )EOF";
@@ -31,7 +31,7 @@ typed_config:
 class CdnLoopFilterIntegrationTest : public HttpProtocolIntegrationTest {};
 
 TEST_P(CdnLoopFilterIntegrationTest, NoCdnLoopHeader) {
-  config_helper_.addFilter(MaxDefaultConfig);
+  config_helper_.prependFilter(MaxDefaultConfig);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -48,7 +48,7 @@ TEST_P(CdnLoopFilterIntegrationTest, NoCdnLoopHeader) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoopHeaderWithOtherCdns) {
-  config_helper_.addFilter(MaxDefaultConfig);
+  config_helper_.prependFilter(MaxDefaultConfig);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -68,7 +68,7 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoopHeaderWithOtherCdns) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, MultipleCdnLoopHeaders) {
-  config_helper_.addFilter(MaxDefaultConfig);
+  config_helper_.prependFilter(MaxDefaultConfig);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -86,7 +86,7 @@ TEST_P(CdnLoopFilterIntegrationTest, MultipleCdnLoopHeaders) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoop0Allowed1Seen) {
-  config_helper_.addFilter(MaxDefaultConfig);
+  config_helper_.prependFilter(MaxDefaultConfig);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -103,7 +103,7 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoop0Allowed1Seen) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, UnparseableHeader) {
-  config_helper_.addFilter(MaxDefaultConfig);
+  config_helper_.prependFilter(MaxDefaultConfig);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -120,7 +120,7 @@ TEST_P(CdnLoopFilterIntegrationTest, UnparseableHeader) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed1Seen) {
-  config_helper_.addFilter(MaxOf2Config);
+  config_helper_.prependFilter(MaxOf2Config);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -140,7 +140,7 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed1Seen) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed2Seen) {
-  config_helper_.addFilter(MaxOf2Config);
+  config_helper_.prependFilter(MaxOf2Config);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
@@ -160,7 +160,7 @@ TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed2Seen) {
 }
 
 TEST_P(CdnLoopFilterIntegrationTest, CdnLoop2Allowed3Seen) {
-  config_helper_.addFilter(MaxOf2Config);
+  config_helper_.prependFilter(MaxOf2Config);
   initialize();
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 

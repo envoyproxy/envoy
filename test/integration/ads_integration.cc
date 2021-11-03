@@ -22,9 +22,16 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
-                          ConfigHelper::adsBootstrap(
-                              sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+    : HttpIntegrationTest(
+          Http::CodecType::HTTP2, ipVersion(),
+          ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
+                                             (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
+                                         ? "GRPC"
+                                         : "DELTA_GRPC")) {
+  if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+      sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+  }
   use_lds_ = false;
   create_xds_upstream_ = true;
   tls_xds_upstream_ = true;
@@ -58,6 +65,26 @@ envoy::config::endpoint::v3::ClusterLoadAssignment
 AdsIntegrationTest::buildTlsClusterLoadAssignment(const std::string& name) {
   return ConfigHelper::buildClusterLoadAssignment(
       name, Network::Test::getLoopbackAddressString(ipVersion()), 8443);
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+AdsIntegrationTest::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                       const std::string& collection_name) {
+  return ConfigHelper::buildClusterLoadAssignmentWithLeds(name, collection_name);
+}
+
+envoy::service::discovery::v3::Resource
+AdsIntegrationTest::buildLbEndpointResource(const std::string& lb_endpoint_resource_name,
+                                            const std::string& version) {
+  envoy::service::discovery::v3::Resource resource;
+  resource.set_name(lb_endpoint_resource_name);
+  resource.set_version(version);
+
+  envoy::config::endpoint::v3::LbEndpoint lb_endpoint =
+      ConfigHelper::buildLbEndpoint(Network::Test::getLoopbackAddressString(ipVersion()),
+                                    fake_upstreams_[0]->localAddress()->ip()->port());
+  resource.mutable_resource()->PackFrom(lb_endpoint);
+  return resource;
 }
 
 envoy::config::listener::v3::Listener
@@ -101,6 +128,8 @@ void AdsIntegrationTest::makeSingleRequest() {
 void AdsIntegrationTest::initialize() { initializeAds(false); }
 
 void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.explicit_wildcard_resource",
+                                    oldDssOrNewDss() == OldDssOrNewDss::Old ? "false" : "true");
   config_helper_.addConfigModifier([this, &rate_limiting](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* ads_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();

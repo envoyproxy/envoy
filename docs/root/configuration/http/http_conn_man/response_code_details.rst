@@ -101,6 +101,8 @@ All http2 details are rooted at *http2.*
     http2.unexpected_underscore, Envoy was configured to drop requests with header keys beginning with underscores.
     http2.unknown.nghttp2.error, An unknown error was encountered by nghttp2
     http2.violation.of.messaging.rule, The stream was in violation of a HTTP/2 messaging rule.
+    http2.remote_refuse, The peer refused the stream.
+    http2.remote_reset, The peer reset the stream.
 
 Http3 details
 ~~~~~~~~~~~~~
@@ -116,4 +118,7 @@ All http3 details are rooted at *http3.*
     http3.unexpected_underscore, Envoy was configured to drop or reject requests with header keys beginning with underscores.
     http3.too_many_headers, Either incoming request or response headers contained too many headers.
     http3.too_many_trailers, Either incoming request or response trailers contained too many entries.
+    http3.remote_refuse, The peer refused the stream.
+    http3.remote_reset, The peer reset the stream.
+    http3.inconsistent_content_length, The payload size is different from what was indicated by the content-length header.
 

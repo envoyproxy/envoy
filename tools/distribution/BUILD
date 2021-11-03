@@ -1,5 +1,5 @@
 load("//bazel:envoy_build_system.bzl", "envoy_package")
-load("//tools/base:envoy_python.bzl", "envoy_py_binary", "envoy_py_library")
+load("@base_pip3//:requirements.bzl", "entry_point")
 
 licenses(["notice"])  # Apache 2
 
@@ -9,31 +9,26 @@ exports_files([
     "distrotest.sh",
 ])
 
-envoy_py_library(
-    name = "tools.distribution.distrotest",
-    data = [
-        "distrotest.yaml",
-    ],
-    deps = [
-        "//tools/base:checker",
-        "//tools/base:utils",
-        "//tools/docker:utils",
-    ],
+alias(
+    name = "release",
+    actual = entry_point(
+        pkg = "envoy.distribution.release",
+        script = "envoy.distribution.release",
+    ),
 )
 
-envoy_py_binary(
-    name = "tools.distribution.sign",
-    deps = [
-        "//tools/base:runner",
-        "//tools/base:utils",
-        "//tools/gpg:identity",
-    ],
+alias(
+    name = "sign",
+    actual = entry_point(
+        pkg = "envoy.gpg.sign",
+        script = "envoy.gpg.sign",
+    ),
 )
 
-envoy_py_binary(
-    name = "tools.distribution.verify",
-    deps = [
-        ":distrotest",
-        "//tools/base:checker",
-    ],
+alias(
+    name = "verify",
+    actual = entry_point(
+        pkg = "envoy.distribution.verify",
+        script = "envoy.distribution.verify",
+    ),
 )

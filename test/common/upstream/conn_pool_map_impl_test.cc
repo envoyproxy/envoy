@@ -160,7 +160,7 @@ TEST_F(ConnPoolMapImplTest, CallbacksPassedToPools) {
 
   ReadyWatcher watcher;
   test_map->addIdleCallback([&watcher]() { watcher.ready(); });
-  test_map->startDrain();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   EXPECT_CALL(watcher, ready()).Times(2);
   cb1();
@@ -173,7 +173,7 @@ TEST_F(ConnPoolMapImplTest, CallbacksCachedAndPassedOnCreation) {
 
   ReadyWatcher watcher;
   test_map->addIdleCallback([&watcher]() { watcher.ready(); });
-  test_map->startDrain();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete);
 
   Http::ConnectionPool::Instance::IdleCb cb1;
   test_map->getPool(1, getFactoryExpectIdleCb(&cb1));
@@ -189,7 +189,7 @@ TEST_F(ConnPoolMapImplTest, CallbacksCachedAndPassedOnCreation) {
 // Tests that if we drain connections on an empty map, nothing happens.
 TEST_F(ConnPoolMapImplTest, EmptyMapDrainConnectionsNop) {
   TestMapPtr test_map = makeTestMap();
-  test_map->drainConnections();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 // Tests that we forward drainConnections to the pools.
@@ -198,10 +198,12 @@ TEST_F(ConnPoolMapImplTest, DrainConnectionsForwarded) {
 
   test_map->getPool(1, getBasicFactory());
   test_map->getPool(2, getBasicFactory());
-  EXPECT_CALL(*mock_pools_[0], drainConnections());
-  EXPECT_CALL(*mock_pools_[1], drainConnections());
+  EXPECT_CALL(*mock_pools_[0],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*mock_pools_[1],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
 
-  test_map->drainConnections();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 TEST_F(ConnPoolMapImplTest, ClearDefersDelete) {

@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "envoy/config/listener/v3/listener_components.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
@@ -55,7 +56,7 @@ public:
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Server::Options& options() override;
   Network::DrainDecision& drainDecision() override;
   Grpc::Context& grpcContext() override;
@@ -66,11 +67,13 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return parent_context_.serverScope(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
@@ -145,7 +148,7 @@ public:
   // Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
+  Event::Dispatcher& mainThreadDispatcher() override;
   const Server::Options& options() override;
   Grpc::Context& grpcContext() override;
   Router::Context& routerContext() override;
@@ -155,6 +158,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override;
   Envoy::Runtime::Loader& runtime() override;
   Stats::Scope& scope() override;
+  Stats::Scope& serverScope() override { return server_.stats(); }
   Singleton::Manager& singletonManager() override;
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
@@ -168,6 +172,7 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
   const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  const Envoy::Config::TypedMetadata& listenerTypedMetadata() const override;
   envoy::config::core::v3::TrafficDirection direction() const override;
   Network::DrainDecision& drainDecision() override;
   Stats::Scope& listenerScope() override;

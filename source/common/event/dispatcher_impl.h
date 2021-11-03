@@ -77,9 +77,6 @@ public:
     return internal_listener_manager_;
   }
 
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) override;
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;

@@ -51,11 +51,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/extensions/transport_sockets/tls/integration:__subpackages__",
-    ],
     deps = [
         ":tap_config_impl",
         ":tap_lib",

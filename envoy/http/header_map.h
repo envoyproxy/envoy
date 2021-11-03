@@ -318,7 +318,8 @@ private:
   HEADER_FUNC(EnvoyExpectedRequestTimeoutMs)                                                       \
   HEADER_FUNC(EnvoyMaxRetries)                                                                     \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutMs)                                                       \
-  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)
+  HEADER_FUNC(EnvoyUpstreamRequestPerTryTimeoutMs)                                                 \
+  HEADER_FUNC(EnvoyUpstreamStreamDurationMs)
 
 #define INLINE_REQ_HEADERS(HEADER_FUNC)                                                            \
   INLINE_REQ_STRING_HEADERS(HEADER_FUNC)                                                           \
@@ -541,15 +542,14 @@ public:
 
   /**
    * Replaces a header value by copying the value. Copies the key if the key does not exist.
+   * If there are multiple values for one header, this removes all existing values and add
+   * the new one.
    *
    * Calling setCopy multiple times for the same header will result in only the last header
    * being present in the HeaderMap.
    *
    * @param key specifies the name of the header to set; it WILL be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
-   *
-   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
-   * first occurrence of the header.
    * TODO(asraa): Investigate whether necessary to set all headers with the key.
    */
   virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;

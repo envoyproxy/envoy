@@ -16,20 +16,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-TEST(DefaultCertValidatorTest, TestDnsNameMatching) {
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("lyft.com", "lyft.com"));
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.lyft.com", "*.lyft.com"));
-  EXPECT_TRUE(DefaultCertValidator::dnsNameMatch("a.LYFT.com", "*.lyft.COM"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("a.b.lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("foo.test.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("alyft.com", "*.lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("alyft.com", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("", "*lyft.com"));
-  EXPECT_FALSE(DefaultCertValidator::dnsNameMatch("lyft.com", ""));
-}
-
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameDNSMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));

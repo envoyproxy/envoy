@@ -93,12 +93,31 @@ index 6651220..a469c19 100644
  #define REINITIALIZES_AFTER_MOVE
  #endif
 
+# TODO(keith): Remove once bazel supports newer NDK versions https://github.com/bazelbuild/bazel/issues/12889
+
+diff --git a/base/containers/checked_iterators.h b/base/containers/checked_iterators.h
+index b5fe925..31aa81e 100644
+--- a/base/containers/checked_iterators.h
++++ b/base/containers/checked_iterators.h
+@@ -237,9 +237,11 @@ using CheckedContiguousConstIterator = CheckedContiguousIterator<const T>;
+ // [3] https://wg21.link/pointer.traits.optmem
+ namespace std {
+ 
++#ifdef SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
+ template <typename T>
+ struct __is_cpp17_contiguous_iterator<::gurl_base::CheckedContiguousIterator<T>>
+     : true_type {};
++#endif
+ 
+ template <typename T>
+ struct pointer_traits<::gurl_base::CheckedContiguousIterator<T>> {
+
 # TODO(dio): Consider to remove the following patch when we have IDN-free optional build for URL
 # library from the upstream Chromium project. This is tracked in:
 # https://github.com/envoyproxy/envoy/issues/14743.
 
 diff --git a/url/BUILD b/url/BUILD
-index f2ec8da..951039b 100644
+index f2ec8da..df69661 100644
 --- a/url/BUILD
 +++ b/url/BUILD
 @@ -52,3 +52,27 @@ cc_library(

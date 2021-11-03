@@ -205,6 +205,39 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   client_->onSuccess(std::move(check_response), span_);
 }
 
+// Test the client when a denied response with unknown HTTP status code (i.e. if
+// DeniedResponse.status is not set by the auth server implementation). The response sent to client
+// is set with the default HTTP status code for denied response (403 Forbidden).
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithEmptyDeniedResponseStatus) {
+  initialize();
+
+  const std::string expected_body{"test"};
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{"foo", "bar", false}, {"foobar", "bar", true}});
+  const auto expected_downstream_headers = TestCommon::makeHeaderValueOption({});
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::WellKnownGrpcStatus::PermissionDenied, envoy::type::v3::Empty, expected_body,
+      expected_headers, expected_downstream_headers);
+  // When the check response gives unknown denied response HTTP status code, the filter sets the
+  // response HTTP status code with 403 Forbidden (default).
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden, expected_body,
+                                    expected_headers, expected_downstream_headers);
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  EXPECT_EQ(nullptr, headers.RequestId());
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+
+  client_->onSuccess(std::move(check_response), span_);
+}
+
 // Test the client when an unknown error occurs.
 TEST_F(ExtAuthzGrpcClientTest, UnknownError) {
   initialize();
@@ -279,6 +312,46 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
   EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
                                       AuthzResponseNoAttributes(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an OK response is received with additional query string parameters.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithQueryParameters) {
+  initialize();
+
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+
+  const Http::Utility::QueryParamsVector query_parameters_to_set{{"add-me", "yes"}};
+  for (const auto& [key, value] : query_parameters_to_set) {
+    auto* query_parameter = check_response->mutable_ok_response()->add_query_parameters_to_set();
+    query_parameter->set_key(key);
+    query_parameter->set_value(value);
+  }
+
+  const std::vector<std::string> query_parameters_to_remove{"remove-me"};
+  for (const auto& key : query_parameters_to_remove) {
+    check_response->mutable_ok_response()->add_query_parameters_to_remove(key);
+  }
+
+  // This is the expected authz response.
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::OK;
+  authz_response.query_parameters_to_set = {{"add-me", "yes"}};
+  authz_response.query_parameters_to_remove = {"remove-me"};
+
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_->onSuccess(std::move(check_response), span_);
 }
 
