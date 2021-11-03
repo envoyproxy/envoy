@@ -10,6 +10,7 @@
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/init/manager.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -453,6 +454,11 @@ public:
 };
 
 using UdpListenerWorkerRouterPtr = std::unique_ptr<UdpListenerWorkerRouter>;
+
+/**
+ * Base class for all listener typed metadata factories.
+ */
+class ListenerTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
 } // namespace Network
 } // namespace Envoy

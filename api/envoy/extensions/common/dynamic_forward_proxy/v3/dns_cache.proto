@@ -97,32 +97,28 @@ message DnsCacheConfig {
   DnsCacheCircuitBreakers dns_cache_circuit_breaker = 7;
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 8
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
-  // *dns_resolution_config* will be deprecated once
-  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.typed_dns_resolver_config>'
-  // is fully supported.
-  config.core.v3.DnsResolutionConfig dns_resolution_config = 9;
+  // This field is deprecated in favor of
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.typed_dns_resolver_config>`.
+  config.core.v3.DnsResolutionConfig dns_resolution_config = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-  // :ref:'dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>'
-  // configuration eventually.
-  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_resolution_config>`
+  // configuration.
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // this configuration is optional.
-  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
+  // [#extension-category: envoy.network.dns_resolver]
   config.core.v3.TypedExtensionConfig typed_dns_resolver_config = 12;
 
   // Hostnames that should be preresolved into the cache upon creation. This might provide a

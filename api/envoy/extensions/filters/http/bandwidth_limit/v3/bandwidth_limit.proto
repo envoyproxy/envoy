@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Bandwidth limit :ref:`configuration overview <config_http_filters_bandwidth_limit>`.
 // [#extension: envoy.filters.http.bandwidth_limit]
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message BandwidthLimit {
   // Defines the mode for the bandwidth limit filter.
   // Values represent bitmask.
@@ -66,4 +66,19 @@ message BandwidthLimit {
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
   // to enabled.
   config.core.v3.RuntimeFeatureFlag runtime_enabled = 5;
+
+  // Enable response trailers.
+  //
+  // .. note::
+  //
+  //   * If set true, the response trailers *bandwidth-request-delay-ms* and *bandwidth-response-delay-ms* will be added, prefixed by *response_trailer_prefix*.
+  //   * bandwidth-request-delay-ms: delay time in milliseconds it took for the request stream transfer.
+  //   * bandwidth-response-delay-ms: delay time in milliseconds it took for the response stream transfer.
+  //   * If :ref:`enable_mode <envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.enable_mode>` is DISABLED or REQUEST, the trailers will not be set.
+  //   * If both the request and response delay time is 0, the trailers will not be set.
+  //
+  bool enable_response_trailers = 6;
+
+  // Optional The prefix for the response trailers.
+  string response_trailer_prefix = 7;
 }

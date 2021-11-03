@@ -1,18 +1,8 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/quic/envoy_quic_stream.h"
 
 #include "quiche/quic/core/http/quic_spdy_server_stream_base.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {

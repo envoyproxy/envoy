@@ -112,9 +112,9 @@ message Cluster {
 
     // Use the new :ref:`load_balancing_policy
     // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field to determine the LB policy.
-    // [#next-major-version: In the v3 API, we should consider deprecating the lb_policy field
-    // and instead using the new load_balancing_policy field as the one and only mechanism for
-    // configuring this.]
+    // This has been deprecated in favor of using the :ref:`load_balancing_policy
+    // <envoy_v3_api_field_config.cluster.v3.Cluster.load_balancing_policy>` field without
+    // setting any value in :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
     LOAD_BALANCING_POLICY_CONFIG = 7;
   }
 
@@ -129,6 +129,8 @@ message Cluster {
   // If V4_PREFERRED is specified, the DNS resolver will first perform a lookup for addresses in the
   // IPv4 family and fallback to a lookup for addresses in the IPv6 family. i.e., the callback
   // target will only get v6 addresses if there were NO v4 addresses to return.
+  // If ALL is specified, the DNS resolver will perform a lookup for both IPv4 and IPv6 families,
+  // and return all resolved addresses.
   // For cluster types other than
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>` and
   // :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`,
@@ -140,6 +142,7 @@ message Cluster {
     V4_ONLY = 1;
     V6_ONLY = 2;
     V4_PREFERRED = 3;
+    ALL = 4;
   }
 
   enum ClusterProtocolSelection {
@@ -900,41 +903,34 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`
   // and :ref:`LOGICAL_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple's API only allows overriding DNS resolvers via system settings.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   repeated core.v3.Address dns_resolvers = 18
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
-  // Setting this value causes failure if the
-  // ``envoy.restart_features.use_apple_api_for_dns_lookups`` runtime value is true during
-  // server startup. Apple' API only uses UDP for DNS resolution.
   // This field is deprecated in favor of *dns_resolution_config*
   // which aggregates all of the DNS resolver configuration in a single message.
   bool use_tcp_for_dns_lookups = 45
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolution configuration which includes the underlying dns resolver addresses and options.
-  // *dns_resolution_config* will be deprecated once
-  // :ref:'typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>'
-  // is fully supported.
-  core.v3.DnsResolutionConfig dns_resolution_config = 53;
+  // This field is deprecated in favor of
+  // :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.cluster.v3.Cluster.typed_dns_resolver_config>`.
+  core.v3.DnsResolutionConfig dns_resolution_config = 53
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // DNS resolver type configuration extension. This extension can be used to configure c-ares, apple,
   // or any other DNS resolver types and the related parameters.
-  // For example, an object of :ref:`DnsResolutionConfig <envoy_v3_api_msg_config.core.v3.DnsResolutionConfig>`
-  // can be packed into this *typed_dns_resolver_config*. This configuration will replace the
-  // :ref:'dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>'
-  // configuration eventually.
-  // TODO(yanjunxiang): Investigate the deprecation plan for *dns_resolution_config*.
+  // For example, an object of
+  // :ref:`CaresDnsResolverConfig <envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`
+  // can be packed into this *typed_dns_resolver_config*. This configuration replaces the
+  // :ref:`dns_resolution_config <envoy_v3_api_field_config.cluster.v3.Cluster.dns_resolution_config>`
+  // configuration.
   // During the transition period when both *dns_resolution_config* and *typed_dns_resolver_config* exists,
-  // this configuration is optional.
-  // When *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
+  // when *typed_dns_resolver_config* is in place, Envoy will use it and ignore *dns_resolution_config*.
   // When *typed_dns_resolver_config* is missing, the default behavior is in place.
-  // [#not-implemented-hide:]
+  // [#extension-category: envoy.network.dns_resolver]
   core.v3.TypedExtensionConfig typed_dns_resolver_config = 55;
 
   // Optional configuration for having cluster readiness block on warm-up. Currently, only applicable for
@@ -1051,9 +1047,8 @@ message Cluster {
   // servers of this cluster.
   repeated Filter filters = 40;
 
-  // New mechanism for LB policy configuration. Used only if the
-  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>` field has the value
-  // :ref:`LOAD_BALANCING_POLICY_CONFIG<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbPolicy.LOAD_BALANCING_POLICY_CONFIG>`.
+  // If this field is set and is supported by the client, it will supersede the value of
+  // :ref:`lb_policy<envoy_v3_api_field_config.cluster.v3.Cluster.lb_policy>`.
   LoadBalancingPolicy load_balancing_policy = 41;
 
   // [#not-implemented-hide:]

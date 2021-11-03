@@ -10,6 +10,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/common/linked_object.h"
@@ -108,10 +109,11 @@ private:
 
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
-    struct FinalResponse {
+    struct PendingResponse {
       ResolutionStatus status_;
       std::list<DnsResponse> v4_responses_;
       std::list<DnsResponse> v6_responses_;
+      std::list<DnsResponse> all_responses_;
     };
 
     AppleDnsResolverImpl& parent_;
@@ -127,7 +129,7 @@ private:
     // DNSServiceGetAddrInfo fires one callback DNSServiceGetAddrInfoReply callback per IP address,
     // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
     // be accumulated before firing callback_.
-    FinalResponse pending_cb_;
+    PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
   };
 
@@ -137,6 +139,8 @@ private:
   Stats::ScopePtr scope_;
   AppleDnsResolverStats stats_;
 };
+
+DECLARE_FACTORY(AppleDnsResolverFactory);
 
 } // namespace Network
 } // namespace Envoy

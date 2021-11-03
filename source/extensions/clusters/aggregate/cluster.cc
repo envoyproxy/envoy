@@ -180,6 +180,32 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
   return nullptr;
 }
 
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
+  if (load_balancer_) {
+    return load_balancer_->peekAnotherHost(context);
+  }
+  return nullptr;
+}
+
+absl::optional<Upstream::SelectedPoolAndConnection>
+AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
+                                                       const Upstream::Host& host,
+                                                       std::vector<uint8_t>& hash_key) {
+  if (load_balancer_) {
+    return load_balancer_->selectExistingConnection(context, host, hash_key);
+  }
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+AggregateClusterLoadBalancer::lifetimeCallbacks() {
+  if (load_balancer_) {
+    return load_balancer_->lifetimeCallbacks();
+  }
+  return {};
+}
+
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,

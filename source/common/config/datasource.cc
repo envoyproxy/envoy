@@ -26,6 +26,15 @@ std::string read(const envoy::config::core::v3::DataSource& source, bool allow_e
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineString:
     data = source.inline_string();
     break;
+  case envoy::config::core::v3::DataSource::SpecifierCase::kEnvironmentVariable: {
+    const char* environment_variable = std::getenv(source.environment_variable().c_str());
+    if (environment_variable == nullptr) {
+      throw EnvoyException(
+          fmt::format("Environment variable doesn't exist: {}", source.environment_variable()));
+    }
+    data = environment_variable;
+    break;
+  }
   default:
     if (!allow_empty) {
       throw EnvoyException(

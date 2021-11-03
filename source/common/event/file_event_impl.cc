@@ -55,6 +55,9 @@ void FileEventImpl::activate(uint32_t events) {
 void FileEventImpl::assignEvents(uint32_t events, event_base* base) {
   ASSERT(dispatcher_.isThreadSafe());
   ASSERT(base != nullptr);
+  // TODO(antoniovicente) remove this once ConnectionImpl can
+  // handle Read and Close events delivered together.
+  ASSERT(!((events & FileReadyType::Read) && (events & FileReadyType::Closed)));
   enabled_events_ = events;
   event_assign(
       &raw_event_, base, fd_,
@@ -120,7 +123,6 @@ void FileEventImpl::unregisterEventIfEmulatedEdge(uint32_t event) {
   ASSERT(dispatcher_.isThreadSafe());
   // This constexpr if allows the compiler to optimize away the function on POSIX
   if constexpr (PlatformDefaultTriggerType == FileTriggerType::EmulatedEdge) {
-    ASSERT((event & (FileReadyType::Read | FileReadyType::Write)) == event);
     if (trigger_ == FileTriggerType::EmulatedEdge) {
       auto new_event_mask = enabled_events_ & ~event;
       updateEvents(new_event_mask);
@@ -156,7 +158,6 @@ void FileEventImpl::mergeInjectedEventsAndRunCb(uint32_t events) {
         injected_activation_events_ = injected_activation_events_ & ~FileReadyType::Read;
       }
     }
-
     events |= injected_activation_events_;
     injected_activation_events_ = 0;
     activation_cb_->cancel();

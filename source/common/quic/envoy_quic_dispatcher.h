@@ -1,27 +1,17 @@
 #pragma once
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
-#include "quiche/quic/core/quic_dispatcher.h"
-#include "quiche/quic/core/quic_utils.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include <string>
 
 #include "envoy/network/listener.h"
-#include "source/server/connection_handler_impl.h"
-#include "source/server/active_listener_base.h"
+
 #include "source/common/quic/envoy_quic_crypto_stream_factory.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/quic_stat_names.h"
+#include "source/server/active_listener_base.h"
+#include "source/server/connection_handler_impl.h"
+
+#include "quiche/quic/core/quic_dispatcher.h"
+#include "quiche/quic/core/quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -61,12 +51,10 @@ public:
 
 protected:
   // quic::QuicDispatcher
-  std::unique_ptr<quic::QuicSession> CreateQuicSession(quic::QuicConnectionId server_connection_id,
-                                                       const quic::QuicSocketAddress& self_address,
-                                                       const quic::QuicSocketAddress& peer_address,
-                                                       absl::string_view alpn,
-                                                       const quic::ParsedQuicVersion& version,
-                                                       absl::string_view sni) override;
+  std::unique_ptr<quic::QuicSession> CreateQuicSession(
+      quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& self_address,
+      const quic::QuicSocketAddress& peer_address, absl::string_view alpn,
+      const quic::ParsedQuicVersion& version, const quic::ParsedClientHello& parsed_chlo) override;
   // Overridden to restore the first 4 bytes of the connection ID because our BPF filter only looks
   // at the first 4 bytes. This ensures that the replacement routes to the same quic dispatcher.
   quic::QuicConnectionId

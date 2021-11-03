@@ -11,9 +11,10 @@
 #include "envoy/network/dns.h"
 
 #include "source/common/network/address_impl.h"
-#include "source/common/network/apple_dns_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/network/dns_resolver/apple/apple_dns_impl.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/environment.h"
@@ -38,6 +39,14 @@ namespace Envoy {
 namespace Network {
 namespace {
 
+void expectAppleTypedDnsResolverConfig(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config) {
+  EXPECT_EQ(typed_dns_resolver_config.name(), std::string(Network::AppleDnsResolver));
+  EXPECT_EQ(
+      typed_dns_resolver_config.typed_config().type_url(),
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+}
+
 class MockDnsService : public Network::DnsService {
 public:
   MockDnsService() = default;
@@ -61,7 +70,11 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    resolver_ =
+        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
   }
 
   ActiveDnsQuery* resolveWithExpectations(const std::string& address,
@@ -84,8 +97,8 @@ public:
               case DnsLookupFamily::V6Only:
                 EXPECT_NE(nullptr, result.address_->ip()->ipv6());
                 break;
-              // In CI these modes could return either V4 or V6 with the non-mocked API calls. But
-              // regardless of the family all returned addresses need to be one _or_ the other.
+              // In CI these modes could return either IPv4 or IPv6 with the non-mocked API calls.
+              // But regardless of the family all returned addresses need to be one _or_ the other.
               case DnsLookupFamily::V4Preferred:
               case DnsLookupFamily::Auto:
                 // Set the expectation for subsequent responses based on the first one.
@@ -98,6 +111,14 @@ public:
                 }
 
                 if (is_v4.value()) {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv4());
+                } else {
+                  EXPECT_NE(nullptr, result.address_->ip()->ipv6());
+                }
+                break;
+              // All could be either IPv4 or IPv6.
+              case DnsLookupFamily::All:
+                if (result.address_->ip()->ipv4()) {
                   EXPECT_NE(nullptr, result.address_->ip()->ipv4());
                 } else {
                   EXPECT_NE(nullptr, result.address_->ip()->ipv6());
@@ -145,15 +166,84 @@ protected:
   DnsResolverSharedPtr resolver_;
 };
 
-TEST_F(AppleDnsImplTest, InvalidConfigOptions) {
-  auto dns_resolver_options = envoy::config::core::v3::DnsResolverOptions();
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({nullptr}, dns_resolver_options),
-      "defining custom resolvers is not possible when using Apple APIs for DNS resolution");
-  dns_resolver_options.set_use_tcp_for_dns_lookups(true);
-  EXPECT_DEATH(
-      dispatcher_->createDnsResolver({}, dns_resolver_options),
-      "using TCP for DNS lookups is not possible when using Apple APIs for DNS resolution");
+// By default in MacOS, it creates an AppleDnsResolver typed config.
+TEST_F(AppleDnsImplTest, DefaultAppleDnsResolverConstruction) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::config::cluster::v3::Cluster config;
+  typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// If typed apple DNS resolver config exits, use it.
+TEST_F(AppleDnsImplTest, TypedAppleDnsResolverConfigExist) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::config::cluster::v3::Cluster config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_TRUE(config.has_typed_dns_resolver_config());
+  EXPECT_TRUE(checkUseAppleApiForDnsLookups(typed_dns_resolver_config));
+  typed_dns_resolver_config.Clear();
+  typed_dns_resolver_config = Network::makeDnsResolverConfig(config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test default DNS resolver typed config creation based on build system and configuration is
+// expected.
+TEST_F(AppleDnsImplTest, MakeDefaultDnsResolverTestInApple) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::makeDefaultDnsResolverConfig(typed_dns_resolver_config);
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test default DNS resolver factory creation based on build system and configuration is
+// expected.
+TEST_F(AppleDnsImplTest, MakeDefaultDnsResolverFactoryTestInApple) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Envoy::Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(AppleDnsResolver));
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto without typed config.
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithoutTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(envoy::config::bootstrap::v3::Bootstrap(),
+                                                        typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(AppleDnsResolver));
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto with valid typed config
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithGoodTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url(
+      "type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig");
+  typed_dns_resolver_config.set_name(std::string(Network::AppleDnsResolver));
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config);
+  EXPECT_EQ(dns_resolver_factory.name(), std::string(AppleDnsResolver));
+  expectAppleTypedDnsResolverConfig(typed_dns_resolver_config);
+}
+
+// Test DNS resolver factory creation from proto with invalid typed config
+TEST_F(AppleDnsImplTest, MakeDnsResolverFactoryFromProtoTestInAppleWithInvalidTypedConfig) {
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config;
+
+  typed_dns_resolver_config.mutable_typed_config()->set_type_url("type.googleapis.com/foo");
+  typed_dns_resolver_config.set_name("bar");
+  config.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Network::createDnsResolverFactoryFromProto(config, typed_dns_resolver_config),
+      Envoy::EnvoyException, "Didn't find a registered implementation for name: 'bar'");
 }
 
 // Validate that when AppleDnsResolverImpl is destructed with outstanding requests,
@@ -192,6 +282,10 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionV4Only) {
 
 TEST_F(AppleDnsImplTest, DnsIpAddressVersionV6Only) {
   EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Success, true));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("google.com", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Success, true));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -233,6 +327,10 @@ TEST_F(AppleDnsImplTest, DnsIpAddressVersionInvalid) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::V6Only,
+                                             DnsResolver::ResolutionStatus::Failure, false));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_NE(nullptr, resolveWithExpectations("invalidDnsName", DnsLookupFamily::All,
                                              DnsResolver::ResolutionStatus::Failure, false));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
@@ -359,7 +457,8 @@ public:
 
   enum AddressType { V4, V6, Both };
 
-  void fallbackWith(DnsLookupFamily dns_lookup_family, AddressType address_type) {
+  void fallbackWith(DnsLookupFamily dns_lookup_family, AddressType address_type,
+                    uint32_t expected_address_size = 1) {
     const std::string hostname = "foo.com";
     sockaddr_in addr4;
     addr4.sin_family = AF_INET;
@@ -386,10 +485,10 @@ public:
 
     auto query = resolver_->resolve(
         hostname, dns_lookup_family,
-        [&dns_callback_executed, dns_lookup_family, address_type](
+        [&dns_callback_executed, dns_lookup_family, address_type, expected_address_size](
             DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& response) -> void {
           EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
-          EXPECT_EQ(1, response.size());
+          EXPECT_EQ(expected_address_size, response.size());
 
           if (dns_lookup_family == DnsLookupFamily::Auto) {
             if (address_type == AddressType::V4) {
@@ -404,6 +503,23 @@ public:
               EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
             } else {
               EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+            }
+          }
+
+          if (dns_lookup_family == DnsLookupFamily::All) {
+            switch (address_type) {
+            case AddressType::V4:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+              break;
+            case AddressType::V6:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv6());
+              break;
+            case AddressType::Both:
+              EXPECT_NE(nullptr, response.front().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.back().address_->ip()->ipv6());
+              break;
+            default:
+              NOT_REACHED_GCOVR_EXCL_LINE;
             }
           }
           dns_callback_executed.Notify();
@@ -664,6 +780,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleAddresses) {
   dns_callback_executed.WaitForNotification();
 }
 
+// TODO: write a TEST_P harness to eliminate duplication.
 TEST_F(AppleDnsImplFakeApiTest, AutoOnlyV6IfBothV6andV4) {
   fallbackWith(DnsLookupFamily::Auto, AddressType::Both);
 }
@@ -686,6 +803,18 @@ TEST_F(AppleDnsImplFakeApiTest, V4PreferredV6IfOnlyV6) {
 
 TEST_F(AppleDnsImplFakeApiTest, V4PreferredV4IfOnlyV4) {
   fallbackWith(DnsLookupFamily::V4Preferred, AddressType::V4);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllIfBothV6andV4) {
+  fallbackWith(DnsLookupFamily::All, AddressType::Both, 2 /* expected_address_size*/);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllV6IfOnlyV6) {
+  fallbackWith(DnsLookupFamily::All, AddressType::V6);
+}
+
+TEST_F(AppleDnsImplFakeApiTest, AllV4IfOnlyV4) {
+  fallbackWith(DnsLookupFamily::All, AddressType::V4);
 }
 
 TEST_F(AppleDnsImplFakeApiTest, MultipleAddressesSecondOneFails) {
