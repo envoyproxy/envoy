@@ -26,7 +26,7 @@ to execute tests on it.
 ### Security releases
 
 Critical security fixes are owned by the Envoy security team, which provides fixes for the
-`main` branch, and the latest release branch. Once those fixes are ready, the maintainers
+`main` branch. Once those fixes are ready, the maintainers
 of stable releases backport them to the remaining supported stable releases.
 
 ### Backports
@@ -55,6 +55,7 @@ stable releases and sending announcements about them. This role is rotating on a
 | 2021 Q1 | Rei Shimizu ([Shikugawa](https://github.com/Shikugawa))        |
 | 2021 Q2 | Dmitri Dolguikh ([dmitri-d](https://github.com/dmitri-d))      |
 | 2021 Q3 | Takeshi Yoneda ([mathetake](https://github.com/mathetake))     |
+| 2021 Q4 | Otto van der Schaaf ([oschaaf](https://github.com/oschaaf))    |
 
 ## Release schedule
 
