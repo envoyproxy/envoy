@@ -270,9 +270,6 @@ TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequestsTightUpstreamLimits
 }
 
 TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequestsLaxUpstreamLimits) {
-  if (upstreamProtocol() == Http::CodecType::HTTP2) {
-    return;
-  }
   envoy::config::core::v3::Http2ProtocolOptions config;
   config.mutable_max_concurrent_streams()->set_value(10000);
   mergeOptions(config);

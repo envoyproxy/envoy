@@ -266,6 +266,7 @@ public:
     ASSERT(connecting_stream_capacity_ >= delta);
     connecting_stream_capacity_ -= delta;
   }
+
   void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
     state_.incrConnectingAndConnectedStreamCapacity(delta);
     connecting_stream_capacity_ += delta;
