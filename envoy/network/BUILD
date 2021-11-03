@@ -39,6 +39,7 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         ":transport_socket_interface",
+        "//envoy/config:typed_config_interface",
     ],
 )
 

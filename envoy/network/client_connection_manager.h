@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/typed_config.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
@@ -8,7 +9,7 @@
 namespace Envoy {
 namespace Network {
 
-class ClientConnectionFactory {
+class ClientConnectionFactory : public Config::UntypedFactory{
 public:
   virtual ~ClientConnectionFactory() = default;
   std::string category() { return "network.connection"; }
