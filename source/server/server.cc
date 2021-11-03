@@ -31,13 +31,14 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -849,6 +850,8 @@ void InstanceImpl::terminate() {
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   Config::GrpcMuxImpl::shutdownAll();
   Config::NewGrpcMuxImpl::shutdownAll();
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+  Config::XdsMux::GrpcMuxDelta::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -917,7 +920,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainOrTestThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

@@ -592,6 +592,13 @@ public:
   TestZoneAwareLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
+TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {
+  EXPECT_FALSE(lb_.lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_.selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
+}
+
 TEST_F(ZoneAwareLoadBalancerBaseTest, CrossPriorityHostMapUpdate) {
   // Fake cross priority host map.
   auto host_map = std::make_shared<HostMap>();

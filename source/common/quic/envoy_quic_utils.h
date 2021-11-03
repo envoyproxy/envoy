@@ -157,7 +157,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 // Create a connection socket instance and apply given socket options to the
 // socket. IP_PKTINFO and SO_RXQ_OVFL is always set if supported.
 Network::ConnectionSocketPtr
-createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
+createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);
 
@@ -177,6 +177,10 @@ createServerConnectionSocket(Network::IoHandle& io_handle,
                              const quic::QuicSocketAddress& self_address,
                              const quic::QuicSocketAddress& peer_address,
                              const std::string& hostname, absl::string_view alpn);
+
+// Alter QuicConfig based on all the options in the supplied config.
+void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& config,
+                       quic::QuicConfig& quic_config);
 
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,

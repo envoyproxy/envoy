@@ -47,10 +47,13 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::AtMost;
 using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsEmpty;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -373,10 +376,13 @@ public:
     request_msg.set_name(HELLO_REQUEST);
 
     Tracing::MockSpan active_span;
-    EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
+    EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
+    EXPECT_CALL(*request->child_span_,
+                setTag(Eq(Tracing::Tags::get().UpstreamAddress), Not(IsEmpty())))
+        .Times(AtMost(1));
     EXPECT_CALL(*request->child_span_,
                 setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));

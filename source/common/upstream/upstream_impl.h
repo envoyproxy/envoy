@@ -634,6 +634,7 @@ public:
   const envoy::config::core::v3::HttpProtocolOptions& commonHttpProtocolOptions() const override {
     return http_protocol_options_->common_http_protocol_options_;
   }
+  void configureLbPolicies(const envoy::config::cluster::v3::Cluster& config);
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
