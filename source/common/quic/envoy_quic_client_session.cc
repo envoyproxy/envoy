@@ -1,6 +1,5 @@
 #include "source/common/quic/envoy_quic_client_session.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 

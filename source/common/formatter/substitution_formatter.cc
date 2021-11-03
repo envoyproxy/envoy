@@ -954,7 +954,13 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         });
   } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.ja3Hash(); });
+        [](const StreamInfo::StreamInfo& stream_info) { 
+          absl::optional<std::string> result;
+          if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+            result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
+          }
+          return result;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

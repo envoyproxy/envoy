@@ -106,10 +106,6 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const FilterStateSharedPtr& filter_state) {
         upstream_filter_state_ = filter_state;
       }));
-  ON_CALL(*this, setJA3Hash(_)).WillByDefault(Invoke([this](const absl::string_view ja3_hash) {
-    ja3_hash_ = std::string(ja3_hash);
-  }));
-  ON_CALL(*this, ja3Hash()).WillByDefault(ReturnRef(ja3_hash_));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));

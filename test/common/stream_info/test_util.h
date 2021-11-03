@@ -170,10 +170,6 @@ public:
     upstream_filter_state_ = filter_state;
   }
 
-  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
-
-  const std::string& ja3Hash() const override { return ja3_hash_; }
-
   void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
     upstream_transport_failure_reason_ = std::string(failure_reason);
   }
@@ -275,7 +271,6 @@ public:
   Envoy::StreamInfo::FilterStateSharedPtr upstream_filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
-  std::string ja3_hash_;
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;

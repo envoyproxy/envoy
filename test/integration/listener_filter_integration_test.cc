@@ -49,6 +49,7 @@ filter_disabled:
   }
 
   void initializeWithListenerFilter(bool ssl_client,
+                                    const std::string& log_format,
                                     absl::optional<bool> listener_filter_disabled = absl::nullopt) {
     config_helper_.renameListener("echo");
     std::string tls_inspector_config = ConfigHelper::tlsInspectorFilter();
@@ -77,7 +78,7 @@ filter_disabled:
       config_helper_.addSslConfig();
     }
 
-    useListenerAccessLog("%RESPONSE_CODE_DETAILS%");
+    useListenerAccessLog(log_format);
     BaseIntegrationTest::initialize();
 
     context_manager_ =
@@ -85,13 +86,14 @@ filter_disabled:
   }
 
   void setupConnections(bool listener_filter_disabled, bool expect_connection_open,
-                        bool ssl_client) {
-    initializeWithListenerFilter(ssl_client, listener_filter_disabled);
+                        bool ssl_client, const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
+                        const Ssl::ClientSslTransportOptions& ssl_options = {}) {
+    initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled);
 
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("echo"));
-    context_ = Ssl::createClientSslTransportSocketFactory({}, *context_manager_, *api_);
+    context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
     Network::TransportSocketPtr transport_socket;
     if (ssl_client) {
       transport_socket =
@@ -155,6 +157,23 @@ TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
+}
+
+// The JA3 fingerprint is correct in the access log.
+TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
+  // These TLS options will create a client hello message with 
+  // JA3 fingerprint:
+  //   `771,49199,23-65281-10-11-35-16-13,29-23,0`
+  // MD5 hash:
+  //   `714198b884d1202ccc10aff641b5ec38`
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
+                   /*ssl_client=*/true, /*log_format=*/"%TLS_JA3_FINGERPRINT%",
+                   /*ssl_options=*/ssl_options);
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::HasSubstr("714198b884d1202ccc10aff641b5ec38"));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,

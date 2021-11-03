@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "source/common/common/assert.h"
-#include "source/common/common/empty_string.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
 #include "source/common/quic/envoy_quic_server_stream.h"
 

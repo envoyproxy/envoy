@@ -194,8 +194,12 @@ public:
     return connectionInfoProvider().requestedServerName();
   }
 
-  void setJA3Hash(absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
-  absl::string_view ja3Hash() const override { return ja3_hash_; }
+  void setJA3Hash(absl::string_view ja3_hash) override { 
+    connectionInfoProvider().setJA3Hash(ja3_hash);
+  }
+  absl::string_view ja3Hash() const override {
+    return connectionInfoProvider().ja3Hash();
+  }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
@@ -210,7 +214,6 @@ public:
 protected:
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
-  std::string ja3_hash_;
 };
 
 // ConnectionSocket used with server connections.

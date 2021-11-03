@@ -148,6 +148,8 @@ std::string ConfigHelper::tlsInspectorFilter() {
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+  enable_ja3_fingerprinting: true
 )EOF";
 }
 
