@@ -31,7 +31,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")), client_cache_(*dispatcher_) {}
 
   // advanceTimeAndRun moves the current time as requested, and then executes
-  // all runnable timers in a non-deterministic order. This mimics real-time behavior in
+  // all executable timers in a non-deterministic order. This mimics real-time behavior in
   // libevent if there is a long delay between libevent regaining control. Here we want to
   // test behavior with a specific sequence of events, where each timer fires within a
   // simulated second of what was programmed.
