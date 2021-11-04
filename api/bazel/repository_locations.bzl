@@ -95,7 +95,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         sha256 = "28724736b7ff49a48cb4b2b8cfa373f89edfcb9e8e492a8d5ab60aa3459314c8",
         release_date = "2021-10-04",
         strip_prefix = "rules_proto_grpc-{version}",
-        urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/v{version}.tar.gz"],
+        urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/{version}.tar.gz"],
         use_category = ["api"],
     ),
     io_bazel_rules_dotnet = dict(

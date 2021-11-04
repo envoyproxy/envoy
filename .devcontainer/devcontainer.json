@@ -26,8 +26,7 @@
       "--style=${workspaceFolder}/.style.yapf"
     ],
     "files.exclude": {
-      "**/.clangd/**": true,
-      "**/bazel-*/**": true
+      "**/.clangd/**": true
     },
     "files.watcherExclude": {
       "**/.clangd/**": true,
