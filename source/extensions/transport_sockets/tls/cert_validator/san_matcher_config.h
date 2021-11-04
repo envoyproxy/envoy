@@ -32,7 +32,7 @@ public:
   StringSanMatcher(envoy::type::matcher::v3::StringMatcher matcher) : matcher_(matcher) {}
 
 private:
-  Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
+  const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
 using DnsSanMatcher = StringSanMatcher<GEN_DNS>;
