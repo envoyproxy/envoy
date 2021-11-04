@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.brpc_proxy.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.brpc_proxy.v3";
+option java_outer_classname = "BrpcProxyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Brpc Proxy]
+// Brpc Proxy :ref:`configuration overview <config_network_filters_brpc_proxy>`.
+// [#extension: envoy.filters.network.brpc_proxy]
+
+message BrpcProxy {
+  // The prefix to use when emitting :ref:`statistics <config_network_filters_brpc_proxy_stats>`.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster = 2;
+}
+
+

@@ -46,6 +46,8 @@ public:
   const std::string SniCluster = "envoy.filters.network.sni_cluster";
   // ZooKeeper proxy filter
   const std::string ZooKeeperProxy = "envoy.filters.network.zookeeper_proxy";
+  // brpc proxy filter
+  const std::string BrpcProxy = "envoy.filters.network.brpc_proxy";   
 };
 
 using NetworkFilterNames = ConstSingleton<NetworkFilterNameValues>;

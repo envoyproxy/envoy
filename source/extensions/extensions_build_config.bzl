@@ -80,7 +80,7 @@ EXTENSIONS = {
     #
     # Network filters
     #
-
+    "envoy.filters.network.brpc_proxy":                           "//source/extensions/filters/network/brpc_proxy:config",
     "envoy.filters.network.client_ssl_auth":            "//source/extensions/filters/network/client_ssl_auth:config",
     "envoy.filters.network.direct_response":            "//source/extensions/filters/network/direct_response:config",
     "envoy.filters.network.dubbo_proxy":                "//source/extensions/filters/network/dubbo_proxy:config",
