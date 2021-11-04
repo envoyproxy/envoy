@@ -109,10 +109,11 @@ private:
 
     // Small wrapping struct to accumulate addresses from firings of the
     // onDNSServiceGetAddrInfoReply callback.
-    struct FinalResponse {
+    struct PendingResponse {
       ResolutionStatus status_;
       std::list<DnsResponse> v4_responses_;
       std::list<DnsResponse> v6_responses_;
+      std::list<DnsResponse> all_responses_;
     };
 
     AppleDnsResolverImpl& parent_;
@@ -128,7 +129,7 @@ private:
     // DNSServiceGetAddrInfo fires one callback DNSServiceGetAddrInfoReply callback per IP address,
     // and informs via flags if more IP addresses are incoming. Therefore, these addresses need to
     // be accumulated before firing callback_.
-    FinalResponse pending_cb_;
+    PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
   };
 
