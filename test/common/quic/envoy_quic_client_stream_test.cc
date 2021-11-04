@@ -194,11 +194,11 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
   quic_stream_->OnStreamFrame(frame);
 }
 
-TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd100Continue) {
+TEST_F(EnvoyQuicClientStreamTest, PostRequestAnd1xx) {
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
 
-  EXPECT_CALL(stream_decoder_, decode100ContinueHeaders_(_))
+  EXPECT_CALL(stream_decoder_, decode1xxHeaders_(_))
       .WillOnce(Invoke([this](const Http::ResponseHeaderMapPtr& headers) {
         EXPECT_EQ("100", headers->getStatusValue());
         EXPECT_EQ("0", headers->get(Http::LowerCaseString("i"))[0]->value().getStringView());

@@ -201,6 +201,10 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
                                  header_value.size()) != 0;
 }
 
+bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
+  return response_headers.Status()->value() == "100";
+}
+
 bool HeaderUtility::isConnect(const RequestHeaderMap& headers) {
   return headers.Method() && headers.Method()->value() == Http::Headers::get().MethodValues.Connect;
 }

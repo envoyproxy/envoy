@@ -258,8 +258,8 @@ class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
 
-  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                            UpstreamRequest& upstream_request) PURE;
+  virtual void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                  UpstreamRequest& upstream_request, bool end_stream) PURE;
   virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -301,9 +301,9 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr),
-        downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false), request_buffer_overflowed_(false) {}
+      : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
+        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
+        request_buffer_overflowed_(false) {}
 
   ~Filter() override;
 
@@ -434,8 +434,8 @@ public:
   }
 
   // RouterFilterInterface
-  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                    UpstreamRequest& upstream_request) override;
+  void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                            UpstreamRequest& upstream_request) override;
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -562,7 +562,7 @@ private:
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
-  bool downstream_100_continue_headers_encoded_ : 1;
+  bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
