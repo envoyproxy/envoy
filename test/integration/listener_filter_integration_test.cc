@@ -103,7 +103,8 @@ filter_disabled:
               std::vector<std::string>{"envoyalpn"}));
 
       if (!curves_list.empty()) {
-        auto ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+        auto ssl_socket =
+            dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
         if (ssl_socket) {
           SSL_set1_curves_list(ssl_socket->rawSslForTest(), curves_list.c_str());
         }
