@@ -99,7 +99,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":address_interface",
+        ":connection_interface",
     ],
 )
 

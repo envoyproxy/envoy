@@ -109,7 +109,7 @@ address:
     port_value: 1234
 api_listener:
   api_listener:
-    "@type": type.googleapis.com/envoy.api.v2.Cluster
+    "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
     name: cluster1
     type: EDS
     eds_cluster_config:
@@ -123,7 +123,8 @@ api_listener:
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
       "Unable to unpack as "
       "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager: "
-      "[type.googleapis.com/envoy.api.v2.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "
+      "[type.googleapis.com/envoy.config.cluster.v3.Cluster] {\n  name: \"cluster1\"\n  type: "
+      "EDS\n  "
       "eds_cluster_config {\n    eds_config {\n      path: \"eds path\"\n    }\n  }\n}\n");
 }
 
