@@ -47,6 +47,7 @@ public:
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
   void enableFileEvents(uint32_t events) override;
+
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 
