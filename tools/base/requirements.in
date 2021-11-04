@@ -6,7 +6,7 @@ coloredlogs
 coverage
 envoy.base.checker
 envoy.base.runner
-envoy.base.utils
+envoy.base.utils>=0.0.10
 envoy.code_format.python_check>=0.0.4
 envoy.dependency.pip_check>=0.0.4
 envoy.distribution.release

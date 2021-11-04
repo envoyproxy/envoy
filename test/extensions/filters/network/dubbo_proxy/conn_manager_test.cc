@@ -832,7 +832,7 @@ TEST_F(ConnectionManagerTest, ResponseWithUnknownSequenceID) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233333);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -847,8 +847,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233333);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::SuccessReply;
       }));
@@ -878,7 +880,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233334);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -893,8 +895,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233334);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
       }));
