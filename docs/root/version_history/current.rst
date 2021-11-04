@@ -18,6 +18,7 @@ Bug Fixes
 * http: remove redundant Warn log in HTTP codec.
 * listener: fix a crash when updating any listener that does not bind to port.
 * listener: listener add can reuse the listener socket of a draining filter chain listener and fix the request lost.
+* mac: fix crash on startup on macOS 12 by changing the default allocator.
 
 Removed Config or Runtime
 -------------------------
