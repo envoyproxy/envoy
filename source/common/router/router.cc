@@ -1406,16 +1406,13 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
-  // In upstream request hedging scenarios properties set in onPoolReady might not be the same
-  // as the properties set on the final tream, thus we reset fields based on the
-  // final upstream request.
+  // In upstream request hedging scenarios the upstream connection ID set in onPoolReady might not
+  // be the connection ID of the upstream connection that ended up receiving upstream headers. Thus
+  // reset the upstream connection ID here with the ID of the connection that ultimately was the
+  // transport for the final upstream request.
   if (final_upstream_request_->streamInfo().upstreamConnectionId().has_value()) {
     callbacks_->streamInfo().setUpstreamConnectionId(
         final_upstream_request_->streamInfo().upstreamConnectionId().value());
-  }
-  if (final_upstream_request_->streamInfo().protocol().has_value()) {
-    callbacks_->streamInfo().upstreamProtocol(
-        final_upstream_request_->streamInfo().protocol().value());
   }
   resetOtherUpstreams(upstream_request);
   if (end_stream) {

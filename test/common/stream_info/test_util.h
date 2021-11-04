@@ -35,8 +35,6 @@ public:
   uint64_t bytesReceived() const override { return 1; }
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
-  absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
-  void upstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
   const absl::optional<std::string>& responseCodeDetails() const override {
     return response_code_details_;
@@ -253,7 +251,6 @@ public:
   absl::optional<MonotonicTime> end_time_;
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
-  absl::optional<Http::Protocol> upstream_protocol_{Http::Protocol::Http11};
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;

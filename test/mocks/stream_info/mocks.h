@@ -54,8 +54,6 @@ public:
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
-  MOCK_METHOD(absl::optional<Http::Protocol>, upstreamProtocol, (), (const));
-  MOCK_METHOD(void, upstreamProtocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, responseCodeDetails, (), (const));
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));

@@ -142,9 +142,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
 
-    stream_info.upstreamProtocol(Http::Protocol::Http11);
-    EXPECT_EQ(Http::Protocol::Http11, stream_info.upstreamProtocol().value());
-
     EXPECT_FALSE(stream_info.responseCode());
     stream_info.response_code_ = 200;
     ASSERT_TRUE(stream_info.responseCode());

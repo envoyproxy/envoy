@@ -322,24 +322,14 @@ public:
   virtual uint64_t bytesReceived() const PURE;
 
   /**
-   * @return the protocol of the downstream stream.
+   * @return the protocol of the request.
    */
   virtual absl::optional<Http::Protocol> protocol() const PURE;
 
   /**
-   * @param protocol the downstream stream's protocol.
+   * @param protocol the request's protocol.
    */
   virtual void protocol(Http::Protocol protocol) PURE;
-
-  /**
-   * @return the protocol of the upstream stream.
-   */
-  virtual absl::optional<Http::Protocol> upstreamProtocol() const PURE;
-
-  /**
-   * @param protocol the upstream stream's protocol.
-   */
-  virtual void upstreamProtocol(Http::Protocol protocol) PURE;
 
   /**
    * @return the response code.

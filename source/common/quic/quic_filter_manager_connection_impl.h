@@ -31,7 +31,8 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo> info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -59,11 +60,63 @@ public:
   void readDisable(bool /*disable*/) override { ASSERT(false); }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
+
+  // TODO(alyssawilk, danzh), sort out which of these need to be handled
+  // locally.
+  class ConnectionInfoProviderShim : public Network::ConnectionInfoSetter {
+  public:
+    ConnectionInfoProviderShim(Network::ConnectionInfoSetter& setter,
+                               Network::ConnectionInfoProviderSharedPtr conn_info,
+                               Ssl::ConnectionInfoConstSharedPtr ssl)
+        : setter_(setter), conn_info_(conn_info), ssl_(ssl) {}
+
+    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+      return conn_info_->localAddress();
+    }
+    bool localAddressRestored() const override { return conn_info_->localAddressRestored(); }
+    const Network::Address::InstanceConstSharedPtr& remoteAddress() const override {
+      return conn_info_->remoteAddress();
+    }
+    const Network::Address::InstanceConstSharedPtr& directRemoteAddress() const override {
+      return conn_info_->directRemoteAddress();
+    }
+    absl::string_view requestedServerName() const override {
+      return conn_info_->requestedServerName();
+    }
+    absl::optional<uint64_t> connectionID() const override { return conn_info_->connectionID(); }
+    void dumpState(std::ostream& os, int indent_level) const override {
+      conn_info_->dumpState(os, indent_level);
+    }
+    Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_; }
+
+    void setLocalAddress(const Network::Address::InstanceConstSharedPtr& local_address) override {
+      setter_.setLocalAddress(local_address);
+    }
+    void
+    restoreLocalAddress(const Network::Address::InstanceConstSharedPtr& local_address) override {
+      setter_.restoreLocalAddress(local_address);
+    }
+    void setRemoteAddress(const Network::Address::InstanceConstSharedPtr& remote_address) override {
+      setter_.setRemoteAddress(remote_address);
+    }
+    void setRequestedServerName(const absl::string_view requested_server_name) override {
+      setter_.setRequestedServerName(requested_server_name);
+    }
+    void setConnectionID(uint64_t id) override { setter_.setConnectionID(id); }
+    void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+      ssl_ = ssl_connection_info;
+    }
+
+    Network::ConnectionInfoSetter& setter_;
+    Network::ConnectionInfoProviderSharedPtr conn_info_;
+    Ssl::ConnectionInfoConstSharedPtr ssl_;
+  };
+
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
-    return network_connection_->connectionSocket()->connectionInfoProvider();
+    return *info_provider_;
   }
   Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
-    return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
+    return info_provider_;
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
   unixSocketPeerCredentials() const override {
@@ -177,6 +230,7 @@ private:
   // and the rest incoming data bypasses these filters.
   std::unique_ptr<Network::FilterManagerImpl> filter_manager_;
 
+  std::shared_ptr<ConnectionInfoProviderShim> info_provider_;
   StreamInfo::StreamInfoImpl stream_info_;
   std::string transport_failure_reason_;
   uint32_t bytes_to_send_{0};
