@@ -138,7 +138,9 @@ TEST_P(MultiplexedIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(MultiplexedIntegrationTest, RetryAttemptCount) { testRetryAttemptCountHeader(); }
 
-TEST_P(MultiplexedIntegrationTest, LargeRequestTrailersRejected) { testLargeRequestTrailers(66, 60); }
+TEST_P(MultiplexedIntegrationTest, LargeRequestTrailersRejected) {
+  testLargeRequestTrailers(66, 60);
+}
 
 // Verify downstream codec stream flush timeout.
 TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
@@ -499,7 +501,8 @@ TEST_P(MultiplexedIntegrationTest, RequestMirrorWithBody) {
 }
 
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
-void MultiplexedIntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes) {
+void MultiplexedIntegrationTest::simultaneousRequest(int32_t request1_bytes,
+                                                     int32_t request2_bytes) {
   FakeHttpConnectionPtr fake_upstream_connection1;
   FakeHttpConnectionPtr fake_upstream_connection2;
   Http::RequestEncoder* encoder1;
@@ -900,7 +903,8 @@ void MultiplexedRingHashIntegrationTest::sendMultipleRequests(
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedRingHashIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3}, {Http::CodecType::HTTP1})),
+                             {Http::CodecType::HTTP2, Http::CodecType::HTTP3},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedRingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {

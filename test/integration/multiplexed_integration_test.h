@@ -1,5 +1,3 @@
 #pragma once
 
-namespace Envoy {
-
-} // namespace Envoy
+namespace Envoy {} // namespace Envoy
