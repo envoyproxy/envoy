@@ -124,7 +124,6 @@ public class AndroidEnvoyExplicitFlowTest {
   }
 
   @Test
-  @Ignore("Crashes on callbacks->onResetStream(reason, absl::string_view()) in codec_helper.h")
   public void get_cancelOnResponseHeaders() throws Exception {
     mockWebServer.enqueue(new MockResponse().setBody("hello, world"));
     mockWebServer.start();
