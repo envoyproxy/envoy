@@ -312,24 +312,30 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  // TODO(davinci26): Mocking should not be used to provide real system calls.
+// TODO(davinci26): Mocking should not be used to provide real system calls.
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+#else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
       }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -374,9 +380,20 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   // TODO(davinci26): Mocking should not be used to provide real system calls.
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+#else
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -386,11 +403,6 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -782,6 +794,15 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   // TODO(davinci26): Mocking should not be used to provide real system calls.
+#ifdef WIN32
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillOnce(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
+        return x;
+      }))
+      .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -790,6 +811,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
   EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -799,11 +827,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -849,6 +872,20 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   // TODO(davinci26): Mocking should not be used to provide real system calls.
+#ifdef WIN32
+  bool partial_writed = false;
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
+        if (partial_writed) {
+          ENVOY_LOG_MISC(debug, "inject failure");
+          return Api::SysCallSizeResult{-1, 0};
+        }
+        ENVOY_LOG_MISC(debug, "wire");
+        const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
+        return x;
+      }));
+#else
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, void* buf, size_t len, int flags) {
@@ -857,6 +894,12 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
+      }));
+#endif
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
@@ -866,11 +909,6 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
-        return os_sys_calls_actual_.readv(fd, iov, iovcnt);
       }));
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
@@ -901,6 +939,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  partial_writed = true;
   write(buffer + 10, 10);
 
   expectProxyProtoError();

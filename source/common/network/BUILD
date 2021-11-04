@@ -196,6 +196,7 @@ envoy_cc_library(
         ":io_socket_error_lib",
         ":socket_interface_lib",
         ":socket_lib",
+        "//source/common/buffer:buffer_lib",
         "//envoy/event:dispatcher_interface",
         "//envoy/network:io_handle_interface",
         "//source/common/api:os_sys_calls_lib",
