@@ -104,6 +104,8 @@ public:
 
   void setSocketMode(mode_t socket_mode) { socket_mode_ = socket_mode; }
 
+  void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -146,6 +148,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool coreDumpEnabled() const override { return core_dump_enabled_; }
+  const Stats::TagVector& statsTags() const override { return stats_tags_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -207,6 +210,7 @@ private:
   bool core_dump_enabled_{false};
   bool cpuset_threads_{false};
   std::vector<std::string> disabled_extensions_;
+  Stats::TagVector stats_tags_;
   uint32_t count_{0};
 
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized

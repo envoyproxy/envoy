@@ -605,6 +605,55 @@ TEST_P(TcpTunnelingIntegrationTest, BasicUsePost) {
   closeConnection(fake_upstream_connection_);
 }
 
+TEST_P(TcpTunnelingIntegrationTest, BasicHeaderEvaluationTunnelingConfig) {
+  // Set the "downstream-local-ip" header in the CONNECT request.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("host.com:80");
+    auto new_header = proxy_config.mutable_tunneling_config()->mutable_headers_to_add()->Add();
+    new_header->mutable_header()->set_key("downstream-local-ip");
+    new_header->mutable_header()->set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  // Verify that the connect request has a "downstream-local-ip" header and its value is the
+  // loopback address.
+  EXPECT_EQ(
+      upstream_request_->headers().get(Envoy::Http::LowerCaseString("downstream-local-ip")).size(),
+      1);
+  EXPECT_EQ(upstream_request_->headers()
+                .get(Envoy::Http::LowerCaseString("downstream-local-ip"))[0]
+                ->value()
+                .getStringView(),
+            Network::Test::getLoopbackAddressString(version_));
+
+  // Send upgrade headers downstream, fully establishing the connection.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+}
+
 TEST_P(TcpTunnelingIntegrationTest, Goaway) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;

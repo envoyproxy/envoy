@@ -7,6 +7,9 @@
 
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
+
+#include "test/test_common/network_utility.h"
 
 #include "absl/types/optional.h"
 
@@ -16,7 +19,7 @@
 namespace Envoy {
 namespace Network {
 
-class TestIoSocketHandle : public IoSocketHandleImpl {
+class TestIoSocketHandle : public Test::IoSocketHandlePlatformImpl {
 public:
   using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle,
                                                                      const Buffer::RawSlice* slices,
@@ -25,13 +28,14 @@ public:
 
   TestIoSocketHandle(WritevOverrideProc writev_override_proc, os_fd_t fd = INVALID_SOCKET,
                      bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
-      : IoSocketHandleImpl(fd, socket_v6only, domain), writev_override_(writev_override_proc) {}
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
+        writev_override_(writev_override_proc) {}
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override {
     absl::MutexLock lock(&mutex_);
     dispatcher_ = &dispatcher;
-    IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
+    Test::IoSocketHandlePlatformImpl::initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
   // Schedule resumption on the IoHandle by posting a callback to the IoHandle's dispatcher. Note

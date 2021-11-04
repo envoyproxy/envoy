@@ -26,6 +26,9 @@ public:
     return "envoy.extensions.network.socket_interface.default_socket_interface";
   };
 
+  static IoHandlePtr makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                absl::optional<int> domain);
+
 protected:
   virtual IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
                                  absl::optional<int> domain) const;
