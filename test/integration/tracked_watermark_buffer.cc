@@ -284,7 +284,7 @@ bool TrackedWatermarkBufferFactory::
     removeDanglingAccounts();
     uint32_t num_accounts_seen_envoy_stream_complete = 0;
     for (auto& entry : account_infos_) {
-      if (entry.first->sawEnvoyStreamComplete()) {
+      if (entry.first->envoyStreamComplete()) {
         ++num_accounts_seen_envoy_stream_complete;
       }
     }

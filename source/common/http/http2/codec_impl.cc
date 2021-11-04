@@ -537,7 +537,7 @@ void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
     buffer_memory_account_->clearDownstream();
   }
 
-  if (buffer_memory_account_ && buffer_memory_account_->sawEnvoyStreamComplete()) {
+  if (buffer_memory_account_ && buffer_memory_account_->envoyStreamComplete()) {
     // We should use a lower level reset mechanism to reset the stream.
     resetStreamWorker(reason);
     if (parent_.sendPendingFramesAndHandleError()) {

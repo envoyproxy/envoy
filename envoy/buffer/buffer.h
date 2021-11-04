@@ -132,7 +132,7 @@ public:
   /**
    * Whether the Envoy level stream was complete.
    */
-  virtual bool sawEnvoyStreamComplete() PURE;
+  virtual bool envoyStreamComplete() const PURE;
 };
 
 using BufferMemoryAccountSharedPtr = std::shared_ptr<BufferMemoryAccount>;
