@@ -10,7 +10,8 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list),
+    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher),
+      address_list_(sortAddresses(address_list)),
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
@@ -377,6 +378,41 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   for (auto& connection : connections_) {
     DUMP_DETAILS(connection);
   }
+}
+
+std::vector<Address::InstanceConstSharedPtr>
+HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
+  std::vector<Address::InstanceConstSharedPtr> address_list = in;
+  for (size_t current = 1; current < address_list.size(); ++current) {
+    // If the current address has a different family than the previous address then
+    // it is in the correct position.
+    if (address_list[current]->type() != Address::Type::Ip ||
+        address_list[current - 1]->type() != Address::Type::Ip ||
+        address_list[current]->ip()->version() != address_list[current - 1]->ip()->version()) {
+      continue;
+    }
+    // Find the first address with a different address family than the current address.
+    size_t next = current + 1;
+    while (next < address_list.size()) {
+      if (address_list[next]->type() != Address::Type::Ip ||
+          address_list[current]->ip()->version() != address_list[next]->ip()->version()) {
+        break;
+      }
+      ++next;
+    }
+    // There are no more addresses with different families so sorting is finished.
+    if (next >= address_list.size()) {
+      break;
+    }
+
+    // Bubble the address up to the current position.
+    for (size_t i = next; i > current; i--) {
+      using std::swap;
+      swap(address_list[i], address_list[i - 1]);
+    }
+    current = next - 1;
+  }
+  return address_list;
 }
 
 ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {

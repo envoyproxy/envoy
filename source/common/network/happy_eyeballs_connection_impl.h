@@ -98,6 +98,13 @@ public:
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
 
+  // Returns a new vector containing the contents of |address_list| sorted
+  // with address families interleaved, as per Section 4 of RFC 8305, Happy
+  // Eyeballs v2. It is assumed that The list must already sorted as per
+  // Section 6 of RFC6724, which happens in ares_getaddrinfo().
+  static std::vector<Address::InstanceConstSharedPtr>
+  sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
+
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which
   // sends connection events back to the HappyEyeballsConnectionImpl.
@@ -196,7 +203,7 @@ private:
   Event::Dispatcher& dispatcher_;
 
   // List of addresses to attempt to connect to.
-  const std::vector<Address::InstanceConstSharedPtr>& address_list_;
+  const std::vector<Address::InstanceConstSharedPtr> address_list_;
   // Index of the next address to use.
   size_t next_address_ = 0;
 
