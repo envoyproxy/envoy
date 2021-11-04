@@ -873,5 +873,35 @@ TEST_P(ExplicitFlowControlTest, ResumeWithDataAndTrailers) {
   ASSERT_EQ(cc_.on_complete_calls, 1);
 }
 
+TEST_P(ExplicitFlowControlTest, CancelWithStreamComplete) {
+  cc_.end_stream_with_headers_ = false;
+
+  // Create a stream, and set up request_decoder_ and response_encoder_
+  createStream();
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
+
+  // Encode response headers and data.
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+
+  // When data arrives it should be buffered to send up
+  Buffer::OwnedImpl response_data("12345");
+  response_encoder_->encodeData(response_data, true);
+  ASSERT_EQ(cc_.on_complete_calls, false);
+
+  MockStreamCallbacks stream_callbacks;
+  response_encoder_->getStream().addCallbacks(stream_callbacks);
+
+  // make sure when the stream is canceled, the reset stream callbacks are
+  // not called on the "closed" stream.
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  EXPECT_CALL(stream_callbacks, onResetStream(_, _)).Times(0);
+  http_client_.cancelStream(stream_);
+  ASSERT_EQ(cc_.on_cancel_calls, 1);
+  ASSERT_EQ(cc_.on_error_calls, 0);
+  ASSERT_EQ(cc_.on_complete_calls, 0);
+}
+
 } // namespace Http
 } // namespace Envoy
