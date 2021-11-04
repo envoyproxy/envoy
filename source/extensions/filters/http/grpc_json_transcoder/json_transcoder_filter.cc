@@ -344,8 +344,19 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
 
   for (const auto& binding : variable_bindings) {
     google::grpc::transcoding::RequestWeaver::BindingInfo resolved_binding;
-    status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
-                                            &resolved_binding.field_path);
+    {
+      /**
+       * type_helper_ is not a thread safe object. Its used
+       * `TypeInfoForTypeResolver
+       * <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/util/internal/type_info.cc#L170>`_
+       * uses three mutable maps to cache used data. This function is called in the worker thread.
+       * Multiple worker threads may use type_helper concurrently and these maps could be corrupted.
+       * Hence use a mutex to protect it.
+       */
+      absl::MutexLock lock(&type_helper_mutex_);
+      status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
+                                              &resolved_binding.field_path);
+    }
     if (!status.ok()) {
       if (ignore_unknown_query_parameters_) {
         continue;

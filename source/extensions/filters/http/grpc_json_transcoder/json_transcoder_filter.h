@@ -12,6 +12,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
 
+#include "absl/synchronization/mutex.h"
 #include "google/api/http.pb.h"
 #include "grpc_transcoding/path_matcher.h"
 #include "grpc_transcoding/request_message_translator.h"
@@ -126,6 +127,7 @@ private:
 
   Protobuf::DescriptorPool descriptor_pool_;
   google::grpc::transcoding::PathMatcherPtr<MethodInfoSharedPtr> path_matcher_;
+  mutable absl::Mutex type_helper_mutex_;
   std::unique_ptr<google::grpc::transcoding::TypeHelper> type_helper_;
   Protobuf::util::JsonPrintOptions print_options_;
 
