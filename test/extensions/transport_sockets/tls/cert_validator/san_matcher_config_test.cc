@@ -23,9 +23,9 @@ TEST(SanMatcherConfigTest, TestInvalidSanType) {
 TEST(SanMatcherConfigTest, TestValidSanType) {
   // Iterate over all san type enums.
   for (envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType san_type =
-           envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType_SanType_MIN;
+           envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType_MIN;
        san_type <=
-       envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher_SanType_SanType_MAX;
+       envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType_MAX;
        san_type = static_cast<
            envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>(
            static_cast<int>(san_type + 1))) {
