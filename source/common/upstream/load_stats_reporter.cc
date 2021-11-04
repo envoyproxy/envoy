@@ -82,17 +82,25 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_issued = 0;
         LoadMetricStats::StatsMap load_metrics;
         for (const HostSharedPtr& host : hosts) {
-          rq_success += host->stats().rq_success_.latch();
-          rq_error += host->stats().rq_error_.latch();
-          rq_active += host->stats().rq_active_.value();
-          rq_issued += host->stats().rq_total_.latch();
-          const std::unique_ptr<LoadMetricStats::StatsMap> latched_stats =
-              host->loadMetricStats().latch();
-          for (const auto& metric : *latched_stats) {
-            const std::string& name = metric.first;
-            LoadMetricStats::Stat& stat = load_metrics[name];
-            stat.num_requests_with_metric += metric.second.num_requests_with_metric;
-            stat.total_metric_value += metric.second.total_metric_value;
+          uint64_t host_rq_success = host->stats().rq_success_.latch();
+          uint64_t host_rq_error = host->stats().rq_error_.latch();
+          uint64_t host_rq_active = host->stats().rq_active_.value();
+          uint64_t host_rq_issued = host->stats().rq_total_.latch();
+          rq_success += host_rq_success;
+          rq_error += host_rq_error;
+          rq_active += host_rq_active;
+          rq_issued += host_rq_issued;
+          if (host_rq_success + host_rq_error + host_rq_active != 0) {
+            const std::unique_ptr<LoadMetricStats::StatsMap> latched_stats =
+                host->loadMetricStats().latch();
+            if (latched_stats != nullptr) {
+              for (const auto& metric : *latched_stats) {
+                const std::string& name = metric.first;
+                LoadMetricStats::Stat& stat = load_metrics[name];
+                stat.num_requests_with_metric += metric.second.num_requests_with_metric;
+                stat.total_metric_value += metric.second.total_metric_value;
+              }
+            }
           }
         }
         if (rq_success + rq_error + rq_active != 0) {

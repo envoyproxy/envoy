@@ -62,39 +62,23 @@ struct HostStats {
  */
 class LoadMetricStats {
 public:
+  virtual ~LoadMetricStats() = default;
+
   struct Stat {
     uint64_t num_requests_with_metric = 0;
     double total_metric_value = 0.0;
   };
 
   using StatsMap = absl::flat_hash_map<std::string, Stat>;
-
-  LoadMetricStats() : map_(std::make_unique<StatsMap>()) {}
+  using StatsMapPtr = std::unique_ptr<StatsMap>;
 
   // Adds the given stat to the map. If the stat already exists in the map, then the stat is
   // combined with the existing map entry by incrementing num_requests_with_metric and summing the
   // total_metric_value fields.
-  void add(const std::string& key, double value) {
-    absl::MutexLock lock(&mu_);
-    Stat& stat = (*map_)[key];
-    ++stat.num_requests_with_metric;
-    stat.total_metric_value += value;
-  }
+  virtual void add(const std::string& key, double value) PURE;
 
   // Returns an owning pointer to the current load metrics and clears the map.
-  std::unique_ptr<StatsMap> latch() {
-    absl::MutexLock lock(&mu_);
-    std::unique_ptr<StatsMap> latched = std::move(map_);
-    map_ = std::make_unique<StatsMap>();
-    return latched;
-  }
-
-private:
-  absl::Mutex mu_;
-  std::unique_ptr<StatsMap> map_ ABSL_GUARDED_BY(mu_);
-
-  LoadMetricStats(const LoadMetricStats&) = delete;
-  LoadMetricStats& operator=(const LoadMetricStats&) = delete;
+  virtual StatsMapPtr latch() PURE;
 };
 
 class ClusterInfo;

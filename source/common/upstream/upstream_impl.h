@@ -73,6 +73,38 @@ public:
 };
 
 /**
+ * Implementation of LoadMetricStats.
+ */
+class LoadMetricStatsImpl : public LoadMetricStats {
+public:
+  LoadMetricStatsImpl() {}
+
+  void add(const std::string& key, double value) {
+    absl::MutexLock lock(&mu_);
+    if (map_ == nullptr) {
+      map_ = std::make_unique<StatsMap>();
+    }
+    Stat& stat = (*map_)[key];
+    ++stat.num_requests_with_metric;
+    stat.total_metric_value += value;
+  }
+
+  StatsMapPtr latch() {
+    absl::MutexLock lock(&mu_);
+    StatsMapPtr latched = std::move(map_);
+    map_ = nullptr;
+    return latched;
+  }
+
+private:
+  absl::Mutex mu_;
+  StatsMapPtr map_ ABSL_GUARDED_BY(mu_) = nullptr;
+
+  LoadMetricStatsImpl(const LoadMetricStatsImpl&) = delete;
+  LoadMetricStatsImpl& operator=(const LoadMetricStatsImpl&) = delete;
+};
+
+/**
  * Implementation of Upstream::HostDescription.
  */
 class HostDescriptionImpl : virtual public HostDescription,
@@ -186,7 +218,7 @@ private:
   const envoy::config::core::v3::Locality locality_;
   Stats::StatNameDynamicStorage locality_zone_stat_name_;
   mutable HostStats stats_;
-  mutable LoadMetricStats load_metric_stats_;
+  mutable LoadMetricStatsImpl load_metric_stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
   std::atomic<uint32_t> priority_;
