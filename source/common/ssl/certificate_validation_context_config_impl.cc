@@ -66,26 +66,18 @@ CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
                                 config.match_typed_subject_alt_names().end());
   // Handle deprecated string type san matchers without san type specified, by
   // creating a matcher for each supported type.
-  for (auto& matcher : config.match_subject_alt_names()) {
-    subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_san_type(
-        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
-    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
-
-    subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_san_type(
-        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI);
-    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
-
-    subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_san_type(
-        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL);
-    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
-
-    subject_alt_name_matchers.emplace_back();
-    subject_alt_name_matchers.back().set_san_type(
-        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS);
-    *subject_alt_name_matchers.back().mutable_matcher() = matcher;
+  for (const envoy::type::matcher::v3::StringMatcher& matcher : config.match_subject_alt_names()) {
+    static const std::vector<
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>
+        san_types{envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+                  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+                  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+                  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS};
+    for (const auto san_type : san_types) {
+      subject_alt_name_matchers.emplace_back();
+      subject_alt_name_matchers.back().set_san_type(san_type);
+      *subject_alt_name_matchers.back().mutable_matcher() = matcher;
+    }
   }
   return subject_alt_name_matchers;
 }
