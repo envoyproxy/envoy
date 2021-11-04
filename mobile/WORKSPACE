@@ -28,9 +28,6 @@ envoy_dependencies_extra()
 load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 envoy_dependency_imports()
 
-load("@envoy_mobile//bazel:envoy_mobile_swift_bazel_support.bzl", "swift_support")
-swift_support()
-
 load("@envoy_mobile//bazel:envoy_mobile_dependencies.bzl", "envoy_mobile_dependencies")
 envoy_mobile_dependencies()
 
