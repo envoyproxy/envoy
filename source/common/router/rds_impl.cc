@@ -290,7 +290,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
-    const envoy::config::route::v3::RouteConfiguration& config) const {
+    const envoy::config::route::v3::RouteConfiguration&) const {
   // Validation work is delegated to the subscription, since subscription is the
   // entity that generate new ConfigImpl.
 }
