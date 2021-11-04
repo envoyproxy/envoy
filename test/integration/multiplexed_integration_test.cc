@@ -39,15 +39,6 @@ namespace Envoy {
 class MultiplexedIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
-
-protected:
-  // Utility function to prepend filters. Note that the filters
-  // are added in reverse order.
-  void prependFilters(std::vector<std::string> filters) {
-    for (const auto& filter : filters) {
-      config_helper_.prependFilter(filter);
-    }
-  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTest,
@@ -214,7 +205,7 @@ typed_config:
   "@type": type.googleapis.com/google.protobuf.Empty
 )EOF";
 
-class Http2MetadataIntegrationTest : public MultiplexedIntegrationTest {
+class Http2MetadataIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void SetUp() override {
     HttpProtocolIntegrationTest::SetUp();
@@ -238,6 +229,15 @@ public:
   void verifyHeadersOnlyTest();
 
   void runHeaderOnlyTest(bool send_request_body, size_t body_size);
+
+protected:
+  // Utility function to prepend filters. Note that the filters
+  // are added in reverse order.
+  void prependFilters(std::vector<std::string> filters) {
+    for (const auto& filter : filters) {
+      config_helper_.prependFilter(filter);
+    }
+  }
 };
 
 // Verifies metadata can be sent at different locations of the responses.
@@ -1430,7 +1430,7 @@ TEST_P(MultiplexedIntegrationTest, EmptyTrailers) {
   ASSERT_TRUE(response->complete());
 }
 
-class MultiplexedRingHashIntegrationTest : public MultiplexedIntegrationTest {
+class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   MultiplexedRingHashIntegrationTest();
 
