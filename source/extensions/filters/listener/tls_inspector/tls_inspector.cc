@@ -266,16 +266,14 @@ void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fi
   bool first = true;
   while (CBS_len(&cipher_suites) > 0) {
     uint16_t id;
-    if (!CBS_get_u16(&cipher_suites, &id)) {
-      return;
-    }
-
-    if (isNotGrease(id)) {
-      if (!first) {
-        absl::StrAppend(&fingerprint, "-");
+    if (CBS_get_u16(&cipher_suites, &id)) {
+      if (isNotGrease(id)) {
+        if (!first) {
+          absl::StrAppend(&fingerprint, "-");
+        }
+        absl::StrAppendFormat(&fingerprint, "%d", id);
+        first = false;
       }
-      absl::StrAppendFormat(&fingerprint, "%d", id);
-      first = false;
     }
   }
 }
@@ -289,15 +287,14 @@ void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fing
     uint16_t id;
     CBS extension;
 
-    if (!CBS_get_u16(&extensions, &id) || !CBS_get_u16_length_prefixed(&extensions, &extension)) {
-      return;
-    }
-    if (isNotGrease(id)) {
-      if (!first) {
-        absl::StrAppend(&fingerprint, "-");
+    if (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension)) {
+      if (isNotGrease(id)) {
+        if (!first) {
+          absl::StrAppend(&fingerprint, "-");
+        }
+        absl::StrAppendFormat(&fingerprint, "%d", id);
+        first = false;
       }
-      absl::StrAppendFormat(&fingerprint, "%d", id);
-      first = false;
     }
   }
 }
@@ -310,22 +307,19 @@ void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& 
     CBS ec;
     CBS_init(&ec, ec_data, ec_len);
 
-    // skip list length
+    // Skip list length then add each elliptic curve.
     uint16_t id;
-    if (!CBS_get_u16(&ec, &id)) {
-      return;
-    }
-
-    bool first = true;
-    while (CBS_len(&ec) > 0) {
-      if (!CBS_get_u16(&ec, &id)) {
-        return;
+    if (CBS_get_u16(&ec, &id)) {
+      bool first = true;
+      while (CBS_len(&ec) > 0) {
+        if (CBS_get_u16(&ec, &id)) {
+          if (!first) {
+            absl::StrAppend(&fingerprint, "-");
+          }
+          absl::StrAppendFormat(&fingerprint, "%d", id);
+          first = false;
+        }
       }
-      if (!first) {
-        absl::StrAppend(&fingerprint, "-");
-      }
-      absl::StrAppendFormat(&fingerprint, "%d", id);
-      first = false;
     }
   }
 }
@@ -339,22 +333,19 @@ void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello,
     CBS ecpf;
     CBS_init(&ecpf, ecpf_data, ecpf_len);
 
-    // skip list length
+    // Skip list length then add each point format
     uint8_t id;
-    if (!CBS_get_u8(&ecpf, &id)) {
-      return;
-    }
-
-    bool first = true;
-    while (CBS_len(&ecpf) > 0) {
-      if (!CBS_get_u8(&ecpf, &id)) {
-        return;
+    if (CBS_get_u8(&ecpf, &id)) {
+      bool first = true;
+      while (CBS_len(&ecpf) > 0) {
+        if (CBS_get_u8(&ecpf, &id)) {
+          if (!first) {
+            absl::StrAppend(&fingerprint, "-");
+          }
+          absl::StrAppendFormat(&fingerprint, "%d", id);
+          first = false;
+        }
       }
-      if (!first) {
-        absl::StrAppend(&fingerprint, "-");
-      }
-      absl::StrAppendFormat(&fingerprint, "%d", id);
-      first = false;
     }
   }
 }
