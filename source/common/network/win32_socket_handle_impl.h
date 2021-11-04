@@ -21,8 +21,8 @@ class Win32SocketHandleImpl : public IoSocketHandleImpl {
 public:
   explicit Win32SocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                                  absl::optional<int> domain = absl::nullopt)
-      : peek_buffer_(std::make_unique<Buffer::OwnedImpl>()),
-        IoSocketHandleImpl(fd, socket_v6only, domain) {}
+      : IoSocketHandleImpl(fd, socket_v6only, domain),
+        peek_buffer_(std::make_unique<Buffer::OwnedImpl>()) {}
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
