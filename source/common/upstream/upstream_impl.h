@@ -77,9 +77,9 @@ public:
  */
 class LoadMetricStatsImpl : public LoadMetricStats {
 public:
-  LoadMetricStatsImpl() {}
+  LoadMetricStatsImpl() = default;
 
-  void add(const std::string& key, double value) {
+  void add(const std::string& key, double value) override {
     absl::MutexLock lock(&mu_);
     if (map_ == nullptr) {
       map_ = std::make_unique<StatsMap>();
@@ -89,7 +89,7 @@ public:
     stat.total_metric_value += value;
   }
 
-  StatsMapPtr latch() {
+  StatsMapPtr latch() override {
     absl::MutexLock lock(&mu_);
     StatsMapPtr latched = std::move(map_);
     map_ = nullptr;
