@@ -1,6 +1,6 @@
 #pragma once
 
-#include <jni.h>
+#include "library/common/jni/import/jni_import.h"
 
 // NOLINT(namespace-envoy)
 

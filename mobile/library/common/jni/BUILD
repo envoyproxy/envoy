@@ -1,13 +1,13 @@
 load("//bazel:kotlin_lib.bzl", "envoy_mobile_so_to_jni_lib")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
-load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package")
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_package")
 load("//bazel:envoy_mobile_test_extensions.bzl", "TEST_EXTENSIONS")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_library(
+cc_library(
     name = "jni_utility_lib",
     srcs = [
         "jni_utility.cc",
@@ -18,8 +18,8 @@ envoy_cc_library(
         "jni_utility.h",
         "jni_version.h",
     ],
-    repository = "@envoy",
     deps = [
+        "//library/common/jni/import:jni_import_lib",
         "//library/common/types:c_types_lib",
         "@envoy//source/common/common:assert_lib",
     ],
@@ -81,7 +81,6 @@ cc_binary(
     srcs = [
         "android_test_jni_interface.cc",
         "jni_interface.cc",
-        "//bazel:jni_header",
     ],
     copts = ["-std=c++17"],
     linkopts = [
@@ -90,9 +89,9 @@ cc_binary(
     deps = [
         "base_java_jni_lib",
         ":java_jni_support",
-        "//bazel:jni",
         "//library/common:envoy_main_interface_lib",
         "//library/common/api:c_types",
+        "//library/common/jni/import:jni_import_lib",
     ],
 )
 
@@ -122,7 +121,6 @@ cc_library(
     srcs = [
         "jni_utility.cc",
         "jni_version.cc",
-        "//bazel:jni_header",
     ],
     hdrs = [
         "jni_utility.h",
@@ -134,7 +132,7 @@ cc_library(
     ],
     deps = [
         ":java_jni_support",
-        "//bazel:jni",
+        "//library/common/jni/import:jni_import_lib",
         "//library/common:envoy_main_interface_lib",
         "//library/common/types:c_types_lib",
         "@envoy//source/common/common:assert_lib",
@@ -146,14 +144,15 @@ cc_library(
     name = "java_jni_support",
     srcs = [
         "java_jni_support.cc",
-        "//bazel:jni_header",
     ],
     hdrs = ["jni_support.h"],
     copts = ["-std=c++14"],
     linkopts = [
         "-lm",
     ],
-    deps = ["//bazel:jni"],
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
+    ],
 )
 
 # Utility implementation for NDK JNI
@@ -167,5 +166,8 @@ cc_library(
     linkopts = [
         "-lm",
         "-llog",
+    ],
+    deps = [
+        "//library/common/jni/import:jni_import_lib",
     ],
 )
