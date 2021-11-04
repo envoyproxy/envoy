@@ -1860,6 +1860,7 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
 }
 
 TEST_P(Http2IntegrationTest, InvalidTrailers) {
+  autonomous_allow_incomplete_streams_ = true;
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
   initialize();
