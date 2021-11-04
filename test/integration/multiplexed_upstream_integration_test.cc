@@ -1,5 +1,3 @@
-#include "test/integration/http_protocol_integration.h"
-
 #include <iostream>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -8,6 +6,7 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -223,8 +222,8 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLim
 }
 
 void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes,
-                                                            uint32_t max_response_bytes,
-                                                            uint32_t num_requests) {
+                                                                  uint32_t max_response_bytes,
+                                                                  uint32_t num_requests) {
   TestRandomGenerator rand;
   std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
