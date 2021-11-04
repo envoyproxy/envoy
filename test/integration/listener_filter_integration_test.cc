@@ -9,6 +9,7 @@
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/ssl_utility.h"
@@ -86,7 +87,8 @@ filter_disabled:
 
   void setupConnections(bool listener_filter_disabled, bool expect_connection_open, bool ssl_client,
                         const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
-                        const Ssl::ClientSslTransportOptions& ssl_options = {}) {
+                        const Ssl::ClientSslTransportOptions& ssl_options = {},
+                        const std::string& curves_list = "") {
     initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled);
 
     // Set up the SSL client.
@@ -99,6 +101,13 @@ filter_disabled:
           context_->createTransportSocket(std::make_shared<Network::TransportSocketOptionsImpl>(
               absl::string_view(""), std::vector<std::string>(),
               std::vector<std::string>{"envoyalpn"}));
+
+      if (!curves_list.empty()) {
+        auto ssl_socket = dynamic_cast<Extensions::TransportSockets::Tls::SslSocket*>(transport_socket.get());
+        if (ssl_socket) {
+          SSL_set1_curves_list(ssl_socket->rawSslForTest(), curves_list.c_str());
+        }
+      }
     } else {
       auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
       transport_socket = transport_socket_factory->createTransportSocket(nullptr);
@@ -162,7 +171,7 @@ TEST_P(ListenerFilterIntegrationTest, ContinueOnListenerTimeout) {
 TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with
   // JA3 fingerprint:
-  //   `771,49199,23-65281-10-11-35-16-13,29-23,0`
+  //   `771,49199,23-65281-10-11-35-16-13,23,0`
   // MD5 hash:
   //   `714198b884d1202ccc10aff641b5ec38`
   Ssl::ClientSslTransportOptions ssl_options;
@@ -170,10 +179,10 @@ TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
   ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
                    /*ssl_client=*/true, /*log_format=*/"%TLS_JA3_FINGERPRINT%",
-                   /*ssl_options=*/ssl_options);
+                   /*ssl_options=*/ssl_options, /*curves_list=*/"P-256");
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::HasSubstr("714198b884d1202ccc10aff641b5ec38"));
+              testing::HasSubstr("71d1f47d1125ac53c3c6a4863c087cfe"));
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ListenerFilterIntegrationTest,
