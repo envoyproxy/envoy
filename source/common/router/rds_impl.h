@@ -209,7 +209,7 @@ public:
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
-  void validateConfig(const envoy::config::route::v3::RouteConfiguration& ) const override;
+  void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
