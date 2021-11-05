@@ -82,7 +82,6 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length,
   if (flags & MSG_PEEK) {
     // can a remote OOM us now that we are not protected by readDisable?
     Api::IoCallUint64Result peek_result = drainToPeekBuffer();
-
     //  Some fatal error happened
     if (!peek_result.wouldBlock()) {
       return peek_result;
@@ -90,12 +89,14 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length,
 
     // No data available, register read again.
     if (peek_result.wouldBlock() && peek_buffer_->length() == 0) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+      if (file_event_) {
+        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
+      }
       return peek_result;
     }
 
     Api::IoCallUint64Result result = peekFromPeekBuffer(buffer, length);
-    if (peek_buffer_->length() < length) {
+    if (peek_buffer_->length() < length && file_event_) {
       file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
     } else {
       // This means that our peak buffer has more data than what the user

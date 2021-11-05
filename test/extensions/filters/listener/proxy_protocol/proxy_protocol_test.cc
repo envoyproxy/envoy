@@ -872,8 +872,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   // TODO(davinci26): Mocking should not be used to provide real system calls.
-  bool partial_writed = false;
 #ifdef WIN32
+  bool partial_writed = false;
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
@@ -939,7 +939,9 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+#ifdef WIN32
   partial_writed = true;
+#endif
   write(buffer + 10, 10);
 
   expectProxyProtoError();
