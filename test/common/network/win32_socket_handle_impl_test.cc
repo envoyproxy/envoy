@@ -114,7 +114,8 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekReactivatesReadOnBlock) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(1)
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));;
+      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  ;
 
   EXPECT_CALL(*file_event_, registerEventIfEmulatedEdge(_));
   absl::FixedArray<char> buf(10);
