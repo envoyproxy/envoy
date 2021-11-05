@@ -579,6 +579,7 @@ struct FakeUpstreamConfig {
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -760,7 +761,7 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_);
         // Initialize QUICHE flags.
         quiche::FlagRegistry::getInstance();
 #else
@@ -823,6 +824,7 @@ private:
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactoryPtr socket_factory_;
   ConditionalInitializer server_initialized_;

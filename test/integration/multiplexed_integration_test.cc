@@ -1859,6 +1859,8 @@ TEST_P(Http2IntegrationTest, OnLocalReply) {
   }
 }
 
+// Disabled for coverage temporarily see #18881
+#if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(Http2IntegrationTest, InvalidTrailers) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   autonomous_upstream_ = true;
@@ -1878,6 +1880,7 @@ TEST_P(Http2IntegrationTest, InvalidTrailers) {
   // http2.invalid.header.field or http3.invalid_header_field
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
 }
+#endif
 
 TEST_P(Http2IntegrationTest, InconsistentContentLength) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");

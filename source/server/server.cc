@@ -38,7 +38,7 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -397,7 +397,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(
       Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
@@ -920,7 +920,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainOrTestThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

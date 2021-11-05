@@ -4,8 +4,8 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:95.9" # Raise when QUIC coverage goes up
-"source/common/api:79.8"
-"source/common/api/posix:78.5"
+"source/common/api:76.5"
+"source/common/api/posix:75.0"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
 "source/common/crypto:0.0"
@@ -16,7 +16,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/json:90.1"
 "source/common/matcher:94.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
-"source/common/network/dns_resolver:90.8"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
+"source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
 "source/common/protobuf:95.3"
 "source/common/quic:91.8"
 "source/common/router:96.5"
@@ -45,10 +45,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/kill_request:95.3" # Death tests don't report LCOV
 "source/extensions/filters/http/lua:96.4"
 "source/extensions/filters/http/wasm:95.8"
-"source/extensions/filters/listener:96.2"
-"source/extensions/filters/listener/http_inspector:95.9"
+"source/extensions/filters/listener:95.9"
+"source/extensions/filters/listener/http_inspector:95.8"
 "source/extensions/filters/listener/original_dst:93.3"
-"source/extensions/filters/listener/tls_inspector:93.5"
+"source/extensions/filters/listener/tls_inspector:92.3"
 "source/extensions/filters/network/common:96.0"
 "source/extensions/filters/network/common/redis:96.2"
 "source/extensions/filters/network/mongo_proxy:95.5"

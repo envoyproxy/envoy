@@ -3,7 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 namespace Envoy {

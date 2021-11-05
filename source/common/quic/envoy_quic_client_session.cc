@@ -19,9 +19,8 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
                                       send_buffer_limit),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
-      host_name_(server_id.host()), crypto_config_(crypto_config),
-      crypto_stream_factory_(crypto_stream_factory), quic_stat_names_(quic_stat_names),
-      scope_(scope) {
+      crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
+      quic_stat_names_(quic_stat_names), scope_(scope) {
   quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
 }
 
@@ -30,7 +29,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   network_connection_ = nullptr;
 }
 
-absl::string_view EnvoyQuicClientSession::requestedServerName() const { return host_name_; }
+absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
@@ -82,6 +81,16 @@ void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) 
                                                    /*from_self*/ false, /*is_upstream*/ true);
 }
 
+void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
+  if (!http_connection_callbacks_ || unidirectional) {
+    return;
+  }
+  uint32_t streams_available = streamsAvailable();
+  if (streams_available > 0) {
+    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
+  }
+}
+
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
   ASSERT(codec_stats_.has_value() && http3_options_.has_value());
   return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
@@ -110,9 +119,24 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
   return initialized_ ? connection() : nullptr;
 }
 
+uint64_t EnvoyQuicClientSession::streamsAvailable() {
+  const quic::UberQuicStreamIdManager& manager = ietf_streamid_manager();
+  ASSERT(manager.max_outgoing_bidirectional_streams() >=
+         manager.outgoing_bidirectional_stream_count());
+  uint32_t streams_available =
+      manager.max_outgoing_bidirectional_streams() - manager.outgoing_bidirectional_stream_count();
+  return streams_available;
+}
+
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
-  raiseConnectionEvent(Network::ConnectionEvent::Connected);
+
+  // TODO(alyssawilk) support the case where a connection starts with 0 max streams.
+  ASSERT(streamsAvailable());
+  if (streamsAvailable() > 0) {
+    OnCanCreateNewOutgoingStream(false);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
+  }
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
