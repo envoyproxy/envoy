@@ -18,6 +18,8 @@ build --workspace_status_command=envoy/bazel/get_workspace_status
 build --xcode_version=13.0
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --tool_java_runtime_version=remotejdk_11
+build --java_runtime_version=remotejdk_11
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
