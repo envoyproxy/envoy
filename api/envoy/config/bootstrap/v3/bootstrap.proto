@@ -356,7 +356,7 @@ message Admin {
   // precompiled binaries.
   repeated core.v3.SocketOption socket_options = 4;
 
-  // Indicates whether `global_downstream_max_connections <https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/overload_manager/overload_manager#limiting-active-connections>`_
+  // Indicates whether :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
   // should apply to the admin interface or not.
   bool ignore_global_conn_limit = 6;
 }

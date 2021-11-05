@@ -320,6 +320,6 @@ message Listener {
   bool enable_mptcp = 30;
 
   // Whether the listener should limit connections based upon the value of
-  // `global_downstream_max_connections <https://www.envoyproxy.io/docs/envoy/latest/configuration/operations/overload_manager/overload_manager#limiting-active-connections>`_
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
   bool ignore_global_conn_limit = 31;
 }
