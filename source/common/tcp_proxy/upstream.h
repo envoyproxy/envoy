@@ -103,6 +103,7 @@ private:
   GenericConnectionPoolCallbacks* callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
   std::unique_ptr<HttpUpstream> upstream_;
+  const StreamInfo::StreamInfo& downstream_info_;
 };
 
 class TcpUpstream : public GenericUpstream {
@@ -150,12 +151,14 @@ public:
   }
 
 protected:
-  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
+  HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
+               const StreamInfo::StreamInfo& downstream_info);
   void resetEncoder(Network::ConnectionEvent event, bool inform_downstream = true);
 
   Http::RequestEncoder* request_encoder_{};
   const TunnelingConfig config_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
+  const StreamInfo::StreamInfo& downstream_info_;
 
 private:
   class DecoderShim : public Http::ResponseDecoder {
@@ -198,7 +201,8 @@ private:
 
 class Http1Upstream : public HttpUpstream {
 public:
-  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
+  Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
+                const StreamInfo::StreamInfo& downstream_info);
 
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
@@ -207,7 +211,8 @@ public:
 
 class Http2Upstream : public HttpUpstream {
 public:
-  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config);
+  Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks, const TunnelingConfig& config,
+                const StreamInfo::StreamInfo& downstream_info);
 
   void setRequestEncoder(Http::RequestEncoder& request_encoder, bool is_ssl) override;
   bool isValidResponse(const Http::ResponseHeaderMap& headers) override;

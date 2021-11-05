@@ -429,7 +429,11 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
                                     "true");
   use_cache_file_ = true;
   // Prepend a bad address
-  cache_file_value_contents_ = "99.99.99.99:1|1000000|0\n";
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    cache_file_value_contents_ = "99.99.99.99:1|1000000|0\n";
+  } else {
+    cache_file_value_contents_ = "[::99]:1|1000000|0\n";
+  }
 
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
