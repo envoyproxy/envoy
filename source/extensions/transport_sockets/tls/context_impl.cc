@@ -1192,22 +1192,22 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
 
   EVP_PKEY* temp_private_key = nullptr;
   X509* temp_cert = nullptr;
-  STACK_OF(X509)* ca_certificates = nullptr;
+  STACK_OF(X509)* temp_ca_certs = nullptr;
   if (pkcs12 == nullptr ||
       !PKCS12_parse(pkcs12.get(), !password.empty() ? const_cast<char*>(password.c_str()) : nullptr,
-                    &temp_private_key, &temp_cert, &ca_certificates)) {
+                    &temp_private_key, &temp_cert, &temp_ca_certs)) {
     logSslErrorChain();
     throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", data_path));
   }
   cert_chain_.reset(temp_cert);
   bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
-  if (ca_certificates) {
+  bssl::UniquePtr<STACK_OF(X509)> ca_certificates(temp_ca_certs);
+  if (ca_certificates != nullptr) {
     X509* ca_cert = nullptr;
-    while ((ca_cert = sk_X509_pop(ca_certificates)) != nullptr) {
+    while ((ca_cert = sk_X509_pop(ca_certificates.get())) != nullptr) {
       // This transfers ownership to ssl_ctx therefore ca_cert does not need to be freed.
       SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), ca_cert);
     }
-    sk_X509_free(ca_certificates);
   }
   if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
