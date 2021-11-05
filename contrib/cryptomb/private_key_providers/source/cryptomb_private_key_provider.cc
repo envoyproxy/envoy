@@ -330,10 +330,10 @@ ssl_private_key_result_t rsaPrivateKeyDecryptForTest(CryptoMbPrivateKeyConnectio
 }
 
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                             IppCryptoSharedPtr ipp, Event::Dispatcher& d)
+                             IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
     : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp),
-      timer_(d.createTimer([this]() -> void { processRequests(); })) {
+      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() -> void { processRequests(); })),
+      stats_(stats) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
 
@@ -359,6 +359,8 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 
 void CryptoMbQueue::processRequests() {
   if (type_ == KeyType::Rsa) {
+    // Increment correct queue size statistic.
+    stats_.getQueueSizeCounters()[request_queue_.size() - 1].get().inc();
     processRsaRequests();
   }
   request_queue_.clear();
@@ -486,7 +488,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
         CryptoMbPrivateKeyMethodConfig& conf,
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
     : api_(factory_context.api()),
-      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())) {
+      tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
+      stats_(factory_context.scope(), CryptoMbQueue::MULTIBUFF_BATCH, "cryptomb",
+             "rsa_queue_size_") {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
     throw EnvoyException("Multi-buffer CPU instructions not available.");
@@ -519,7 +523,6 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     method_->complete = privateKeyComplete;
 
     RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-
     switch (RSA_bits(rsa)) {
     case 1024:
       key_size = 1024;
@@ -582,9 +585,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
   enum KeyType key_type = key_type_;
 
   // Create a single queue for every worker thread to avoid locking.
-  tls_->set([poll_delay, key_type, key_size, ipp](Event::Dispatcher& d) {
+  tls_->set([poll_delay, key_type, key_size, ipp, this](Event::Dispatcher& d) {
     ENVOY_LOG(debug, "Created CryptoMb Queue for thread {}", d.name());
-    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d);
+    return std::make_shared<ThreadLocalData>(poll_delay, key_type, key_size, ipp, d, stats_);
   });
 }
 
