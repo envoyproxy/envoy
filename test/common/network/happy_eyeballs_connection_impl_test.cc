@@ -1084,13 +1084,6 @@ TEST_F(HappyEyeballsConnectionImplTest, SortAddresses) {
   std::vector<Address::InstanceConstSharedPtr> interleaved3 = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2,
                                                                ip_v6_3, ip_v4_3, ip_v6_4, ip_v4_4};
   EXPECT_EQ(interleaved3, HappyEyeballsConnectionImpl::sortAddresses(mixed));
-  for (size_t i = 0; i < interleaved3.size(); ++i) {
-    std::cout << i << " " << interleaved3[i]->asString() << "\n";
-  }
-  interleaved3 = HappyEyeballsConnectionImpl::sortAddresses(mixed);
-  for (size_t i = 0; i < interleaved3.size(); ++i) {
-    std::cout << i << " " << interleaved3[i]->asString() << "\n";
-  }
 }
 
 } // namespace Network
