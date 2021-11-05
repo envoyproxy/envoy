@@ -1,5 +1,3 @@
-#include <absl/types/optional.h>
-
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/async_client_impl.h"
