@@ -9,7 +9,7 @@ namespace HeaderFormatters {
 namespace PreserveCase {
 
 TEST(PreserveCaseFormatterTest, All) {
-  PreserveCaseHeaderFormatter formatter;
+  PreserveCaseHeaderFormatter formatter(false);
   formatter.processKey("Foo");
   formatter.processKey("Bar");
   formatter.processKey("BAR");
@@ -20,6 +20,14 @@ TEST(PreserveCaseFormatterTest, All) {
   EXPECT_EQ("Bar", formatter.format("Bar"));
   EXPECT_EQ("Bar", formatter.format("BAR"));
   EXPECT_EQ("baz", formatter.format("baz"));
+}
+
+TEST(PreserveCaseFormatterTest, ReasonPhrase) {
+  PreserveCaseHeaderFormatter formatter(true);
+
+  formatter.setReasonPhrase(absl::string_view("Slow Down"));
+
+  EXPECT_EQ("Slow Down", formatter.getReasonPhrase());
 }
 
 } // namespace PreserveCase
