@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/protobuf/utility.h"
 
@@ -28,15 +30,16 @@ public:
     }
   }
 
-  void bufferMessage(RequestType& message) {
+  absl::optional<uint64_t> bufferMessage(RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
     if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
-      return;
+      return absl::nullopt;
     }
 
     auto id = publishId();
     message_buffer_[id] = std::make_pair(BufferState::Buffered, message);
     current_buffer_bytes_ += buffer_size;
+    return id;
   }
 
   absl::flat_hash_set<uint64_t> sendBufferedMessages() {

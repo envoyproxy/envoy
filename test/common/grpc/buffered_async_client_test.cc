@@ -1,3 +1,5 @@
+#include <absl/types/optional.h>
+
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "source/common/grpc/async_client_impl.h"
@@ -57,7 +59,7 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  buffered_client.bufferMessage(request);
+  EXPECT_EQ(0, buffered_client.bufferMessage(request).value());
   const auto inflight_message_ids = buffered_client.sendBufferedMessages();
   EXPECT_TRUE(buffered_client.hasActiveStream());
   EXPECT_EQ(1, inflight_message_ids.size());
@@ -70,7 +72,7 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
 
   helloworld::HelloRequest request2;
   request2.set_name("Bob");
-  buffered_client.bufferMessage(request2);
+  EXPECT_EQ(1, buffered_client.bufferMessage(request2).value());
   auto ids2 = buffered_client.sendBufferedMessages();
   EXPECT_EQ(2, ids2.size());
 
@@ -102,7 +104,7 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  buffered_client.bufferMessage(request);
+  EXPECT_EQ(absl::nullopt, buffered_client.bufferMessage(request));
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
   EXPECT_TRUE(buffered_client.hasActiveStream());
@@ -125,7 +127,7 @@ TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  buffered_client.bufferMessage(request);
+  EXPECT_EQ(0, buffered_client.bufferMessage(request).value());
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
   EXPECT_TRUE(buffered_client.hasActiveStream());
