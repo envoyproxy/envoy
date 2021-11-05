@@ -110,17 +110,22 @@ message FilterChainMatch {
   }
 
   // Matches filter chains by the destination port.
+  // [#next-free-field: 6]
   message DestinationPort {
     // Optional destination port to consider when use_original_dst is set on the
     // listener in determining a filter chain match.
     google.protobuf.UInt32Value destination_port = 1
         [(validate.rules).uint32 = {lte: 65535 gte: 1}];
+
+    // Match destination port by range.
+    type.v3.Int32Range destination_port_range = 5;
   }
 
   // Matches filter chains by the destination IP address.
   message DestinationIP {
     // If non-empty, an IP address and prefix length to match addresses when the
     // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
+    // Empty list matches all.
     repeated core.v3.CidrRange prefix_ranges = 1;
   }
 
@@ -130,8 +135,8 @@ message FilterChainMatch {
   // listener filter <config_listener_filters_proxy_protocol>`).
   message DirectSourceIP {
     // The criteria is satisfied if the directly connected source IP address of the downstream
-    // connection is contained in at least one of the specified subnets. If the parameter is not
-    // specified or the list is empty, the directly connected source IP address is ignored.
+    // connection is contained in at least one of the specified subnets. If the list is empty,
+    // the directly connected source IP address is ignored.
     repeated core.v3.CidrRange direct_source_prefix_ranges = 1;
   }
 
@@ -144,8 +149,7 @@ message FilterChainMatch {
   // Matches filter chains by the source IP address.
   message SourceIP {
     // The criteria is satisfied if the source IP address of the downstream
-    // connection is contained in at least one of the specified subnets. If the
-    // parameter is not specified or the list is empty, the source IP address is
+    // connection is contained in at least one of the specified subnets. If the list is empty, the source IP address is
     // ignored.
     repeated core.v3.CidrRange source_prefix_ranges = 1;
   }
@@ -192,7 +196,6 @@ message FilterChainMatch {
   }
 
   // Matches filter chains by the application protocol (e.g. ALPN for TLS protocol).
-  // [#next-free-field: 11]
   message ApplicationProtocol {
     // If non-empty, a list of application protocols (e.g. ALPN for TLS protocol) to consider when
     // determining a filter chain match. Those values will be compared against the application
@@ -213,7 +216,7 @@ message FilterChainMatch {
     //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
     //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
     //   unless all connecting clients are known to use ALPN.
-    repeated string application_protocols = 10;
+    repeated string application_protocols = 1;
   }
 
   // Individual filter chain match predicate.
