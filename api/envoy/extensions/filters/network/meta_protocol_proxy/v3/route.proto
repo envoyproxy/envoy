@@ -5,6 +5,7 @@ package envoy.extensions.filters.network.meta_protocol_proxy.v3;
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3";
 option java_outer_classname = "RouteProto";
@@ -18,8 +19,8 @@ option (udpa.annotations.file_status).work_in_progress = true;
 message RouteConfiguration {
   // The name of the route configuration. For example, it might match route_config_name in
   // envoy.extensions.filters.network.meta_protocol_proxy.v3.Rds.
-  string name = 1;
+  string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The match tree to use when resolving route actions for incoming requests.
-  xds.type.matcher.v3.Matcher route = 2;
+  xds.type.matcher.v3.Matcher route = 2 [(validate.rules).message = {required: true}];
 }

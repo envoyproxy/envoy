@@ -1,3 +1,4 @@
+
 syntax = "proto3";
 
 package envoy.extensions.filters.network.meta_protocol_proxy.v3;
@@ -39,7 +40,7 @@ message MetaProtocolProxy {
   }
 
   // The codec which encodes and decodes the application protocol.
-  Codec codec = 5;
+  Codec codec = 5 [(validate.rules).message = {required: true}];
 
   // A list of individual Layer-7 filters that make up the filter chain for requests made to the
   // meta protocol proxy. Order matters as the filters are processed sequentially as request events
@@ -55,7 +56,7 @@ message Rds {
 
   // The name of the route configuration. This name will be passed to the RDS API. This allows an
   // Envoy configuration with multiple MetaProtocol proxies to use different route configurations.
-  string route_config_name = 2;
+  string route_config_name = 2 [(validate.rules).string = {min_len: 1}];
 }
 
 // [#not-implemented-hide:]

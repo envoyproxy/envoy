@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3";
 option java_outer_classname = "MatcherProto";
@@ -29,5 +30,5 @@ message MethodMatchInput {
 // [#not-implemented-hide:]
 message PropertyMatchInput {
   // The property name to match on.
-  string property_name = 1;
+  string property_name = 1 [(validate.rules).string = {min_len: 1}];
 }
