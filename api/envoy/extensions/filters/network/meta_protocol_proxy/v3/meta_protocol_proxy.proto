@@ -7,8 +7,6 @@ import "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
