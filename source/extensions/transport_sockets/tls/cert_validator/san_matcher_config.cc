@@ -18,7 +18,7 @@ Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher) {
   // Verify that a new san type has not been added.
   static_assert(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType_MAX ==
-                3);
+                4);
 
   switch (matcher.san_type()) {
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS:
