@@ -216,6 +216,21 @@ message FilterChainMatch {
     repeated string application_protocols = 10;
   }
 
+  // Individual filter chain match predicate.
+  message FilterChainMatchPredicate {
+    // The typed config for the match predicate extension. The type URL will be
+    // used to identify the extension. In the case that the type URL is
+    // *xds.type.v3.TypedStruct* (or, for historical reasons,
+    // *udpa.type.v1.TypedStruct*), the inner type URL of *TypedStruct* will be
+    // utilized. See the :ref:`extension configuration overview
+    // <config_overview_extension_configuration>` for further details.
+    google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
+
+    // Flag to continue matching if this match is a wildcard match and there is a
+    // more specific match.
+    bool fallthrough = 2;
+  }
+
   reserved 1;
 
   // Optional destination port to consider when use_original_dst is set on the
@@ -301,13 +316,45 @@ message FilterChainMatch {
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
 
-  // Specifies the filter chain matching predicates to be used in the matching
-  // order. Each predicate extension must be specified at most once. For
-  // backwards compatibility, the existing fields in the filter chain match, if
-  // specified, are converted to their corresponding filter chain matching
-  // predicates in this list.
+  // A list of filter chain matching predicate extensions specifying the order
+  // of selection for the most specific filter chain. The filter chains in a
+  // single listener must have the identical order of predicate extension type
+  // URLs. For backwards compatibility, if the existing fields in the filter
+  // chain match are specified, the fields are converted to their corresponding
+  // filter chain matching predicates in the following default matching order:
+  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationPort>`.
+  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationIP>`.
+  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SNI>`.
+  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.TransportProtocol>`.
+  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.ApplicationProtocol>`.
+  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DirectSourceIP>`.
+  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceType>`.
+  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceIP>`.
+  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourcePort>`.
+  //
+  // At each step, the predicate is evaluated for each filter chain. If the
+  // predicate returns false, the filter chain is eliminated from subsequent
+  // consideration. If the predicate returns true, then the decision is based
+  // on the ``fallthrough`` flag. If there is another more specific match for
+  // the same predicate and the flag is not set, then the less specific match
+  // is eliminated. If the flag is set, then it remains as a candidate for the
+  // next step.
+  //
+  // For example, consider SNI ``www.example.com``and two filter chains with
+  // the predicates ```*.example.com``` and ```*.com```. If ``fallthrough``
+  // flag is not set then only the filter chain ```*.example.com``` matches. If
+  // ``fallthrough`` flag is set on ```*.com```, then both filter chains match.
+  // In general, the order of specificity is domain specific as defined by the
+  // predicate extension. The flag should be set when matching on multiple
+  // properties in order for a default chain to apply without explicit specific
+  // matching of the first properties in the list.
+  //
+  // In case, there is more than one filter chain candidates remaining after
+  // the process completes, the first of the filter chains in the order of
+  // their declaration is selected.
+  //
   // [#not-implemented-hide:]
-  repeated core.v3.TypedExtensionConfig predicates = 14;
+  repeated FilterChainMatchPredicate predicates = 14;
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
