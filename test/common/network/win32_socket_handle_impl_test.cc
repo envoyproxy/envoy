@@ -81,6 +81,10 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithBufferShouldReadFromBuffer) {
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(2)
       .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iov) {
+        // Gcc treats the variables as unused and this causes
+        // a compilation failure.
+        UNREFERENCED_PARAMETER(iov);
+        UNREFERENCED_PARAMETER(num_iov);
         iov = peek_iov.begin();
         num_iov = 1;
         return Api::SysCallSizeResult{data_length, 0};
