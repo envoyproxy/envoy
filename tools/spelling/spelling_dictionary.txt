@@ -1311,3 +1311,6 @@ ep
 suri
 transid
 routable
+rds_vhosts
+vhds_vhosts
+virtual_hosts

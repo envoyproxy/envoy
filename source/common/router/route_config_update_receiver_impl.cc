@@ -17,7 +17,7 @@ namespace Router {
 
 namespace {
 
-// Resets 'route_config::virutal_hosts' by merging VirtualHost contained in
+// Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
 // 'rds_vhosts' and 'vhds_vhosts'.
 void rebuildRouteConfigVirtualHosts(
     const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
