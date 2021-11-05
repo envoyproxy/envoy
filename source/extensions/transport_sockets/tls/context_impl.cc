@@ -1199,18 +1199,16 @@ void TlsContext::loadPkcs12(const std::string& data, const std::string& data_pat
     logSslErrorChain();
     throw EnvoyException(absl::StrCat("Failed to load pkcs12 from ", data_path));
   }
+  cert_chain_.reset(temp_cert);
+  bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
   if (ca_certificates) {
     X509* ca_cert = nullptr;
     while ((ca_cert = sk_X509_pop(ca_certificates)) != nullptr) {
-      //
       // This transfers ownership to ssl_ctx therefore ca_cert does not need to be freed.
-      //
       SSL_CTX_add_extra_chain_cert(ssl_ctx_.get(), ca_cert);
     }
     sk_X509_free(ca_certificates);
   }
-  cert_chain_.reset(temp_cert);
-  bssl::UniquePtr<EVP_PKEY> pkey(temp_private_key);
   if (!SSL_CTX_use_certificate(ssl_ctx_.get(), cert_chain_.get())) {
     logSslErrorChain();
     throw EnvoyException(absl::StrCat("Failed to load certificate from ", data_path));

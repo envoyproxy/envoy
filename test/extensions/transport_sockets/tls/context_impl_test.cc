@@ -1423,6 +1423,35 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
             client_context_config.tlsCertificates()[0].get().password());
 }
 
+// Validate that not supplying the incorrect passphrase for password-protected `PKCS12`
+// triggers a failure loading the private key.
+TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  const std::string pkcs12_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12");
+  tls_certificate->mutable_pkcs12()->set_filename(pkcs12_path);
+  tls_certificate->mutable_password()->set_inline_string("WrongPassword");
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  factory_context_.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException, absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
+}
+
 // Validate that not supplying a passphrase for password-protected `PKCS12`
 // triggers a failure loading the private key.
 TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
