@@ -22,8 +22,6 @@ build --javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
 build --define cxxopts=-std=c++17
-# https://github.com/bazelbuild/bazel/issues/10674#issuecomment-658208918
-build --incompatible_objc_compile_info_migration
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
