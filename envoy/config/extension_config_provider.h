@@ -16,7 +16,7 @@ using ConfigAppliedCb = std::function<void()>;
  * the extension configuration discovery service. Dynamically updated extension
  * configurations may share subscriptions across extension config providers.
  */
-template <class Factory, class FactoryCallback> class ExtensionConfigProvider {
+template <class FactoryCallback> class ExtensionConfigProvider {
 public:
   virtual ~ExtensionConfigProvider() = default;
 
@@ -63,9 +63,9 @@ public:
   virtual void applyDefaultConfiguration() PURE;
 };
 
-template <class Factory, class FactoryCallback>
+template <class FactoryCallback>
 class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase,
-                                       public ExtensionConfigProvider<Factory, FactoryCallback> {};
+                                       public ExtensionConfigProvider<FactoryCallback> {};
 
 } // namespace Config
 } // namespace Envoy
