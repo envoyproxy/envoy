@@ -122,7 +122,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "perfetto-{version}/sdk",
         urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-11-01",
+        release_date = "2021-11-02",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
