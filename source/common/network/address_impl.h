@@ -9,6 +9,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
+#include "envoy/network/client_connection_manager.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/statusor.h"
@@ -30,6 +31,9 @@ StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss,
                                                      bool v6only = true);
 InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss, socklen_t len,
                                                   bool v6only = true);
+
+Network::ClientConnectionFactory* getFactoryAddressType(Address::Type address_type);
+
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
@@ -354,7 +358,6 @@ private:
   };
   EnvoyInternalAddressImpl internal_address_;
 };
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

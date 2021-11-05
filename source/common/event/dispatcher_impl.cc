@@ -163,8 +163,7 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
     }
   };
   // TODO: register and find by address type instead of name.
-  auto factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
-      address_type_name(address));
+  auto factory = Config::Utility::getFactoryByAddressType<Network::ClientConnectionFactory>(address->type());
   if (factory == nullptr) {
     // get rid of this once the ip and pipe factory is offered.
     return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,

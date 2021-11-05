@@ -118,6 +118,13 @@ addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len, os_fd_t f
   return *address;
 }
 
+Network::ClientConnectionFactory* getFactoryAddressType(Address::Type address_type) {
+  switch (address_type) {
+
+  }
+}
+
+
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
     : InstanceBase(Type::Ip, sockInterfaceOrDefault(sock_interface)) {
   throwOnError(validateProtocolSupported());

@@ -15,6 +15,7 @@ envoy_cc_library(
     deps = [
         ":socket_interface_lib",
         "//envoy/network:address_interface",
+        "//envoy/network:client_connection_manager",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:safe_memcpy_lib",
