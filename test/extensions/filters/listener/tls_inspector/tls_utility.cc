@@ -108,14 +108,14 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
 
   // signature algorithms extension
   const uint16_t signature_algorithms_id = 0xd;
-  std::vector<uint8_t> signature_algorithms = {(signature_algorithms_id & 0xff00) >> 8, signature_algorithms_id & 0xff,
+  std::vector<uint8_t> signature_algorithms = {(signature_algorithms_id & 0xff00) >> 8,
+                                               signature_algorithms_id & 0xff,
                                                // length
                                                0x00, 0x04,
                                                // list length
                                                0x00, 0x02,
                                                // algorithm
-                                               0x04, 0x03
-                                               };
+                                               0x04, 0x03};
 
   // extensions
   values = absl::StrSplit(fingerprint[2], '-', absl::SkipEmpty());
@@ -137,7 +137,8 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
       break;
     }
     case signature_algorithms_id: {
-      extensions.insert(std::end(extensions), std::begin(signature_algorithms), std::end(signature_algorithms));
+      extensions.insert(std::end(extensions), std::begin(signature_algorithms),
+                        std::end(signature_algorithms));
       break;
     }
     default: {

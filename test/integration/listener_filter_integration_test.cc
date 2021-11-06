@@ -91,7 +91,8 @@ filter_disabled:
                         const Ssl::ClientSslTransportOptions& ssl_options = {},
                         const std::string& curves_list = "",
                         bool enable_ja3_fingerprinting = false) {
-    initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled, enable_ja3_fingerprinting);
+    initializeWithListenerFilter(ssl_client, log_format, listener_filter_disabled,
+                                 enable_ja3_fingerprinting);
 
     // Set up the SSL client.
     Network::Address::InstanceConstSharedPtr address =

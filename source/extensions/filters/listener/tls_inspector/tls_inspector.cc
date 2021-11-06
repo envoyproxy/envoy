@@ -286,7 +286,8 @@ void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fing
     uint16_t id;
     CBS extension;
 
-    write_extension = (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension));
+    write_extension =
+        (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension));
     if (write_extension && isNotGrease(id)) {
       if (!first) {
         absl::StrAppend(&fingerprint, "-");

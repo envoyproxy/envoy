@@ -60,7 +60,8 @@ public:
     filter_->onAccept(cb_);
   }
 
-  void test_ja3(const std::string& fingerprint, bool expect_server_name = true, const std::string& hash = {});
+  void test_ja3(const std::string& fingerprint, bool expect_server_name = true,
+                const std::string& hash = {});
 
   NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
@@ -264,7 +265,8 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   file_event_callback_(Event::FileReadyType::Read);
 }
 
-void TlsInspectorTest::test_ja3(const std::string& fingerprint, bool expect_server_name, const std::string& hash) {
+void TlsInspectorTest::test_ja3(const std::string& fingerprint, bool expect_server_name,
+                                const std::string& hash) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   proto_config.set_enable_ja3_fingerprinting(true);
   cfg_ = std::make_shared<Config>(store_, proto_config);
@@ -296,10 +298,9 @@ void TlsInspectorTest::test_ja3(const std::string& fingerprint, bool expect_serv
 // Test that the filter sets the correct `JA3` hash.
 // Fingerprint created with User-Agent "curl/7.64.1" and a request to ja3er.com/json.
 TEST_P(TlsInspectorTest, ConnectionJA3Hash) {
-  test_ja3(
-      "771,49200-49196-49192-49188-49172-49162-159-107-57-52393-52392-52394-65413-196-136-"
-      "129-157-61-53-192-132-49199-49195-49191-49187-49171-49161-158-103-51-190-69-156-60-"
-      "47-186-65-49169-49159-5-4-49170-49160-22-10-255,0-11-10-13-16,29-23-24,0");
+  test_ja3("771,49200-49196-49192-49188-49172-49162-159-107-57-52393-52392-52394-65413-196-136-"
+           "129-157-61-53-192-132-49199-49195-49191-49187-49171-49161-158-103-51-190-69-156-60-"
+           "47-186-65-49169-49159-5-4-49170-49160-22-10-255,0-11-10-13-16,29-23-24,0");
 }
 
 // Test that the filter sets the correct `JA3` hash with GREASE values in ClientHello message.
@@ -322,7 +323,8 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashGREASE) {
     absl::StrAppendFormat(&grease, "%d", i);
   }
   std::string fingerprint_with_grease;
-  absl::StrAppend(&fingerprint_with_grease, version, ",", grease, "-", ciphers, ",", grease, "-", extensions_ec_formats);
+  absl::StrAppend(&fingerprint_with_grease, version, ",", grease, "-", ciphers, ",", grease, "-",
+                  extensions_ec_formats);
 
   uint8_t buf[MD5_DIGEST_LENGTH];
   MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
@@ -342,7 +344,8 @@ TEST_P(TlsInspectorTest, ConnectionJA3HashNoEllipticCurvesOrPointFormats) {
 TEST_P(TlsInspectorTest, ConnectionJA3HashTls10NoExtensions) {
   test_ja3(
       "769,49162-49157-49161-49156-49159-49154-49160-49155-49172-49167-49171-49166-49169-49164-"
-      "49170-49165-57-51-53-47-5-4-10,,,", false);
+      "49170-49165-57-51-53-47-5-4-10,,,",
+      false);
 }
 
 // Test that the filter sets the correct `JA3` hash with TLS1.1.
