@@ -782,7 +782,7 @@ class RstFormatVisitor(visitor.Visitor):
                 in type_context.source_code_info.file_level_annotations):
             return ':orphan:\n\n' + header + FILE_LEVEL_NOT_IMPLEMENTED
 
-        # If there are no messages or there is there is a file level 'not-implemented-hide' annotation, we don't include in the doc tree (no support for
+        # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
         if not has_messages:
