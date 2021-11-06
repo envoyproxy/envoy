@@ -183,7 +183,7 @@ TEST_P(ListenerFilterIntegrationTest, JA3FingerprintIsSet) {
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
                    /*ssl_client=*/true, /*log_format=*/"%TLS_JA3_FINGERPRINT%",
                    /*ssl_options=*/ssl_options, /*curves_list=*/"P-256",
-                   /*enable_ja3_fingerprinting=*/true);
+                   /*`enable_ja3_fingerprinting=`*/true);
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq("71d1f47d1125ac53c3c6a4863c087cfe"));
