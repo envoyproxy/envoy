@@ -47,9 +47,7 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
   // Example:
   //   769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0
   std::vector<std::string> fingerprint = absl::StrSplit(ja3_fingerprint, ',');
-  if (fingerprint.size() != 5) {
-    return {};
-  }
+  ASSERT(fingerprint.size() == 5);
 
   // version
   const uint16_t tls_version = std::stoi(fingerprint[0], nullptr);
@@ -108,6 +106,17 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
                                       'w', 'w', 'w', '.', 'e', 'n', 'v', 'o', 'y', 'p', 'r', 'o',
                                       'x', 'y', '.', 'i', 'o'};
 
+  // signature algorithms extension
+  const uint16_t signature_algorithms_id = 0xd;
+  std::vector<uint8_t> signature_algorithms = {(signature_algorithms_id & 0xff00) >> 8, signature_algorithms_id & 0xff,
+                                               // length
+                                               0x00, 0x04,
+                                               // list length
+                                               0x00, 0x02,
+                                               // algorithm
+                                               0x04, 0x03
+                                               };
+
   // extensions
   values = absl::StrSplit(fingerprint[2], '-', absl::SkipEmpty());
   std::vector<uint8_t> extensions;
@@ -125,6 +134,10 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
     }
     case server_name_id: {
       extensions.insert(std::end(extensions), std::begin(server_name), std::end(server_name));
+      break;
+    }
+    case signature_algorithms_id: {
+      extensions.insert(std::end(extensions), std::begin(signature_algorithms), std::end(signature_algorithms));
       break;
     }
     default: {

@@ -176,7 +176,6 @@ ITOA
 Injectable
 Isode
 Iters
-JA
 JSON
 JSONs
 JWKS

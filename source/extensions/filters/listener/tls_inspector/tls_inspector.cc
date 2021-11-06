@@ -1,7 +1,6 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <cstdint>
-#include <iomanip>
 #include <string>
 #include <vector>
 
@@ -56,7 +55,6 @@ Config::Config(
         size_t len;
         if (SSL_early_callback_ctx_extension_get(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
           filter->onALPN(data, len);
         }
         return ssl_select_cert_success;
@@ -245,7 +243,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
 }
 
 // Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)
-static const uint16_t GREASE[] = {
+static constexpr std::array<uint16_t, 16> GREASE = {
     0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
     0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa,
 };
@@ -263,17 +261,17 @@ void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fi
   CBS cipher_suites;
   CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
 
+  bool write_cipher = true;
   bool first = true;
-  while (CBS_len(&cipher_suites) > 0) {
+  while (write_cipher && CBS_len(&cipher_suites) > 0) {
     uint16_t id;
-    if (CBS_get_u16(&cipher_suites, &id)) {
-      if (isNotGrease(id)) {
-        if (!first) {
-          absl::StrAppend(&fingerprint, "-");
-        }
-        absl::StrAppendFormat(&fingerprint, "%d", id);
-        first = false;
+    write_cipher = CBS_get_u16(&cipher_suites, &id);
+    if (write_cipher && isNotGrease(id)) {
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
       }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
     }
   }
 }
@@ -282,19 +280,19 @@ void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fing
   CBS extensions;
   CBS_init(&extensions, ssl_client_hello->extensions, ssl_client_hello->extensions_len);
 
+  bool write_extension = true;
   bool first = true;
-  while (CBS_len(&extensions) > 0) {
+  while (write_extension && CBS_len(&extensions) > 0) {
     uint16_t id;
     CBS extension;
 
-    if (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension)) {
-      if (isNotGrease(id)) {
-        if (!first) {
-          absl::StrAppend(&fingerprint, "-");
-        }
-        absl::StrAppendFormat(&fingerprint, "%d", id);
-        first = false;
+    write_extension = (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension));
+    if (write_extension && isNotGrease(id)) {
+      if (!first) {
+        absl::StrAppend(&fingerprint, "-");
       }
+      absl::StrAppendFormat(&fingerprint, "%d", id);
+      first = false;
     }
   }
 }
@@ -307,18 +305,19 @@ void writeEllipticCurves(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& 
     CBS ec;
     CBS_init(&ec, ec_data, ec_len);
 
-    // Skip list length then add each elliptic curve.
+    // skip list length
     uint16_t id;
-    if (CBS_get_u16(&ec, &id)) {
-      bool first = true;
-      while (CBS_len(&ec) > 0) {
-        if (CBS_get_u16(&ec, &id)) {
-          if (!first) {
-            absl::StrAppend(&fingerprint, "-");
-          }
-          absl::StrAppendFormat(&fingerprint, "%d", id);
-          first = false;
+    bool write_elliptic_curve = CBS_get_u16(&ec, &id);
+
+    bool first = true;
+    while (write_elliptic_curve && CBS_len(&ec) > 0) {
+      write_elliptic_curve = CBS_get_u16(&ec, &id);
+      if (write_elliptic_curve) {
+        if (!first) {
+          absl::StrAppend(&fingerprint, "-");
         }
+        absl::StrAppendFormat(&fingerprint, "%d", id);
+        first = false;
       }
     }
   }
@@ -333,18 +332,19 @@ void writeEllipticCurvePointFormats(const SSL_CLIENT_HELLO* ssl_client_hello,
     CBS ecpf;
     CBS_init(&ecpf, ecpf_data, ecpf_len);
 
-    // Skip list length then add each point format
+    // skip list length
     uint8_t id;
-    if (CBS_get_u8(&ecpf, &id)) {
-      bool first = true;
-      while (CBS_len(&ecpf) > 0) {
-        if (CBS_get_u8(&ecpf, &id)) {
-          if (!first) {
-            absl::StrAppend(&fingerprint, "-");
-          }
-          absl::StrAppendFormat(&fingerprint, "%d", id);
-          first = false;
+    bool write_point_format = CBS_get_u8(&ecpf, &id);
+
+    bool first = true;
+    while (write_point_format && CBS_len(&ecpf) > 0) {
+      write_point_format = CBS_get_u8(&ecpf, &id);
+      if (write_point_format) {
+        if (!first) {
+          absl::StrAppend(&fingerprint, "-");
         }
+        absl::StrAppendFormat(&fingerprint, "%d", id);
+        first = false;
       }
     }
   }
@@ -363,12 +363,12 @@ void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
     absl::StrAppend(&fingerprint, ",");
     writeEllipticCurvePointFormats(ssl_client_hello, fingerprint);
 
-    ENVOY_LOG(debug, "tls:createJA3Hash(), fingerprint: {}", fingerprint);
+    ENVOY_LOG(trace, "tls:createJA3Hash(), fingerprint: {}", fingerprint);
 
     uint8_t buf[MD5_DIGEST_LENGTH];
     MD5(reinterpret_cast<const uint8_t*>(fingerprint.data()), fingerprint.size(), buf);
     std::string md5 = Envoy::Hex::encode(buf, MD5_DIGEST_LENGTH);
-    ENVOY_LOG(debug, "tls:createJA3Hash(), hash: {}", md5);
+    ENVOY_LOG(trace, "tls:createJA3Hash(), hash: {}", md5);
 
     cb_->socket().setJA3Hash(md5);
   }

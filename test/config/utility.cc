@@ -144,7 +144,14 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
-std::string ConfigHelper::tlsInspectorFilter() {
+std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
+  if (!enable_ja3_fingerprinting) {
+    return R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+)EOF";
+  }
+
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
