@@ -34,13 +34,13 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Upstream {
 
-class EdfLoadBalancerBasePeer {
+class WRRLoadBalancerBasePeer {
 public:
-  static const std::chrono::milliseconds& slowStartWindow(EdfLoadBalancerBase& edf_lb) {
+  static const std::chrono::milliseconds& slowStartWindow(WRRLoadBalancerBase& edf_lb) {
     return edf_lb.slow_start_window_;
   }
-  static double aggression(EdfLoadBalancerBase& edf_lb) { return edf_lb.aggression_; }
-  static const std::chrono::milliseconds latestHostAddedTime(EdfLoadBalancerBase& edf_lb) {
+  static double aggression(WRRLoadBalancerBase& edf_lb) { return edf_lb.aggression_; }
+  static const std::chrono::milliseconds latestHostAddedTime(WRRLoadBalancerBase& edf_lb) {
     return std::chrono::time_point_cast<std::chrono::milliseconds>(edf_lb.latest_host_added_time_)
         .time_since_epoch();
   }
@@ -1574,13 +1574,13 @@ INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
 TEST_P(RoundRobinLoadBalancerTest, SlowStartWithDefaultParams) {
   init(false);
   const auto slow_start_window =
-      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::slowStartWindow(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::aggression(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(1.0, aggression);
   const auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
 }
 
@@ -1599,7 +1599,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   simTime().advanceTimeWait(std::chrono::seconds(5));
   hostSet().runCallbacks(hosts_added, empty);
   auto latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
 
   // Advance time, so that host is no longer in slow start.
@@ -1615,7 +1615,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartNoWait) {
   hostSet().runCallbacks(hosts_added, empty);
 
   latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(62000), latest_host_added_time_ms);
 
   // host2 is 12 secs in slow start, the weight is scaled with time factor 12 / 60 == 0.2.
@@ -1673,7 +1673,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
   simTime().advanceTimeWait(std::chrono::seconds(1));
   hostSet().runCallbacks(hosts_added, empty);
   auto latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
 
   simTime().advanceTimeWait(std::chrono::seconds(5));
@@ -1687,7 +1687,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWaitForPassingHC) {
 
   // As host1 has not passed first HC, it should not enter slow start mode.
   latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(7000), latest_host_added_time_ms);
 
   simTime().advanceTimeWait(std::chrono::seconds(1));
@@ -1745,7 +1745,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
   hostSet().runCallbacks({}, {});
 
   auto latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time_ms);
 
   // We should see 2:1:1 ratio, as hosts 2 and 3 are in slow start, their weights are scaled with
@@ -1766,7 +1766,7 @@ TEST_P(RoundRobinLoadBalancerTest, SlowStartWithRuntimeAggression) {
   hostSet().runCallbacks(hosts_added, {});
 
   latest_host_added_time_ms =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(*lb_));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(*lb_));
   EXPECT_EQ(std::chrono::milliseconds(10000), latest_host_added_time_ms);
 
   // We should see 1:1:1:0 ratio, as host 2 and 3 weight is scaled with (9/10)^(1/1.5)=0.93 factor,
@@ -2128,13 +2128,13 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
                                 random_,       common_config_, lr_lb_config, simTime()};
   const auto slow_start_window =
-      EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::slowStartWindow(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
   const auto aggression =
-      EdfLoadBalancerBasePeer::aggression(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::aggression(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(1.0, aggression);
   const auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
 }
 
@@ -2155,7 +2155,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   hostSet().runCallbacks({}, {});
 
   auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(1000), latest_host_added_time);
 
   // Advance time, so that host is no longer in slow start.
@@ -2170,7 +2170,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   hostSet().runCallbacks(hosts_added, {});
 
   latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(62000), latest_host_added_time);
 
   // host2 is 20 secs in slow start, the weight is scaled with time factor 20 / 60 == 0.16.
@@ -2229,7 +2229,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
   hostSet().runCallbacks(hosts_added, {});
 
   auto latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), latest_host_added_time);
 
   simTime().advanceTimeWait(std::chrono::seconds(5));
@@ -2243,7 +2243,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWaitForPassingHC) {
   hostSet().runCallbacks(hosts_added, {});
 
   latest_host_added_time =
-      EdfLoadBalancerBasePeer::latestHostAddedTime(static_cast<EdfLoadBalancerBase&>(lb_2));
+      WRRLoadBalancerBasePeer::latestHostAddedTime(static_cast<WRRLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(7000), latest_host_added_time);
 
   simTime().advanceTimeWait(std::chrono::seconds(1));

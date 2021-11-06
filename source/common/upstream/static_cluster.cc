@@ -13,8 +13,7 @@ StaticClusterImpl::StaticClusterImpl(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
                       factory_context.mainThreadDispatcher().timeSource()),
-      priority_state_manager_(
-          new PriorityStateManager(*this, factory_context.localInfo(), nullptr,
+      priority_state_manager_(new PriorityStateManager(*this, factory_context.localInfo(), nullptr,
                                                        factory_context.api().randomGenerator())) {
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();

@@ -419,14 +419,13 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class WRRLoadBalancerBase : public ZoneAwareLoadBalancerBase {
+class WRRLoadBalancerBase : public ZoneAwareLoadBalancerBase,
                             Logger::Loggable<Logger::Id::upstream> {
 public:
   WRRLoadBalancerBase(
       const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
       Runtime::Loader& runtime, Random::RandomGenerator& random,
-      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
-      bool use_wrsq,
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, bool use_wrsq,
       const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_cofig,
       TimeSource& time_source);
 
@@ -462,7 +461,7 @@ protected:
   double applySlowStartFactor(double host_weight, const Host& host);
 
 private:
-  friend class EdfLoadBalancerBasePeer;
+  friend class WRRLoadBalancerBasePeer;
   virtual void refreshHostSource(const HostsSource& source) PURE;
   virtual double hostWeight(const Host& host) PURE;
   virtual HostConstSharedPtr unweightedHostPeek(const HostVector& hosts_to_use,

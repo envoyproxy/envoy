@@ -758,12 +758,12 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 WRRLoadBalancerBase::WRRLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, bool use_wrsq,
     const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
     TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
-      seed_(random_.random()), use_wrsq_(use_wrsq)
+      seed_(random_.random()), use_wrsq_(use_wrsq),
       slow_start_window_(slow_start_config.has_value()
                              ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
                                    slow_start_config.value().slow_start_window()))
@@ -827,9 +827,16 @@ void WRRLoadBalancerBase::refresh(uint32_t priority) {
       return;
     }
 
-    if (Runtime::runtimeFeatureEnabled(WeightedRoundRobinSchedulerWRSQRuntime) && use_wrsq_) {
+    const bool wrsq_enabled =
+        Runtime::runtimeFeatureEnabled(WeightedRoundRobinSchedulerWRSQRuntime) && use_wrsq_;
+    if (wrsq_enabled && !isSlowStartEnabled()) {
       scheduler.sched_ = std::make_unique<WRSQScheduler<const Host>>(random_);
     } else {
+      if (wrsq_enabled && isSlowStartEnabled()) {
+        ENVOY_LOG(
+            warn,
+            "a WRSQ scheduler cannot be used with slow start mode, using EDF scheduler instead");
+      }
       scheduler.sched_ = std::make_unique<EdfScheduler<const Host>>();
     }
 
@@ -952,7 +959,7 @@ HostConstSharedPtr WRRLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
-double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
+double WRRLoadBalancerBase::applyAggressionFactor(double time_factor) {
   if (aggression_ == 1.0 || time_factor == 1.0) {
     return time_factor;
   } else {
@@ -960,7 +967,7 @@ double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
   }
 }
 
-double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
+double WRRLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
   auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       time_source_.monotonicTime() - host.creationTime());
   if (host_create_duration < slow_start_window_ &&
