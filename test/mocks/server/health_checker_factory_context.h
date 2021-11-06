@@ -23,7 +23,7 @@ public:
   ~MockHealthCheckerFactoryContext() override;
 
   MOCK_METHOD(Upstream::Cluster&, cluster, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
   MOCK_METHOD(Upstream::HealthCheckEventLogger*, eventLogger_, ());

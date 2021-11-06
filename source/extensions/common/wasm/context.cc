@@ -974,19 +974,15 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
                              uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
-      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
-      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
-      if (thread_local_cluster == nullptr) {
-        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
-        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
-        // `BadArgument` after ABI 0.2.x will have released.
-        return WasmResult::ParseFailure;
-      }
-      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
-    } else {
+    auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+    const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+    if (thread_local_cluster == nullptr) {
+      // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+      // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+      // `BadArgument` after ABI 0.2.x will have released.
       return WasmResult::ParseFailure;
     }
+    service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
   }
   uint32_t token = wasm()->nextGrpcCallId();
   auto& handler = grpc_call_request_[token];
@@ -1023,19 +1019,15 @@ WasmResult Context::grpcStream(std::string_view grpc_service, std::string_view s
                                uint32_t* token_ptr) {
   GrpcService service_proto;
   if (!service_proto.ParseFromArray(grpc_service.data(), grpc_service.size())) {
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.wasm_cluster_name_envoy_grpc")) {
-      auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
-      const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
-      if (thread_local_cluster == nullptr) {
-        // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
-        // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
-        // `BadArgument` after ABI 0.2.x will have released.
-        return WasmResult::ParseFailure;
-      }
-      service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
-    } else {
+    auto cluster_name = std::string(grpc_service.substr(0, grpc_service.size()));
+    const auto thread_local_cluster = clusterManager().getThreadLocalCluster(cluster_name);
+    if (thread_local_cluster == nullptr) {
+      // TODO(shikugawa): The reason to keep return status as `BadArgument` is not to force
+      // callers to change their own codebase with ABI 0.1.x. We should treat this failure as
+      // `BadArgument` after ABI 0.2.x will have released.
       return WasmResult::ParseFailure;
     }
+    service_proto.mutable_envoy_grpc()->set_cluster_name(cluster_name);
   }
   uint32_t token = wasm()->nextGrpcStreamId();
   auto& handler = grpc_stream_[token];
@@ -1237,23 +1229,30 @@ WasmResult Context::defineMetric(uint32_t metric_type, std::string_view name,
   // TODO: Consider rethinking the scoping policy as it does not help in this case.
   Stats::StatNameManagedStorage storage(toAbslStringView(name), wasm()->scope_->symbolTable());
   Stats::StatName stat_name = storage.statName();
+  // We prefix the given name with custom_stat_name_ so that these user-defined
+  // custom metrics can be distinguished from native Envoy metrics.
   if (type == MetricType::Counter) {
     auto id = wasm()->nextCounterMetricId();
-    auto c = &wasm()->scope_->counterFromStatName(stat_name);
+    Stats::Counter* c = &Stats::Utility::counterFromElements(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name});
     wasm()->counters_.emplace(id, c);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   if (type == MetricType::Gauge) {
     auto id = wasm()->nextGaugeMetricId();
-    auto g = &wasm()->scope_->gaugeFromStatName(stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::Gauge* g = &Stats::Utility::gaugeFromStatNames(
+        *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+        Stats::Gauge::ImportMode::Accumulate);
     wasm()->gauges_.emplace(id, g);
     *metric_id_ptr = id;
     return WasmResult::Ok;
   }
   // (type == MetricType::Histogram) {
   auto id = wasm()->nextHistogramMetricId();
-  auto h = &wasm()->scope_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+  Stats::Histogram* h = &Stats::Utility::histogramFromStatNames(
+      *wasm()->scope_, {wasm()->custom_stat_namespace_, stat_name},
+      Stats::Histogram::Unit::Unspecified);
   wasm()->histograms_.emplace(id, h);
   *metric_id_ptr = id;
   return WasmResult::Ok;

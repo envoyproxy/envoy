@@ -12,8 +12,10 @@ DEFINE_PROTO_FUZZER(const test::server::config_validation::XdsTestCase& input) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
-  XdsFuzzTest test(input, envoy::config::core::v3::ApiVersion::V3);
+  XdsFuzzTest test(input);
   test.replay();
+  XdsFuzzTest test_with_unified_mux(input, true);
+  test_with_unified_mux.replay();
 }
 
 } // namespace Envoy

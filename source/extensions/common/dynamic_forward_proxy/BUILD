@@ -29,6 +29,7 @@ envoy_cc_library(
     deps = [
         ":dns_cache_impl",
         "//source/common/protobuf",
+        "//source/server:factory_context_base_impl_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -43,10 +44,12 @@ envoy_cc_library(
         "//envoy/network:dns_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:dns_utils_lib",
+        "//source/common/common:key_value_store_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

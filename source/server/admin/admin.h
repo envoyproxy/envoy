@@ -319,7 +319,7 @@ private:
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->addressProvider().localAddress();
+      return socket_->connectionInfoProvider().localAddress();
     }
     Network::SocketSharedPtr getListenSocket(uint32_t) override {
       // This is only supposed to be called once.

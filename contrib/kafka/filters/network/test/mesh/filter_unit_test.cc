@@ -184,12 +184,18 @@ public:
   MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
 };
 
+class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
+public:
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
+};
+
 TEST(Filter, ShouldBeConstructable) {
   // given
   MockUpstreamKafkaConfiguration configuration;
+  MockUpstreamKafkaFacade upstream_kafka_facade;
 
   // when
-  KafkaMeshFilter filter = KafkaMeshFilter(configuration);
+  KafkaMeshFilter filter = KafkaMeshFilter(configuration, upstream_kafka_facade);
 
   // then - no exceptions.
 }

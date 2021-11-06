@@ -20,6 +20,7 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/api/api_impl.h"
@@ -30,13 +31,14 @@
 #include "source/common/config/grpc_mux_impl.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
-#include "source/common/config/version_converter.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -106,7 +108,7 @@ InstanceImpl::InstanceImpl(
 
     restarter_.initialize(*dispatcher_, *this);
     drain_manager_ = component_factory.createDrainManager(*this);
-    initialize(options, std::move(local_address), component_factory);
+    initialize(std::move(local_address), component_factory);
   }
   END_TRY
   catch (const EnvoyException& e) {
@@ -166,18 +168,26 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  snapped_counters_ = store.counters();
-  counters_.reserve(snapped_counters_.size());
-  for (const auto& counter : snapped_counters_) {
-    counters_.push_back({counter->latch(), *counter});
-  }
+  store.forEachCounter(
+      [this](std::size_t size) mutable {
+        snapped_counters_.reserve(size);
+        counters_.reserve(size);
+      },
+      [this](Stats::Counter& counter) mutable {
+        snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
+        counters_.push_back({counter.latch(), counter});
+      });
 
-  snapped_gauges_ = store.gauges();
-  gauges_.reserve(snapped_gauges_.size());
-  for (const auto& gauge : snapped_gauges_) {
-    ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-    gauges_.push_back(*gauge);
-  }
+  store.forEachGauge(
+      [this](std::size_t size) mutable {
+        snapped_gauges_.reserve(size);
+        gauges_.reserve(size);
+      },
+      [this](Stats::Gauge& gauge) mutable {
+        ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
+        gauges_.push_back(gauge);
+      });
 
   snapped_histograms_ = store.histograms();
   histograms_.reserve(snapped_histograms_.size());
@@ -185,11 +195,15 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     histograms_.push_back(*histogram);
   }
 
-  snapped_text_readouts_ = store.textReadouts();
-  text_readouts_.reserve(snapped_text_readouts_.size());
-  for (const auto& text_readout : snapped_text_readouts_) {
-    text_readouts_.push_back(*text_readout);
-  }
+  store.forEachTextReadout(
+      [this](std::size_t size) mutable {
+        snapped_text_readouts_.reserve(size);
+        text_readouts_.reserve(size);
+      },
+      [this](Stats::TextReadout& text_readout) {
+        snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
+        text_readouts_.push_back(text_readout);
+      });
 
   snapshot_time_ = time_source.systemTime();
 }
@@ -279,19 +293,6 @@ ProcessContextOptRef InstanceImpl::processContext() {
 }
 
 namespace {
-// Loads a bootstrap object, potentially at a specific version (upgrading if necessary).
-void loadBootstrap(absl::optional<uint32_t> bootstrap_version,
-                   envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                   std::function<void(Protobuf::Message&, bool)> load_function) {
-
-  if (!bootstrap_version.has_value()) {
-    load_function(bootstrap, true);
-  } else if (*bootstrap_version == 3) {
-    load_function(bootstrap, false);
-  } else {
-    throw EnvoyException(fmt::format("Unknown bootstrap version {}.", *bootstrap_version));
-  }
-}
 
 bool canBeRegisteredAsInlineHeader(const Http::LowerCaseString& header_name) {
   // 'set-cookie' cannot currently be registered as an inline header.
@@ -349,19 +350,11 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   }
 
   if (!config_path.empty()) {
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap,
-        [&config_path, &validation_visitor, &api](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromFile(config_path, message, validation_visitor, api, do_boosting);
-        });
+    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
-    loadBootstrap(
-        options.bootstrapVersion(), bootstrap_override,
-        [&config_yaml, &validation_visitor](Protobuf::Message& message, bool do_boosting) {
-          MessageUtil::loadFromYaml(config_yaml, message, validation_visitor, do_boosting);
-        });
+    MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     // TODO(snowp): The fact that we do a merge here doesn't seem to be covered under test.
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -371,11 +364,10 @@ void InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v3::Bootstrap& 
   MessageUtil::validate(bootstrap, validation_visitor);
 }
 
-void InstanceImpl::initialize(const Options& options,
-                              Network::Address::InstanceConstSharedPtr local_address,
+void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   ENVOY_LOG(info, "initializing epoch {} (base id={}, hot restart version={})",
-            options.restartEpoch(), restarter_.baseId(), restarter_.version());
+            options_.restartEpoch(), restarter_.baseId(), restarter_.version());
 
   ENVOY_LOG(info, "statically linked extensions:");
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -383,7 +375,7 @@ void InstanceImpl::initialize(const Options& options,
   }
 
   // Handle configuration that needs to take place prior to the main configuration load.
-  InstanceUtil::loadBootstrapConfig(bootstrap_, options,
+  InstanceUtil::loadBootstrapConfig(bootstrap_, options_,
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
@@ -405,7 +397,7 @@ void InstanceImpl::initialize(const Options& options,
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(
       Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
@@ -422,10 +414,9 @@ void InstanceImpl::initialize(const Options& options,
               POOL_COUNTER_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_GAUGE_PREFIX(stats_store_, server_compilation_settings_stats_prefix),
               POOL_HISTOGRAM_PREFIX(stats_store_, server_compilation_settings_stats_prefix))});
-  validation_context_.staticWarningValidationVisitor().setUnknownCounter(
-      server_stats_->static_unknown_fields_);
-  validation_context_.dynamicWarningValidationVisitor().setUnknownCounter(
-      server_stats_->dynamic_unknown_fields_);
+  validation_context_.setCounters(server_stats_->static_unknown_fields_,
+                                  server_stats_->dynamic_unknown_fields_,
+                                  server_stats_->wip_protos_);
 
   initialization_timer_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
       server_stats_->initialization_time_ms_, timeSource());
@@ -460,15 +451,6 @@ void InstanceImpl::initialize(const Options& options,
     bootstrap_.mutable_node()->set_user_agent_name("envoy");
   }
 
-  // If user has set user_agent_version in the bootstrap config, use it.
-  // Default to the internal server version.
-  if (!bootstrap_.node().user_agent_version().empty()) {
-    std::string user_agent_version = bootstrap_.node().user_agent_version();
-    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(user_agent_version);
-  } else {
-    bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
-  }
-
   // If user has set user_agent_build_version in the bootstrap config, use it.
   // Default to the internal server version.
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
@@ -490,9 +472,9 @@ void InstanceImpl::initialize(const Options& options,
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       stats().symbolTable(), bootstrap_.node(), bootstrap_.node_context_params(), local_address,
-      options.serviceZone(), options.serviceClusterName(), options.serviceNodeName());
+      options_.serviceZone(), options_.serviceClusterName(), options_.serviceNodeName());
 
-  Configuration::InitialImpl initial_config(bootstrap_, options);
+  Configuration::InitialImpl initial_config(bootstrap_);
 
   // Learn original_start_time_ if our parent is still around to inform us of it.
   const auto parent_admin_shutdown_response = restarter_.sendParentAdminShutdownRequest();
@@ -514,7 +496,7 @@ void InstanceImpl::initialize(const Options& options,
   // Initialize the overload manager early so other modules can register for actions.
   overload_manager_ = std::make_unique<OverloadManagerImpl>(
       *dispatcher_, stats_store_, thread_local_, bootstrap_.overload_manager(),
-      messageValidationContext().staticValidationVisitor(), *api_, options);
+      messageValidationContext().staticValidationVisitor(), *api_, options_);
 
   heap_shrinker_ =
       std::make_unique<Memory::HeapShrinker>(*dispatcher_, *overload_manager_, stats_store_);
@@ -597,7 +579,7 @@ void InstanceImpl::initialize(const Options& options,
   initial_config.initAdminAccessLog(bootstrap_, *this);
 
   if (initial_config.admin().address()) {
-    admin_->startHttpListener(initial_config.admin().accessLogs(), options.adminAddressPath(),
+    admin_->startHttpListener(initial_config.admin().accessLogs(), options_.adminAddressPath(),
                               initial_config.admin().address(),
                               initial_config.admin().socketOptions(),
                               stats_store_.createScope("listener.admin."));
@@ -613,23 +595,11 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
-  std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
-  if (bootstrap_.has_dns_resolution_config()) {
-    dns_resolver_options.CopyFrom(bootstrap_.dns_resolution_config().dns_resolver_options());
-    if (!bootstrap_.dns_resolution_config().resolvers().empty()) {
-      const auto& resolver_addrs = bootstrap_.dns_resolution_config().resolvers();
-      resolvers.reserve(resolver_addrs.size());
-      for (const auto& resolver_addr : resolver_addrs) {
-        resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
-      }
-    }
-  } else {
-    // Field bool `use_tcp_for_dns_lookups` will be deprecated in future. To be backward compatible
-    // utilize bootstrap_.use_tcp_for_dns_lookups() if `bootstrap_.dns_resolver_options` is not set.
-    dns_resolver_options.set_use_tcp_for_dns_lookups(bootstrap_.use_tcp_for_dns_lookups());
-  }
-  dns_resolver_ = dispatcher_->createDnsResolver(resolvers, dns_resolver_options);
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  Network::DnsResolverFactory& dns_resolver_factory =
+      Network::createDnsResolverFactoryFromProto(bootstrap_, typed_dns_resolver_config);
+  dns_resolver_ =
+      dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, dns_resolver_,
@@ -708,14 +678,14 @@ void InstanceImpl::onRuntimeReady() {
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
         *config_.clusterManager(), thread_local_, time_source_, *api_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
+      Config::Utility::checkTransportVersion(hds_config);
       hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
           stats_store_,
           Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                          stats_store_, false)
               ->createUncachedRawAsyncClient(),
-          Config::Utility::getAndCheckTransportVersion(hds_config), *dispatcher_,
-          Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_, info_factory_,
-          access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
+          *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
+          info_factory_, access_log_manager_, *config_.clusterManager(), *local_info_, *admin_,
           *singleton_manager_, thread_local_, messageValidationContext().dynamicValidationVisitor(),
           *api_, options_);
     }
@@ -825,14 +795,13 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       return;
     }
 
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::route::v3::RouteConfiguration>();
+    const auto type_url = Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>();
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
     Config::ScopedResume maybe_resume_rds;
     if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_urls);
+      maybe_resume_rds = cm.adsMux()->pause(type_url);
     }
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
@@ -881,6 +850,8 @@ void InstanceImpl::terminate() {
   // TODO: figure out the correct fix: https://github.com/envoyproxy/envoy/issues/15072.
   Config::GrpcMuxImpl::shutdownAll();
   Config::NewGrpcMuxImpl::shutdownAll();
+  Config::XdsMux::GrpcMuxSotw::shutdownAll();
+  Config::XdsMux::GrpcMuxDelta::shutdownAll();
 
   if (overload_manager_) {
     overload_manager_->stop();
@@ -949,7 +920,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

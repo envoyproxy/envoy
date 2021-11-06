@@ -75,8 +75,8 @@ public:
   }
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
-  const Network::SocketAddressSetter& downstreamAddressProvider() const override {
-    return *downstream_address_provider_;
+  const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
+    return *downstream_connection_info_provider_;
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -219,6 +219,24 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
+  }
+
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
+  }
+
+  void setUpstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& upstream_bytes_meter) override {
+    upstream_bytes_meter_ = upstream_bytes_meter;
+  }
+
+  void setDownstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& downstream_bytes_meter) override {
+    downstream_bytes_meter_ = downstream_bytes_meter;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -241,8 +259,8 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::SocketAddressSetterSharedPtr downstream_address_provider_{
-      std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)};
+  Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
+      std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   Router::RouteConstSharedPtr route_;
@@ -262,6 +280,10 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  Envoy::StreamInfo::BytesMeterSharedPtr upstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
+  Envoy::StreamInfo::BytesMeterSharedPtr downstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
 };
 
 } // namespace Envoy

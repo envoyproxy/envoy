@@ -8,7 +8,7 @@
 #include "absl/synchronization/mutex.h"
 
 // included to make code_format happy
-#include "envoy/extensions/cache/simple_http_cache/v3alpha/config.pb.h"
+#include "envoy/extensions/cache/simple_http_cache/v3/config.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +28,12 @@ private:
   Entry varyLookup(const LookupRequest& request,
                    const Http::ResponseHeaderMapPtr& response_headers);
 
+  // A list of headers that we do not want to update upon validation
+  // We skip these headers because either it's updated by other application logic
+  // or they are fall into categories defined in the IETF doc below
+  // https://www.ietf.org/archive/id/draft-ietf-httpbis-cache-18.html s3.2
+  static const absl::flat_hash_set<Http::LowerCaseString> headersNotToUpdate();
+
 public:
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request) override;
@@ -44,7 +50,8 @@ public:
   // Inserts a response that has been varied on certain headers.
   void varyInsert(const Key& request_key, Http::ResponseHeaderMapPtr&& response_headers,
                   ResponseMetadata&& metadata, std::string&& body,
-                  const Http::RequestHeaderMap& request_headers, const VaryHeader& vary_allow_list);
+                  const Http::RequestHeaderMap& request_headers,
+                  const VaryAllowList& vary_allow_list);
 
   absl::Mutex mutex_;
   absl::flat_hash_map<Key, Entry, MessageUtil, MessageUtil> map_ ABSL_GUARDED_BY(mutex_);

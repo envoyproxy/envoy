@@ -25,7 +25,7 @@ Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromP
   auto gradient_controller_config =
       Controller::GradientControllerConfig(config.gradient_controller_config(), context.runtime());
   controller = std::make_shared<Controller::GradientController>(
-      std::move(gradient_controller_config), context.dispatcher(), context.runtime(),
+      std::move(gradient_controller_config), context.mainThreadDispatcher(), context.runtime(),
       acc_stats_prefix + "gradient_controller.", context.scope(), context.api().randomGenerator(),
       context.timeSource());
 

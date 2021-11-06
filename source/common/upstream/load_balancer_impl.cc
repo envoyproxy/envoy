@@ -1,5 +1,6 @@
 #include "source/common/upstream/load_balancer_impl.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -10,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -22,9 +24,12 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
-
 constexpr absl::string_view WeightedRoundRobinSchedulerWRSQRuntime =
     "envoy.reloadable_features.upstream.round_robin_scheduler_wrsq";
+
+static constexpr uint32_t UnhealthyStatus = 1u << static_cast<size_t>(Host::Health::Unhealthy);
+static constexpr uint32_t DegradedStatus = 1u << static_cast<size_t>(Host::Health::Degraded);
+static constexpr uint32_t HealthyStatus = 1u << static_cast<size_t>(Host::Health::Healthy);
 
 bool tooManyPreconnects(size_t num_preconnect_picks, uint32_t healthy_hosts) {
   // Currently we only allow the number of preconnected connections to equal the
@@ -365,6 +370,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
   resizePerPriorityState();
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        // Update cross priority host map for fast host searching.
+        cross_priority_host_map_ = priority_set_.crossPriorityHostMap();
+
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -511,8 +519,59 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host;
+bool LoadBalancerContextBase::validateOverrideHostStatus(Host::Health health,
+                                                         OverrideHostStatus status) {
+  switch (health) {
+  case Host::Health::Unhealthy:
+    return status & UnhealthyStatus;
+  case Host::Health::Degraded:
+    return status & DegradedStatus;
+  case Host::Health::Healthy:
+    return status & HealthyStatus;
+  }
+  return false;
+}
+
+HostConstSharedPtr LoadBalancerContextBase::selectOverrideHost(const HostMap* host_map,
+                                                               LoadBalancerContext* context) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+
+  auto override_host = context->overrideHostToSelect();
+  if (!override_host.has_value()) {
+    return nullptr;
+  }
+
+  if (host_map == nullptr) {
+    return nullptr;
+  }
+
+  auto host_iter = host_map->find(override_host.value().first);
+
+  // The override host cannot be found in the host map.
+  if (host_iter == host_map->end()) {
+    return nullptr;
+  }
+
+  HostConstSharedPtr host = host_iter->second;
+  ASSERT(host != nullptr);
+
+  // Verify the host status.
+  if (LoadBalancerContextBase::validateOverrideHostStatus(host->health(),
+                                                          override_host.value().second)) {
+    return host;
+  }
+  return nullptr;
+}
+
+HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr host =
+      LoadBalancerContextBase::selectOverrideHost(cross_priority_host_map_.get(), context);
+  if (host != nullptr) {
+    return host;
+  }
+
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (size_t i = 0; i < max_attempts; ++i) {
     host = chooseHostOnce(context);
@@ -699,10 +758,21 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 WRRLoadBalancerBase::WRRLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config, bool use_wrsq)
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config,
+    const absl::optional<envoy::config::cluster::v3::Cluster::SlowStartConfig> slow_start_config,
+    TimeSource& time_source)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
-      seed_(random_.random()), use_wrsq_(use_wrsq) {
+      seed_(random_.random()), use_wrsq_(use_wrsq)
+      slow_start_window_(slow_start_config.has_value()
+                             ? std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+                                   slow_start_config.value().slow_start_window()))
+                             : std::chrono::milliseconds(0)),
+      aggression_runtime_(
+          slow_start_config.has_value() && slow_start_config.value().has_aggression()
+              ? absl::optional<Runtime::Double>({slow_start_config.value().aggression(), runtime})
+              : absl::nullopt),
+      time_source_(time_source), latest_host_added_time_(time_source_.monotonicTime()) {
   // We fully recompute the schedulers for a given host set here on membership change, which is
   // consistent with what other LB implementations do (e.g. thread aware).
   // The downside of a full recompute is that time complexity is O(n * log n),
@@ -710,6 +780,12 @@ WRRLoadBalancerBase::WRRLoadBalancerBase(
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_update_cb_ = priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+  member_update_cb_ = priority_set.addMemberUpdateCb(
+      [this](const HostVector& hosts_added, const HostVector&) -> void {
+        if (isSlowStartEnabled()) {
+          recalculateHostsInSlowStart(hosts_added);
+        }
+      });
 }
 
 void WRRLoadBalancerBase::initialize() {
@@ -718,17 +794,36 @@ void WRRLoadBalancerBase::initialize() {
   }
 }
 
+void WRRLoadBalancerBase::recalculateHostsInSlowStart(const HostVector& hosts) {
+  auto current_time = time_source_.monotonicTime();
+  // TODO(nezdolik): linear scan can be improved with using flat hash set for hosts in slow start.
+  for (const auto& host : hosts) {
+    auto host_create_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(current_time - host->creationTime());
+    // Check if host existence time is within slow start window.
+    if (host->creationTime() > latest_host_added_time_ &&
+        host_create_duration <= slow_start_window_ &&
+        host->health() == Upstream::Host::Health::Healthy) {
+      latest_host_added_time_ = host->creationTime();
+    }
+  }
+}
+
 void WRRLoadBalancerBase::refresh(uint32_t priority) {
   const auto add_hosts_source = [this](HostsSource source, const HostVector& hosts) {
     // Nuke existing scheduler if it exists.
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
+    if (isSlowStartEnabled()) {
+      recalculateHostsInSlowStart(hosts);
+    }
 
-    // Check if the original host weights are equal and skip scheduler creation if they are. When
-    // all original weights are equal we can rely on unweighted host pick to do optimal round robin
-    // and least-loaded host selection with lower memory and CPU overhead.
-    if (hostWeightsAreEqual(hosts)) {
-      // Skip scheduler creation.
+    // Check if the original host weights are equal and no hosts are in slow start mode, in that
+    // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
+    // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
+    // host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+      // Skip edf creation.
       return;
     }
 
@@ -781,6 +876,22 @@ void WRRLoadBalancerBase::refresh(uint32_t priority) {
         HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
         host_set->degradedHostsPerLocality().get()[locality_index]);
   }
+}
+
+bool WRRLoadBalancerBase::isSlowStartEnabled() {
+  return slow_start_window_ > std::chrono::milliseconds(0);
+}
+
+bool WRRLoadBalancerBase::noHostsAreInSlowStart() {
+  if (!isSlowStartEnabled()) {
+    return true;
+  }
+  auto current_time = time_source_.monotonicTime();
+  if (std::chrono::duration_cast<std::chrono::milliseconds>(
+          current_time - latest_host_added_time_) <= slow_start_window_) {
+    return false;
+  }
+  return true;
 }
 
 HostConstSharedPtr WRRLoadBalancerBase::peekAnotherHost(LoadBalancerContext* context) {
@@ -841,6 +952,36 @@ HostConstSharedPtr WRRLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
   }
 }
 
+double EdfLoadBalancerBase::applyAggressionFactor(double time_factor) {
+  if (aggression_ == 1.0 || time_factor == 1.0) {
+    return time_factor;
+  } else {
+    return std::pow(time_factor, 1.0 / aggression_);
+  }
+}
+
+double EdfLoadBalancerBase::applySlowStartFactor(double host_weight, const Host& host) {
+  auto host_create_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      time_source_.monotonicTime() - host.creationTime());
+  if (host_create_duration < slow_start_window_ &&
+      host.health() == Upstream::Host::Health::Healthy) {
+    aggression_ = aggression_runtime_ != absl::nullopt ? aggression_runtime_.value().value() : 1.0;
+    if (aggression_ < 0.0) {
+      ENVOY_LOG_EVERY_POW_2(error, "Invalid runtime value provided for aggression parameter, "
+                                   "agression cannot be less than 0.0");
+    }
+    aggression_ = std::max(0.0, aggression_);
+
+    ASSERT(aggression_ > 0.0);
+    auto time_factor = static_cast<double>(std::max(std::chrono::milliseconds(1).count(),
+                                                    host_create_duration.count())) /
+                       slow_start_window_.count();
+    return host_weight * applyAggressionFactor(time_factor);
+  } else {
+    return host_weight;
+  }
+}
+
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector&,
                                                                 const HostsSource&) {
   // LeastRequestLoadBalancer can not do deterministic preconnecting, because
@@ -852,11 +993,13 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPeek(const HostVector
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
   HostSharedPtr candidate_host = nullptr;
+
   for (uint32_t choice_idx = 0; choice_idx < choice_count_; ++choice_idx) {
     const int rand_idx = random_.random() % hosts_to_use.size();
     HostSharedPtr sampled_host = hosts_to_use[rand_idx];
 
     if (candidate_host == nullptr) {
+
       // Make a first choice to start the comparisons.
       candidate_host = sampled_host;
       continue;

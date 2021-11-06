@@ -70,6 +70,7 @@ private:
   std::string dns_url_;
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
+  std::vector<Network::Address::InstanceConstSharedPtr> current_resolved_address_list_;
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;

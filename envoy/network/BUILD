@@ -64,6 +64,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dns_resolver_interface",
+    hdrs = ["dns_resolver.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//source/common/config:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "drain_decision_interface",
     hdrs = ["drain_decision.h"],
     external_deps = ["abseil_base"],
@@ -93,7 +102,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":address_interface",
+        ":connection_interface",
     ],
 )
 
@@ -177,6 +186,7 @@ envoy_cc_library(
         ":udp_packet_writer_handler_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:resource_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/init:manager_interface",
         "//envoy/stats:stats_interface",
         "//source/common/common:interval_value",

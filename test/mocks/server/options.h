@@ -22,7 +22,6 @@ public:
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
-  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
@@ -53,6 +52,7 @@ public:
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
   MOCK_METHOD(const std::string&, socketPath, (), (const));
   MOCK_METHOD(mode_t, socketMode, (), (const));
+  MOCK_METHOD((const Stats::TagVector&), statsTags, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
@@ -77,6 +77,7 @@ public:
   std::vector<std::string> disabled_extensions_;
   std::string socket_path_;
   mode_t socket_mode_;
+  Stats::TagVector stats_tags_;
 };
 } // namespace Server
 } // namespace Envoy

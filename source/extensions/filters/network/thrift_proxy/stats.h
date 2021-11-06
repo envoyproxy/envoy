@@ -22,11 +22,13 @@ namespace ThriftProxy {
   COUNTER(request_decoding_error)                                                                  \
   COUNTER(request_invalid_type)                                                                    \
   COUNTER(request_oneway)                                                                          \
+  COUNTER(request_passthrough)                                                                     \
   COUNTER(response)                                                                                \
   COUNTER(response_decoding_error)                                                                 \
   COUNTER(response_error)                                                                          \
   COUNTER(response_exception)                                                                      \
   COUNTER(response_invalid_type)                                                                   \
+  COUNTER(response_passthrough)                                                                    \
   COUNTER(response_reply)                                                                          \
   COUNTER(response_success)                                                                        \
   GAUGE(request_active, Accumulate)                                                                \

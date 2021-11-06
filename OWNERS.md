@@ -47,6 +47,8 @@ routing PRs, questions, etc. to the right place.
   * Windows, low level networking.
 * Dmitry Rozhkov ([rojkov](https://github.com/rojkov)) (dmitry.rozhkov@intel.com)
   * Scalability and performance.
+* Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
+  * HTTP/3, upstream connection management.
 
 # Senior extension maintainers
 
@@ -61,8 +63,12 @@ without further review.
 
 # Envoy security team
 
-* All maintainers
-* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tallen@lyft.com)
+* All senior maintainers
+* Tony Allen ([tonya11en](https://github.com/tonya11en)) (tony@allen.gg)
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+* William A Rowe Jr ([wrowe](https://github.com/wrowe)) (wrowe@vmware.com)
+* Otto van der Schaaf ([oschaaf](https://github.com/oschaaf)) (oschaaf@redhat.com)
+* Tim Walsh ([twghu](https://github.com/twghu)) (walsh@redhat.com)
 
 # Emeritus maintainers
 

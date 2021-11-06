@@ -62,12 +62,19 @@ public:
   public:
     HttpStatusChecker(
         const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& expected_statuses,
+        const Protobuf::RepeatedPtrField<envoy::type::v3::Int64Range>& retriable_statuses,
         uint64_t default_expected_status);
 
-    bool inRange(uint64_t http_status) const;
+    bool inRetriableRanges(uint64_t http_status) const;
+    bool inExpectedRanges(uint64_t http_status) const;
 
   private:
-    std::vector<std::pair<uint64_t, uint64_t>> ranges_;
+    static bool inRanges(uint64_t http_status,
+                         const std::vector<std::pair<uint64_t, uint64_t>>& ranges);
+    static void validateRange(uint64_t start, uint64_t end, absl::string_view range_type);
+
+    std::vector<std::pair<uint64_t, uint64_t>> expected_ranges_;
+    std::vector<std::pair<uint64_t, uint64_t>> retriable_ranges_;
   };
 
 private:
@@ -78,7 +85,7 @@ private:
     ~HttpActiveHealthCheckSession() override;
 
     void onResponseComplete();
-    enum class HealthCheckResult { Succeeded, Degraded, Failed };
+    enum class HealthCheckResult { Succeeded, Degraded, Failed, Retriable };
     HealthCheckResult healthCheckResult();
     bool shouldClose() const;
 
@@ -141,7 +148,7 @@ private:
     Http::ResponseHeaderMapPtr response_headers_;
     const std::string& hostname_;
     const Http::Protocol protocol_;
-    Network::SocketAddressProviderSharedPtr local_address_provider_;
+    Network::ConnectionInfoProviderSharedPtr local_connection_info_provider_;
     bool expect_reset_{};
     bool reuse_connection_ = false;
     bool request_in_flight_ = false;

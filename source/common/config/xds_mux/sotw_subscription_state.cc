@@ -44,7 +44,7 @@ void SotwSubscriptionState::markStreamFresh() {
 
 void SotwSubscriptionState::handleGoodResponse(
     const envoy::service::discovery::v3::DiscoveryResponse& message) {
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> non_heartbeat_resources;
+  std::vector<DecodedResourcePtr> non_heartbeat_resources;
   std::vector<envoy::service::discovery::v3::Resource> resources_with_ttl(
       message.resources().size());
 
@@ -65,12 +65,12 @@ void SotwSubscriptionState::handleGoodResponse(
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
       }
-      non_heartbeat_resources.Add()->CopyFrom(any);
+      non_heartbeat_resources.push_back(std::move(decoded_resource));
     }
   }
 
   // TODO (dmitri-d) to eliminate decoding of resources twice consider expanding the interface to
-  // support passing of decoded resources
+  // support passing of decoded resources. This would also avoid a resource copy above.
   callbacks().onConfigUpdate(non_heartbeat_resources, message.version_info());
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();

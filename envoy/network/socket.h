@@ -24,6 +24,7 @@ namespace Network {
 struct SocketOptionName {
   SocketOptionName() = default;
   SocketOptionName(const SocketOptionName&) = default;
+  SocketOptionName& operator=(const SocketOptionName&) = default;
   SocketOptionName(int level, int option, const std::string& name)
       : value_(std::make_tuple(level, option, name)) {}
 
@@ -47,12 +48,10 @@ private:
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
- * TODO(soulxu): Since there are more than address information inside the provider, this will be
- * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
-class SocketAddressProvider {
+class ConnectionInfoProvider {
 public:
-  virtual ~SocketAddressProvider() = default;
+  virtual ~ConnectionInfoProvider() = default;
 
   /**
    * @return the local address of the socket.
@@ -87,7 +86,7 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
-   * Dumps the state of the SocketAddressProvider to the given ostream.
+   * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
    * @param indent_level the level of indentation.
@@ -101,7 +100,7 @@ public:
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
 };
 
-class SocketAddressSetter : public SocketAddressProvider {
+class ConnectionInfoSetter : public ConnectionInfoProvider {
 public:
   /**
    * Set the local address of the socket. On accepted sockets the local address defaults to the
@@ -145,8 +144,8 @@ public:
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 };
 
-using SocketAddressSetterSharedPtr = std::shared_ptr<SocketAddressSetter>;
-using SocketAddressProviderSharedPtr = std::shared_ptr<const SocketAddressProvider>;
+using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
+using ConnectionInfoProviderSharedPtr = std::shared_ptr<const ConnectionInfoProvider>;
 
 /**
  * Base class for Sockets
@@ -161,11 +160,11 @@ public:
   enum class Type { Stream, Datagram };
 
   /**
-   * @return the address provider backing this socket.
+   * @return the connection info provider backing this socket.
    */
-  virtual SocketAddressSetter& addressProvider() PURE;
-  virtual const SocketAddressProvider& addressProvider() const PURE;
-  virtual SocketAddressProviderSharedPtr addressProviderSharedPtr() const PURE;
+  virtual ConnectionInfoSetter& connectionInfoProvider() PURE;
+  virtual const ConnectionInfoProvider& connectionInfoProvider() const PURE;
+  virtual ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const PURE;
 
   /**
    * @return IoHandle for the underlying connection
@@ -301,8 +300,18 @@ public:
     virtual absl::optional<Details>
     getOptionDetails(const Socket& socket,
                      envoy::config::core::v3::SocketOption::SocketState state) const PURE;
+
+    /**
+     * Whether the socket implementation is supported. Real implementations should typically return
+     * true. Placeholder implementations may indicate such by returning false. Note this does NOT
+     * inherently prevent an option from being applied if it's passed to socket/connection
+     * interfaces.
+     * @return Whether this is a supported socket option.
+     */
+    virtual bool isSupported() const PURE;
   };
 
+  using OptionConstPtr = std::unique_ptr<const Option>;
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
   using Options = std::vector<OptionConstSharedPtr>;
   using OptionsSharedPtr = std::shared_ptr<Options>;

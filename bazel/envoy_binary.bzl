@@ -22,7 +22,8 @@ def envoy_cc_binary(
         stamped = False,
         deps = [],
         linkopts = [],
-        tags = []):
+        tags = [],
+        features = []):
     if not linkopts:
         linkopts = _envoy_linkopts()
     if stamped:
@@ -42,6 +43,7 @@ def envoy_cc_binary(
         stamp = 1,
         deps = deps,
         tags = tags,
+        features = features,
     )
 
 # Select the given values if exporting is enabled in the current build.

@@ -18,8 +18,8 @@
 // 7. Remove locks after crash is addressed by separate issue
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
 #include "source/common/network/address_impl.h"
@@ -36,9 +36,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 
 // The buffer size for the listeners
 static const uint32_t BufferSize = 100000;
@@ -93,21 +93,15 @@ public:
       ConfigHelper::setHttp2(*processor_cluster);
 
       // Make sure both flavors of gRPC client use the right address.
-      if (ipVersion() == Network::Address::IpVersion::v4) {
-        const auto addr = std::make_shared<Network::Address::Ipv4Instance>(
-            Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
-      } else {
-        const auto addr = std::make_shared<Network::Address::Ipv6Instance>(
-            Network::Test::getLoopbackAddressString(ipVersion()), test_processor_.port());
-        setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr);
-      }
+      const auto addr = Network::Test::getCanonicalLoopbackAddress(ipVersion());
+      const auto addr_port = Network::Utility::getAddressWithPort(*addr, test_processor_.port());
+      setGrpcService(*proto_config_.mutable_grpc_service(), "ext_proc_server", addr_port);
 
       // Merge the filter.
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
 
     // Make sure that we have control over when buffers will fill up.
@@ -222,7 +216,7 @@ public:
     }
   }
 
-  envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   TestProcessor test_processor_;
   Network::Address::IpVersion ip_version_;
   Grpc::ClientType client_type_;
@@ -252,6 +246,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // external process to consume messages in a loop without blocking the fuzz
   // target from receiving the response.
   fuzzer.test_processor_.start(
+      fuzzer.ip_version_,
       [&fuzz_helper](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
         while (true) {
           ProcessingRequest req;

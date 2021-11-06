@@ -2,7 +2,7 @@ Examples
 --------
 
 Below we will use YAML representation of the config protos and a running example
-of a service proxying HTTP from 127.0.0.1:10000 to 127.0.0.2:1234.
+of a service proxying HTTP from 127.0.0.1:10000 to 127.0.0.1:1234.
 
 Static
 ^^^^^^
@@ -152,7 +152,7 @@ In the above example, the EDS management server could then return a proto encodi
       - endpoint:
           address:
             socket_address:
-              address: 127.0.0.2
+              address: 127.0.0.1
               port_value: 1234
 
 
@@ -300,7 +300,7 @@ The management server could respond to EDS requests with:
       - endpoint:
           address:
             socket_address:
-              address: 127.0.0.2
+              address: 127.0.0.1
               port_value: 1234
 
 Special YAML usage

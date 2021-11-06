@@ -79,9 +79,10 @@ public:
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, "test_log_name", FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_, envoy::config::core::v3::ApiVersion::V3);
+    *config_.mutable_log_name() = "test_log_name";
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     config_, FlushInterval, BUFFER_SIZE_BYTES,
+                                                     dispatcher_, local_info_, stats_store_);
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -91,6 +92,7 @@ public:
   Event::MockTimer* timer_;
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
 };
 
 TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
@@ -151,7 +153,7 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, local_info_),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, false))
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
         .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
@@ -178,8 +180,8 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   // Force a flush for every log entry.
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
-  GrpcAccessLoggerSharedPtr logger = logger_cache_.getOrCreateLogger(
-      config, envoy::config::core::v3::ApiVersion::V3, Common::GrpcAccessLoggerType::HTTP, scope_);
+  GrpcAccessLoggerSharedPtr logger =
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:
