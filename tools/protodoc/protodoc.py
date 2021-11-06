@@ -133,10 +133,9 @@ WIP_WARNING = (
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
 
-FILE_LEVEL_NOT_IMPLEMENTED =(
+FILE_LEVEL_NOT_IMPLEMENTED = (
     '.. warning::\n   Envoy does not provide any relevant implementation for this API at the moment. '
-    'Please ignore this page.\n\n'
-)
+    'Please ignore this page.\n\n')
 
 r = runfiles.Create()
 
@@ -778,9 +777,9 @@ class RstFormatVisitor(visitor.Visitor):
         header, comment = format_header_from_file(
             '=', type_context.source_code_info, file_proto.name, v2_link)
 
-
         # If there is a file-level 'not-implemented-hide' annotation, only header and unimplemented warning is returned.
-        if(annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION in type_context.source_code_info.file_level_annotations):
+        if (annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION
+                in type_context.source_code_info.file_level_annotations):
             return ':orphan:\n\n' + header + FILE_LEVEL_NOT_IMPLEMENTED
 
         # If there are no messages or there is there is a file level 'not-implemented-hide' annotation, we don't include in the doc tree (no support for
