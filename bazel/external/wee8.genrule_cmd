@@ -136,7 +136,7 @@ else
 fi
 
 # Select ninja tool for the current platform.
-if [[ $${PLATFORM} == "Darwin-x86_64" ]]; then
+if [[ $${SYSTEM} == "Darwin" ]]; then
   ninja=third_party/depot_tools/ninja-mac
 elif [[ $${PLATFORM} == "Linux-x86_64" ]]; then
   ninja=third_party/depot_tools/ninja-linux64
