@@ -23,6 +23,7 @@
 #include "quiche/quic/core/quic_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
+#include "quiche/quic/test_tools/quic_sent_packet_manager_peer.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -545,8 +546,14 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   concurrency_ = 2;
   initialize();
+  client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
+
+  // Make sure that the port migration config is plumbed through.
+  EXPECT_EQ(2u, quic::test::QuicSentPacketManagerPeer::GetNumPtosForPathDegrading(
+                    &quic_connection_->sent_packet_manager()));
+
   auto encoder_decoder =
       codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                                  {":path", "/test/long/url"},
