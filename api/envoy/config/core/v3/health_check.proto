@@ -108,9 +108,9 @@ message HealthCheck {
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
-      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
-    }];
+    repeated string request_headers_to_remove = 8
+        [(validate.rules).repeated = {
+             items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}}];
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
@@ -226,16 +226,10 @@ message HealthCheck {
 
   // The time to wait for a health check response. If the timeout is reached the
   // health check attempt will be considered a failure.
-  google.protobuf.Duration timeout = 1 [(validate.rules).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration timeout = 1 [(validate.rules).duration = {required: true gt {}}];
 
   // The interval between health checks.
-  google.protobuf.Duration interval = 2 [(validate.rules).duration = {
-    required: true
-    gt {}
-  }];
+  google.protobuf.Duration interval = 2 [(validate.rules).duration = {required: true gt {}}];
 
   // An optional jitter amount in milliseconds. If specified, Envoy will start health
   // checking after for a random time in ms between 0 and initial_jitter. This only
