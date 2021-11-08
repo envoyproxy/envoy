@@ -110,15 +110,14 @@ message FilterChainMatch {
   }
 
   // Matches filter chains by the destination port.
-  // [#next-free-field: 6]
   message DestinationPort {
     // Optional destination port to consider when use_original_dst is set on the
     // listener in determining a filter chain match.
     google.protobuf.UInt32Value destination_port = 1
         [(validate.rules).uint32 = {lte: 65535 gte: 1}];
 
-    // Match destination port by range.
-    type.v3.Int32Range destination_port_range = 5;
+    // Match destination port by ranges.
+    repeated type.v3.Int32Range destination_port_ranges = 2;
   }
 
   // Matches filter chains by the destination IP address.
@@ -157,10 +156,9 @@ message FilterChainMatch {
   // Matches filter chains by the source port.
   message SourcePort {
     // The criteria is satisfied if the source port of the downstream connection
-    // is contained in at least one of the specified ports. If the parameter is
+    // is contained in at least one of the specified port ranges. If the parameter is
     // not specified, the source port is ignored.
-    repeated uint32 source_ports = 1
-        [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
+    repeated type.v3.Int32Range source_port_ranges = 1;
   }
 
   // Matches filter chains by the server name indication.
@@ -341,16 +339,24 @@ message FilterChainMatch {
   // on the ``fallthrough`` flag. If there is another more specific match for
   // the same predicate and the flag is not set, then the less specific match
   // is eliminated. If the flag is set, then it remains as a candidate for the
-  // next step.
-  //
-  // For example, consider SNI ``www.example.com``and two filter chains with
-  // the predicates ```*.example.com``` and ```*.com```. If ``fallthrough``
-  // flag is not set then only the filter chain ```*.example.com``` matches. If
-  // ``fallthrough`` flag is set on ```*.com```, then both filter chains match.
-  // In general, the order of specificity is domain specific as defined by the
+  // next step. In general, the order of specificity is domain specific to the
   // predicate extension. The flag should be set when matching on multiple
   // properties in order for a default chain to apply without explicit specific
   // matching of the first properties in the list.
+  //
+  // As an example, consider a filter chain ``FC1`` matching plaintext HTTP
+  // traffic on destination port 80, and another pass-through filter chain
+  // ``FC2`` for the rest of the traffic. The first chain match condition can
+  // be expressed with the transport protocol match on ``raw_buffer``, the
+  // application protocol match on ``http/1.1`` and ``h2``, and the destination
+  // port match on 80, in this order. If the second filter chain match does not
+  // specify ``fallthrough`` for any of its empty predicates, then for the
+  // plaintext non-HTTP traffic, ``FC2`` is not selected because it is
+  // eliminated at the first step as being less specific than ``FC1`` on the
+  // transport protocol match ``raw_buffer``. Therefore, ``FC2`` should specify
+  // ``fallthrough`` flag for both the transport protocol and the application
+  // protocol match predicates, in order to match plaintext non-HTTP traffic as
+  // well as plaintext HTTP traffic on ports other than 80.
   //
   // In case, there is more than one filter chain candidates remaining after
   // the process completes, the first of the filter chains in the order of
