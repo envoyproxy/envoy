@@ -129,9 +129,6 @@ public:
       uint32_t num_accounts, uint32_t num_bound_buffers,
       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  bool waitUntilExpectedNumberOfActiveAccountsThatSawEnvoyStreamComplete(
-      uint32_t num_accounts, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
-
   using AccountToBoundBuffersMap =
       absl::flat_hash_map<BufferMemoryAccountSharedPtr,
                           absl::flat_hash_set<TrackedWatermarkBuffer*>>;
