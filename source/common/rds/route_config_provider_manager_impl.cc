@@ -3,11 +3,11 @@
 namespace Envoy {
 namespace Rds {
 
-RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {
-  config_tracker_entry_ =
-      admin.getConfigTracker().add("routes", [this](const Matchers::StringMatcher& matcher) {
-        return dumpRouteConfigs(matcher);
-      });
+RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
+    Server::Admin& admin, const std::string& config_tracker_key)
+    : config_tracker_entry_(admin.getConfigTracker().add(
+          config_tracker_key,
+          [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })) {
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");

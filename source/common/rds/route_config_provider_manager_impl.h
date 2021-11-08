@@ -20,7 +20,7 @@ namespace Rds {
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager {
 public:
-  RouteConfigProviderManagerImpl(Server::Admin& admin);
+  RouteConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_tracker_key);
 
   void eraseStaticProvider(RouteConfigProvider* provider) override;
 

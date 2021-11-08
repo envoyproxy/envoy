@@ -18,7 +18,7 @@ public:
   /**
    * Same purpose as Rds::RouteConfigProvider::config()
    * but the return is downcasted to proper type.
-   * @return dowcasted ConfigConstSharedPtr from Rds::ConfigConstSharedPtr
+   * @return downcasted ConfigConstSharedPtr from Rds::ConfigConstSharedPtr
    */
   virtual ConfigConstSharedPtr configCast() PURE;
 

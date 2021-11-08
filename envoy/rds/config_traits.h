@@ -40,7 +40,7 @@ public:
    * Runtime check if the provided proto message object is really a route configuration instance.
    * Throw an std::bad_cast exception if not.
    * Every other method below this assumes the proto message is already
-   * validated and and doesn't do any further runtime check.
+   * validated and doesn't do any further runtime check.
    */
   virtual const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const PURE;
 
@@ -51,8 +51,7 @@ public:
   virtual const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const PURE;
 
   /**
-   * Gives back the value of the name field  Check if a valid config object can be made
-   * based on the provided route configuration proto.
+   * Gives back the name from the route configuration proto.
    * The object behind the returned reference has to have the same lifetime like the proto.
    */
   virtual const std::string& resourceName(const Protobuf::Message& rc) const PURE;
