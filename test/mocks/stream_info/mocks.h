@@ -32,6 +32,8 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastDownstreamRxByteReceived, (), (const));
   MOCK_METHOD(void, onLastDownstreamRxByteReceived, ());
   MOCK_METHOD(void, setUpstreamTiming, (const UpstreamTiming&));
+  MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
+  MOCK_METHOD(const UpstreamTiming&, upstreamTiming, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, firstUpstreamTxByteSent, (), (const));
   MOCK_METHOD(void, onFirstUpstreamTxByteSent, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastUpstreamTxByteSent, (), (const));

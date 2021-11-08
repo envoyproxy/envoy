@@ -232,10 +232,29 @@ struct UpstreamTiming {
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
+  void onUpstreamConnectStart(TimeSource& time_source) {
+    ASSERT(!upstream_connect_start_);
+    upstream_connect_start_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamConnectComplete(TimeSource& time_source) {
+    ASSERT(!upstream_connect_complete_);
+    upstream_connect_complete_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamHandshakeComplete(TimeSource& time_source) {
+    ASSERT(!upstream_handshake_complete_);
+    upstream_handshake_complete_ = time_source.monotonicTime();
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+
+  absl::optional<MonotonicTime> upstream_connect_start_;
+  absl::optional<MonotonicTime> upstream_connect_complete_;
+  absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -374,6 +393,12 @@ public:
    * information for the one that "wins".
    */
   virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
+
+  /**
+   * Returns the upstream timing information for this stream.
+   */
+  virtual UpstreamTiming& upstreamTiming() PURE;
+  virtual const UpstreamTiming& upstreamTiming() const PURE;
 
   /**
    * @return the duration between the first byte of the request was sent upstream and the start of

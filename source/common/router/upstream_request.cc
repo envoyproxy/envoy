@@ -140,6 +140,7 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
+  stream_info_.setUpstreamTiming(upstream_timing_);
   resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
@@ -426,6 +427,13 @@ void UpstreamRequest::onPoolReady(
   if (protocol) {
     stream_info_.protocol(protocol.value());
   }
+
+  std::cerr << "Setting connect stuff " << info.upstreamTiming().upstream_connect_start_.has_value()
+            << "\n";
+  upstream_timing_.upstream_connect_start_ = info.upstreamTiming().upstream_connect_start_;
+  upstream_timing_.upstream_connect_complete_ = info.upstreamTiming().upstream_connect_complete_;
+  upstream_timing_.upstream_handshake_complete_ =
+      info.upstreamTiming().upstream_handshake_complete_;
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
