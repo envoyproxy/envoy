@@ -113,11 +113,6 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   ENVOY_LOG(trace, "tls inspector: recv: {}", raw_slice.len_);
 
-  if (result.return_value_ == 0) {
-    config_->stats().connection_closed_.inc();
-    return ParseState::Error;
-  }
-
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
   if (static_cast<uint64_t>(raw_slice.len_) > read_) {

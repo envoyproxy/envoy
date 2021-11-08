@@ -167,6 +167,7 @@ envoy_cc_test(
     srcs = ["listener_filter_buffer_impl_test.cc"],
     deps = [
         "//source/common/network:listener_filter_buffer_lib",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:io_handle_mocks",
     ],
 )
