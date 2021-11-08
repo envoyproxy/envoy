@@ -817,6 +817,32 @@ TEST_P(QuicHttpIntegrationTest, NoInitialStreams) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+TEST_P(QuicHttpIntegrationTest, NoStreams) {
+  // Tighten the stream idle timeout, as it defaults to 5m
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+hcm) -> void {
+    hcm.mutable_stream_idle_timeout()->set_seconds(0);
+    hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
+      });
+
+  // Set the fake upstream to start with 0 streams available.
+  setUpstreamProtocol(Http::CodecType::HTTP3);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
+  mergeOptions(options);
+  initialize();
+
+  // Create the client connection and send a request.
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Make sure the time out closes the stream.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+}
+
 class QuicInplaceLdsIntegrationTest : public QuicHttpIntegrationTest {
 public:
   void inplaceInitialize(bool add_default_filter_chain = false) {
