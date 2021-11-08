@@ -147,6 +147,56 @@ request_rules:
   filter_->onDestroy();
 }
 
+TEST_F(HeaderToMetadataTest, NoMatchSubstituteValueTest) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-sub
+    on_present:
+      metadata_namespace: envoy.lb
+      key: subbed
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^hello (\\w+)?.*$"
+        substitution: "\\1"
+)EOF";
+  initializeFilter(request_config_yaml);
+  std::map<std::string, std::string> expected = {{"subbed", "does not match"}};
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "does not match");
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
+  filter_->onDestroy();
+}
+
+/**
+ * Test empty value doesn't get written to metadata.
+ */
+TEST_F(HeaderToMetadataTest, SubstituteEmptyValueTest) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-sub
+    on_present:
+      metadata_namespace: envoy.lb
+      key: subbed
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^hello (\\w+)?.*$"
+        substitution: "\\1"
+)EOF";
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "hello !!!!!");
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
+  filter_->onDestroy();
+}
+
 /**
  * Test the value gets written as a number.
  */
@@ -165,6 +215,28 @@ request_rules:
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
   metadata->headers().setCopy(Http::LowerCaseString("X-Number"), "1");
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
+  filter_->onDestroy();
+}
+
+/**
+ * Test the value gets written as a number.
+ */
+TEST_F(HeaderToMetadataTest, BadNumberTypeTest) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-number
+    on_present:
+      metadata_namespace: envoy.lb
+      key: number
+      type: NUMBER
+)EOF";
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  metadata->headers().setCopy(Http::LowerCaseString("X-Number"), "invalid");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -281,30 +353,9 @@ request_rules:
   filter_->onDestroy();
 }
 
-TEST_F(HeaderToMetadataTest, NoMatchSubstituteValueTest) {
-  const std::string request_config_yaml = R"EOF(
-request_rules:
-  - header: x-sub
-    on_present:
-      metadata_namespace: envoy.lb
-      key: subbed
-      regex_value_rewrite:
-        pattern:
-          google_re2: {}
-          regex: "^hello (\\w+)?.*$"
-        substitution: "\\1"
-)EOF";
-  initializeFilter(request_config_yaml);
-  std::map<std::string, std::string> expected = {{"subbed", "does not match"}};
-  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
-
-  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
-  metadata->headers().setCopy(Http::LowerCaseString("X-sub"), "does not match");
-  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
-  filter_->onDestroy();
-}
-
+/*
+ * Set configured value when header is missing.
+ */
 TEST_F(HeaderToMetadataTest, SetMissingValueTest) {
   const std::string request_config_yaml = R"EOF(
 request_rules:
@@ -319,6 +370,28 @@ request_rules:
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
 
   auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
+  filter_->onDestroy();
+}
+
+/**
+ * Missing case is not executed when header is present.
+ */
+TEST_F(HeaderToMetadataTest, NoMissingWhenHeaderIsPresent) {
+  const std::string config = R"EOF(
+request_rules:
+  - header: x-exist
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: version
+      value: hi
+)EOF";
+  initializeFilter(config);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  metadata->headers().setCopy(Http::LowerCaseString("X-Exist"), "hello");
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
@@ -352,6 +425,49 @@ request_rules:
   Http::TestRequestHeaderMapImpl headers{metadata->headers()};
   EXPECT_EQ("", headers.get_(Http::LowerCaseString("X-REMOVE")));
   EXPECT_EQ("remains", headers.get_(Http::LowerCaseString("X-KEEP")));
+  filter_->onDestroy();
+}
+
+/**
+ * No header value does not set any metadata.
+ */
+TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), "");
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
+  filter_->onDestroy();
+}
+
+/**
+ * Header value too long does not set header value as metadata.
+ */
+TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
+  const std::string request_config_yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_present:
+      metadata_namespace: envoy.lb
+      key: version
+)EOF";
+  initializeFilter(request_config_yaml);
+  EXPECT_CALL(req_info_, setDynamicMetadata(_, _)).Times(0);
+
+  auto metadata = std::make_shared<Extensions::NetworkFilters::ThriftProxy::MessageMetadata>();
+  auto length = MAX_HEADER_VALUE_LEN + 1;
+  metadata->headers().setCopy(Http::LowerCaseString("X-VERSION"), std::string(length, 'x'));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_EQ(ThriftProxy::FilterStatus::Continue, filter_->transportBegin(metadata));
   filter_->onDestroy();
 }
 
