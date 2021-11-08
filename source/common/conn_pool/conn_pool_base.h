@@ -49,7 +49,7 @@ public:
 
   // Returns the concurrent stream limit, accounting for if the total stream limit
   // is less than the concurrent stream limit.
-  uint32_t effectiveConcurrentStreamLimit() const {
+  virtual uint32_t effectiveConcurrentStreamLimit() const {
     return std::min(remaining_streams_, concurrent_stream_limit_);
   }
 
@@ -267,6 +267,11 @@ public:
     connecting_stream_capacity_ -= delta;
   }
 
+  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
+    state_.incrConnectingAndConnectedStreamCapacity(delta);
+    connecting_stream_capacity_ += delta;
+  }
+
   // Called when an upstream is ready to serve pending streams.
   void onUpstreamReady();
 
@@ -308,11 +313,6 @@ protected:
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
-
-  void incrConnectingAndConnectedStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
-    connecting_stream_capacity_ += delta;
-  }
 
   Upstream::ClusterConnectivityState& state_;
 
