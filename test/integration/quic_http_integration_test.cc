@@ -204,6 +204,14 @@ public:
   IntegrationCodecClientPtr makeRawHttpConnection(
       Network::ClientConnectionPtr&& conn,
       absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options) override {
+    return makeRawHttp3Connection(std::move(conn), http2_options, true);
+  }
+
+  // Create Http3 codec client with the option not to wait for 1-RTT key establishment.
+  IntegrationCodecClientPtr makeRawHttp3Connection(
+      Network::ClientConnectionPtr&& conn,
+      absl::optional<envoy::config::core::v3::Http2ProtocolOptions> http2_options,
+      bool wait_for_1rtt_key) {
     std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
     cluster->max_response_headers_count_ = 200;
     if (http2_options.has_value()) {
@@ -218,7 +226,8 @@ public:
     // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
     // in-connection version negotiation.
     auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
-                                                          host_description, downstream_protocol_);
+                                                          host_description, downstream_protocol_,
+                                                          wait_for_1rtt_key);
     if (codec->disconnected()) {
       // Connection may get closed during version negotiation or handshake.
       // TODO(#8479) QUIC connection doesn't support in-connection version negotiationPropagate
@@ -386,10 +395,12 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Close the first connection.
   codec_client_->close();
   // Start a second connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
   // Send a complete request on the second connection.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // Ensure 0-RTT was used by second connection.
@@ -414,6 +425,38 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   }
 
   test_server_->waitForCounterEq("http3.quic_version_rfc_v1", 2u);
+
+  // Start the third connection.
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
+  auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  // Without retry, 425 should be forwarded back to the client.
+  EXPECT_EQ("425", response3->headers().getStatusValue());
+  codec_client_->close();
+
+  // Start the fourth connection.
+  codec_client_ = makeRawHttp3Connection(makeClientConnection((lookupPort("http"))), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ false);
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"},
+                                         {":path", "/test/long/url"},
+                                         {":scheme", "http"},
+                                         {":authority", "host"},
+                                         {"Early-Data", "2"}};
+  auto response4 = codec_client_->makeHeaderOnlyRequest(request);
+  waitForNextUpstreamRequest(0);
+  // If the request already has Early-Data header, no additional Early-Data header should be added
+  // and the header should be forwarded as is.
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  // 425 response should be forwarded back to the client.
+  EXPECT_EQ("425", response3->headers().getStatusValue());
+  codec_client_->close();
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support
