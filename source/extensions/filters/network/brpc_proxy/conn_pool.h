@@ -1,8 +1,8 @@
 #pragma once
 
 
-#include "source/extensions/filters/network/brpc_proxy/client.h"
-#include "source/extensions/filters/network/brpc_proxy/codec.h"
+#include "extensions/filters/network/brpc_proxy/client.h"
+#include "extensions/filters/network/brpc_proxy/codec.h"
 
 namespace Envoy {
 namespace Extensions {

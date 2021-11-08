@@ -1,6 +1,5 @@
-#include "source/common/common/assert.h"
-
-#include "source/extensions/filters/network/brpc_proxy/request_manager_impl.h"
+#include "common/common/assert.h"
+#include "extensions/filters/network/brpc_proxy/request_manager_impl.h"
 
 namespace Envoy {
 namespace Extensions {

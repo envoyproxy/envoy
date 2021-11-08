@@ -2,7 +2,7 @@
 
 #include <map>
 
-#include "source/extensions/filters/network/brpc_proxy/request_manager.h"
+#include "extensions/filters/network/brpc_proxy/request_manager.h"
 
 
 namespace Envoy {

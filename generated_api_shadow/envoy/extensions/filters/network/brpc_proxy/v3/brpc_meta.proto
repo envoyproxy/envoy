@@ -1,9 +1,5 @@
 syntax = "proto3";
-
-//package envoy.extensions.filters.network.brpc_proxy.v3;
 package brpc.policy;
-
-
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.brpc_proxy.v3";
 option java_outer_classname = "BrpcMetaProto";
 option java_multiple_files = true;

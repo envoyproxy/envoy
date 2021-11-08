@@ -3,13 +3,12 @@
 #include <cstdint>
 #include <map>
 
-#include "absl/container/node_hash_map.h"
-#include "envoy/thread_local/thread_local_object.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/thread_local_cluster.h"
-#include "source/common/network/filter_impl.h"
-#include "source/common/common/logger.h"
-#include "source/extensions/filters/network/brpc_proxy/client.h"
-#include "source/extensions/filters/network/brpc_proxy/codec_impl.h"
+#include "common/network/filter_impl.h"
+#include "common/common/logger.h"
+#include "extensions/filters/network/brpc_proxy/client.h"
+#include "extensions/filters/network/brpc_proxy/codec_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -103,7 +102,7 @@ private:
 	ClientFactory& client_factory_;
 	Event::Dispatcher& dispatcher_;
 	Upstream::ThreadLocalCluster* cluster_{};
-	absl::node_hash_map<Upstream::HostConstSharedPtr, ClientPtr> client_map_;
+	std::map<Upstream::HostConstSharedPtr, ClientPtr> client_map_;
 };
 } // namespace BrpcProxy
 } // namespace NetworkFilters

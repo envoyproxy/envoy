@@ -3,14 +3,15 @@
 #include <cstdint>
 #include <list>
 #include <string>
+#include <iostream>
 
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/request_manager.h"
+#include "common/buffer/buffer_impl.h"
+#include "extensions/filters/network/brpc_proxy/request_manager.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,7 +1,7 @@
 #include "envoy/event/dispatcher.h"
 
-#include "source/extensions/filters/network/brpc_proxy/conn_pool_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/client_impl.h"
+#include "extensions/filters/network/brpc_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/brpc_proxy/client_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -21,7 +21,7 @@ void ConnInstanceImpl::init(){
 	tls_->set(
 		[this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
 		 if (auto this_shared_ptr = this_weak_ptr.lock()) {
-		    return std::make_shared<ClientWrapper>(this_shared_ptr->client_factory_,dispatcher,this_shared_ptr->cm_.getThreadLocalCluster(this_shared_ptr->cluster_));
+		    return std::make_shared<ClientWrapper>(this_shared_ptr->client_factory_,dispatcher,this_shared_ptr->cm_.get(this_shared_ptr->cluster_));
 		 }
 		 return nullptr;
 	});

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "source/extensions/filters/network/brpc_proxy/message.h"
+#include "extensions/filters/network/brpc_proxy/message.h"
 
 namespace Envoy {
 namespace Extensions {

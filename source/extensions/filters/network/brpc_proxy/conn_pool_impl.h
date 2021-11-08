@@ -3,8 +3,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "source/extensions/filters/network/brpc_proxy/conn_pool.h"
-#include "source/extensions/filters/network/brpc_proxy/client.h"
+#include "extensions/filters/network/brpc_proxy/conn_pool.h"
+#include "extensions/filters/network/brpc_proxy/client.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

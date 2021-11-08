@@ -81,6 +81,7 @@ proto_library(
         "//envoy/extensions/filters/listener/original_src/v3:pkg",
         "//envoy/extensions/filters/listener/proxy_protocol/v3:pkg",
         "//envoy/extensions/filters/listener/tls_inspector/v3:pkg",
+        "//envoy/extensions/filters/network/brpc_proxy/v3:pkg",
         "//envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//envoy/extensions/filters/network/direct_response/v3:pkg",
         "//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg",

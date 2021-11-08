@@ -1,9 +1,9 @@
-#include "source/extensions/filters/network/brpc_proxy/config.h"
-#include "source/extensions/filters/network/brpc_proxy/client_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/conn_pool_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/codec_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/request_manager_impl.h"
-#include "source/extensions/filters/network/brpc_proxy/proxy_filter.h"
+#include "extensions/filters/network/brpc_proxy/config.h"
+#include "extensions/filters/network/brpc_proxy/client_impl.h"
+#include "extensions/filters/network/brpc_proxy/conn_pool_impl.h"
+#include "extensions/filters/network/brpc_proxy/codec_impl.h"
+#include "extensions/filters/network/brpc_proxy/request_manager_impl.h"
+#include "extensions/filters/network/brpc_proxy/proxy_filter.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

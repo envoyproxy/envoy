@@ -34,9 +34,9 @@ envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
-	"//envoy/event:dispatcher_interface",
-	"//envoy/upstream:upstream_interface",
-	"//envoy/network:connection_interface",
+	"//include/envoy/event:dispatcher_interface",
+	"//include/envoy/upstream:upstream_interface",
+	"//include/envoy/network:connection_interface",
 	":message_interface",
     ],
 )
@@ -76,8 +76,8 @@ envoy_cc_library(
     deps = [
 	":client_interface",
 	":codec_lib",
-	"//envoy/upstream:cluster_manager_interface",
-	"//envoy/thread_local:thread_local_object",
+	"//include/envoy/upstream:cluster_manager_interface",
+	"//include/envoy/thread_local:thread_local_interface",
 	"//source/common/common:minimal_logger_lib",
 	"//source/common/network:filter_lib",
     ],
@@ -101,9 +101,9 @@ envoy_cc_library(
     deps = [
 	":client_lib",
         ":conn_pool_interface",
-        "//envoy/thread_local:thread_local_interface",
-        "//envoy/upstream:cluster_manager_interface",
-	"//envoy/event:dispatcher_interface",
+        "//include/envoy/thread_local:thread_local_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
+	"//include/envoy/event:dispatcher_interface",
     ],
 )
 
@@ -123,10 +123,9 @@ envoy_cc_library(
     hdrs = ["proxy_filter.h"],
     deps = [
     	":request_manager_interface",
-	"//envoy/network:connection_interface",
-	"//envoy/network:filter_interface",
-	"//envoy/stats:stats_interface",
-	"//envoy/upstream:cluster_manager_interface",
+	"//include/envoy/network:connection_interface",
+	"//include/envoy/network:filter_interface",
+	"//include/envoy/upstream:cluster_manager_interface",
 	"//source/common/buffer:buffer_lib",
     ],
 )

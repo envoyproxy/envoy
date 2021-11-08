@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/brpc_proxy/proxy_filter.h"
+#include "extensions/filters/network/brpc_proxy/proxy_filter.h"
 
 namespace Envoy {
 namespace Extensions {

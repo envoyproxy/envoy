@@ -1,7 +1,6 @@
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
-
-#include "source/extensions/filters/network/brpc_proxy/codec_impl.h"
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+#include "extensions/filters/network/brpc_proxy/codec_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -17,57 +16,65 @@ void DecoderImpl::decode(Buffer::Instance& data) {
 void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
 	const char* buffer = reinterpret_cast<const char*>(slice.mem_);
 	int64_t remaining = slice.len_;
-	while(remaining || state_ == State::Init){
+	int64_t offset = 0;
+	while(remaining || state_ == State::Complete){
 		switch(state_) {
 		case State::Init: {
-			ENVOY_LOG(trace, "parse new message:");
+			ENVOY_LOG(trace, "parse new message: remaining{}",remaining);
 			msgptr_ = std::make_unique<BrpcMessage>();
 			state_ = State::Head;
-			msgptr_->pre_add(buffer);
 			break;	
 		}
 		case State::Head:{
-			ENVOY_LOG(trace, "parse header:");
-			if(msgptr_->headerReady()){
-				msgptr_->add();
-				msgptr_->pre_add(buffer);
+			ENVOY_LOG(trace, "parse header: remaining {}",remaining);
+			remaining--;
+			offset++;
+			if(msgptr_->headerReady(offset)){
+				msgptr_->append(buffer,offset);
 				msgptr_->onheaderComplete();
+				buffer += offset;
+				offset = 0;
 				state_ = State::Meta;
-			} else {
-				remaining--;
-				buffer++;
-				msgptr_->to_add();
+				if(!msgptr_->has_meta()){
+					state_ = State::Body;
+					if(!msgptr_->has_body()){
+						state_ = State::Complete;
+					}
+				}
 			}
-			break;				
+			break;
 		}
 		case State::Meta:{
-			ENVOY_LOG(trace, "parse meta:");
-			if(msgptr_->metaReady()){
-				msgptr_->add();
-				msgptr_->pre_add(buffer);
-				msgptr_->onmetaComplete();
-				state_ = State::Body;
-			} else {
-				remaining--;
-				buffer++;
-				msgptr_->to_add();
-			}			
+                        ENVOY_LOG(trace, "parse meta: remaining {}", remaining);
+                        remaining--;
+                        offset++;
+                        if(msgptr_->metaReady(offset)){
+                                msgptr_->append(buffer,offset);
+                               	msgptr_->onmetaComplete();
+                                buffer += offset;
+                                offset = 0;
+                                state_ = State::Body;
+				if(!msgptr_->has_body()){
+					state_ = State::Complete;
+				}
+			}
 			break;
 		}
 		case State::Body:{
-			ENVOY_LOG(trace, "parse body:");
-			if(msgptr_->bodyReady()){
-				msgptr_->add();
+			ENVOY_LOG(trace, "parse body: remaining{}",remaining);
+			remaining--;
+			offset++;
+			if(msgptr_->bodyReady(offset)){
+				msgptr_->append(buffer,offset);
 				msgptr_->onbodyComplete();
+				buffer += offset;
+				offset = 0;
 				state_ = State::Complete;
-			} else {
-				remaining--;
-				buffer++;
-				msgptr_->to_add();
-			}			
-			break;			
+			}
+			break;
 		}
 		case State::Complete: {
+			ENVOY_LOG(trace, "parse complete:"); 
 			callbacks_.onMessage(std::move(msgptr_));
 			state_ = State::Init;
 			break;
@@ -76,7 +83,9 @@ void DecoderImpl::parseSlice(const Buffer::RawSlice& slice) {
 			throw ProtocolError("invalid state");
 		}
 	}
-	msgptr_->add();
+	if(offset){
+		msgptr_->append(buffer,offset);
+	}
 }
 
 

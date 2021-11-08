@@ -1,4 +1,4 @@
-#include "source/extensions/filters/network/brpc_proxy/client_impl.h"
+#include "extensions/filters/network/brpc_proxy/client_impl.h"
 #include "envoy/extensions/filters/network/brpc_proxy/v3/brpc_proxy.pb.h"
 
 namespace Envoy {
@@ -25,8 +25,21 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host,
 }
 
 ClientImpl::~ClientImpl() {
-	ASSERT(pending_requests_.empty());
-	ASSERT(connection_->state() == Network::Connection::State::Closed);
+	auto it = pending_requests_.begin();
+	while(it != pending_requests_.end()){
+		PendingRequestPtr& request = it->second;
+		if (!request->canceled_) {
+			request->callbacks_.onResponse(BrpcMessagePtr {new BrpcMessage(500, "connection closed", it->first)});
+		} else {
+			host_->cluster().stats().upstream_rq_cancelled_.inc();
+		}
+		it++;
+	}
+	pending_requests_.clear();
+	close();
+
+	//ASSERT(pending_requests_.empty());
+	//ASSERT(connection_->state() == Network::Connection::State::Closed);
 }
 
 void ClientImpl::close() { connection_->close(Network::ConnectionCloseType::NoFlush); }
@@ -63,12 +76,14 @@ void ClientImpl::onEvent(Network::ConnectionEvent event) {
 			} else {
 				host_->cluster().stats().upstream_rq_cancelled_.inc();
 			}
+			it++;
 		  }
 		  pending_requests_.clear();
 		}
 	} else if (event == Network::ConnectionEvent::Connected) {
 		connected_ = true;
 		ASSERT(!pending_requests_.empty());
+		connection_->write(encoder_buffer_, false);
 	}
 
 	if (event == Network::ConnectionEvent::RemoteClose && !connected_) {
@@ -118,6 +133,7 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host, Event::Di
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},decoder_factory_);
   return client;
 }
+
 
 ClientPtr& ClientWrapper::getClient(Upstream::HostConstSharedPtr host) {
 	ClientPtr& client = client_map_[host];

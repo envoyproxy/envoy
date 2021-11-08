@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/extensions/filters/network/brpc_proxy/conn_pool.h"
+#include "extensions/filters/network/brpc_proxy/conn_pool.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

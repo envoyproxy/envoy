@@ -1,8 +1,7 @@
 #pragma once
 
-#include "source/common/buffer/buffer_impl.h"
-
-#include "source/extensions/filters/network/brpc_proxy/codec.h"
+#include "common/buffer/buffer_impl.h"
+#include "extensions/filters/network/brpc_proxy/codec.h"
 
 
 namespace Envoy {
