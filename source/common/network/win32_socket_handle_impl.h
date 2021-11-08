@@ -60,9 +60,6 @@ private:
   Api::IoCallUint64Result readvFromPeekBuffer(uint64_t max_length, Buffer::RawSlice* slices,
                                               uint64_t num_slice);
   Api::IoCallUint64Result peekFromPeekBuffer(void* buffer, size_t length);
-
-  Api::IoCallUint64Result readvImpl(uint64_t max_length, Buffer::RawSlice* slices,
-                                    uint64_t num_slice);
 };
 } // namespace Network
 } // namespace Envoy

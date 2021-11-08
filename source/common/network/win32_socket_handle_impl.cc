@@ -123,13 +123,11 @@ void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64
 
 Api::IoCallUint64Result Win32SocketHandleImpl::drainToPeekBuffer() {
   while (true) {
-    Buffer::OwnedImpl read_buffer;
-    Buffer::Reservation reservation = read_buffer.reserveForRead();
+    Buffer::Reservation reservation = peek_buffer_->reserveForRead();
     Api::IoCallUint64Result result = IoSocketHandleImpl::readv(
         reservation.length(), reservation.slices(), reservation.numSlices());
     uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
     reservation.commit(bytes_to_commit);
-    peek_buffer_->add(read_buffer);
     if (!result.ok() || bytes_to_commit == 0) {
       return result;
     }
@@ -164,7 +162,6 @@ Api::IoCallUint64Result Win32SocketHandleImpl::readFromPeekBuffer(Buffer::Instan
                                                                   size_t length) {
   auto lenght_to_move = std::min(peek_buffer_->length(), static_cast<uint64_t>(length));
   buffer.move(*peek_buffer_, lenght_to_move);
-  peek_buffer_->drain(lenght_to_move);
   return Api::IoCallUint64Result(lenght_to_move, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
 }
 
