@@ -1618,6 +1618,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       current_priority_hosts.size());
   // Keep track of hosts we're adding (or replacing)
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
+  // Keep track of hosts for which locality is changed.
+  absl::flat_hash_set<std::string> existing_hosts_for_current_priority_locality_changed(
+      current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     // To match a new host with an existing host means comparing their addresses.
@@ -1634,13 +1637,24 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
     //   but the health check address is different.
-    const bool skip_inplace_host_update =
-        health_checker_ != nullptr && existing_host_found &&
-        *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
+    const bool health_check_address_changed =
+        (health_checker_ != nullptr && existing_host_found &&
+         *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
 
-    // When there is a match and we decided to do in-place update, we potentially update the host's
-    // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
-    // i.e. hosts that should be preserved in the current priority.
+    const bool locality_changed =
+        (existing_host_found &&
+         ((host->locality().region() != existing_host->second->locality().region()) ||
+          (host->locality().zone() != existing_host->second->locality().zone()) ||
+          (host->locality().sub_zone() != existing_host->second->locality().sub_zone())));
+    if (locality_changed) {
+      existing_hosts_for_current_priority_locality_changed.emplace(existing_host->first);
+    }
+
+    const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
+
+    // When there is a match and we decided to do in-place update, we potentially update the
+    // host's health check flag and metadata. Afterwards, the host is pushed back into the
+    // final_hosts, i.e. hosts that should be preserved in the current priority.
     if (existing_host_found && !skip_inplace_host_update) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
@@ -1749,8 +1763,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&all_new_hosts, &new_hosts_for_current_priority, &final_hosts,
+                       [&all_new_hosts, &new_hosts_for_current_priority,
+                        &existing_hosts_for_current_priority_locality_changed, &final_hosts,
                         &max_host_weight](const HostSharedPtr& p) {
+                         // This host is being added as a new host, total replacement
+                         // remove the older host
+                         if (existing_hosts_for_current_priority_locality_changed.contains(
+                                 p->address()->asString())) {
+                           return false;
+                         }
+
                          if (all_new_hosts.contains(p->address()->asString()) &&
                              !new_hosts_for_current_priority.contains(p->address()->asString())) {
                            // If the address is being completely deleted from this priority, but is
@@ -1758,6 +1780,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
                            // priority will perform an in-place update to re-use the existing Host.
                            // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
                            // instead remove it immediately from this priority.
+                           // Example: health check address changed and priority also changed
                            return false;
                          }
 
