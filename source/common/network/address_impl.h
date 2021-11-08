@@ -45,6 +45,12 @@ InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, sock
                                                 os_fd_t fd, bool v6only = true);
 
 /**
+ * Return the address type in string_view. The returned type name is used by calling
+ * ClientConnectionFactory.
+ */
+absl::string_view addressType(const Network::Address::InstanceConstSharedPtr& addr);
+
+/**
  * Base class for all address types.
  */
 class InstanceBase : public Instance {

@@ -24,6 +24,7 @@
 #include "source/common/event/signal_impl.h"
 #include "source/common/event/timer_impl.h"
 #include "source/common/filesystem/watcher_impl.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -151,25 +152,9 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
                                        const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(isThreadSafe());
 
-  auto address_type_name = [](const Network::Address::InstanceConstSharedPtr& addr) {
-    ASSERT(addr != nullptr);
-    switch (addr->type()) {
-    // TODO: create IP and
-    case Network::Address::Type::Ip:
-    case Network::Address::Type::Pipe:
-      return "does-not-exist";
-    case Network::Address::Type::EnvoyInternal:
-      return "EnvoyInternal";
-    }
-  };
-  // TODO: register and find by address type instead of name.
   auto factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
-      address_type_name(address));
-  if (factory == nullptr) {
-    // get rid of this once the ip and pipe factory is offered.
-    return std::make_unique<Network::ClientConnectionImpl>(*this, address, source_address,
-                                                           std::move(transport_socket), options);
-  }
+      std::string(Network::Address::addressType(address)));
+  // The caller expects a non-null connection as of today. A unsupported address will crash any way.
   return factory->createClientConnection(*this, address, source_address,
                                          std::move(transport_socket), options);
 }

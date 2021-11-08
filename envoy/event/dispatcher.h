@@ -226,7 +226,7 @@ public:
 
   /**
    * @brief Get the Internal Listener Manager object.
-   * 
+   *
    * @return the registered internal istener manager or nullopt.
    */
   virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;

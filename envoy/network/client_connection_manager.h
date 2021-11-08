@@ -9,11 +9,13 @@
 namespace Envoy {
 namespace Network {
 
-class ClientConnectionFactory : public Config::UntypedFactory{
+class ClientConnectionFactory : public Config::UntypedFactory {
 public:
+  ClientConnectionFactory() = default;
   virtual ~ClientConnectionFactory() = default;
-  std::string category() { return "network.connection"; }
-  virtual std::string name() PURE;
+
+  // Config::UntypedFactory
+  std::string category() const override { return "network.connection"; }
 
   virtual Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,

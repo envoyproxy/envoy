@@ -7,15 +7,19 @@
 #include "envoy/network/client_connection_manager.h"
 #include "envoy/network/connection.h"
 
+#include "source/common/common/logger.h"
+
 namespace Envoy {
 
 namespace Extensions {
 namespace IoSocket {
 namespace UserSpace {
 
-class InternalClientConnectionFactory : public Network::ClientConnectionFactory {
+class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
+                                        Logger::Loggable<Logger::Id::connection> {
 public:
-  std::string name() override { return "EnvoyInternal"; }
+  ~InternalClientConnectionFactory() = default;
+  std::string name() const override { return "EnvoyInternal"; }
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,
                          Network::Address::InstanceConstSharedPtr address,

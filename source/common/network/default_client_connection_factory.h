@@ -10,7 +10,8 @@ namespace Network {
 
 class DefaultClientConnectionFactory : public Network::ClientConnectionFactory {
 public:
-  std::string name() override { return "default"; }
+  ~DefaultClientConnectionFactory() = default;
+  std::string name() const override { return "default"; }
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,
                          Network::Address::InstanceConstSharedPtr address,
