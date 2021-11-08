@@ -264,10 +264,10 @@ message SubjectAltNameMatcher {
     EMAIL = 1;                // rfc822Name [1]
     DNS = 2;                  // dNSName [2]
     URI = 3;                  // uniformResourceIdentifier [6]
-    IP_ADDRESS = 4;           // iPAdress [7]
+    IP_ADDRESS = 4;           // iPAddress [7]
   }
 
-  // Speficification of type of SAN.
+  // Specification of type of SAN.
   SanType san_type = 1 [(validate.rules).enum = {in: [1, 2, 3, 4]}];
 
   // Matcher for SAN value.
