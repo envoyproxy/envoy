@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.listener.tls_inspector.v3;
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 
@@ -18,6 +20,6 @@ message TlsInspector {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspector";
 
-  // Populate `JA3` fingerprint hash using data from the TLS Client Hello packet.
-  bool enable_ja3_fingerprinting = 1;
+  // Populate `JA3` fingerprint hash using data from the TLS Client Hello packet.  Default is false.
+  google.protobuf.BoolValue enable_ja3_fingerprinting = 1;
 }

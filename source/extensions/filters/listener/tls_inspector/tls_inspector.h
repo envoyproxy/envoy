@@ -66,7 +66,7 @@ public:
 private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
-  const bool enable_ja3_fingerprinting_;
+  bool enable_ja3_fingerprinting_;
   const uint32_t max_client_hello_size_;
 };
 
