@@ -3775,6 +3775,7 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
@@ -3787,6 +3788,7 @@ TEST_F(RouterTest, Coalesce1xxHeaders) {
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
@@ -3828,6 +3830,7 @@ TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
   EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decode1xxHeaders(std::move(continue_headers));
   EXPECT_EQ(
       1U,
