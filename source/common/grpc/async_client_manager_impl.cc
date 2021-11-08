@@ -168,26 +168,27 @@ void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
 
 RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
     const envoy::config::core::v3::GrpcService& config) {
-  RawAsyncClientSharedPtr client;
   auto it = lru_map_.find(config);
-  if (it != lru_map_.end()) {
-    auto cache_entry = it->second;
-    // Reset the eviction timer if the next entry to expire is accessed.
-    bool should_reset_timer = (cache_entry == --lru_list_.end());
-    cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
-    // Move the cache entry to the beginning of the list upon access.
-    lru_list_.splice(lru_list_.begin(), lru_list_, cache_entry);
-    // Get the cached async client before any cache eviction.
-    client = cache_entry->client_;
-    if (should_reset_timer) {
-      evictEntriesAndResetEvictionTimer();
-    }
+  if (it == lru_map_.end()) {
+    return nullptr;
+  }
+  const auto cache_entry = it->second;
+  // Reset the eviction timer if the next entry to expire is accessed.
+  const bool should_reset_timer = (cache_entry == --lru_list_.end());
+  cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
+  // Move the cache entry to the beginning of the list upon access.
+  lru_list_.splice(lru_list_.begin(), lru_list_, cache_entry);
+  // Get the cached async client before any cache eviction.
+  RawAsyncClientSharedPtr client = cache_entry->client_;
+  if (should_reset_timer) {
+    evictEntriesAndResetEvictionTimer();
   }
   return client;
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTimer() {
   MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+  // Evict all the entries that have expired.
   while (!lru_list_.empty()) {
     MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
     if (now >= next_expire) {
@@ -195,7 +196,6 @@ void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTi
       lru_map_.erase(lru_list_.back().config_);
       lru_list_.pop_back();
     } else {
-      // Evict in a while loop because now timestamp keep changing, make sure next_expire > now
       cache_eviction_timer_->enableTimer(
           std::chrono::duration_cast<std::chrono::seconds>(next_expire - now));
       return;

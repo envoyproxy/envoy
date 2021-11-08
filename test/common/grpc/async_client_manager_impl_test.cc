@@ -55,10 +55,10 @@ TEST_F(RawAsyncClientCacheTest, CacheEviction) {
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
   waitForSeconds(49);
-  // Cache entry hasn't been evicted because it was created 45s ago.
+  // Cache entry hasn't been evicted because it was created 49s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(49);
-  // Cache entry hasn't been evicted because it was accessed 45s ago.
+  // Cache entry hasn't been evicted because it was accessed 49s ago.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   waitForSeconds(51);
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), nullptr);
@@ -89,13 +89,15 @@ TEST_F(RawAsyncClientCacheTest, MultipleCacheEntriesEviction) {
   }
 }
 
-TEST_F(RawAsyncClientCacheTest, GetTimeoutButNotEvictedCacheEntry) {
+// Test the case when the eviction timer doesn't fire on time, getting the oldest entry that has
+// already expired but hasn't been evicted should succeed.
+TEST_F(RawAsyncClientCacheTest, GetExpiredButNotEvictedCacheEntry) {
   envoy::config::core::v3::GrpcService foo_service;
   foo_service.mutable_envoy_grpc()->set_cluster_name("foo");
   RawAsyncClientSharedPtr foo_client = std::make_shared<MockAsyncClient>();
   client_cache_.setCache(foo_service, foo_client);
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(50));
-  // Cache entry doesn't get evicted because it is accessed before timer fire.
+  // Cache entry hasn't been evicted because it is accessed before timer fire.
   EXPECT_EQ(client_cache_.getCache(foo_service).get(), foo_client.get());
   time_system_.advanceTimeAndRun(std::chrono::seconds(50), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
