@@ -152,7 +152,7 @@ void EnvoyQuicClientSession::setHttp3Options(
     return;
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
-      ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {
