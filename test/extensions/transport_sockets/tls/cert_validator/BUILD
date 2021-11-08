@@ -67,5 +67,6 @@ envoy_cc_test(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets/tls/cert_validator:cert_validator_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

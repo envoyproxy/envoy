@@ -257,18 +257,17 @@ message CertificateProviderPluginInstance {
 // Matcher for subject alternative names, to match both type and value of the SAN.
 message SubjectAltNameMatcher {
   // Indicates the choice of GeneralName as defined in section 4.2.1.5 of RFC 5280 to match
-  // against. See corresponding names and indices from the spec for the enums in the
-  // comments next to the values below.
+  // against.
   enum SanType {
-    SAN_TYPE_UNSPECIFIED = 0; // Default, invalid value.
-    EMAIL = 1;                // rfc822Name [1]
-    DNS = 2;                  // dNSName [2]
-    URI = 3;                  // uniformResourceIdentifier [6]
-    IP_ADDRESS = 4;           // iPAddress [7]
+    SAN_TYPE_UNSPECIFIED = 0;
+    EMAIL = 1;
+    DNS = 2;
+    URI = 3;
+    IP_ADDRESS = 4;
   }
 
-  // Specification of type of SAN.
-  SanType san_type = 1 [(validate.rules).enum = {in: [1, 2, 3, 4]}];
+  // Specification of type of SAN. Note that the default enum value is an invalid choice.
+  SanType san_type = 1 [(validate.rules).enum = {in: 1 in: 2 in: 3 in: 4}];
 
   // Matcher for SAN value.
   type.matcher.v3.StringMatcher matcher = 2;

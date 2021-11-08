@@ -1,9 +1,8 @@
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.validate.h"
 
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
-
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 
 #include "test/test_common/utility.h"
 
