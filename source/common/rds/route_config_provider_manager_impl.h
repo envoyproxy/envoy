@@ -23,20 +23,19 @@ public:
   RouteConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_tracker_key);
 
   void eraseStaticProvider(RouteConfigProvider* provider) override;
-
-  void eraseDynamicProvider(int64_t manager_identifier) override;
+  void eraseDynamicProvider(uint64_t manager_identifier) override;
 
   std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
   dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const;
 
-protected:
-  void insertStaticProvider(RouteConfigProvider* provider);
-  void insertDynamicProvider(int64_t manager_identifier, RouteConfigProviderSharedPtr provider,
-                             const Init::Target* init_target, Init::Manager& init_manager);
-
-  RouteConfigProviderSharedPtr reuseDynamicProvider(uint64_t manager_identifier,
-                                                    Init::Manager& init_manager,
-                                                    const std::string& route_config_name);
+  RouteConfigProviderPtr
+  addStaticProvider(std::function<RouteConfigProviderPtr()> create_static_provider);
+  RouteConfigProviderSharedPtr
+  addDynamicProvider(const Protobuf::Message& rds, const std::string& route_config_name,
+                     Init::Manager& init_manager,
+                     std::function<std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(
+                         uint64_t manager_identifier)>
+                         create_dynamic_provider);
 
 private:
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
@@ -46,6 +45,10 @@ private:
       dynamic_route_config_providers_;
   absl::node_hash_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+
+  RouteConfigProviderSharedPtr reuseDynamicProvider(uint64_t manager_identifier,
+                                                    Init::Manager& init_manager,
+                                                    const std::string& route_config_name);
 };
 
 } // namespace Rds

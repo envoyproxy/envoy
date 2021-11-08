@@ -216,33 +216,30 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
-    : Rds::RouteConfigProviderManagerImpl(admin, "routes") {}
+    : manager_(admin, "routes") {}
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
-  // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  const uint64_t manager_identifier = MessageUtil::hash(rds);
-  auto existing_provider =
-      reuseDynamicProvider(manager_identifier, init_manager, rds.route_config_name());
-
-  if (existing_provider) {
-    ASSERT(dynamic_cast<RouteConfigProvider*>(existing_provider.get()));
-    return std::static_pointer_cast<RouteConfigProvider>(existing_provider);
-  }
-  auto config_update = new RouteConfigUpdateReceiverImpl(factory_context, optional_http_filters);
-  auto resource_decoder =
-      new Envoy::Config::OpaqueResourceDecoderImpl<envoy::config::route::v3::RouteConfiguration>(
-          factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
-  auto subscription =
-      new RdsRouteConfigSubscription(config_update, resource_decoder, rds, manager_identifier,
-                                     factory_context, stat_prefix, *this);
-  auto new_provider = std::make_shared<RdsRouteConfigProviderImpl>(subscription, factory_context);
-  insertDynamicProvider(manager_identifier, new_provider,
-                        &new_provider->subscription().initTarget(), init_manager);
-  return new_provider;
+  auto provider = manager_.addDynamicProvider(
+      rds, rds.route_config_name(), init_manager,
+      [&optional_http_filters, &factory_context, &rds, &stat_prefix,
+       this](uint64_t manager_identifier) {
+        auto config_update =
+            new RouteConfigUpdateReceiverImpl(factory_context, optional_http_filters);
+        auto resource_decoder = new Envoy::Config::OpaqueResourceDecoderImpl<
+            envoy::config::route::v3::RouteConfiguration>(
+            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
+        auto subscription =
+            new RdsRouteConfigSubscription(config_update, resource_decoder, rds, manager_identifier,
+                                           factory_context, stat_prefix, manager_);
+        auto provider = std::make_shared<RdsRouteConfigProviderImpl>(subscription, factory_context);
+        return std::make_pair(provider, &provider->subscription().initTarget());
+      });
+  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
+  return std::static_pointer_cast<RouteConfigProvider>(provider);
 }
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
@@ -250,11 +247,14 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
     const OptionalHttpFilters& optional_http_filters,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
-  ConfigTraitsImpl config_traits(optional_http_filters, factory_context, validator, true);
-  auto provider = std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits,
-                                                                  factory_context, *this);
-  insertStaticProvider(provider.get());
-  return provider;
+  auto provider = manager_.addStaticProvider(
+      [&optional_http_filters, &factory_context, &validator, &route_config, this]() {
+        ConfigTraitsImpl config_traits(optional_http_filters, factory_context, validator, true);
+        return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits,
+                                                               factory_context, manager_);
+      });
+  ASSERT(dynamic_cast<RouteConfigProvider*>(provider.get()));
+  return RouteConfigProviderPtr(static_cast<RouteConfigProvider*>(provider.release()));
 }
 
 } // namespace Router

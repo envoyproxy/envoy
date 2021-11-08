@@ -14,7 +14,7 @@ public:
   virtual ~RouteConfigProviderManager() = default;
 
   virtual void eraseStaticProvider(RouteConfigProvider* provider) PURE;
-  virtual void eraseDynamicProvider(int64_t manager_identifier) PURE;
+  virtual void eraseDynamicProvider(uint64_t manager_identifier) PURE;
 };
 
 } // namespace Rds

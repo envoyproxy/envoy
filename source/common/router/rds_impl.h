@@ -182,10 +182,14 @@ private:
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
-                                       public Singleton::Instance,
-                                       public Rds::RouteConfigProviderManagerImpl {
+                                       public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
+
+  std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
+  dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const {
+    return manager_.dumpRouteConfigs(name_matcher);
+  }
 
   // RouteConfigProviderManager
   RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
@@ -199,6 +203,9 @@ public:
                                   const OptionalHttpFilters& optional_http_filters,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator) override;
+
+private:
+  Rds::RouteConfigProviderManagerImpl manager_;
 };
 
 using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;

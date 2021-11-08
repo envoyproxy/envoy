@@ -17,7 +17,7 @@ void RouteConfigProviderManagerImpl::eraseStaticProvider(RouteConfigProvider* pr
   static_route_config_providers_.erase(provider);
 }
 
-void RouteConfigProviderManagerImpl::eraseDynamicProvider(int64_t manager_identifier) {
+void RouteConfigProviderManagerImpl::eraseDynamicProvider(uint64_t manager_identifier) {
   dynamic_route_config_providers_.erase(manager_identifier);
 }
 
@@ -59,18 +59,30 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
   return config_dump;
 }
 
-void RouteConfigProviderManagerImpl::insertStaticProvider(RouteConfigProvider* provider) {
-  static_route_config_providers_.insert(provider);
+RouteConfigProviderPtr RouteConfigProviderManagerImpl::addStaticProvider(
+    std::function<RouteConfigProviderPtr()> create_static_provider) {
+  auto provider = create_static_provider();
+  static_route_config_providers_.insert(provider.get());
+  return provider;
 }
 
-void RouteConfigProviderManagerImpl::insertDynamicProvider(int64_t manager_identifier,
-                                                           RouteConfigProviderSharedPtr provider,
-                                                           const Init::Target* init_target,
-                                                           Init::Manager& init_manager) {
-  init_manager.add(*init_target);
-  dynamic_route_config_providers_.insert(
-      {manager_identifier,
-       std::make_pair(std::weak_ptr<RouteConfigProvider>(provider), init_target)});
+RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::addDynamicProvider(
+    const Protobuf::Message& rds, const std::string& route_config_name, Init::Manager& init_manager,
+    std::function<
+        std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(uint64_t manager_identifier)>
+        create_dynamic_provider) {
+  // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
+  const uint64_t manager_identifier = MessageUtil::hash(rds);
+  auto existing_provider =
+      reuseDynamicProvider(manager_identifier, init_manager, route_config_name);
+
+  if (existing_provider) {
+    return existing_provider;
+  }
+  auto new_provider = create_dynamic_provider(manager_identifier);
+  init_manager.add(*new_provider.second);
+  dynamic_route_config_providers_.insert({manager_identifier, new_provider});
+  return new_provider.first;
 }
 
 RouteConfigProviderSharedPtr
