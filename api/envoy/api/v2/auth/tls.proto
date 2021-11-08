@@ -85,8 +85,10 @@ message DownstreamTlsContext {
   // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
   // <https://tools.ietf.org/html/rfc5077#section-5.6>`
   // only seconds could be specified (fractional seconds are going to be ignored).
-  google.protobuf.Duration session_timeout = 6
-      [(validate.rules).duration = {lt {seconds: 4294967296} gte {}}];
+  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 }
 
 // TLS context shared by both client and server TLS contexts.

@@ -172,7 +172,10 @@ message Bootstrap {
   // can be set.
   // Duration must be at least 1ms and at most 5 min.
   google.protobuf.Duration stats_flush_interval = 7 [
-    (validate.rules).duration = {lt {seconds: 300} gte {nanos: 1000000}},
+    (validate.rules).duration = {
+      lt {seconds: 300}
+      gte {nanos: 1000000}
+    },
     (udpa.annotations.field_migrate).oneof_promotion = "stats_flush"
   ];
 

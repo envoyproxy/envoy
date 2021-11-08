@@ -30,8 +30,10 @@ message DnsTable {
     // Envoy will return one randomly chosen entry from this list in the
     // DNS response. The random index will vary per query so that we prevent
     // clients pinning on a single address for a configured domain
-    repeated string address = 1
-        [(validate.rules).repeated = {min_items: 1 items {string {min_len: 3}}}];
+    repeated string address = 1 [(validate.rules).repeated = {
+      min_items: 1
+      items {string {min_len: 3}}
+    }];
   }
 
   // This message type is extensible and can contain a list of addresses

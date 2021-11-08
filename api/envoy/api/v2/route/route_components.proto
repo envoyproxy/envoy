@@ -1049,7 +1049,10 @@ message RetryPolicy {
     // than zero. Values less than 1 ms are rounded up to 1 ms.
     // See :ref:`config_http_filters_router_x-envoy-max-retries` for a discussion of Envoy's
     // back-off algorithm.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {required: true gt {}}];
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {}
+    }];
 
     // Specifies the maximum interval between retries. This parameter is optional, but must be
     // greater than or equal to the `base_interval` if set. The default is 10 times the

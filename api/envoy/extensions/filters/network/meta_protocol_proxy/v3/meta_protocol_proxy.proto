@@ -68,7 +68,7 @@ message MetaProtocolFilter {
 
   // Filter specific configuration which depends on the filter being instantiated. See the
   // supported filters for further documentation.
-  config.core.v3.TypedExtensionConfig config = 2;
+  core.v3.TypedExtensionConfig config = 2;
 }
 
 // [#not-implemented-hide:]
@@ -77,5 +77,5 @@ message Codec {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Codec specific configuration which depends on the codec being instantiated.
-  config.core.v3.TypedExtensionConfig config = 2;
+  core.v3.TypedExtensionConfig config = 2;
 }
