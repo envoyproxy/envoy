@@ -450,8 +450,10 @@ public:
   /**
    * Called with 1xx headers to be encoded.
    *
+   * Currently supported codes for this function include 100.
+   *
    * This is not folded into encodeHeaders because most Envoy users and filters will not be proxying
-   * 10s and with it split out, can ignore the complexity of multiple encodeHeaders calls.
+   * 1xx headers and with it split out, can ignore the complexity of multiple encodeHeaders calls.
    *
    * This is currently only called once per request but implementations should
    * handle multiple calls as multiple 1xx headers are legal.

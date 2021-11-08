@@ -143,8 +143,8 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
-  // We unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client as
-  // part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
+  // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
+  // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
   //
   // We could in principle handle other headers here, but this might result in the double invocation
   // of decodeHeaders() (once for informational, again for non-informational), which is likely an

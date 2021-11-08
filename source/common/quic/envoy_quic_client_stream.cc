@@ -176,7 +176,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     set_headers_decompressed(false);
   }
 
-  bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
+  const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
     decoded_1xx_ = true;
