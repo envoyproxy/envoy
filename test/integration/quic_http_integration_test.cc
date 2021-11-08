@@ -821,9 +821,9 @@ TEST_P(QuicHttpIntegrationTest, NoStreams) {
   // Tighten the stream idle timeout, as it defaults to 5m
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-hcm) -> void {
-    hcm.mutable_stream_idle_timeout()->set_seconds(0);
-    hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
+              hcm) -> void {
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(400 * 1000 * 1000);
       });
 
   // Set the fake upstream to start with 0 streams available.
