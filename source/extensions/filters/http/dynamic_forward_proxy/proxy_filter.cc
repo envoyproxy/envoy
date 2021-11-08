@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -12,7 +13,20 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace DynamicForwardProxy {
+namespace {
 
+void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, const std::string& key) {
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks->streamInfo().filterState();
+  auto timing = std::make_unique<StreamInfo::UInt64AccessorImpl>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          decoder_callbacks->dispatcher().timeSource().monotonicTime().time_since_epoch())
+          .count());
+  filter_state->setData(key, std::move(timing), StreamInfo::FilterState::StateType::Mutable,
+                        StreamInfo::FilterState::LifeSpan::Request);
+}
+
+} // namespace
 struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
@@ -46,6 +60,8 @@ void ProxyFilter::onDestroy() {
 }
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  latchTime(decoder_callbacks_, dnsStart());
+
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
   if (!route || !(route_entry = route->routeEntry())) {
@@ -132,6 +148,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
       addHostAddressToFilterState(host.value()->address());
     }
 
+    latchTime(decoder_callbacks_, dnsEnd());
     return Http::FilterHeadersStatus::Continue;
   }
   case LoadDnsCacheEntryStatus::Loading:
@@ -183,6 +200,7 @@ void ProxyFilter::onLoadDnsCacheComplete(
     const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) {
   ENVOY_STREAM_LOG(debug, "load DNS cache complete, continuing after adding resolved host: {}",
                    *decoder_callbacks_, host_info->resolvedHost());
+  latchTime(decoder_callbacks_, dnsEnd());
   ASSERT(circuit_breaker_ != nullptr);
   circuit_breaker_.reset();
 

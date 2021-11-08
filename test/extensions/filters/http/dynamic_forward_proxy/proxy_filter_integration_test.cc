@@ -43,6 +43,10 @@ typed_config:
                                            max_hosts, max_pending_requests, filename);
     config_helper_.prependFilter(filter);
 
+    config_helper_.prependFilter(fmt::format(R"EOF(
+name: stream-info-to-headers-filter
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
@@ -174,12 +178,18 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   checkSimpleRequestSuccess(1024, 1024, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+  // Make sure dns timings are tracked for cache-misses.
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
 
   // Now send another request. This should hit the DNS cache.
   response = sendRequestAndWaitForResponse(request_headers, 512, default_response_headers_, 512);
   checkSimpleRequestSuccess(512, 512, response.get());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.host_added")->value());
+  // Make sure dns timings are tracked for cache-hits.
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_start")).empty());
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
 }
 
 // Currently if the first DNS resolution fails, the filter will continue with

@@ -51,6 +51,13 @@ class ProxyFilter
 public:
   ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
 
+  static const std::string& dnsStart() {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.dynamic_forward_proxy.dns_start_ms");
+  }
+  static const std::string& dnsEnd() {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.dynamic_forward_proxy.dns_end_ms");
+  }
+
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
