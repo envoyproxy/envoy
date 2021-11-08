@@ -39,7 +39,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-using FilterConfigProviderManager = Filter::FilterConfigProviderManager;
+using FilterConfigProviderManager = Filter::FilterConfigProviderManager<Http::FilterFactoryCb>;
 
 /**
  * Config registration for the HTTP connection manager filter. @see NamedNetworkFilterConfigFactory.
@@ -125,7 +125,7 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
-  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr>;
+  using FilterFactoriesList = std::list<Filter::FilterConfigProviderPtr<Http::FilterFactoryCb>>;
   struct FilterConfig {
     std::unique_ptr<FilterFactoriesList> filter_factories;
     bool allow_upgrade;

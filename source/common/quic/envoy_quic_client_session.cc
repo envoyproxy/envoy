@@ -5,21 +5,6 @@
 
 #include "quic_filter_manager_connection_impl.h"
 
-namespace quic {
-namespace test {
-
-// TODO(alyssawilk) add the necessary accessors to quiche and remove this.
-class QuicSessionPeer {
-public:
-  static quic::QuicStreamIdManager&
-  getStreamIdManager(Envoy::Quic::EnvoyQuicClientSession* session) {
-    return session->ietf_streamid_manager_.bidirectional_stream_id_manager_;
-  }
-};
-
-} // namespace test
-} // namespace quic
-
 namespace Envoy {
 namespace Quic {
 
@@ -135,9 +120,11 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
 }
 
 uint64_t EnvoyQuicClientSession::streamsAvailable() {
-  quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
-  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
-  uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
+  const quic::UberQuicStreamIdManager& manager = ietf_streamid_manager();
+  ASSERT(manager.max_outgoing_bidirectional_streams() >=
+         manager.outgoing_bidirectional_stream_count());
+  uint32_t streams_available =
+      manager.max_outgoing_bidirectional_streams() - manager.outgoing_bidirectional_stream_count();
   return streams_available;
 }
 
