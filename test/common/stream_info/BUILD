@@ -74,3 +74,11 @@ envoy_cc_test(
         "//source/common/stream_info:uint32_accessor_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "uint64_accessor_impl_test",
+    srcs = ["uint64_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:uint64_accessor_lib",
+    ],
+)
