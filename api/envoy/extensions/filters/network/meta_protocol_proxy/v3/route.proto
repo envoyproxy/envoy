@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.meta_protocol_proxy.v3;
 
+import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
@@ -11,7 +12,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_proto
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).work_in_progress = true;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol Proxy Route Configuration]
 

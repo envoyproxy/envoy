@@ -1,4 +1,3 @@
-
 syntax = "proto3";
 
 package envoy.extensions.filters.network.meta_protocol_proxy.v3;
@@ -7,7 +6,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.proto";
 
-import "google/protobuf/any.proto";
+import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -16,7 +15,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_proto
 option java_outer_classname = "MetaProtocolProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).work_in_progress = true;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol proxy]
 // Meta Protocol proxy.

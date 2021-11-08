@@ -4,14 +4,16 @@ package envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3;
 
 import "envoy/config/route/v3/route_components.proto";
 
+import "xds/annotations/v3/status.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3";
-option java_outer_classname = "RouteActionProto";
+option java_outer_classname = "ActionProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).work_in_progress = true;
+option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Meta Protocol Proxy Route Action Configuration]
 
@@ -29,5 +31,4 @@ message RouteAction {
     // Currently ClusterWeight only supports the name and weight fields.
     config.route.v3.WeightedCluster weighted_clusters = 2;
   }
-  //TODO other configuration: RetryPolicy, Mirroring, Fault Injection, etc.
 }
