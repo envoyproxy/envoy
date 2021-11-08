@@ -75,6 +75,8 @@ PeekState ListenerFilterBufferImpl::peekFromSocket() {
     return PeekState::Error;
   }
   data_size_ = result.return_value_;
+  ASSERT(data_size_ <= buffer_size_);
+
   return PeekState::Done;
 }
 
