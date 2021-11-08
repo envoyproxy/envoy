@@ -366,7 +366,6 @@ envoy_cc_test(
     name = "multiplexed_integration_test",
     srcs = [
         "multiplexed_integration_test.cc",
-        "multiplexed_integration_test.h",
     ],
     shard_count = 8,
     deps = [
@@ -538,7 +537,6 @@ envoy_cc_test(
     name = "multiplexed_upstream_integration_test",
     srcs = [
         "multiplexed_upstream_integration_test.cc",
-        "multiplexed_upstream_integration_test.h",
     ],
     shard_count = 2,
     deps = [

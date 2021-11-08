@@ -66,7 +66,7 @@ StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
 
 StderrSinkDelegate::~StderrSinkDelegate() { restoreDelegate(); }
 
-void StderrSinkDelegate::log(absl::string_view msg) {
+void StderrSinkDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
   Thread::OptionalLockGuard guard(lock_);
   std::cerr << msg;
 }
@@ -94,11 +94,11 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   }
   lock.Release();
 
-  auto log_to_sink = [this, msg_view](SinkDelegate& sink) {
+  auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
     if (should_escape_) {
-      sink.log(escapeLogLine(msg_view));
+      sink.log(escapeLogLine(msg_view), msg);
     } else {
-      sink.log(msg_view);
+      sink.log(msg_view, msg);
     }
   };
   auto* tls_sink = tlsDelegate();

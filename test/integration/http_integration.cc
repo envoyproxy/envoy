@@ -77,11 +77,20 @@ IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type)
+    : IntegrationCodecClient(dispatcher, random, std::move(conn), std::move(host_description), type,
+                             true) {}
+
+IntegrationCodecClient::IntegrationCodecClient(
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
+    Http::CodecType type, bool wait_till_connected)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
-      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
+      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  if (wait_till_connected) {
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -203,12 +212,14 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   parent_.last_connection_event_ = event;
   if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
-    parent_.connection_->dispatcher().exit();
+    if (block_till_connected_) {
+      parent_.connection_->dispatcher().exit();
+    }
   } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
-    if (parent_.type() == Http::CodecType::HTTP3 && !parent_.connected_) {
+    if (parent_.type() == Http::CodecType::HTTP3 && !parent_.connected_ && block_till_connected_) {
       // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
       // connection may fail of INVALID_VERSION if both this client doesn't support any of the
       // versions the server advertised before handshake established. In this case the connection is
