@@ -23,6 +23,8 @@
 namespace Envoy {
 namespace {
 
+using testing::HasSubstr;
+
 std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
   return fmt::format("{}_{}",
@@ -612,6 +614,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
 }
 
 TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  useAccessLog("%RESPONSE_CODE%");
   initializeOverloadManagerInBootstrap(
       TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
       name: "envoy.overload_actions.reset_high_memory_stream"
@@ -660,10 +663,9 @@ TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnde
   const int response_size = downstream_window_size + 1024; // Slightly over the window size.
   upstream_request_for_response->encodeData(response_size, true);
 
-  // Wait for the stream to have seen complete.
   if (streamBufferAccounting()) {
-    EXPECT_TRUE(
-        buffer_factory_->waitUntilExpectedNumberOfActiveAccountsThatSawEnvoyStreamComplete(1));
+    // Wait for access log to know the Envoy level stream has been deleted.
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
   }
 
   // Set the pressure so the overload action kills the response if doing stream

@@ -361,6 +361,11 @@ public:
    * Get the bytes meter for this stream.
    */
   virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
+
+  /**
+   * Fired when the Envoy level stream representation has been destroyed.
+   */
+  virtual void onEnvoyStreamComplete() PURE;
 };
 
 /**

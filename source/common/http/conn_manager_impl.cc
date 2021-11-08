@@ -260,6 +260,15 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 
+  if (stream.response_encoder_) {
+    stream.response_encoder_->getStream().removeCallbacks(stream);
+    // Notify to the codec level stream that Envoy level stream is destroyed.
+    // This is only useful for H1, which prior didn't have the invariant that
+    // the codec level stream outlived the Envoy level stream.
+    stream.response_encoder_->getStream().onEnvoyStreamComplete();
+    stream.response_encoder_ = nullptr;
+  }
+
   if (connection_idle_timer_ && streams_.empty()) {
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }

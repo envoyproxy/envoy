@@ -127,6 +127,11 @@ protected:
 
   virtual bool hasPendingData() PURE;
 
+  // NOP for H2/H3.
+  // The H2 codec defers deletion of codec level stream until Envoy level has
+  // been destroyed.
+  void onEnvoyStreamComplete() override{};
+
 private:
   Event::Dispatcher& dispatcher_;
   // See HttpConnectionManager.stream_idle_timeout.

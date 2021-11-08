@@ -129,6 +129,7 @@ public:
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    response_encoder->getStream().onEnvoyStreamComplete();
   }
 
 protected:
@@ -814,6 +815,7 @@ TEST_F(Http1ServerConnectionImplTest, Http10MultipleResponses) {
     ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
+    response_encoder->getStream().onEnvoyStreamComplete();
     EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
     EXPECT_EQ(Protocol::Http10, codec_->protocol());
   }
@@ -1071,6 +1073,7 @@ TEST_F(Http1ServerConnectionImplTest, FloodProtection) {
 
     TestResponseHeaderMapImpl headers{{":status", "200"}};
     response_encoder->encodeHeaders(headers, true);
+    response_encoder->getStream().onEnvoyStreamComplete();
   }
 
   // Trying to accept a third request with two buffered responses in the queue should trigger flood
@@ -1365,6 +1368,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
 
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -1392,6 +1396,7 @@ TEST_F(Http1ServerConnectionImplTest, LargeHeaderResponseEncode) {
   const std::string long_header_value = std::string(79 * 1024, 'a');
   TestResponseHeaderMapImpl headers{{":status", "200"}, {"foo", long_header_value}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 200 OK\r\nfoo: " + long_header_value + "\r\ncontent-length: 0\r\n\r\n",
             output);
 }
@@ -1419,6 +1424,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
   TestResponseHeaderMapImpl headers{
       {":status", "200"}, {"some-header", "foo"}, {"some#header", "baz"}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 200 OK\r\nSome-Header: foo\r\nSome#Header: baz\r\nContent-Length: 0\r\n\r\n",
             output);
 }
@@ -1445,6 +1451,7 @@ TEST_F(Http1ServerConnectionImplTest, 304ResponseTransferEncodingNotAddedWhenCon
   TestResponseHeaderMapImpl headers{
       {":status", "304"}, {"etag", "\"1234567890\""}, {"content-length", "123"}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ncontent-length: 123\r\n\r\n",
             output);
 }
@@ -1475,6 +1482,7 @@ TEST_F(Http1ServerConnectionImplTest,
 
   TestResponseHeaderMapImpl headers{{":status", "304"}, {"etag", "\"1234567890\""}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\n\r\n", output);
 
   buffer.add("HEAD / HTTP/1.1\r\nif-none-match: \"1234567890\"\r\n\r\n");
@@ -1486,6 +1494,7 @@ TEST_F(Http1ServerConnectionImplTest,
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\n\r\n", output);
 }
 
@@ -1521,6 +1530,7 @@ TEST_F(Http1ServerConnectionImplTest,
 
   TestResponseHeaderMapImpl headers{{":status", "304"}, {"etag", "\"1234567890\""}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ncontent-length: 0\r\n\r\n",
             output);
 
@@ -1533,6 +1543,7 @@ TEST_F(Http1ServerConnectionImplTest,
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ(
       "HTTP/1.1 304 Not Modified\r\netag: \"1234567890\"\r\ntransfer-encoding: chunked\r\n\r\n",
       output);
@@ -1559,6 +1570,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith204) {
 
   TestResponseHeaderMapImpl headers{{":status", "204"}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 204 No Content\r\n\r\n", output);
 }
 
@@ -1590,6 +1602,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
   // appended) then 200 headers (content length 0 will be appended).
   TestResponseHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
 }
 
@@ -1781,6 +1794,7 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   EXPECT_EQ(request.size(), buffer.length());
 
   response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  response_encoder->getStream().onEnvoyStreamComplete();
 
   status = codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());

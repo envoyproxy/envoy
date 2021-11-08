@@ -22,6 +22,7 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
+  MOCK_METHOD(void, onEnvoyStreamComplete, ());
 
   std::list<StreamCallbacks*> callbacks_{};
   Network::Address::InstanceConstSharedPtr connection_local_address_;
