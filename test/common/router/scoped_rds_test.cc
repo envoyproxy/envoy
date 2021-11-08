@@ -113,6 +113,214 @@ protected:
   NiceMock<Event::MockDispatcher> event_dispatcher_;
 };
 
+using InlineScopedRoutesTest = ScopedRoutesTestBase;
+
+constexpr char hcm_config_base[] = R"EOF(
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: http_dynamo_filter
+    typed_config:
+)EOF";
+
+TEST_F(InlineScopedRoutesTest, RouteConfigurationNameNotSupported) {
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: foo-scoped-routes
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        route_configuration_name: foo-route
+        key:
+          fragments: { string_key: foo-key }
+      - name: foo2-scope
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key-2 }
+)EOF");
+
+  EXPECT_THROW_WITH_REGEX(
+      ScopedRoutesConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(hcm_config),
+                                             server_factory_context_, context_init_manager_, "foo.",
+                                             *config_provider_manager_),
+      EnvoyException, "Fetching routes via RDS \\(route_configuration_name\\) is not supported");
+}
+
+TEST_F(InlineScopedRoutesTest, RouteConfigurationRequired) {
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: foo-scoped-routes
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        key:
+          fragments: { string_key: foo-key }
+)EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
+          parseHttpConnectionManagerFromYaml(hcm_config), server_factory_context_,
+          context_init_manager_, "foo.", *config_provider_manager_),
+      EnvoyException, "You must specify a route_configuration with inline scoped routes.");
+}
+
+TEST_F(InlineScopedRoutesTest, InlineRouteConfigurations) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key }
+      - name: foo2-scope
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key-2 }
+)EOF");
+  Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  ASSERT_THAT(provider->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key"}})
+                ->name(),
+            "foo");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key-2"}})
+                ->name(),
+            "foo2");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestRequestHeaderMapImpl{{"addr", "foo-key,foo-key-2"}})
+                ->name(),
+            "foo");
+}
+
+TEST_F(InlineScopedRoutesTest, ConfigLoadAndDump) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: Addr
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.10" }
+      - name: foo2
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar2
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.20" }
+)EOF");
+  Envoy::Config::ConfigProviderPtr inline_config_provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  UniversalStringMatcher universal_matcher;
+  ProtobufTypes::MessagePtr message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+
+  envoy::admin::v3::ScopedRoutesConfigDump expected_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo
+         virtual_hosts:
+           - name: bar
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+}
+
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup(const OptionalHttpFilters optional_http_filters = OptionalHttpFilters()) {
@@ -251,6 +459,25 @@ scope_key_builder:
   Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.scope_.gauge(
       "foo.scoped_rds.foo_scoped_routes.on_demand_scopes", Stats::Gauge::ImportMode::Accumulate)};
 };
+
+TEST_F(ScopedRdsTest, EmptyRouteConfigurationNameFailsConfigUpdate) {
+  setup();
+  init_watcher_.expectReady().Times(0);
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const envoy::config::route::v3::ScopedRouteConfiguration resource =
+      parseScopedRouteConfigurationFromYaml(config_yaml);
+  const Envoy::Config::DecodedResourcesWrapper decoded_resources =
+      TestUtility::decodeResources({resource});
+  context_init_manager_.initialize(init_watcher_);
+
+  EXPECT_THROW_WITH_MESSAGE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"),
+                            EnvoyException, "route_configuration_name is empty.");
+}
 
 // Test an exception will be throw when unknown factory in the per-virtualhost typed config.
 TEST_F(ScopedRdsTest, UnknownFactoryForPerVirtualHostTypedConfig) {
@@ -791,52 +1018,7 @@ scoped_routes:
           index: 0
 $1
 )EOF";
-  const std::string inline_scoped_route_configs_yaml = R"EOF(
-  scoped_route_configurations_list:
-    scoped_route_configurations:
-      - name: foo
-        route_configuration_name: foo-route-config
-        key:
-          fragments: { string_key: "172.10.10.10" }
-      - name: foo2
-        route_configuration_name: foo-route-config2
-        key:
-          fragments: { string_key: "172.10.10.20" }
-)EOF";
-  // Only load the inline scopes.
-  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
-      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
-                                                          inline_scoped_route_configs_yaml)),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
-  message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
-          universal_matcher);
-  const auto& scoped_routes_config_dump2 =
-      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
-          *message_ptr);
-  TestUtility::loadFromYaml(R"EOF(
-inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
-dynamic_scoped_route_configs:
-)EOF",
-                            expected_config_dump);
-  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump2));
 
-  // Now SRDS kicks off.
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   const auto resource = parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
@@ -844,28 +1026,12 @@ route_configuration_name: dynamic-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF");
-
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
   const auto decoded_resources = TestUtility::decodeResources({resource});
   srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1");
 
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
@@ -889,21 +1055,9 @@ dynamic_scoped_route_configs:
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump3));
 
   NiceMock<MockStringMatcher> mock_matcher;
-  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(true));
-  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(false));
   EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(false));
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     last_updated:
@@ -920,15 +1074,9 @@ dynamic_scoped_route_configs:
           *message_ptr);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
 
-  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
-  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(false));
   EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(true));
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
@@ -954,21 +1102,6 @@ dynamic_scoped_route_configs:
   srds_subscription_->onConfigUpdate({}, "2");
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     last_updated:
@@ -984,9 +1117,63 @@ dynamic_scoped_route_configs:
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump6));
+
+  const std::string inline_scoped_route_configs_yaml = R"EOF(
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.10" }
+)EOF";
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
+                                                          inline_scoped_route_configs_yaml)),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump7 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo
+         virtual_hosts:
+           - name: bar
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "2"
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
 }
 
-// Tests that SRDS only allows creation of delta static config providers.
 TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
   // Use match all regex due to lack of distinctive matchable output for
   // coverage test.

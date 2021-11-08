@@ -820,6 +820,8 @@ TEST_P(GuardDogActionsTest, KillShouldTriggerGuardDogActions) {
   EXPECT_DEATH(die_function(), "ASSERT_GUARDDOG_ACTION");
 }
 
+// Disabled for coverage per #18229
+#if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
   auto die_function = [&]() -> void {
     const NiceMock<Configuration::MockWatchdog> config(DISABLE_MISS, DISABLE_MEGAMISS, DISABLE_KILL,
@@ -833,6 +835,7 @@ TEST_P(GuardDogActionsTest, MultikillShouldTriggerGuardDogActions) {
 
   EXPECT_DEATH(die_function(), "ASSERT_GUARDDOG_ACTION");
 }
+#endif
 
 } // namespace
 } // namespace Server

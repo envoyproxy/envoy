@@ -172,8 +172,8 @@ public:
       parent_.deleted_before_listener_ = !parent_.udp_listener_deleted_;
     }
 
-    MOCK_METHOD(void, onData, (Network::UdpRecvData&), (override));
-    MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode), (override));
+    MOCK_METHOD(Network::FilterStatus, onData, (Network::UdpRecvData&), (override));
+    MOCK_METHOD(Network::FilterStatus, onReceiveError, (Api::IoError::IoErrorCode), (override));
 
   private:
     ConnectionHandlerTest& parent_;

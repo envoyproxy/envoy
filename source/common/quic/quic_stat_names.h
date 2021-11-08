@@ -21,7 +21,7 @@ public:
   void chargeQuicConnectionCloseStats(Stats::Scope& scope, quic::QuicErrorCode error_code,
                                       quic::ConnectionCloseSource source, bool is_upstream);
 
-  void chargeQuicResetStreamErrorStats(Stats::Scope& scope, quic::QuicRstStreamErrorCode error_code,
+  void chargeQuicResetStreamErrorStats(Stats::Scope& scope, quic::QuicResetStreamError error_code,
                                        bool from_self, bool is_upstream);
 
 private:

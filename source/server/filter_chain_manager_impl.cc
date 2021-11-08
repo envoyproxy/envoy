@@ -31,7 +31,9 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 
 PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, Init::Manager& init_manager)
-    : parent_context_(parent_context), init_manager_(init_manager) {}
+    : parent_context_(parent_context), scope_(parent_context_.scope().createScope("")),
+      filter_chain_scope_(parent_context_.listenerScope().createScope("")),
+      init_manager_(init_manager) {}
 
 bool PerFilterChainFactoryContextImpl::drainClose() const {
   return is_draining_.load() || parent_context_.drainDecision().drainClose();
@@ -48,6 +50,11 @@ ThreadLocal::SlotAllocator& PerFilterChainFactoryContextImpl::threadLocal() {
 const envoy::config::core::v3::Metadata&
 PerFilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
+}
+
+const Envoy::Config::TypedMetadata&
+PerFilterChainFactoryContextImpl::listenerTypedMetadata() const {
+  return parent_context_.listenerTypedMetadata();
 }
 
 envoy::config::core::v3::TrafficDirection PerFilterChainFactoryContextImpl::direction() const {
@@ -101,7 +108,7 @@ Envoy::Runtime::Loader& PerFilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
 Singleton::Manager& PerFilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
@@ -135,9 +142,7 @@ PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
   return parent_context_.getTransportSocketFactoryContext();
 }
 
-Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() {
-  return parent_context_.listenerScope();
-}
+Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
 
 bool PerFilterChainFactoryContextImpl::isQuicListener() const {
   return parent_context_.isQuicListener();
@@ -790,6 +795,10 @@ FactoryContextImpl::getTransportSocketFactoryContext() const {
 }
 const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
   return config_.metadata();
+}
+const Envoy::Config::TypedMetadata& FactoryContextImpl::listenerTypedMetadata() const {
+  // TODO(nareddyt): Needs an implementation for this context. Currently not used.
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
   return config_.traffic_direction();

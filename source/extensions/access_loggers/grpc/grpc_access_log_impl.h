@@ -23,10 +23,11 @@ class GrpcAccessLoggerImpl
                                       envoy::service::accesslog::v3::StreamAccessLogsMessage,
                                       envoy::service::accesslog::v3::StreamAccessLogsResponse> {
 public:
-  GrpcAccessLoggerImpl(const Grpc::RawAsyncClientSharedPtr& client, std::string log_name,
-                       std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
+  GrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
 private:
   // Extensions::AccessLoggers::GrpcCommon::GrpcAccessLogger
@@ -54,7 +55,7 @@ private:
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
+               Event::Dispatcher& dispatcher) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

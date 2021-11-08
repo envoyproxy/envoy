@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
-#include "envoy/watchdog/v3alpha/abort_action.pb.h"
+#include "envoy/watchdog/v3/abort_action.pb.h"
 
 #include "source/common/watchdog/abort_action_config.h"
 
@@ -28,8 +28,8 @@ TEST(AbortActionFactoryTest, CanCreateAction) {
           "config": {
             "name": "envoy.watchdog.abort_action",
             "typed_config": {
-              "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-              "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3alpha.AbortActionConfig",
+              "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
+              "type_url": "type.googleapis.com/envoy.watchdog.abort_action.v3.AbortActionConfig",
               "value": {
                 "wait_duration": "2s",
               }

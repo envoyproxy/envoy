@@ -4,12 +4,12 @@ Bandwidth limit
 ====================
 
 * Bandwidth limiting :ref:`architecture overview <arch_overview_bandwidth_limit>`
-* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit>`
 * This filter should be configured with the name ``envoy.filters.http.bandwidth_limit``.
 
 The HTTP Bandwidth limit filter limits the size of data flow to the max bandwidth set in the ``limit_kbps``
 when the request's route, virtual host or filter chain has a
-:ref:`bandwidth limit configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit>`.
+:ref:`bandwidth limit configuration <envoy_v3_api_msg_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit>`.
 
 If the bandwidth limit has been exhausted the filter stops further transfer until more bandwidth gets allocated
 according to the ``fill_interval`` (default is 50 milliseconds). If the connection buffer fills up with accumulated
@@ -42,11 +42,13 @@ The HTTP bandwidth limit filter outputs statistics in the ``<stat_prefix>.http_b
   :widths: 1, 1, 2
 
   request_enabled, Counter, Total number of request streams for which the bandwidth limiter was consulted
+  request_enforced, Counter, Total number of request streams for which the bandwidth limiter was enforced
   request_pending, GAUGE, Number of request streams which are currently pending transfer in bandwidth limiter
   request_incoming_size, GAUGE, Size in bytes of incoming request data to bandwidth limiter
   request_allowed_size, GAUGE, Size in bytes of outgoing request data from bandwidth limiter
   request_transfer_duration, HISTOGRAM, Total time (including added delay) it took for the request stream transfer
   response_enabled, Counter, Total number of response streams for which the bandwidth limiter was consulted
+  response_enforced, Counter, Total number of response streams for which the bandwidth limiter was enforced
   response_pending, GAUGE, Number of response streams which are currently pending transfer in bandwidth limiter
   response_incoming_size, GAUGE, Size in bytes of incoming response data to bandwidth limiter
   response_allowed_size, GAUGE, Size in bytes of outgoing response data from bandwidth limiter
@@ -60,5 +62,5 @@ Runtime
 The HTTP bandwidth limit filter supports the following runtime settings:
 
 The bandwidth limit filter can be runtime feature flagged via the :ref:`enabled
-<envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit.runtime_enabled>`
+<envoy_v3_api_field_extensions.filters.http.bandwidth_limit.v3.BandwidthLimit.runtime_enabled>`
 configuration field.

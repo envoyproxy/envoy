@@ -18,6 +18,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -75,6 +76,30 @@ TEST_P(TlsInspectorTest, MaxClientHelloSize) {
                             "max_client_hello_size of 65537 is greater than maximum of 65536.");
 }
 
+<<<<<<< HEAD
+=======
+// Test that the filter detects Closed events and terminates.
+TEST_P(TlsInspectorTest, ConnectionClosed) {
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
+}
+
+// Test that the filter detects detects read errors.
+TEST_P(TlsInspectorTest, ReadError) {
+  init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce(InvokeWithoutArgs([]() {
+    return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_NOT_SUP};
+  }));
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(1, cfg_->stats().read_error_.value());
+}
+
+>>>>>>> main
 // Test that a ClientHello with an SNI value causes the correct name notification.
 TEST_P(TlsInspectorTest, SniRegistered) {
   init();
@@ -250,11 +275,44 @@ TEST_P(TlsInspectorTest, NotSsl) {
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
 }
 
-// Test that the deprecated extension name still functions.
+TEST_P(TlsInspectorTest, InlineReadSucceed) {
+  filter_ = std::make_unique<Filter>(cfg_);
+
+  EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+  const auto alpn_protos = std::vector<absl::string_view>{Http::Utility::AlpnNames::get().Http2};
+  const std::string servername("example.com");
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHello(
+      std::get<0>(GetParam()), std::get<1>(GetParam()), servername, "\x02h2");
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&client_hello](os_fd_t fd, void* buffer, size_t length,
+                                       int flag) -> Api::SysCallSizeResult {
+        ENVOY_LOG_MISC(trace, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
+        ASSERT(length >= client_hello.size());
+        memcpy(buffer, client_hello.data(), client_hello.size());
+        return Api::SysCallSizeResult{ssize_t(client_hello.size()), 0};
+      }));
+
+  // No event is created if the inline recv parse the hello.
+  EXPECT_CALL(dispatcher_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .Times(0);
+
+  EXPECT_CALL(socket_, setRequestedServerName(Eq(servername)));
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(alpn_protos));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onAccept(cb_));
+}
+
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(TlsInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.listener.tls_inspector";
 
-  ASSERT_NE(
+  ASSERT_EQ(
       nullptr,
       Registry::FactoryRegistry<
           Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));

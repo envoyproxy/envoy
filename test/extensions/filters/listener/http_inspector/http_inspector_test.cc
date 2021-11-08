@@ -326,6 +326,15 @@ TEST_F(HttpInspectorTest, InspectHttp2) {
       "9e03f1ca5582265f59a75b0ac3111959c7e49004908db6e83f4096f2b16aee7f4b17cd65224b22d6765926a4a7b5"
       "2b528f840b60003f";
   testHttpInspectSuccess(header, Http::Utility::AlpnNames::get().Http2c);
+
+TEST_F(HttpInspectorTest, ReadClosed) {
+  init();
+
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  EXPECT_CALL(cb_, continueFilterChain(false));
+  file_event_callback_(Event::FileReadyType::Read);
+  EXPECT_EQ(0, cfg_->stats().http2_found_.value());
 }
 
 TEST_F(HttpInspectorTest, InvalidConnectionPreface) {

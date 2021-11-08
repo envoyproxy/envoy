@@ -167,6 +167,7 @@ public:
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const));
+  MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

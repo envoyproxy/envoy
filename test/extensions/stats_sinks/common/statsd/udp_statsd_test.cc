@@ -63,7 +63,7 @@ TEST(UdpOverUdsStatsdSinkTest, InitWithPipeAddress) {
   sink.flush(snapshot);
 
   // Start the server.
-  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address, nullptr);
+  Network::SocketImpl sock(Network::Socket::Type::Datagram, uds_address, nullptr, {});
   RELEASE_ASSERT(sock.setBlockingForTest(false).return_value_ != -1, "");
   sock.bind(uds_address);
 
@@ -359,6 +359,23 @@ TEST(UdpStatsdSinkTest, SiSuffix) {
   EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
               write("envoy.duration:4|ms"));
   sink.onHistogramComplete(duration_milli, 4);
+
+  tls_.shutdownThread();
+}
+
+TEST(UdpStatsdSinkTest, ScaledPercent) {
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
+  auto writer_ptr = std::make_shared<NiceMock<MockWriter>>();
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  UdpStatsdSink sink(tls_, writer_ptr, false);
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Percent;
+
+  EXPECT_CALL(*std::dynamic_pointer_cast<NiceMock<MockWriter>>(writer_ptr),
+              write("envoy.items:0.5|h"));
+  sink.onHistogramComplete(items, Stats::Histogram::PercentScale / 2);
 
   tls_.shutdownThread();
 }
