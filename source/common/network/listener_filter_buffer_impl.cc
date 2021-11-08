@@ -40,19 +40,10 @@ bool ListenerFilterBufferImpl::drain(uint64_t length) {
     auto result = io_handle_.recv(base_, length - read_size, 0);
     ENVOY_LOG(trace, "recv returned: {}", result.return_value_);
 
-    if (!result.ok()) {
-      if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        continue;
-      }
-      ENVOY_LOG(debug, "recv failed: {}: {}", result.err_->getErrorCode(),
-                result.err_->getErrorDetails());
-      return false;
-    }
-    // Remote closed
-    if (result.return_value_ == 0) {
-      ENVOY_LOG(debug, "recv failed: remote closed");
-      return false;
-    }
+    // The socket buffer is expected to have the data. so the
+    // recv doesn't expected to fail.
+    ASSERT(result.ok());
+
     read_size += result.return_value_;
     if (read_size < length) {
       continue;
