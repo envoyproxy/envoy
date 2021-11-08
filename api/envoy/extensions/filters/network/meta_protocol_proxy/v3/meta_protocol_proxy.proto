@@ -4,6 +4,7 @@ syntax = "proto3";
 package envoy.extensions.filters.network.meta_protocol_proxy.v3;
 
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.proto";
 
 import "google/protobuf/any.proto";
@@ -32,8 +33,8 @@ message MetaProtocolProxy {
   oneof route_specifier {
     option (validate.required) = true;
 
-    // The meta protocol proxy’s route table will be dynamically loaded via the RDS API.
-    Rds rds = 3;
+    // The meta protocol proxies route table will be dynamically loaded via the Meta RDS API.
+    MetaRds rds = 3;
 
     // The route table for the meta protocol proxy is static and is specified in this property.
     RouteConfiguration route_config = 4;
@@ -50,7 +51,7 @@ message MetaProtocolProxy {
 }
 
 // [#not-implemented-hide:]
-message Rds {
+message MetaRds {
   // Configuration source specifier for RDS.
   config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
@@ -67,7 +68,7 @@ message MetaProtocolFilter {
 
   // Filter specific configuration which depends on the filter being instantiated. See the
   // supported filters for further documentation.
-  google.protobuf.Any config = 2;
+  core.v3.TypedExtensionConfig config = 2;
 }
 
 // [#not-implemented-hide:]
@@ -76,5 +77,5 @@ message Codec {
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // Codec specific configuration which depends on the codec being instantiated.
-  google.protobuf.Any config = 2;
+  core.v3.TypedExtensionConfig config = 2;
 }
