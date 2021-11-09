@@ -336,8 +336,8 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
       const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
       size_t ss_len =
           ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
-      StatusOr<Address::InstanceConstSharedPtr> address =
-          Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
+      StatusOr<Network::Address::InstanceConstSharedPtr> address =
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
       if (address.ok()) {
         interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
       }
