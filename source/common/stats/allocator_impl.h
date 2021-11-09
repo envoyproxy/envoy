@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/stats/allocator.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
@@ -51,7 +52,7 @@ public:
   void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
                                 std::function<void(Stats::TextReadout&)> f_stat) const override;
 
-  void setSinkPredicates(SinkPredicates const& sink_predicates) override;
+  void setSinkPredicates(SinkPredicates& sink_predicates) override;
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
@@ -111,7 +112,7 @@ private:
   StatPointerSet<TextReadout> sinked_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   // Predicates used to filter stats to be flushed.
-  const SinkPredicates* sink_predicates_ = nullptr;
+  OptRef<SinkPredicates> sink_predicates_;
   SymbolTable& symbol_table_;
 
   Thread::ThreadSynchronizer sync_;

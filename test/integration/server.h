@@ -322,7 +322,7 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedHistogram(f_size, f_stat);
   }
-  void setSinkPredicates(const SinkPredicates& sink_predicates) override {
+  void setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
 

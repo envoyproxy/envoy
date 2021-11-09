@@ -97,7 +97,7 @@ public:
   /**
    * Set the predicates to filter stats for sink.
    */
-  virtual void setSinkPredicates(const SinkPredicates& sink_predicates) PURE;
+  virtual void setSinkPredicates(SinkPredicates& sink_predicates) PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gauges

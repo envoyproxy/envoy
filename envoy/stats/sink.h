@@ -56,13 +56,13 @@ public:
   virtual ~SinkPredicates() = default;
 
   /// @return true if @param counter needs to be flushed to sinks.
-  virtual bool includeCounter(const Counter& counter) const PURE;
+  virtual bool includeCounter(const Counter& counter) PURE;
   /// @return true if @param gague needs to be flushed to sinks.
-  virtual bool includeGauge(const Gauge& gauge) const PURE;
+  virtual bool includeGauge(const Gauge& gauge) PURE;
   /// @return true if @param text_readout needs to be flushed to sinks.
-  virtual bool includeTextReadout(const TextReadout& text_readout) const PURE;
+  virtual bool includeTextReadout(const TextReadout& text_readout) PURE;
   /// @return true if @param histogram needs to be flushed to sinks.
-  virtual bool includeHistogram(const Histogram& histogram) const PURE;
+  virtual bool includeHistogram(const Histogram& histogram) PURE;
 };
 
 /**

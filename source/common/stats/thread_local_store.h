@@ -278,7 +278,7 @@ public:
   void forEachSinkedHistogram(std::function<void(size_t)> f_size,
                               std::function<void(Stats::ParentHistogram&)> f_stat) const override;
 
-  void setSinkPredicates(const SinkPredicates& sink_predicates) override;
+  void setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) override;
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -513,7 +513,7 @@ private:
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
-  const SinkPredicates* sink_predicates_ = nullptr;
+  std::unique_ptr<SinkPredicates> sink_predicates_ = nullptr;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;

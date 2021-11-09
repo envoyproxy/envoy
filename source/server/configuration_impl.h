@@ -56,17 +56,10 @@ public:
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
 
-  const Stats::SinkPredicates* sinkPredicates() const { return sink_predicates_.get(); }
-
-  void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates> sink_predicates) {
-    sink_predicates_ = std::move(sink_predicates);
-  }
-
 private:
   std::list<Stats::SinkPtr> sinks_;
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
-  std::unique_ptr<Stats::SinkPredicates> sink_predicates_;
 };
 
 /**

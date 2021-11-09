@@ -678,7 +678,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
-          if (parent_.sink_predicates_ && parent_.sink_predicates_->includeHistogram(*stat)) {
+          if (parent_.sink_predicates_.get() && parent_.sink_predicates_->includeHistogram(*stat)) {
             parent_.sinked_histograms_.insert(stat.get());
           }
         }
@@ -1003,7 +1003,7 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(
 
 void ThreadLocalStoreImpl::forEachSinkedHistogram(
     std::function<void(size_t)> f_size, std::function<void(Stats::ParentHistogram&)> f_stat) const {
-  if (sink_predicates_ != nullptr) {
+  if (sink_predicates_.get() != nullptr) {
     Thread::LockGuard lock(hist_mutex_);
 
     if (f_size != nullptr) {
@@ -1017,9 +1017,12 @@ void ThreadLocalStoreImpl::forEachSinkedHistogram(
   }
 }
 
-void ThreadLocalStoreImpl::setSinkPredicates(const SinkPredicates& sink_predicates) {
-  sink_predicates_ = &sink_predicates;
-  alloc_.setSinkPredicates(sink_predicates);
+void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) {
+  sink_predicates_ = std::move(sink_predicates);
+  ASSERT(sink_predicates_.get() != nullptr);
+  if (sink_predicates_.get() != nullptr) {
+    alloc_.setSinkPredicates(*sink_predicates_);
+  }
 }
 
 } // namespace Stats

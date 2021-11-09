@@ -143,7 +143,7 @@ public:
   /**
    * Set the predicates to filter stats for sink.
    */
-  virtual void setSinkPredicates(const SinkPredicates& sink_predicates) PURE;
+  virtual void setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;
