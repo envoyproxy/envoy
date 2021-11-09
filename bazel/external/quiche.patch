@@ -63,3 +63,13 @@
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
  #include "spdy/core/spdy_header_block.h"
 
+--- http2/adapter/http2_util.cc
++++ http2/adapter/http2_util.cc
+@@ -1,5 +1,7 @@
+ #include "third_party/http2/adapter/http2_util.h"
+
++#undef NO_ERROR
++
+ namespace http2 {
+ namespace adapter {
+ namespace {
