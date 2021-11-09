@@ -6,6 +6,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/io_handle.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
@@ -20,7 +21,8 @@ class Win32SocketHandleImpl : public IoSocketHandleImpl {
 public:
   explicit Win32SocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                                  absl::optional<int> domain = absl::nullopt)
-      : IoSocketHandleImpl(fd, socket_v6only, domain) {}
+      : IoSocketHandleImpl(fd, socket_v6only, domain),
+        peek_buffer_(std::make_unique<Buffer::OwnedImpl>()) {}
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
@@ -42,8 +44,22 @@ public:
                                    RecvMsgOutput& output) override;
   Api::IoCallUint64Result recv(void* buffer, size_t length, int flags) override;
 
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                           Event::FileTriggerType trigger, uint32_t events) override;
+  void enableFileEvents(uint32_t events) override;
+
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
+
+  // For windows mimic MSG_PEEK
+  std::unique_ptr<Buffer::Instance> peek_buffer_;
+
+  Api::IoCallUint64Result drainToPeekBuffer();
+  Api::IoCallUint64Result readFromPeekBuffer(void* buffer, size_t length);
+  Api::IoCallUint64Result readFromPeekBuffer(Buffer::Instance& buffer, size_t length);
+  Api::IoCallUint64Result readvFromPeekBuffer(uint64_t max_length, Buffer::RawSlice* slices,
+                                              uint64_t num_slice);
+  Api::IoCallUint64Result peekFromPeekBuffer(void* buffer, size_t length);
 };
 } // namespace Network
 } // namespace Envoy
