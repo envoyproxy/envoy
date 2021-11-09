@@ -26,7 +26,13 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(NetworkUtility, Url) {
+TEST(NetworkUtility, GetTcpUrl) {
+  EXPECT_EQ("tcp://foo:1234", Utility::getTcpUrl("foo", 1234));
+  EXPECT_EQ("tcp://1.2.3.4:1234", Utility::getTcpUrl("1.2.3.4", 1234));
+  EXPECT_EQ("tcp://[::1]:1234", Utility::getTcpUrl("::1", 1234));
+}
+
+TEST(NetworkUtility, UrlWithIpv4) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
   EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://foo:1234"));
   EXPECT_THROW(Utility::hostFromTcpUrl("bogus://foo:1234"), EnvoyException);
@@ -39,6 +45,25 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
+}
+
+TEST(NetworkUtility, UrlWithIpv6) {
+  EXPECT_EQ("::1", Utility::hostFromTcpUrl("tcp://[::1]:1234"));
+  EXPECT_EQ(1234U, Utility::portFromTcpUrl("tcp://[::1]:1234"));
+  EXPECT_THROW(Utility::hostFromTcpUrl("bogus://[::1]:1234"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("bogus://[::1]:1234"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("abc://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("abc://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://[::1]"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://[::1]:bar"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://[::1]:1234"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://[::1]:999999999999"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://[::1:999999999999"), EnvoyException);
+  EXPECT_THROW(Utility::hostFromTcpUrl("tcp://::1]:999999999999"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://[::1:999999999999"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://::1]:999999999999"), EnvoyException);
 }
 
 TEST(NetworkUtility, udpUrl) {

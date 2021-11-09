@@ -122,6 +122,14 @@ public:
   static bool urlIsUnixScheme(absl::string_view url);
 
   /**
+   * Build a TCP URL
+   * @param ip_address as ip address include in URL
+   * @param port to included in URL.
+   * @return std::string the tcp URL
+   */
+  static std::string getTcpUrl(const std::string& ip_address, uint16_t port);
+
+  /**
    * Parses the host from a TCP URL
    * @param the URL to parse host from
    * @return std::string the parsed host

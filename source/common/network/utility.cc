@@ -66,13 +66,30 @@ std::string hostFromUrl(const std::string& url, absl::string_view scheme,
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  const size_t colon_index = url.find(':', scheme.size());
+  const size_t bracket_begin_index = url.find('[', scheme.size());
 
-  if (colon_index == std::string::npos) {
-    throw EnvoyException(absl::StrCat("malformed url: ", url));
+  if (bracket_begin_index == std::string::npos) {
+    const size_t colon_index = url.find(':', scheme.size());
+
+    if ((colon_index == std::string::npos) || (colon_index == scheme.size())) {
+      throw EnvoyException(absl::StrCat("malformed url: ", url));
+    }
+
+    return url.substr(scheme.size(), colon_index - scheme.size());
+  } else {
+    const size_t bracket_end_index = url.find(']', scheme.size() + 1);
+    if ((bracket_end_index == std::string::npos) || (bracket_begin_index != scheme.size())) {
+      throw EnvoyException(absl::StrCat("malformed url: ", url));
+    }
+
+    const size_t colon_index = url.find(':', bracket_end_index);
+
+    if (colon_index == std::string::npos) {
+      throw EnvoyException(absl::StrCat("malformed url: ", url));
+    }
+
+    return url.substr(bracket_begin_index + 1, bracket_end_index - bracket_begin_index - 1);
   }
-
-  return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
 uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
@@ -81,7 +98,17 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  const size_t colon_index = url.find(':', scheme.size());
+  const size_t bracket_begin_index = url.find('[', scheme.size());
+  size_t colon_index = 0;
+  if (bracket_begin_index == std::string::npos) {
+    colon_index = url.find(':', scheme.size());
+  } else {
+    const size_t bracket_end_index = url.find(']', scheme.size() + 1);
+    if ((bracket_end_index == std::string::npos) || (bracket_begin_index != scheme.size())) {
+      throw EnvoyException(absl::StrCat("malformed url: ", url));
+    }
+    colon_index = url.find(':', bracket_end_index);
+  }
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(absl::StrCat("malformed url: ", url));
@@ -117,6 +144,16 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 }
 
 } // namespace
+
+std::string Utility::getTcpUrl(const std::string& ip_address, uint16_t port) {
+  auto address_instance = parseInternetAddressNoThrow(ip_address, port, false);
+  if ((address_instance != nullptr) &&
+      (address_instance->ip()->version() == Address::IpVersion::v6)) {
+    return fmt::format("tcp://[{}]:{}", ip_address, port);
+  } else {
+    return fmt::format("tcp://{}:{}", ip_address, port);
+  }
+}
 
 std::string Utility::hostFromTcpUrl(const std::string& url) {
   return hostFromUrl(url, TCP_SCHEME, "TCP");

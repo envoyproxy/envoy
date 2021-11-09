@@ -5,6 +5,8 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "source/common/network/utility.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -36,7 +38,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       }
 
       const std::string& url =
-          fmt::format("tcp://{}:{}", socket_address.address(), socket_address.port_value());
+          Network::Utility::getTcpUrl(socket_address.address(), socket_address.port_value());
       resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
                                                      url, locality_lb_endpoint, lb_endpoint));
     }
