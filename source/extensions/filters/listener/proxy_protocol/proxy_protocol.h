@@ -60,15 +60,22 @@ public:
    */
   size_t numberOfNeededTlvTypes() const;
 
+  /**
+   * Filter configuration that determines if we should pass-through failed proxy protocol
+   * requests. Should only be configured to true for trusted downstreams.
+   */
+  bool detectProxyProtocol() const;
+
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
+  bool detect_proxy_protocol_{};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
 
-enum class ReadOrParseState { Done, TryAgainLater, Error };
+enum class ReadOrParseState { Done, TryAgainLaterError, Error, SkipFilterError };
 
 /**
  * Implementation the PROXY Protocol listener filter
@@ -98,7 +105,7 @@ private:
   /**
    * Helper function that attempts to read the proxy header
    * (delimited by \r\n if V1 format, or with length if V2)
-   * @return bool true valid header, false if more data is needed or socket errors occurred.
+   * @return ReadOrParseState Done if successfully parsed, or the error type.
    */
   ReadOrParseState readProxyHeader(Network::IoHandle& io_handle);
 
@@ -117,6 +124,8 @@ private:
   bool parseV1Header(char* buf, size_t len);
   bool parseV2Header(char* buf);
   absl::optional<size_t> lenV2Address(char* buf);
+
+  ReadOrParseState resetAndContinue(Network::IoHandle& io_handle);
 
   Network::ListenerFilterCallbacks* cb_{};
 

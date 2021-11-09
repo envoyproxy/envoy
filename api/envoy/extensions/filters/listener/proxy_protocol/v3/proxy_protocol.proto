@@ -40,4 +40,9 @@ message ProxyProtocol {
 
   // The list of rules to apply to requests.
   repeated Rule rules = 1;
+
+  // NOTICE: only enable if ALL traffic to the listener comes from a trusted source.
+  // Defaults to false. If true, attempt to detect proxy protocol if present, and allow
+  // requests through if proxy protocol is not used on the connection.
+  bool detect_proxy_protocol = 2;
 }
