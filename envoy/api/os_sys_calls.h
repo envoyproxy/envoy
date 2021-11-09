@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/types/optional.h"
+
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
@@ -32,6 +34,8 @@ struct InterfaceAddress {
 };
 
 using InterfaceAddressVector = std::vector<InterfaceAddress>;
+
+using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& ifap)>;
 
 class OsSysCalls {
 public:
@@ -221,6 +225,18 @@ public:
    * @see man getifaddrs
    */
   virtual SysCallIntResult getifaddrs(InterfaceAddressVector& ifap) PURE;
+
+  /**
+   * allows a platform to override getifaddrs or provide an implementation if one does not exist natively.
+   *
+   * @arg alternate_getifaddrs function pointer to implementation.
+   */
+  virtual void setAlternateGetifaddrs(AlternateGetifaddrs alternate_getifaddrs) {
+    alternate_getifaddrs_ = alternate_getifaddrs;
+  }
+
+protected:
+  absl::optional<AlternateGetifaddrs> alternate_getifaddrs_{};
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

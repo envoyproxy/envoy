@@ -301,7 +301,10 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
 // TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
-  return false
+  if (alternate_getifaddrs_.has_value()) {
+    return true;
+  }
+  return false;
 #else
   return true;
 #endif
@@ -311,6 +314,9 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
 // TODO: eliminate this branching by upstreaming an alternative Android implementation
 // e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
 #if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  if (alternate_getifaddrs_.has_value()) {
+    return alternate_getifaddrs_.value()(interfaces);
+  }
   return {0, 0};
 #else
   struct ifaddrs* ifaddr;

@@ -39,4 +39,5 @@ envoy_cc_library(
     deps = [
         "//envoy/network:address_interface",
     ],
+    external_deps = ["abseil_optional"],
 )
