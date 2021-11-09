@@ -380,80 +380,32 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   }
 }
 
-bool hasSameAddressFamily(const Address::InstanceConstSharedPtr& a,
+bool hasDifferentAddressFamily(const Address::InstanceConstSharedPtr& a,
                           const Address::InstanceConstSharedPtr& b) {
-  return (a->type() == Address::Type::Ip &&
-          b->type() == Address::Type::Ip &&
-          a->ip()->version() == b->ip()->version());
+  return (a->type() != Address::Type::Ip ||
+          b->type() != Address::Type::Ip ||
+          a->ip()->version() != b->ip()->version());
 }
 
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
   std::vector<Address::InstanceConstSharedPtr> address_list = in;
-  auto current = address_list.begin();
-  std::cerr << "CURRENT: " << (*current)->asString()<<"\n";
-  while (current != address_list.end()) {
-    std::cerr << "current: " << (*current)->asString()<<"\n";
+  for (auto current = address_list.begin(); current != address_list.end(); ++current) {
+    // Find the first address with a different address family than the current address.
     auto it = std::find_if(current, address_list.end(),
-                           [&](const auto& val){ return !hasSameAddressFamily(*current, val); } );
+                           [&](const auto& val){
+                             return (val->type() != Address::Type::Ip ||
+                                     (*current)->type() != Address::Type::Ip ||
+                                     (*current)->ip()->version() != val->ip()->version());
+                           } );
+    // If there are no more addresses with different families the sorting is finished.
     if (it == address_list.end()) {
       break;
     }
-    std::cerr << "it: " << (*it)->asString()<<"\n";
-    std::cerr << "---\n";
-    for (auto i = current; i!=address_list.end(); ++i) {
-      std::cerr << ": " << (*i)->asString()<<"\n";
-    }
-    std::cerr << "===\n";
-
-    std::cerr << "it: " << (*it)->asString()<<"\n";
-    auto start = std::make_reverse_iterator(it+1);
-    std::cerr << "start: " << (*start)->asString()<<"\n";
-    std::cerr << "it: " << (*it)->asString()<<"\n";
-
-    auto end = std::make_reverse_iterator(current+1);
-    std::cerr << "start: " << (*start)->asString()<<"\n";
-    std::cerr << "start+1: " << (*(start+1))->asString()<<"\n";
-    std::cerr << "end: " << (*end)->asString()<<"\n";
-    std::rotate(start, start + 1, end);
-    std::cerr << "---\n";
-    for (auto i = current; i!=address_list.end(); ++i) {
-      std::cerr << ": " << (*i)->asString()<<"\n";
-    }
-    std::cerr << "===\n";
-    current++;
-  }
-  if (0==0) return address_list;
-
-
-  for (size_t current = 1; current < address_list.size(); ++current) {
-    // If the current address has a different family than the previous address then
-    // it is in the correct position.
-    if (address_list[current]->type() != Address::Type::Ip ||
-        address_list[current - 1]->type() != Address::Type::Ip ||
-        address_list[current]->ip()->version() != address_list[current - 1]->ip()->version()) {
-      continue;
-    }
-    // Find the first address with a different address family than the current address.
-    size_t next = current + 1;
-    while (next < address_list.size()) {
-      if (address_list[next]->type() != Address::Type::Ip ||
-          address_list[current]->ip()->version() != address_list[next]->ip()->version()) {
-        break;
-      }
-      ++next;
-    }
-    // There are no more addresses with different families so sorting is finished.
-    if (next >= address_list.size()) {
-      break;
-    }
-
     // Bubble the address up to the current position.
-    for (size_t i = next; i > current; i--) {
-      using std::swap;
-      swap(address_list[i], address_list[i - 1]);
-    }
-    current = next - 1;
+    auto start = std::make_reverse_iterator(it+1);
+    auto end = std::make_reverse_iterator(current+1);
+    std::rotate(start, start + 1, end);
   }
   return address_list;
 }
