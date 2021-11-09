@@ -5,8 +5,8 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
-
 #include "envoy/stats/sink.h"
+
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/memory/stats.h"

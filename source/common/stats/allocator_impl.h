@@ -104,8 +104,7 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(mutex_);
   std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(mutex_);
 
-  template <typename StatType>
-  using StatPointerSet = absl::flat_hash_set<StatType*, absl::Hash<StatType*>>;
+  template <typename StatType> using StatPointerSet = absl::flat_hash_set<StatType*>;
   // Stat pointers that participate in the flush to sink process.
   StatPointerSet<Counter> sinked_counters_ ABSL_GUARDED_BY(mutex_);
   StatPointerSet<Gauge> sinked_gauges_ ABSL_GUARDED_BY(mutex_);

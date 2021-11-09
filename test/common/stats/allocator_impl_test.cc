@@ -48,19 +48,19 @@ public:
   ~SinkPredicatesImpl() override = default;
   StatNameHashSet& sinkedStatNames() { return sinked_stat_names_; }
 
-  bool includeCounter(const Counter& counter) const override {
+  bool includeCounter(const Counter& counter) override {
     return sinked_stat_names_.find(counter.statName()) != sinked_stat_names_.end();
   }
 
-  bool includeGauge(const Gauge& gauge) const override {
+  bool includeGauge(const Gauge& gauge) override {
     return sinked_stat_names_.find(gauge.statName()) != sinked_stat_names_.end();
   }
 
-  bool includeTextReadout(const TextReadout& text_readout) const override {
+  bool includeTextReadout(const TextReadout& text_readout) override {
     return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
   }
 
-  bool includeHistogram(const Histogram& histogram) const override {
+  bool includeHistogram(const Histogram& histogram) override {
     return sinked_stat_names_.find(histogram.statName()) != sinked_stat_names_.end();
   }
 
@@ -438,7 +438,6 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
-
   SinkPredicatesImpl sink_predicates;
   std::vector<CounterSharedPtr> sinked_counters;
   std::vector<CounterSharedPtr> unsinked_counters;
@@ -484,7 +483,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
-
   SinkPredicatesImpl sink_predicates;
   std::vector<GaugeSharedPtr> sinked_gauges;
   std::vector<GaugeSharedPtr> unsinked_gauges;
@@ -529,7 +527,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
-
   SinkPredicatesImpl sink_predicates;
   std::vector<TextReadoutSharedPtr> sinked_text_readouts;
   std::vector<TextReadoutSharedPtr> unsinked_text_readouts;
