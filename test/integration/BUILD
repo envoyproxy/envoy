@@ -740,6 +740,7 @@ envoy_cc_test_library(
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:quic_factory_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
