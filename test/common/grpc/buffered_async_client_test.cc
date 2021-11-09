@@ -62,6 +62,11 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
   EXPECT_TRUE(buffered_client.hasActiveStream());
   EXPECT_EQ(1, inflight_message_ids.size());
 
+  // Pending messages should not be re-sent.
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  const auto inflight_message_ids2 = buffered_client.sendBufferedMessages();
+  EXPECT_EQ(0, inflight_message_ids2.size());
+
   // Re-buffer, and transport.
   buffered_client.onError(*inflight_message_ids.begin());
 

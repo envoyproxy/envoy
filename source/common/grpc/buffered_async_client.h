@@ -30,6 +30,8 @@ public:
     }
   }
 
+  // It push message into internal message buffer.
+  // If the buffer is full, it will return absl::nullopt.
   absl::optional<uint64_t> bufferMessage(RequestType& message) {
     const auto buffer_size = message.ByteSizeLong();
     if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
@@ -89,8 +91,8 @@ public:
 
 private:
   void erasePendingMessage(uint64_t message_id) {
-    // This case will be considered if `onSuccess` had called with message id that is not received
-    // by envoy as response.
+    // This case will be considered if `onSuccess` had called with unknown message id that is not
+    // received by envoy as response.
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
