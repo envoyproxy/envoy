@@ -56,7 +56,7 @@ RawAsyncStream* AsyncClientImpl::startRaw(absl::string_view service_full_name,
   auto grpc_stream =
       std::make_unique<AsyncStreamImpl>(*this, service_full_name, method_name, callbacks, options);
 
-  grpc_stream->initialize(false);
+  grpc_stream->initialize(options.buffer_body_for_retry);
   if (grpc_stream->hasResetStream()) {
     return nullptr;
   }
