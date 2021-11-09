@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f # v2.3.4
+      uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # v2.3.4
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.

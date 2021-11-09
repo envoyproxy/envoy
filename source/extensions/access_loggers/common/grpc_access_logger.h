@@ -11,6 +11,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/grpc/typed_async_client.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -75,8 +76,9 @@ public:
 template <typename LogRequest, typename LogResponse> class GrpcAccessLogClient {
 public:
   GrpcAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
-                      const Protobuf::MethodDescriptor& service_method)
-      : client_(client), service_method_(service_method) {}
+                      const Protobuf::MethodDescriptor& service_method,
+                      const envoy::config::core::v3::RetryPolicy& retry_policy)
+      : client_(client), service_method_(service_method), grpc_stream_retry_policy_(retry_policy) {}
 
 public:
   struct LocalStream : public Grpc::AsyncStreamCallbacks<LogResponse> {
@@ -108,8 +110,7 @@ public:
     }
 
     if (stream_->stream_ == nullptr) {
-      stream_->stream_ =
-          client_->start(service_method_, *stream_, Http::AsyncClient::StreamOptions());
+      stream_->stream_ = client_->start(service_method_, *stream_, createStreamOptionsForRetry());
     }
 
     if (stream_->stream_ != nullptr) {
@@ -124,9 +125,24 @@ public:
     return true;
   }
 
+  Http::AsyncClient::StreamOptions createStreamOptionsForRetry() {
+    auto opt = Http::AsyncClient::StreamOptions();
+
+    if (!grpc_stream_retry_policy_) {
+      return opt;
+    }
+
+    const auto retry_policy =
+        Http::Utility::convertCoreToRouteRetryPolicy(*grpc_stream_retry_policy_, "connect-failure");
+    opt.setBufferBodyForRetry(true);
+    opt.setRetryPolicy(retry_policy);
+    return opt;
+  }
+
   Grpc::AsyncClient<LogRequest, LogResponse> client_;
   std::unique_ptr<LocalStream> stream_;
   const Protobuf::MethodDescriptor& service_method_;
+  const absl::optional<envoy::config::core::v3::RetryPolicy> grpc_stream_retry_policy_;
 };
 
 } // namespace Detail
@@ -160,8 +176,10 @@ public:
                    std::chrono::milliseconds buffer_flush_interval_msec,
                    uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
                    Stats::Scope& scope, std::string access_log_prefix,
-                   const Protobuf::MethodDescriptor& service_method)
-      : client_(client, service_method), buffer_flush_interval_msec_(buffer_flush_interval_msec),
+                   const Protobuf::MethodDescriptor& service_method,
+                   const envoy::config::core::v3::RetryPolicy& retry_policy)
+      : client_(client, service_method, retry_policy),
+        buffer_flush_interval_msec_(buffer_flush_interval_msec),
         flush_timer_(dispatcher.createTimer([this]() {
           flush();
           flush_timer_->enableTimer(buffer_flush_interval_msec_);

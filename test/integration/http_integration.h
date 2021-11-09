@@ -26,6 +26,10 @@ public:
                          Network::ClientConnectionPtr&& conn,
                          Upstream::HostDescriptionConstSharedPtr host_description,
                          Http::CodecType type);
+  IntegrationCodecClient(Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+                         Network::ClientConnectionPtr&& conn,
+                         Upstream::HostDescriptionConstSharedPtr host_description,
+                         Http::CodecType type, bool wait_till_connected);
 
   IntegrationStreamDecoderPtr makeHeaderOnlyRequest(const Http::RequestHeaderMap& headers);
   IntegrationStreamDecoderPtr makeRequestWithBody(const Http::RequestHeaderMap& headers,
@@ -52,7 +56,8 @@ public:
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-    ConnectionCallbacks(IntegrationCodecClient& parent) : parent_(parent) {}
+    ConnectionCallbacks(IntegrationCodecClient& parent, bool block_till_connected)
+        : parent_(parent), block_till_connected_(block_till_connected) {}
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
@@ -60,6 +65,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     IntegrationCodecClient& parent_;
+    bool block_till_connected_;
   };
 
   struct CodecCallbacks : public Http::ConnectionCallbacks {
