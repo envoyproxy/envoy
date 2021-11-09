@@ -366,7 +366,6 @@ envoy_cc_test(
     name = "multiplexed_integration_test",
     srcs = [
         "multiplexed_integration_test.cc",
-        "multiplexed_integration_test.h",
     ],
     shard_count = 8,
     deps = [
@@ -741,6 +740,7 @@ envoy_cc_test_library(
     ] + envoy_select_enable_http3([
         "//source/common/quic:active_quic_listener_lib",
         "//source/common/quic:quic_factory_lib",
+        "@com_github_google_quiche//:quic_test_tools_session_peer_lib",
     ]),
 )
 
@@ -1143,27 +1143,6 @@ envoy_cc_test(
         "//test/common/config:dummy_config_proto_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "proxy_proto_integration_test",
-    srcs = [
-        "proxy_proto_integration_test.cc",
-        "proxy_proto_integration_test.h",
-    ],
-    deps = [
-        ":http_integration_lib",
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http:codec_client_lib",
-        "//source/extensions/access_loggers/file:config",
-        "//source/extensions/filters/listener/proxy_protocol:config",
-        "//source/extensions/filters/network/tcp_proxy:config",
-        "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
