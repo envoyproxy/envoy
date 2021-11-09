@@ -289,12 +289,6 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   }
 }
 
-void RdsRouteConfigProviderImpl::validateConfig(
-    const envoy::config::route::v3::RouteConfiguration&) const {
-  // Validation work is delegated to the subscription, since subscription is the
-  // entity that generate new ConfigImpl.
-}
-
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(

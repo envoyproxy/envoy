@@ -506,7 +506,6 @@ public:
   MOCK_METHOD(absl::optional<ConfigInfo>, configInfo, (), (const));
   MOCK_METHOD(SystemTime, lastUpdated, (), (const));
   MOCK_METHOD(void, onConfigUpdate, ());
-  MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3::RouteConfiguration&), (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
               (const std::string&, Event::Dispatcher&,
                std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
