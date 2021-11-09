@@ -30,7 +30,7 @@ LambdaDelegate::~LambdaDelegate() {
   logger_.release(logger_.context);
 }
 
-void LambdaDelegate::log(absl::string_view msg) {
+void LambdaDelegate::log(absl::string_view msg, const spdlog::details::log_msg&) {
   logger_.log(Data::Utility::copyToBridgeData(msg), logger_.context);
 }
 
