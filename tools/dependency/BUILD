@@ -30,8 +30,8 @@ py_binary(
     ],
     args = ["$(location :cve.yaml)"],
     data = [
-        ":exports",
         ":cve.yaml",
+        ":exports",
         requirement("envoy.base.utils"),
     ],
 )
