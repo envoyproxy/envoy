@@ -17,6 +17,7 @@
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/codec_impl.h"
+#include "quiche/quic/test_tools/quic_session_peer.h"
 #endif
 
 #include "source/server/connection_handler_impl.h"
@@ -394,6 +395,21 @@ void FakeHttpConnection::encodeGoAway() {
   ASSERT(type_ >= Http::CodecType::HTTP2);
 
   postToConnectionThread([this]() { codec_->goAway(); });
+}
+
+void FakeHttpConnection::updateConcurrentStreams(uint64_t max_streams) {
+  ASSERT(type_ >= Http::CodecType::HTTP3);
+
+#ifdef ENVOY_ENABLE_QUIC
+  postToConnectionThread([this, max_streams]() {
+    auto codec = dynamic_cast<Quic::QuicHttpServerConnectionImpl*>(codec_.get());
+    quic::test::QuicSessionPeer::SetMaxOpenIncomingBidirectionalStreams(&codec->quicServerSession(),
+                                                                        max_streams);
+    codec->quicServerSession().SendMaxStreams(1, false);
+  });
+#else
+  UNREFERENCED_PARAMETER(max_streams);
+#endif
 }
 
 void FakeHttpConnection::encodeProtocolError() {
