@@ -36,8 +36,8 @@ envoy_cc_library(
         "os_sys_calls_hot_restart.h",
         "os_sys_calls_linux.h",
     ],
+    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/network:address_interface",
     ],
-    external_deps = ["abseil_optional"],
 )

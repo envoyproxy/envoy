@@ -7,12 +7,12 @@
 #include <string>
 #include <vector>
 
-#include "absl/types/optional.h"
-
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Api {
@@ -227,7 +227,8 @@ public:
   virtual SysCallIntResult getifaddrs(InterfaceAddressVector& ifap) PURE;
 
   /**
-   * allows a platform to override getifaddrs or provide an implementation if one does not exist natively.
+   * allows a platform to override getifaddrs or provide an implementation if one does not exist
+   * natively.
    *
    * @arg alternate_getifaddrs function pointer to implementation.
    */
