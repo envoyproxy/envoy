@@ -13,6 +13,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
@@ -34,13 +35,8 @@ Config::Config(
     uint32_t max_client_hello_size)
     : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
+      enable_ja3_fingerprinting_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
       max_client_hello_size_(max_client_hello_size) {
-
-  if (proto_config.has_enable_ja3_fingerprinting()) {
-    enable_ja3_fingerprinting_ = proto_config.enable_ja3_fingerprinting().value();
-  } else {
-    enable_ja3_fingerprinting_ = false;
-  }
 
   if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
