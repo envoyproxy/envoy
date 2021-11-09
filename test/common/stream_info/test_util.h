@@ -91,6 +91,11 @@ public:
   }
   const std::string& getRouteName() const override { return route_name_; }
 
+  void setVirtualClusterName(const std::string& virtual_cluster_name) override {
+    virtual_cluster_name_ = virtual_cluster_name;
+  }
+  const std::string& getVirtualClusterName() const override { return virtual_cluster_name_; }
+
   Router::RouteConstSharedPtr route() const override { return route_; }
 
   absl::optional<std::chrono::nanoseconds>
@@ -258,6 +263,7 @@ public:
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   bool health_check_request_{};
   std::string route_name_;
+  std::string virtual_cluster_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};

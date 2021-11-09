@@ -51,7 +51,7 @@ public:
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
-  MOCK_METHOD(void, setVirtualClusterName, (absl::string_view virtual_cluster_name));
+  MOCK_METHOD(void, setVirtualClusterName, (const std::string& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(const std::string&, getVirtualClusterName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));

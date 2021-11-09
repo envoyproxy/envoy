@@ -314,7 +314,7 @@ public:
   /**
    * @param std::string name denotes the name of the virtual cluster.
    */
-  virtual void setVirtualClusterName(absl::string_view name) PURE;
+  virtual void setVirtualClusterName(const std::string& name) PURE;
 
   /**
    * @return std::string& the name of the virtual cluster which got matched.

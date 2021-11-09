@@ -110,7 +110,7 @@ MockStreamInfo::MockStreamInfo()
     route_name_ = std::string(route_name);
   }));
   ON_CALL(*this, setVirtualClusterName(_))
-      .WillByDefault(Invoke([this](const absl::string_view virtual_cluster_name) {
+      .WillByDefault(Invoke([this](const std::string& virtual_cluster_name) {
         virtual_cluster_name_ = std::string(virtual_cluster_name);
       }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));

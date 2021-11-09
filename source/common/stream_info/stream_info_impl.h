@@ -187,8 +187,8 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& getRouteName() const override { return route_name_; }
 
-  void setVirtualClusterName(absl::string_view virtual_cluster_name) override {
-    virtual_cluster_name_ = std::string(virtual_cluster_name);
+  void setVirtualClusterName(const std::string& virtual_cluster_name) override {
+    virtual_cluster_name_ = virtual_cluster_name;
   }
 
   const std::string& getVirtualClusterName() const override { return virtual_cluster_name_; }
