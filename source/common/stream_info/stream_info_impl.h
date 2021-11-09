@@ -187,6 +187,12 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& getRouteName() const override { return route_name_; }
 
+  void setVirtualClusterName(absl::string_view virtual_cluster_name) override {
+    virtual_cluster_name_ = std::string(virtual_cluster_name);
+  }
+
+  const std::string& getVirtualClusterName() const override { return virtual_cluster_name_; }
+
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
     upstream_local_address_ = upstream_local_address;
@@ -332,6 +338,7 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  std::string virtual_cluster_name_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {

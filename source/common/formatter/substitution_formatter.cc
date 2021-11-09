@@ -952,6 +952,16 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return absl::nullopt;
         });
+  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          std::string virtual_cluster_name = stream_info.getVirtualClusterName();
+          if (!virtual_cluster_name.empty()) {
+            result = virtual_cluster_name;
+          }
+          return result;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }

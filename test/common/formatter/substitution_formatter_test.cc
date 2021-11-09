@@ -722,6 +722,14 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    std::string virtual_cluster_name = "authN";
+    stream_info.setVirtualClusterName(virtual_cluster_name);
+    EXPECT_EQ("authN", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+  }
+
+  {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
     const std::vector<std::string> sans{"san"};
