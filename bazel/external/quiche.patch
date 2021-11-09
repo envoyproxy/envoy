@@ -10,3 +10,17 @@
 +
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
  #include "common/platform/api/quiche_export.h"
+
+--- http2/adapter/nghttp2_data_provider.h
++++ http2/adapter/nghttp2_data_provider.h
+@@ -5,6 +5,10 @@
+ #include <memory>
+
+ #include "http2/adapter/data_source.h"
++
++// Required to build on Windows.
++typedef ptrdiff_t ssize_t;
++
+ #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
+
+ namespace http2 {
