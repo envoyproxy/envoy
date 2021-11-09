@@ -380,9 +380,52 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   }
 }
 
+bool hasSameAddressFamily(const Address::InstanceConstSharedPtr& a,
+                          const Address::InstanceConstSharedPtr& b) {
+  return (a->type() == Address::Type::Ip &&
+          b->type() == Address::Type::Ip &&
+          a->ip()->version() == b->ip()->version());
+}
+
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
   std::vector<Address::InstanceConstSharedPtr> address_list = in;
+  auto current = address_list.begin();
+  std::cerr << "CURRENT: " << (*current)->asString()<<"\n";
+  while (current != address_list.end()) {
+    std::cerr << "current: " << (*current)->asString()<<"\n";
+    auto it = std::find_if(current, address_list.end(),
+                           [&](const auto& val){ return !hasSameAddressFamily(*current, val); } );
+    if (it == address_list.end()) {
+      break;
+    }
+    std::cerr << "it: " << (*it)->asString()<<"\n";
+    std::cerr << "---\n";
+    for (auto i = current; i!=address_list.end(); ++i) {
+      std::cerr << ": " << (*i)->asString()<<"\n";
+    }
+    std::cerr << "===\n";
+
+    std::cerr << "it: " << (*it)->asString()<<"\n";
+    auto start = std::make_reverse_iterator(it+1);
+    std::cerr << "start: " << (*start)->asString()<<"\n";
+    std::cerr << "it: " << (*it)->asString()<<"\n";
+
+    auto end = std::make_reverse_iterator(current+1);
+    std::cerr << "start: " << (*start)->asString()<<"\n";
+    std::cerr << "start+1: " << (*(start+1))->asString()<<"\n";
+    std::cerr << "end: " << (*end)->asString()<<"\n";
+    std::rotate(start, start + 1, end);
+    std::cerr << "---\n";
+    for (auto i = current; i!=address_list.end(); ++i) {
+      std::cerr << ": " << (*i)->asString()<<"\n";
+    }
+    std::cerr << "===\n";
+    current++;
+  }
+  if (0==0) return address_list;
+
+
   for (size_t current = 1; current < address_list.size(); ++current) {
     // If the current address has a different family than the previous address then
     // it is in the correct position.

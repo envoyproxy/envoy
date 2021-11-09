@@ -1063,16 +1063,33 @@ TEST_F(HappyEyeballsConnectionImplTest, SortAddresses) {
   auto ip_v6_4 = std::make_shared<Address::Ipv6Instance>("ff02::4", 0);
 
   // All v4 address so unchanged.
-  std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
-  EXPECT_EQ(v4_list, HappyEyeballsConnectionImpl::sortAddresses(v4_list));
+  //  std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
+  //  EXPECT_EQ(v4_list, HappyEyeballsConnectionImpl::sortAddresses(v4_list));
 
   // All v6 address so unchanged.
-  std::vector<Address::InstanceConstSharedPtr> v6_list = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v6_4};
-  EXPECT_EQ(v6_list, HappyEyeballsConnectionImpl::sortAddresses(v6_list));
+  //  std::vector<Address::InstanceConstSharedPtr> v6_list = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v6_4};
+  //  EXPECT_EQ(v6_list, HappyEyeballsConnectionImpl::sortAddresses(v6_list));
+  {
+  std::vector<Address::InstanceConstSharedPtr> v6_then_v4 = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v6_4, ip_v4_1, ip_v4_2};
+  std::vector<Address::InstanceConstSharedPtr> interleaved = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2, ip_v6_3, ip_v6_4};
+  std::cerr << "------------------------------\n";
+  EXPECT_EQ(interleaved, HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4));
+  auto out = HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4);
+  for (auto i = out.begin(); i!=out.end(); ++i) {
+    std::cerr << "*: " << (*i)->asString()<<"\n";
+  }
+  std::cerr << "------------------------------\n";
+  }
 
   std::vector<Address::InstanceConstSharedPtr> v6_then_v4 = {ip_v6_1, ip_v6_2, ip_v4_1, ip_v4_2};
   std::vector<Address::InstanceConstSharedPtr> interleaved = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2};
+  std::cerr << "------------------------------\n";
   EXPECT_EQ(interleaved, HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4));
+  auto out = HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4);
+  for (auto i = out.begin(); i!=out.end(); ++i) {
+    std::cerr << "*: " << (*i)->asString()<<"\n";
+  }
+  std::cerr << "------------------------------\n";
 
   std::vector<Address::InstanceConstSharedPtr> v6_then_single_v4 = {ip_v6_1, ip_v6_2, ip_v6_3,
                                                                     ip_v4_1};
