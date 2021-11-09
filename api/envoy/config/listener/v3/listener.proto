@@ -320,6 +320,6 @@ message Listener {
   bool enable_mptcp = 30;
 
   // Whether the listener should limit connections based upon the value of
-  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
   bool ignore_global_conn_limit = 31;
 }

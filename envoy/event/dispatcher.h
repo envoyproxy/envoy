@@ -228,8 +228,8 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param bind_to_port controls whether the listener binds to a transport port or not.
-   * @param ignore_global_conn_limit controls whether the listener is limitted by the global
-   * connection limit
+   * @param ignore_global_conn_limit controls whether the listener is limited by the global
+   * connection limit.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
