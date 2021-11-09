@@ -646,7 +646,6 @@ envoy_cc_test_library(
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
-        "//source/common/stream_info:uint64_accessor_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],

@@ -46,6 +46,7 @@ public:
   MOCK_METHOD(void, onLastDownstreamTxByteSent, ());
   MOCK_METHOD(void, onRequestComplete, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
+  MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
@@ -141,6 +142,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  DownstreamTiming downstream_timing_;
 };
 
 } // namespace StreamInfo

@@ -131,6 +131,13 @@ struct StreamInfoImpl : public StreamInfo {
     final_time_ = time_source_.monotonicTime();
   }
 
+  DownstreamTiming& downstreamTiming() override {
+    if (!downstream_timing_.has_value()) {
+      downstream_timing_ = DownstreamTiming();
+    }
+    return downstream_timing_.value();
+  }
+
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }
 
   uint64_t bytesReceived() const override { return bytes_received_; }
@@ -360,6 +367,7 @@ private:
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
+  absl::optional<DownstreamTiming> downstream_timing_;
   UpstreamTiming upstream_timing_;
   std::string upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;

@@ -144,6 +144,8 @@ public:
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
+  Envoy::StreamInfo::DownstreamTiming& downstreamTiming() override { return downstream_timing_; }
+
   void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
   }
@@ -241,6 +243,7 @@ public:
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
+  Envoy::StreamInfo::DownstreamTiming downstream_timing_;
   absl::optional<MonotonicTime> last_rx_byte_received_;
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;

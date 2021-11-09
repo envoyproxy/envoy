@@ -1,7 +1,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
-#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
@@ -442,7 +441,7 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   Upstream::ResourceAutoIncDec* circuit_breakers_(
       new Upstream::ResourceAutoIncDec(pending_requests_));
 
-  EXPECT_CALL(callbacks_, streamInfo());
+  EXPECT_CALL(callbacks_, streamInfo()).Times(testing::AnyNumber());
 
   // Pre-populate the filter state with an address.
   auto& filter_state = callbacks_.streamInfo().filterState();
@@ -490,11 +489,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // We expect FilterState and resolution times to be populated
   EXPECT_TRUE(
-      filter_state->hasData<StreamInfo::UpstreamAddress>(StreamInfo::UpstreamAddress::key()));
-  EXPECT_TRUE(filter_state->hasData<StreamInfo::UInt64AccessorImpl>(
-      "envoy.dynamic_forward_proxy.dns_start_ms"));
-  EXPECT_TRUE(filter_state->hasData<StreamInfo::UInt64AccessorImpl>(
-      "envoy.dynamic_forward_proxy.dns_end_ms"));
+      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::dnsStart()).has_value());
+  EXPECT_TRUE(
+      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::dnsEnd()).has_value());
 
   const StreamInfo::UpstreamAddress& updated_address_obj =
       filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(

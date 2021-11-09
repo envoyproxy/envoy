@@ -238,6 +238,22 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
+class DownstreamTiming {
+public:
+  void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
+
+  absl::optional<MonotonicTime> getValue(absl::string_view value) const {
+    auto ret = timings_.find(value);
+    if (ret == timings_.end()) {
+      return {};
+    }
+    return ret->second;
+  }
+
+private:
+  absl::flat_hash_map<std::string, MonotonicTime> timings_;
+};
+
 // Measure the number of bytes sent and received for a stream.
 struct BytesMeter {
   uint64_t wireBytesSent() const { return wire_bytes_sent_; }
@@ -406,6 +422,8 @@ public:
    */
   virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
 
+  // TODO(alyssawilk) move the downstream timing calls into DownstreamTiming in
+  // a follow-up.
   /**
    * Sets the time when the first byte of the response is sent downstream.
    */
@@ -433,6 +451,11 @@ public:
    * completed (i.e., when the request's ActiveStream is destroyed).
    */
   virtual void onRequestComplete() PURE;
+
+  /**
+   * @return the downstream timing information.
+   */
+  virtual DownstreamTiming& downstreamTiming() PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
