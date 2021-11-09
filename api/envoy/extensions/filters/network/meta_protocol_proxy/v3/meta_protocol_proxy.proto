@@ -40,13 +40,13 @@ message MetaProtocolProxy {
   }
 
   // The codec which encodes and decodes the application protocol.
-  Codec codec = 5 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig codec = 5 [(validate.rules).message = {required: true}];
 
   // A list of individual Layer-7 filters that make up the filter chain for requests made to the
   // meta protocol proxy. Order matters as the filters are processed sequentially as request events
   // happen. If no meta_protocol_filters are specified, a default router filter
   // (`aeraki.meta_protocol.filters.router`) is used.
-  repeated MetaProtocolFilter meta_protocol_filters = 6;
+  repeated config.core.v3.TypedExtensionConfig meta_protocol_filters = 6;
 }
 
 // [#not-implemented-hide:]
@@ -57,24 +57,4 @@ message MetaRds {
   // The name of the route configuration. This name will be passed to the RDS API. This allows an
   // Envoy configuration with multiple MetaProtocol proxies to use different route configurations.
   string route_config_name = 2 [(validate.rules).string = {min_len: 1}];
-}
-
-// [#not-implemented-hide:]
-// MetaProtocolFilter configures a MetaProtocol filter.
-message MetaProtocolFilter {
-  // The name of the filter to instantiate. The name must match a supported filter.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Filter specific configuration which depends on the filter being instantiated. See the
-  // supported filters for further documentation.
-  config.core.v3.TypedExtensionConfig config = 2;
-}
-
-// [#not-implemented-hide:]
-message Codec {
-  // The name of the codec configuration.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Codec specific configuration which depends on the codec being instantiated.
-  config.core.v3.TypedExtensionConfig config = 2;
 }
