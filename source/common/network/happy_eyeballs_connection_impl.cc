@@ -380,31 +380,22 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   }
 }
 
-bool hasDifferentAddressFamily(const Address::InstanceConstSharedPtr& a,
-                          const Address::InstanceConstSharedPtr& b) {
-  return (a->type() != Address::Type::Ip ||
-          b->type() != Address::Type::Ip ||
-          a->ip()->version() != b->ip()->version());
-}
-
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
   std::vector<Address::InstanceConstSharedPtr> address_list = in;
   for (auto current = address_list.begin(); current != address_list.end(); ++current) {
     // Find the first address with a different address family than the current address.
-    auto it = std::find_if(current, address_list.end(),
-                           [&](const auto& val){
-                             return (val->type() != Address::Type::Ip ||
-                                     (*current)->type() != Address::Type::Ip ||
-                                     (*current)->ip()->version() != val->ip()->version());
-                           } );
+    auto it = std::find_if(current, address_list.end(), [&](const auto& val) {
+      return (val->type() != Address::Type::Ip || (*current)->type() != Address::Type::Ip ||
+              (*current)->ip()->version() != val->ip()->version());
+    });
     // If there are no more addresses with different families the sorting is finished.
     if (it == address_list.end()) {
       break;
     }
     // Bubble the address up to the current position.
-    auto start = std::make_reverse_iterator(it+1);
-    auto end = std::make_reverse_iterator(current+1);
+    auto start = std::make_reverse_iterator(it + 1);
+    auto end = std::make_reverse_iterator(current + 1);
     std::rotate(start, start + 1, end);
   }
   return address_list;
