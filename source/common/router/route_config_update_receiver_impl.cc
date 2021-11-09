@@ -50,12 +50,12 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
   auto new_config = std::make_shared<ConfigImpl>(
       new_route_config, optional_http_filters_, factory_context_,
       factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
-  // If the above validation/validation doesn't raise exception, update the=
+  // If the above validation/validation doesn't raise exception, update the
   // other cached config entries.
   config_ = new_config;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
   last_config_hash_ = new_hash;
-  route_config_proto_->Swap(&new_route_config);
+  *route_config_proto_ = std::move(new_route_config);
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
 
