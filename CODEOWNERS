@@ -197,6 +197,8 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
+# Mata protocol filter
+/*/extensions/filters/network/meta_protocol_proxy @wbpcode @zhaohuabing @rojkov @htuch
 
 # Contrib
 /contrib/exe/ @mattklein123 @lizan

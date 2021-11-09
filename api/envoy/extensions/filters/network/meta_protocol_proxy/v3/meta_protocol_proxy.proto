@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.meta_protocol_proxy.v3;
+
+import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
+import "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.meta_protocol_proxy.v3";
+option java_outer_classname = "MetaProtocolProxyProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Meta Protocol proxy]
+// Meta Protocol proxy.
+// [#extension: envoy.filters.network.meta_protocol_proxy]
+
+// [#next-free-field: 7]
+message MetaProtocolProxy {
+  // The human readable prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The name of the application protocol built on top of meta protocol.
+  string application_protocol = 2 [(validate.rules).string = {min_len: 1}];
+
+  oneof route_specifier {
+    option (validate.required) = true;
+
+    // [#not-implemented-hide:]
+    // The meta protocol proxy’s route table will be dynamically loaded via the RDS API.
+    Rds rds = 3;
+
+    // The route table for the meta protocol proxy is static and is specified in this property.
+    RouteConfiguration route_config = 4;
+  }
+
+  // The codec which encodes and decodes the application protocol.
+  config.core.v3.TypedExtensionConfig codec = 5;
+
+  // A list of individual Layer-7 filters that make up the filter chain for requests made to the
+  // meta protocol proxy. Order matters as the filters are processed sequentially as request events
+  // happen. If no meta_protocol_filters are specified, a default router filter
+  // (`aeraki.meta_protocol.filters.router`) is used.
+  repeated config.core.v3.TypedExtensionConfig meta_protocol_filters = 6;
+}
+
+// [#not-implemented-hide:]
+message Rds {
+  // Configuration source specifier for RDS.
+  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // The name of the route configuration. This name will be passed to the RDS API. This allows an
+  // Envoy configuration with multiple MetaProtocol proxies to use different route configurations.
+  string route_config_name = 2;
+}

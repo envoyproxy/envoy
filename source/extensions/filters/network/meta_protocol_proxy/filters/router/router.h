@@ -1,0 +1,122 @@
+#pragma once
+
+#include "envoy/network/connection.h"
+#include "envoy/server/factory_context.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/interface/codec.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/interface/filter.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/interface/stream.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace MetaProtocolProxy {
+namespace Router {
+
+/**
+ * Stream reset reasons.
+ */
+enum class StreamResetReason : uint32_t {
+  LocalReset,
+  // If the stream was locally reset by a connection pool due to an initial connection failure.
+  ConnectionFailure,
+  // If the stream was locally reset due to connection termination.
+  ConnectionTermination,
+  // The stream was reset because of a resource overflow.
+  Overflow,
+  // Protocol error.
+  ProtocolError,
+};
+
+class RouterFilter;
+
+class UpstreamRequest : public Tcp::ConnectionPool::Callbacks,
+                        public Tcp::ConnectionPool::UpstreamCallbacks,
+                        public LinkedObject<UpstreamRequest>,
+                        public Envoy::Event::DeferredDeletable,
+                        public ResponseDecoderCallback,
+                        Logger::Loggable<Envoy::Logger::Id::filter> {
+public:
+  UpstreamRequest(RouterFilter& parent, Upstream::TcpPoolData tcp_data);
+
+  void startStream();
+  void resetStream(StreamResetReason reason);
+
+  // Tcp::ConnectionPool::Callbacks
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
+
+  // Tcp::ConnectionPool::UpstreamCallbacks
+  void onUpstreamData(Buffer::Instance& data, bool) override;
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  // ResponseDecoderCallback
+  void onResponse(ResponsePtr response) override;
+  void onDecodingError() override;
+
+  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
+  void encodeBufferToUpstream(Buffer::Instance& buffer);
+
+  bool stream_reset_{};
+
+  RouterFilter& parent_;
+  Upstream::TcpPoolData tcp_data_;
+
+  Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
+  Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
+
+  bool response_started_{};
+  bool response_complete_{};
+  ResponseDecoderPtr response_decoder_;
+};
+using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
+
+class RouterFilter : public DecoderFilter,
+                     Logger::Loggable<Envoy::Logger::Id::filter>,
+                     public Upstream::LoadBalancerContextBase {
+public:
+  RouterFilter(Server::Configuration::FactoryContext& context) : context_(context) {}
+
+  // DecoderFilter
+  void onDestroy() override;
+
+  FilterStatus onStreamDecoded(Request& request) override;
+  void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+
+  void onUpstreamResponse(ResponsePtr response);
+  void resetStream(StreamResetReason reason);
+
+  void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason);
+  void cleanUpstreamRequests(bool filter_complete);
+
+private:
+  friend class UpstreamRequest;
+
+  bool filter_complete_{};
+
+  Buffer::OwnedImpl upstream_request_buffer_;
+  RequestEncoderPtr request_encoder_;
+
+  std::list<UpstreamRequestPtr> upstream_requests_;
+
+  DecoderFilterCallback* callbacks_{};
+
+  Server::Configuration::FactoryContext& context_;
+};
+
+} // namespace Router
+} // namespace MetaProtocolProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy
