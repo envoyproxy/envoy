@@ -56,78 +56,6 @@ licenses(["notice"])  # Apache 2
 api_proto_package($fields)
 """)
 
-IGNORED_V2_PROTOS = [
-    "envoy/config/accesslog/v2",
-    "envoy/config/cluster/aggregate/v2alpha",
-    "envoy/config/cluster/dynamic_forward_proxy/v2alpha",
-    "envoy/config/cluster/redis",
-    "envoy/config/common/dynamic_forward_proxy/v2alpha",
-    "envoy/config/common/tap/v2alpha",
-    "envoy/config/filter/dubbo/router/v2alpha1",
-    "envoy/config/filter/http/adaptive_concurrency/v2alpha",
-    "envoy/config/filter/http/aws_lambda/v2alpha",
-    "envoy/config/filter/http/aws_request_signing/v2alpha",
-    "envoy/config/filter/http/buffer/v2",
-    "envoy/config/filter/http/cache/v2alpha",
-    "envoy/config/filter/http/compressor/v2",
-    "envoy/config/filter/http/cors/v2",
-    "envoy/config/filter/http/csrf/v2",
-    "envoy/config/filter/http/dynamic_forward_proxy/v2alpha",
-    "envoy/config/filter/http/dynamo/v2",
-    "envoy/config/filter/http/ext_authz/v2",
-    "envoy/config/filter/http/fault/v2",
-    "envoy/config/filter/http/grpc_http1_bridge/v2",
-    "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1",
-    "envoy/config/filter/http/grpc_stats/v2alpha",
-    "envoy/config/filter/http/grpc_web/v2",
-    "envoy/config/filter/http/gzip/v2",
-    "envoy/config/filter/http/header_to_metadata/v2",
-    "envoy/config/filter/http/health_check/v2",
-    "envoy/config/filter/http/ip_tagging/v2",
-    "envoy/config/filter/http/jwt_authn/v2alpha",
-    "envoy/config/filter/http/lua/v2",
-    "envoy/config/filter/http/on_demand/v2",
-    "envoy/config/filter/http/original_src/v2alpha1",
-    "envoy/config/filter/http/rate_limit/v2",
-    "envoy/config/filter/http/rbac/v2",
-    "envoy/config/filter/http/router/v2",
-    "envoy/config/filter/http/squash/v2",
-    "envoy/config/filter/http/tap/v2alpha",
-    "envoy/config/filter/http/transcoder/v2",
-    "envoy/config/filter/listener/http_inspector/v2",
-    "envoy/config/filter/listener/original_dst/v2",
-    "envoy/config/filter/listener/original_src/v2alpha1",
-    "envoy/config/filter/listener/proxy_protocol/v2",
-    "envoy/config/filter/listener/tls_inspector/v2",
-    "envoy/config/filter/network/client_ssl_auth/v2",
-    "envoy/config/filter/network/direct_response/v2",
-    "envoy/config/filter/network/dubbo_proxy/v2alpha1",
-    "envoy/config/filter/network/echo/v2",
-    "envoy/config/filter/network/ext_authz/v2",
-    "envoy/config/filter/network/kafka_broker/v2alpha1",
-    "envoy/config/filter/network/local_rate_limit/v2alpha",
-    "envoy/config/filter/network/mongo_proxy/v2",
-    "envoy/config/filter/network/mysql_proxy/v1alpha1",
-    "envoy/config/filter/network/rate_limit/v2",
-    "envoy/config/filter/network/rbac/v2",
-    "envoy/config/filter/network/sni_cluster/v2",
-    "envoy/config/filter/network/zookeeper_proxy/v1alpha1",
-    "envoy/config/filter/thrift/rate_limit/v2alpha1",
-    "envoy/config/filter/udp/udp_proxy/v2alpha",
-    "envoy/config/grpc_credential/v2alpha",
-    "envoy/config/ratelimit/v2",
-    "envoy/config/rbac/v2",
-    "envoy/config/retry/omit_host_metadata/v2",
-    "envoy/config/retry/previous_priorities",
-    "envoy/config/transport_socket/raw_buffer/v2",
-    "envoy/config/transport_socket/tap/v2alpha",
-    "envoy/data/cluster/v2alpha",
-    "envoy/data/dns/v2alpha",
-    "envoy/data/core/v2alpha",
-    "envoy/service/event_reporting/v2alpha",
-    "envoy/service/trace/v2",
-]
-
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
 PACKAGE_REGEX = re.compile('\npackage: "([^"]*)"')
@@ -182,7 +110,7 @@ def get_destination_path(src):
         dst_path = pathlib.Path('contrib').joinpath(dst_path)
     # Non-contrib can not use alpha.
     if not 'contrib' in src:
-        if not 'v2alpha' in package and 'alpha' in package:
+        if (not 'v2alpha' in package and not 'v1alpha1' in package) and 'alpha' in package:
             raise ProtoSyncError(
                 "package '{}' uses an alpha namespace. This is not allowed. Instead mark with "
                 "(xds.annotations.v3.file_status).work_in_progress or related annotation.".format(
@@ -294,28 +222,6 @@ def get_import_deps(proto_path):
     return imports
 
 
-def get_previous_message_type_deps(proto_path):
-    """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
-
-    We need to link in earlier proto descriptors to support Envoy reflection upgrades.
-
-    Args:
-        proto_path: path to .proto.
-
-    Returns:
-        A list of Bazel targets reflecting the previous message types in the .proto at proto_path.
-    """
-    contents = pathlib.Path(proto_path).read_text(encoding='utf8')
-    matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
-    deps = []
-    for m in matches:
-        pkg = get_directory_from_package(m)
-        if pkg in IGNORED_V2_PROTOS:
-            continue
-        deps.append('//%s:pkg' % pkg)
-    return deps
-
-
 def has_services(proto_path):
     """Does a .proto file have any service definitions?
 
@@ -347,10 +253,7 @@ def build_file_contents(root, files):
     Returns:
         A string containing the canonical BUILD file content for root.
     """
-    import_deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
-    history_deps = set(
-        sum([get_previous_message_type_deps(os.path.join(root, f)) for f in files], []))
-    deps = import_deps.union(history_deps)
+    deps = set(sum([get_import_deps(os.path.join(root, f)) for f in files], []))
     _has_services = any(has_services(os.path.join(root, f)) for f in files)
     fields = []
     if _has_services:
@@ -396,14 +299,12 @@ def generate_current_api_dir(api_dir, dst_dir):
     dst = dst_dir.joinpath("envoy")
     shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
 
-    for p in dst.glob('**/*.md'):
-        p.unlink()
     # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
     # so we ignore it here.
     shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
-    for proto in IGNORED_V2_PROTOS:
-        shutil.rmtree(str(dst.joinpath(proto[6:])))
+    for p in dst.glob('**/*.md'):
+        p.unlink()
 
 
 def git_status(path):

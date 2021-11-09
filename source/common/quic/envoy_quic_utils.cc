@@ -134,7 +134,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
     local_addr = Network::Utility::getLocalAddress(peer_addr->ip()->version());
   }
   auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram, local_addr, peer_addr);
+      Network::Socket::Type::Datagram, local_addr, peer_addr, Network::SocketCreationOptions{});
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   if (options != nullptr) {

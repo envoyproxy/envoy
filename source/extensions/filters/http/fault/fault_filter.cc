@@ -212,7 +212,7 @@ void FaultFilter::maybeSetupResponseRateLimit(const Http::RequestHeaderMap& requ
         encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
       },
       [this] { encoder_callbacks_->continueEncoding(); },
-      [](uint64_t) {
+      [](uint64_t, bool) {
         // write stats callback.
       },
       config_->timeSource(), decoder_callbacks_->dispatcher(), decoder_callbacks_->scope());
