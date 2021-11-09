@@ -1,8 +1,8 @@
---- http2/adapter/nghttp2_session.h
-+++ http2/adapter/nghttp2_session.h
-@@ -5,6 +5,10 @@
-
- #include "http2/adapter/http2_session.h"
+--- http2/adapter/callback_visitor.h
++++ http2/adapter/callback_visitor.h
+@@ -8,6 +8,10 @@
+ #include "absl/container/flat_hash_map.h"
+ #include "http2/adapter/http2_visitor_interface.h"
  #include "http2/adapter/nghttp2_util.h"
 +
 +// Required to build on Windows.
@@ -11,6 +11,19 @@
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
  #include "common/platform/api/quiche_export.h"
 
+--- http2/adapter/nghttp2_callbacks.h
++++ http2/adapter/nghttp2_callbacks.h
+@@ -5,6 +5,10 @@
+
+ #include "http2/adapter/http2_protocol.h"
+ #include "http2/adapter/nghttp2_util.h"
++
++// Required to build on Windows.
++typedef ptrdiff_t ssize_t;
++
+ #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
+
+ namespace http2 {
 --- http2/adapter/nghttp2_data_provider.h
 +++ http2/adapter/nghttp2_data_provider.h
 @@ -5,6 +5,10 @@
@@ -24,3 +37,29 @@
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
 
  namespace http2 {
+--- http2/adapter/nghttp2_session.h
++++ http2/adapter/nghttp2_session.h
+@@ -5,6 +5,10 @@
+
+ #include "http2/adapter/http2_session.h"
+ #include "http2/adapter/nghttp2_util.h"
++
++// Required to build on Windows.
++typedef ptrdiff_t ssize_t;
++
+ #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
+ #include "common/platform/api/quiche_export.h"
+
+--- http2/adapter/nghttp2_util.h
++++ http2/adapter/nghttp2_util.h
+@@ -10,6 +10,10 @@
+ #include "absl/types/span.h"
+ #include "http2/adapter/data_source.h"
+ #include "http2/adapter/http2_protocol.h"
++
++// Required to build on Windows.
++typedef ptrdiff_t ssize_t;
++
+ #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
+ #include "spdy/core/spdy_header_block.h"
+
