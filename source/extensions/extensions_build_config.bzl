@@ -173,6 +173,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
+    "envoy.filters.thrift.header_to_metadata":          "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:config",
     "envoy.filters.thrift.ratelimit":                   "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
 
     #
