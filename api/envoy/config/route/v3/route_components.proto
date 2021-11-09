@@ -5,11 +5,11 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/custom_tag/v3/custom_tag.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/metadata/v3/metadata.proto";
-import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 import "envoy/type/v3/range.proto";
 
@@ -1618,7 +1618,7 @@ message Tracing {
   // configured in the HTTP connection manager. If two tags with the same name are configured
   // each in the HTTP connection manager and the route level, the one configured here takes
   // priority.
-  repeated type.tracing.v3.CustomTag custom_tags = 4;
+  repeated type.custom_tag.v3.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

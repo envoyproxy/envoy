@@ -14,7 +14,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/tracing/v3/custom_tag.pb.h"
+#include "envoy/type/custom_tag/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/access_log/access_log_impl.h"

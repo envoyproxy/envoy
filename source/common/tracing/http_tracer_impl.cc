@@ -5,8 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/custom_tag/v3/custom_tag.pb.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
-#include "envoy/type/tracing/v3/custom_tag.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
@@ -242,15 +242,15 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 }
 
 CustomTagConstSharedPtr
-HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
+HttpTracerUtility::createCustomTag(const envoy::type::custom_tag::v3::CustomTag& tag) {
   switch (tag.type_case()) {
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
+  case envoy::type::custom_tag::v3::CustomTag::TypeCase::kLiteral:
     return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
+  case envoy::type::custom_tag::v3::CustomTag::TypeCase::kEnvironment:
     return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
+  case envoy::type::custom_tag::v3::CustomTag::TypeCase::kRequestHeader:
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
+  case envoy::type::custom_tag::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -290,14 +290,14 @@ void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
 }
 
 EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
+    const std::string& tag, const envoy::type::custom_tag::v3::CustomTag::Environment& environment)
     : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
   const char* env = std::getenv(name_.data());
   final_value_ = env ? env : default_value_;
 }
 
 RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
+    const std::string& tag, const envoy::type::custom_tag::v3::CustomTag::Header& request_header)
     : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
       default_value_(request_header.default_value()) {}
 
@@ -310,8 +310,8 @@ absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) con
   return entry.value_or(default_value_);
 }
 
-MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
+MetadataCustomTag::MetadataCustomTag(
+    const std::string& tag, const envoy::type::custom_tag::v3::CustomTag::Metadata& metadata)
     : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 

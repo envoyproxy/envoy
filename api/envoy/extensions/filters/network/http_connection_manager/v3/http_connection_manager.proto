@@ -11,8 +11,8 @@ import "envoy/config/core/v3/substitution_format_string.proto";
 import "envoy/config/route/v3/route.proto";
 import "envoy/config/route/v3/scoped_route.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
+import "envoy/type/custom_tag/v3/custom_tag.proto";
 import "envoy/type/http/v3/path_transformation.proto";
-import "envoy/type/tracing/v3/custom_tag.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -179,7 +179,7 @@ message HttpConnectionManager {
     google.protobuf.UInt32Value max_path_tag_length = 7;
 
     // A list of custom tags with unique tag name to create tags for the active span.
-    repeated type.tracing.v3.CustomTag custom_tags = 8;
+    repeated type.custom_tag.v3.CustomTag custom_tags = 8;
 
     // Configuration for an external tracing provider.
     // If not specified, no tracing will be performed.

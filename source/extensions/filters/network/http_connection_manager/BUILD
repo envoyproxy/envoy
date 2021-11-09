@@ -62,7 +62,7 @@ envoy_cc_extension(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/original_ip_detection/xff/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/custom_tag/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ] + envoy_select_enable_http3([
         "//source/common/quic:codec_lib",

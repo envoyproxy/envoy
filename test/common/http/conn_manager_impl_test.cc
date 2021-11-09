@@ -1304,24 +1304,24 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   std::vector<TracingTagMetaSuite> tracing_tag_meta_cases = {
       {"l-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v3::CustomTag::Literal literal;
+         envoy::type::custom_tag::v3::CustomTag::Literal literal;
          literal.set_value(v);
          return std::make_shared<Tracing::LiteralCustomTag>(t, literal);
        }},
       {"e-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v3::CustomTag::Environment e;
+         envoy::type::custom_tag::v3::CustomTag::Environment e;
          e.set_default_value(v);
          return std::make_shared<Tracing::EnvironmentCustomTag>(t, e);
        }},
       {"x-tag",
        [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v3::CustomTag::Header h;
+         envoy::type::custom_tag::v3::CustomTag::Header h;
          h.set_default_value(v);
          return std::make_shared<Tracing::RequestHeaderCustomTag>(t, h);
        }},
       {"m-tag", [](const std::string& t, const std::string& v) {
-         envoy::type::tracing::v3::CustomTag::Metadata m;
+         envoy::type::custom_tag::v3::CustomTag::Metadata m;
          m.mutable_kind()->mutable_host();
          m.set_default_value(v);
          return std::make_shared<Tracing::MetadataCustomTag>(t, m);

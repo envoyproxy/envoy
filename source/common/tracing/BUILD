@@ -62,8 +62,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/custom_tag/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )
 

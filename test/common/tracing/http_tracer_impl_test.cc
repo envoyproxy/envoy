@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/type/tracing/v3/custom_tag.pb.h"
+#include "envoy/type/custom_tag/v3/custom_tag.pb.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/http/header_map_impl.h"
@@ -103,7 +103,7 @@ protected:
 
   void expectSetCustomTags(const std::vector<CustomTagCase>& cases) {
     for (const CustomTagCase& cas : cases) {
-      envoy::type::tracing::v3::CustomTag custom_tag;
+      envoy::type::custom_tag::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
       config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
       if (cas.set) {
@@ -821,7 +821,7 @@ TEST_F(HttpTracerImplTest, ChildUpstreamSpanTest) {
 }
 
 TEST_F(HttpTracerImplTest, MetadataCustomTagReturnsDefaultValue) {
-  envoy::type::tracing::v3::CustomTag::Metadata testing_metadata;
+  envoy::type::custom_tag::v3::CustomTag::Metadata testing_metadata;
   testing_metadata.mutable_metadata_key()->set_key("key");
   *testing_metadata.mutable_default_value() = "default_value";
   MetadataCustomTag tag("testing", testing_metadata);

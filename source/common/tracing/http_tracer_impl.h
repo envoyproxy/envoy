@@ -9,8 +9,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/custom_tag/v3/custom_tag.pb.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
-#include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/config/metadata.h"
@@ -62,7 +62,7 @@ public:
    * Create a custom tag according to the configuration.
    * @param tag a tracing custom tag configuration.
    */
-  static CustomTagConstSharedPtr createCustomTag(const envoy::type::tracing::v3::CustomTag& tag);
+  static CustomTagConstSharedPtr createCustomTag(const envoy::type::custom_tag::v3::CustomTag& tag);
 
 private:
   static void setCommonTags(Span& span, const Http::ResponseHeaderMap* response_headers,
@@ -125,7 +125,7 @@ protected:
 class LiteralCustomTag : public CustomTagBase {
 public:
   LiteralCustomTag(const std::string& tag,
-                   const envoy::type::tracing::v3::CustomTag::Literal& literal)
+                   const envoy::type::custom_tag::v3::CustomTag::Literal& literal)
       : CustomTagBase(tag), value_(literal.value()) {}
   absl::string_view value(const CustomTagContext&) const override { return value_; }
 
@@ -136,7 +136,7 @@ private:
 class EnvironmentCustomTag : public CustomTagBase {
 public:
   EnvironmentCustomTag(const std::string& tag,
-                       const envoy::type::tracing::v3::CustomTag::Environment& environment);
+                       const envoy::type::custom_tag::v3::CustomTag::Environment& environment);
   absl::string_view value(const CustomTagContext&) const override { return final_value_; }
 
 private:
@@ -148,7 +148,7 @@ private:
 class RequestHeaderCustomTag : public CustomTagBase {
 public:
   RequestHeaderCustomTag(const std::string& tag,
-                         const envoy::type::tracing::v3::CustomTag::Header& request_header);
+                         const envoy::type::custom_tag::v3::CustomTag::Header& request_header);
   absl::string_view value(const CustomTagContext& ctx) const override;
 
 private:
@@ -159,7 +159,7 @@ private:
 class MetadataCustomTag : public CustomTagBase {
 public:
   MetadataCustomTag(const std::string& tag,
-                    const envoy::type::tracing::v3::CustomTag::Metadata& metadata);
+                    const envoy::type::custom_tag::v3::CustomTag::Metadata& metadata);
   void apply(Span& span, const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
   const envoy::config::core::v3::Metadata* metadata(const CustomTagContext& ctx) const;

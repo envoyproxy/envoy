@@ -45,7 +45,7 @@ HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {
 
 Tracing::CustomTagConstSharedPtr
 HttpConnectionManagerImplTest::requestHeaderCustomTag(const std::string& header) {
-  envoy::type::tracing::v3::CustomTag::Header headerTag;
+  envoy::type::custom_tag::v3::CustomTag::Header headerTag;
   headerTag.set_name(header);
   return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
 }
