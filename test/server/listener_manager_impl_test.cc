@@ -536,6 +536,28 @@ TEST_F(ListenerManagerImplTest, UnsupportedInternalListener) {
   EXPECT_DEATH(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true), ".*");
 }
 
+TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListenerConfig) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "true"}});
+
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    internal_listener: {}
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", true),
+                            EnvoyException,
+                            "error adding listener '127.0.0.1:1234': address is not an internal "
+                            "address but an internal listener config is provided");
+}
+
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   const std::string yaml = R"EOF(
     name: "foo"
@@ -4792,13 +4814,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
 static_listeners:
 )EOF");
 
-  // Add foo listener.
+  // Add foo listener. The internal listener does not need explicit internal listener field.
   const std::string listener_foo_yaml = R"EOF(
 name: test_internal_listener
 address:
   envoy_internal_address:
     server_listener_name: test_internal_listener_name
-internal_listener: {}
 filter_chains: {}
   )EOF";
 
@@ -4821,7 +4842,6 @@ dynamic_listeners:
           envoy_internal_address:
             server_listener_name: test_internal_listener_name
         filter_chains: {}
-        internal_listener: {}
       last_updated:
         seconds: 1001001001
         nanos: 1000000
@@ -4838,7 +4858,6 @@ address:
   envoy_internal_address:
     server_listener_name: test_internal_listener_name
 filter_chains: {}
-internal_listener: {}
 per_connection_buffer_limit_bytes: 10
     )EOF";
 
@@ -4864,7 +4883,6 @@ per_connection_buffer_limit_bytes: 10
             envoy_internal_address:
               server_listener_name: test_internal_listener_name
           filter_chains: {}
-          internal_listener: {}
           per_connection_buffer_limit_bytes: 10
         last_updated:
           seconds: 2002002002
@@ -4925,7 +4943,6 @@ per_connection_buffer_limit_bytes: 10
             envoy_internal_address:
               server_listener_name: test_internal_listener_name
           filter_chains: {}
-          internal_listener: {}
         last_updated:
           seconds: 3003003003
           nanos: 3000000
@@ -4938,7 +4955,6 @@ per_connection_buffer_limit_bytes: 10
             envoy_internal_address:
               server_listener_name: test_internal_listener_name
           filter_chains: {}
-          internal_listener: {}
           per_connection_buffer_limit_bytes: 10
         last_updated:
           seconds: 2002002002
@@ -5004,7 +5020,6 @@ per_connection_buffer_limit_bytes: 10
             envoy_internal_address:
               server_listener_name: test_internal_listener_name
           filter_chains: {}
-          internal_listener: {}
         last_updated:
           seconds: 3003003003
           nanos: 3000000

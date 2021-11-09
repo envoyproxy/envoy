@@ -465,8 +465,14 @@ void ListenerImpl::buildAccessLog() {
 }
 
 void ListenerImpl::buildInternalListener() {
-  if (config_.has_internal_listener()) {
+  if (config_.address().has_envoy_internal_address()) {
     internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
+  } else {
+    if (config_.has_internal_listener()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "
+                                       "address but an internal listener config is provided",
+                                       address_->asString()));
+    }
   }
 }
 

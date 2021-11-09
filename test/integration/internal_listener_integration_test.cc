@@ -23,15 +23,7 @@ class InternalListenerIntegrationTest : public testing::TestWithParam<Network::A
                                         public BaseIntegrationTest {
 public:
   InternalListenerIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseConfig() + +R"EOF(
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.tcp_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-          stat_prefix: tcp_stats
-          cluster: cluster_0
-)EOF") {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::tcpProxyConfig()) {}
 
   void initialize() override {
     config_helper_.renameListener("tcp");
@@ -39,13 +31,12 @@ public:
       auto& listener = *bootstrap.mutable_static_resources()->mutable_listeners(0);
       listener.mutable_address()->mutable_envoy_internal_address()->set_server_listener_name(
           "internal_listener");
-      listener.mutable_internal_listener();
     });
     BaseIntegrationTest::initialize();
   }
 };
 
-TEST_P(InternalListenerIntegrationTest, Basic) {
+TEST_P(InternalListenerIntegrationTest, BasicConfigUpdate) {
   initialize();
   EXPECT_EQ(1, test_server_->counter("listener_manager.lds.update_success")->value());
 

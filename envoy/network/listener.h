@@ -456,13 +456,12 @@ public:
    */
   virtual void onAccept(ConnectionSocketPtr&& socket) PURE;
 };
-using InternalListenerCallbacksOptRef =
-    absl::optional<std::reference_wrapper<InternalListenerCallbacks>>;
+using InternalListenerCallbacksOptRef = OptRef<InternalListenerCallbacks>;
 
 class InternalListener {};
 
 using InternalListenerPtr = std::unique_ptr<InternalListener>;
-using InternalListenerOptRef = absl::optional<std::reference_wrapper<InternalListener>>;
+using InternalListenerOptRef = OptRef<InternalListener>;
 
 /**
  * The query interface of the registered internal listener callbacks.

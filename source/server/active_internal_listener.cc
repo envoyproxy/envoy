@@ -54,7 +54,7 @@ void ActiveInternalListener::onAccept(Network::ConnectionSocketPtr&& socket) {
   incNumConnections();
 
   auto active_socket = std::make_unique<ActiveTcpSocket>(
-      *this, std::move(socket), false /* do not handle off at internal listener */);
+      *this, std::move(socket), false /* do not hand off at internal listener */);
 
   onSocketAccepted(std::move(active_socket));
 }

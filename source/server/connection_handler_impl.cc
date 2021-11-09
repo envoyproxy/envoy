@@ -175,7 +175,7 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
     return Network::InternalListenerCallbacksOptRef(
         listener_it->second.internalListener().value().get());
   }
-  return absl::nullopt;
+  return OptRef<Network::InternalListenerCallbacks>();
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef
