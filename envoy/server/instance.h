@@ -277,7 +277,7 @@ public:
   virtual bool enableReusePortDefault() PURE;
 
   virtual void
-  setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates> sink_predicates) PURE;
+  setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;
 };
 
 } // namespace Server

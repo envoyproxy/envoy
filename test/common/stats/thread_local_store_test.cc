@@ -1582,46 +1582,6 @@ private:
   absl::flat_hash_set<std::string> sinked_stat_names_;
 };
 
-TEST_F(HistogramTest, ForEachSinkedHistogram) {
-  std::unique_ptr<Stats::SinkPredicatesImpl> moved_sink_predicates =
-      std::make_unique<SinkPredicatesImpl>();
-  SinkPredicatesImpl* sink_predicates = moved_sink_predicates.get();
-  std::vector<std::reference_wrapper<Stats::Histogram>> sinked_histograms;
-  std::vector<std::reference_wrapper<Stats::Histogram>> unsinked_histograms;
-
-  store_->setSinkPredicates(std::move(moved_sink_predicates));
-
-  const size_t num_stats = 11;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = absl::StrCat("histogram.", idx);
-    // sink every 3rd stat
-    if ((idx + 1) % 3 == 0) {
-      sink_predicates->sinkedStatNames().insert(stat_name);
-      sinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
-    } else {
-      unsinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
-    }
-  }
-
-  EXPECT_EQ(sinked_histograms.size(), 3);
-  EXPECT_EQ(unsinked_histograms.size(), 8);
-
-  size_t num_sinked_histograms = 0;
-  size_t num_iterations = 0;
-  store_->forEachSinkedHistogram(
-      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
-      [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
-        EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.tagExtractedName()),
-                  sink_predicates->sinkedStatNames().end());
-        ++num_iterations;
-      });
-  EXPECT_EQ(num_sinked_histograms, 3);
-  EXPECT_EQ(num_iterations, 3);
-}
-
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:

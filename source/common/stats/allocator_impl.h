@@ -36,21 +36,15 @@ public:
   SymbolTable& symbolTable() override { return symbol_table_; }
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
-  void forEachCounter(std::function<void(std::size_t)>,
-                      std::function<void(Stats::Counter&)>) const override;
+  void forEachCounter(SizeFn, StatFn<Counter>) const override;
 
-  void forEachGauge(std::function<void(std::size_t)>,
-                    std::function<void(Stats::Gauge&)>) const override;
+  void forEachGauge(SizeFn, StatFn<Gauge>) const override;
 
-  void forEachTextReadout(std::function<void(std::size_t)>,
-                          std::function<void(Stats::TextReadout&)>) const override;
+  void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
 
-  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                            std::function<void(Stats::Counter&)> f_stat) const override;
-  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::Gauge&)> f_stat) const override;
-  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                std::function<void(Stats::TextReadout&)> f_stat) const override;
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
 
   void setSinkPredicates(SinkPredicates& sink_predicates) override;
 #ifndef ENVOY_CONFIG_COVERAGE

@@ -355,8 +355,7 @@ Counter* AllocatorImpl::makeCounterInternal(StatName name, StatName tag_extracte
   return new CounterImpl(name, *this, tag_extracted_name, stat_name_tags);
 }
 
-void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
-                                   std::function<void(Stats::Counter&)> f_stat) const {
+void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(counters_.size());
@@ -366,8 +365,7 @@ void AllocatorImpl::forEachCounter(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
-                                 std::function<void(Stats::Gauge&)> f_stat) const {
+void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(gauges_.size());
@@ -377,8 +375,7 @@ void AllocatorImpl::forEachGauge(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
-                                       std::function<void(Stats::TextReadout&)> f_stat) const {
+void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   Thread::LockGuard lock(mutex_);
   if (f_size != nullptr) {
     f_size(text_readouts_.size());
@@ -388,8 +385,7 @@ void AllocatorImpl::forEachTextReadout(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                                         std::function<void(Stats::Counter&)> f_stat) const {
+void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   if (sink_predicates_.has_value()) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_counters_.size());
@@ -401,8 +397,7 @@ void AllocatorImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size
   }
 }
 
-void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                                       std::function<void(Stats::Gauge&)> f_stat) const {
+void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   if (sink_predicates_.has_value()) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
@@ -414,9 +409,7 @@ void AllocatorImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
   }
 }
 
-void AllocatorImpl::forEachSinkedTextReadout(
-    std::function<void(std::size_t)> f_size,
-    std::function<void(Stats::TextReadout&)> f_stat) const {
+void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   if (sink_predicates_.has_value()) {
     Thread::LockGuard lock(mutex_);
     f_size(sinked_text_readouts_.size());

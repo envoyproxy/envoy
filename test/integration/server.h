@@ -282,47 +282,31 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
-  void forEachCounter(std::function<void(std::size_t)> f_size,
-                      std::function<void(Stats::Counter&)> f_stat) const override {
+  void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
   }
-  void forEachGauge(std::function<void(std::size_t)> f_size,
-                    std::function<void(Stats::Gauge&)> f_stat) const override {
+  void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachGauge(f_size, f_stat);
   }
-  void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+  void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
-  void forEachHistogram(std::function<void(std::size_t)> f_size,
-                        std::function<void(Stats::ParentHistogram&)> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachHistogram(f_size, f_stat);
-  }
-  void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                            std::function<void(Stats::Counter&)> f_stat) const override {
+  void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedCounter(f_size, f_stat);
   }
-  void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::Gauge&)> f_stat) const override {
+  void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedGauge(f_size, f_stat);
   }
-  void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                std::function<void(Stats::TextReadout&)> f_stat) const override {
+  void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedTextReadout(f_size, f_stat);
   }
-  void forEachSinkedHistogram(std::function<void(std::size_t)> f_size,
-                              std::function<void(Stats::ParentHistogram&)> f_stat) const override {
-    Thread::LockGuard lock(lock_);
-    store_.forEachSinkedHistogram(f_size, f_stat);
-  }
-  void setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) override {
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
     UNREFERENCED_PARAMETER(sink_predicates);
   }
 

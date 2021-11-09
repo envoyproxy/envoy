@@ -90,7 +90,6 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
     for (uint32_t i = first_histogram_index; i < deleted_histograms_.size(); ++i) {
       uint32_t erased = histogram_set_.erase(deleted_histograms_[i].get());
       ASSERT(erased == 1);
-      sinked_histograms_.erase(deleted_histograms_[i].get());
     }
   }
 }
@@ -222,7 +221,6 @@ void ThreadLocalStoreImpl::shutdownThreading() {
     histogram->setShuttingDown(true);
   }
   histogram_set_.clear();
-  sinked_histograms_.clear();
 }
 
 void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
@@ -245,7 +243,9 @@ void ThreadLocalStoreImpl::mergeHistograms(PostMergeCb merge_complete_cb) {
 
 void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   if (!shutting_down_) {
-    forEachHistogram(nullptr, [](ParentHistogram& histogram) { histogram.merge(); });
+    for (const ParentHistogramSharedPtr& histogram : histograms()) {
+      histogram->merge();
+    }
     merge_complete_cb();
     merge_in_progress_ = false;
   }
@@ -678,9 +678,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
-          if (parent_.sink_predicates_.get() && parent_.sink_predicates_->includeHistogram(*stat)) {
-            parent_.sinked_histograms_.insert(stat.get());
-          }
         }
       }
     }
@@ -870,7 +867,6 @@ bool ThreadLocalStoreImpl::decHistogramRefCount(ParentHistogramImpl& hist,
     if (!shutting_down_) {
       const size_t count = histogram_set_.erase(hist.statName());
       ASSERT(shutting_down_ || count == 1);
-      sinked_histograms_.erase(&hist);
     }
     return true;
   }
@@ -958,66 +954,32 @@ bool ParentHistogramImpl::usedLockHeld() const {
   return false;
 }
 
-void ThreadLocalStoreImpl::forEachCounter(std::function<void(std::size_t)> f_size,
-                                          std::function<void(Stats::Counter&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   alloc_.forEachCounter(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachGauge(std::function<void(std::size_t)> f_size,
-                                        std::function<void(Stats::Gauge&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   alloc_.forEachGauge(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachTextReadout(
-    std::function<void(std::size_t)> f_size,
-    std::function<void(Stats::TextReadout&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   alloc_.forEachTextReadout(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachHistogram(
-    std::function<void(size_t)> f_size, std::function<void(Stats::ParentHistogram&)> f_stat) const {
-  Thread::LockGuard lock(hist_mutex_);
-  if (f_size != nullptr) {
-    f_size(histogram_set_.size());
-  }
-  for (auto histogram : histogram_set_) {
-    f_stat(*histogram);
-  }
-}
-
-void ThreadLocalStoreImpl::forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                                                std::function<void(Stats::Counter&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   alloc_.forEachSinkedCounter(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                                              std::function<void(Stats::Gauge&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   alloc_.forEachSinkedGauge(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachSinkedTextReadout(
-    std::function<void(std::size_t)> f_size,
-    std::function<void(Stats::TextReadout&)> f_stat) const {
+void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
+                                                    StatFn<TextReadout> f_stat) const {
   alloc_.forEachSinkedTextReadout(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachSinkedHistogram(
-    std::function<void(size_t)> f_size, std::function<void(Stats::ParentHistogram&)> f_stat) const {
-  if (sink_predicates_.get() != nullptr) {
-    Thread::LockGuard lock(hist_mutex_);
-
-    if (f_size != nullptr) {
-      f_size(sinked_histograms_.size());
-    }
-    for (auto histogram : sinked_histograms_) {
-      f_stat(*histogram);
-    }
-  } else {
-    forEachHistogram(f_size, f_stat);
-  }
-}
-
-void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates> sink_predicates) {
+void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
   sink_predicates_ = std::move(sink_predicates);
   ASSERT(sink_predicates_.get() != nullptr);
   if (sink_predicates_.get() != nullptr) {

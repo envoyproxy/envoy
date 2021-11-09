@@ -190,15 +190,11 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         gauges_.push_back(gauge);
       });
 
-  store.forEachSinkedHistogram(
-      [this](std::size_t size) mutable {
-        snapped_histograms_.reserve(size);
-        histograms_.reserve(size);
-      },
-      [this](Stats::ParentHistogram& histogram) mutable {
-        snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
-        histograms_.push_back(histogram);
-      });
+  snapped_histograms_ = store.histograms();
+  histograms_.reserve(snapped_histograms_.size());
+  for (const auto& histogram : snapped_histograms_) {
+    histograms_.push_back(*histogram);
+  }
 
   store.forEachSinkedTextReadout(
       [this](std::size_t size) mutable {

@@ -80,19 +80,13 @@ public:
    *        called only once, prior to any calls to f_stat.
    * @param f_stat functor that is provided one stat in the sink at a time.
    */
-  virtual void forEachCounter(std::function<void(std::size_t)> f_size,
-                              std::function<void(Stats::Counter&)> f_stat) const PURE;
-  virtual void forEachGauge(std::function<void(std::size_t)> f_size,
-                            std::function<void(Stats::Gauge&)> f_stat) const PURE;
-  virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                                  std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+  virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
+  virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
+  virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
-  virtual void forEachSinkedCounter(std::function<void(std::size_t)> f_size,
-                                    std::function<void(Stats::Counter&)> f_stat) const PURE;
-  virtual void forEachSinkedGauge(std::function<void(std::size_t)> f_size,
-                                  std::function<void(Stats::Gauge&)> f_stat) const PURE;
-  virtual void forEachSinkedTextReadout(std::function<void(std::size_t)> f_size,
-                                        std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+  virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
+  virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
+  virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
   /**
    * Set the predicates to filter stats for sink.
