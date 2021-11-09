@@ -1002,24 +1002,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "echo_integration_test",
-    srcs = [
-        "echo_integration_test.cc",
-    ],
-    tags = [
-        # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
-        # or RBE, see comments in AddRemoveListener.
-        # "exclusive",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/extensions/filters/network/echo:config",
-        "//test/server:utility_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "socket_interface_integration_test",
     srcs = ["socket_interface_integration_test.cc"],
     deps = [
