@@ -111,6 +111,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -143,6 +148,10 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  std::string expected_alpn = upstreamProtocol() == Http::CodecType::HTTP2 ? "h2" : "h3";
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("alpn")).empty());
+  ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
+            expected_alpn);
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
