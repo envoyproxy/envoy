@@ -61,14 +61,14 @@ public:
   size_t numberOfNeededTlvTypes() const;
 
   /**
-   * Filter configuration that determines if we should pass-through failed proxy protocol
-   * requests. Should only be configured to true for trusted downstreams.
+   * Filter configuration that determines if we should pass-through requests without
+   * proxy protocol. Should only be configured to true for trusted downstreams.
    */
-  bool detectProxyProtocol() const;
+  bool allowRequestsWithoutProxyProtocol() const;
 
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
-  bool detect_proxy_protocol_{};
+  bool allow_requests_without_proxy_protocol_{};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;

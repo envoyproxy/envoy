@@ -225,7 +225,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 TEST_P(ProxyProtocolTest, AllowNoProxyProtocol) {
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  proto_config.set_detect_proxy_protocol(true);
+  proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
   write("more data");
@@ -943,7 +943,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  proto_config.set_detect_proxy_protocol(true);
+  proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
   write("PROXY TCP4");

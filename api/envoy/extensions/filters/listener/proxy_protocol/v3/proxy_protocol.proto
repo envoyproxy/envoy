@@ -42,7 +42,8 @@ message ProxyProtocol {
   repeated Rule rules = 1;
 
   // NOTICE: only enable if ALL traffic to the listener comes from a trusted source.
-  // Defaults to false. If true, attempt to detect proxy protocol if present, and allow
-  // requests through if proxy protocol is not used on the connection.
-  bool detect_proxy_protocol = 2;
+  // Defaults to false. If true, allow requests through that don't use proxy protocol.
+  // For more information on the security implications of this feature, see
+  // https://www.haproxy.org/download/1.9/doc/proxy-protocol.txt
+  bool allow_requests_without_proxy_protocol = 2;
 }

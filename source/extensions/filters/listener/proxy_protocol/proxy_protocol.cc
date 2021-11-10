@@ -47,7 +47,7 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
-  detect_proxy_protocol_ = proto_config.detect_proxy_protocol();
+  allow_requests_without_proxy_protocol_ = proto_config.allow_requests_without_proxy_protocol();
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -64,7 +64,7 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
-bool Config::detectProxyProtocol() const { return detect_proxy_protocol_; }
+bool Config::allowRequestsWithoutProxyProtocol() const { return allow_requests_without_proxy_protocol_; }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
@@ -443,9 +443,9 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
-    } else if (nread < PROXY_PROTO_V2_HEADER_LEN && config_.get()->detectProxyProtocol()) {
+    } else if (nread < PROXY_PROTO_V2_HEADER_LEN && config_.get()->allowRequestsWithoutProxyProtocol()) {
       if (nread < PROXY_PROTO_V1_SIGNATURE_LEN || memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
-        ENVOY_LOG(debug, "need more bytes to detect proxy protocol header");
+        ENVOY_LOG(debug, "need more bytes to determine if we have a proxy protocol header");
         return ReadOrParseState::SkipFilterError;
       }
     }
