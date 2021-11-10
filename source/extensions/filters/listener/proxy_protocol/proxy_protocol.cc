@@ -47,6 +47,7 @@ Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
     : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
+  detect_proxy_protocol_ = proto_config.detect_proxy_protocol();
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
@@ -63,6 +64,8 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
+bool Config::detectProxyProtocol() const { return detect_proxy_protocol_; }
+
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
@@ -77,11 +80,20 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   return Network::FilterStatus::StopIteration;
 }
 
+ReadOrParseState Filter::resetAndContinue(Network::IoHandle& io_handle) {
+  // Release the file event so that we do not interfere with the connection read events.
+  io_handle.resetFileEvents();
+  cb_->continueFilterChain(true);
+  return ReadOrParseState::Done;
+}
+
 void Filter::onRead() {
   const ReadOrParseState read_state = onReadWorker();
   if (read_state == ReadOrParseState::Error) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->continueFilterChain(false);
+  } else if (read_state == ReadOrParseState::SkipFilterError) {
+    resetAndContinue(cb_->socket().ioHandle());
   }
 }
 
@@ -135,10 +147,7 @@ ReadOrParseState Filter::onReadWorker() {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  // Release the file event so that we do not interfere with the connection read events.
-  socket.ioHandle().resetFileEvents();
-  cb_->continueFilterChain(true);
-  return ReadOrParseState::Done;
+  return resetAndContinue(socket.ioHandle());
 }
 
 absl::optional<size_t> Filter::lenV2Address(char* buf) {
@@ -309,7 +318,7 @@ ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* 
     const auto recv_result = io_handle.recv(buf, to_read, 0);
     if (!recv_result.ok()) {
       if (recv_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
+        return ReadOrParseState::TryAgainLaterError;
       }
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes avail)");
       return ReadOrParseState::Error;
@@ -424,7 +433,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
 
     if (!result.ok()) {
       if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLater;
+        return ReadOrParseState::TryAgainLaterError;
       }
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
@@ -434,6 +443,9 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
+    } else if (nread < PROXY_PROTO_V2_HEADER_LEN && config_.get()->detectProxyProtocol()) {
+      ENVOY_LOG(debug, "need more bytes to read proxy protocol");
+      return ReadOrParseState::SkipFilterError;
     }
 
     if (buf_off_ + nread >= PROXY_PROTO_V2_HEADER_LEN) {
