@@ -65,24 +65,26 @@ public:
 class Request : public StreamBase {
 public:
   /**
-   * Get request protocol.
+   * Get application protocol of meta protocol stream.
    *
-   * @return A string view representing the protocol of the generic request behind the context.
+   * @return A string view representing the application protocol of the meta protocol stream behind
+   * the context.
    */
   virtual absl::string_view protocol() const PURE;
 
   /**
    * Get request authority.
    *
-   * @return The authority of generic request. It generally consists of the host and an optional
-   * user information and an optional port.
+   * @return The authority of meta protocol request. It generally consists of the host and an
+   * optional user information and an optional port. For different application protocols, the
+   * meaning of the return value may be different.
    */
   virtual absl::string_view authority() const PURE;
 
   /**
    * Get request path.
    *
-   * @return The path of generic request. The content and meaning of path are determined by
+   * @return The path of meta protocol request. The content and meaning of path are determined by
    * specific protocol itself.
    */
   virtual absl::string_view path() const PURE;
@@ -90,10 +92,12 @@ public:
   /**
    * Get request method.
    *
-   * @return The method of generic request. The content and meaning of method are determined by
-   * specific protocol itself.
+   * @return The method of meta protocol request. The content and meaning of method are determined
+   * by specific protocol itself.
    */
   virtual absl::string_view method() const PURE;
+
+  static constexpr absl::string_view name() { return "meta_protocol"; }
 };
 using RequestPtr = std::unique_ptr<Request>;
 using RequestSharedPtr = std::shared_ptr<Request>;
@@ -119,23 +123,24 @@ enum class Status {
 class Response : public StreamBase {
 public:
   /**
-   * Get generic response protocol.
+   * Get application protocol of meta protocol stream.
    *
-   * @return A string view representing the protocol of the meta protocol stream behind the context.
+   * @return A string view representing the application protocol of the meta protocol stream behind
+   * the context.
    */
   virtual absl::string_view protocol() const PURE;
 
   /**
-   * Get generic response status.
+   * Get response status.
    *
-   * @return Generic response status.
+   * @return meta protocol response status.
    */
   virtual Status status() const PURE;
 
   /**
-   * Get generic response status detail of string view type.
+   * Get response status detail of string view type.
    *
-   * @return Generic response status detail. Status detail is a specific supplement to status.
+   * @return meta protocol response status detail. Status detail is a specific supplement to status.
    */
   virtual absl::string_view statusDetail() const PURE;
 };

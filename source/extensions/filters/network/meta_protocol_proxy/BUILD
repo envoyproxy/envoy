@@ -56,6 +56,7 @@ envoy_cc_library(
         "route.h",
     ],
     deps = [
+        ":match_lib",
         "//envoy/server:factory_context_interface",
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
@@ -65,6 +66,21 @@ envoy_cc_library(
         "//source/extensions/filters/network/meta_protocol_proxy/interface:route_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "match_lib",
+    srcs = [
+        "match.cc",
+    ],
+    hdrs = [
+        "match.h",
+    ],
+    deps = [
+        "//source/common/matcher:matcher_lib",
+        "//source/extensions/filters/network/meta_protocol_proxy/interface:stream_interface",
         "@envoy_api//envoy/extensions/filters/network/meta_protocol_proxy/v3:pkg_cc_proto",
     ],
 )

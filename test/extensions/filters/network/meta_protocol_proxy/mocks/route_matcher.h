@@ -35,7 +35,7 @@ public:
   std::string cluster_name_{"fake_cluster_name"};
 
   envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<GenericRouteTypedMetadataFactory> typed_metadata_;
+  Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
   testing::NiceMock<MockRetryPolicy> retry_policy_;
 };
 
