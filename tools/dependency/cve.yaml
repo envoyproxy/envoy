@@ -6,7 +6,7 @@ ndist_url: https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz
 
 # These CVEs are false positives for the match heuristics. An explanation is
 # required when adding a new entry to this list as a comment.
-ignore:
+ignored_cves:
 # Node.js issue unrelated to http-parser (napi_ API implementation).
 - CVE-2020-8174
 # Node.js HTTP desync attack. Request smuggling due to CR and hyphen
