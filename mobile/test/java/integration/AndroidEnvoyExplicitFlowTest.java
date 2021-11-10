@@ -21,12 +21,12 @@ import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -58,7 +58,7 @@ public class AndroidEnvoyExplicitFlowTest {
     CountDownLatch latch = new CountDownLatch(1);
     Context appContext = ApplicationProvider.getApplicationContext();
     engine = new AndroidEngineBuilder(appContext)
-                 .addLogLevel(LogLevel.DEBUG)
+                 .addLogLevel(LogLevel.INFO)
                  .setOnEngineRunning(() -> {
                    latch.countDown();
                    return null;
@@ -225,6 +225,26 @@ public class AndroidEnvoyExplicitFlowTest {
     // A "terminating" empty buffer is systematically sent through the setOnResponseData callback.
     // See: https://github.com/envoyproxy/envoy-mobile/issues/1393
     assertThat(response.getNbResponseChunks()).isEqualTo(6); // 3&2 bytes, 3&2 bytes, 2, and 0 bytes
+  }
+
+  @Test
+  public void get_veryLargeResponse() throws Exception {
+    byte[] responseBytes = new byte[100_000_000];
+    Arrays.fill(responseBytes, (byte)'A');
+    String responseBody = new String(responseBytes);
+    mockWebServer.enqueue(new MockResponse().setBody(responseBody));
+    mockWebServer.start();
+
+    RequestScenario requestScenario = new RequestScenario()
+                                          .setHttpMethod(RequestMethod.GET)
+                                          .setUrl(mockWebServer.url("get/flowers").toString())
+                                          .setResponseBufferSize(1_000_001);
+
+    Response response = sendRequest(requestScenario);
+
+    assertThat(response.getHeaders().getHttpStatus()).isEqualTo(200);
+    assertThat(response.getBodyAsString()).isEqualTo(responseBody);
+    assertThat(response.getEnvoyError()).isNull();
   }
 
   @Test

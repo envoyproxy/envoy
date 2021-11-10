@@ -251,6 +251,20 @@ void Client::DirectStreamCallbacks::onCancel() {
   bridge_callbacks_.on_cancel(streamIntel(), bridge_callbacks_.context);
 }
 
+void Client::DirectStreamCallbacks::onHasBufferedData() {
+  // This call is potentially asynchronous, and may occur for a closed stream.
+  if (!remote_end_stream_received_) {
+    direct_stream_.runHighWatermarkCallbacks();
+  }
+}
+
+void Client::DirectStreamCallbacks::onBufferedDataDrained() {
+  // This call is potentially asynchronous, and may occur for a closed stream.
+  if (!remote_end_stream_received_) {
+    direct_stream_.runLowWatermarkCallbacks();
+  }
+}
+
 envoy_stream_intel Client::DirectStreamCallbacks::streamIntel() {
   return direct_stream_.stream_intel_;
 }
