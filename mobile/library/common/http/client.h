@@ -152,8 +152,8 @@ private:
 
     void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-    void onHasBufferedData() { direct_stream_.runHighWatermarkCallbacks(); }
-    void onBufferedDataDrained() { direct_stream_.runLowWatermarkCallbacks(); }
+    void onHasBufferedData();
+    void onBufferedDataDrained();
 
     // To be called by mobile library when in explicit flow control mode and more data is wanted.
     // If bytes are available, the bytes available (up to the limit of
