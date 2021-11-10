@@ -222,15 +222,30 @@ TEST_P(ProxyProtocolTest, V1Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, AllowNoProxyProtocol) {
-  // allows request through even though it doesn't use proxy protocol
+TEST_P(ProxyProtocolTest, AllowTinyNoProxyProtocol) {
+  // allows a small request (less bytes than v1/v2 header) through even though it doesn't use proxy
+  // protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
 
-  write("more data");
+  write("data");
 
-  expectData("more data");
+  expectData("data");
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, AllowLargeNoProxyProtocol) {
+  // allows a large request (more bytes than v1/v2 header) through even though it doesn't use proxy
+  // protocol
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_allow_requests_without_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  write("more data more data more data");
+
+  expectData("more data more data more data");
 
   disconnect();
 }

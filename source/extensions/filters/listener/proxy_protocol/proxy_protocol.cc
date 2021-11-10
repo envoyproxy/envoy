@@ -93,7 +93,7 @@ void Filter::onRead() {
   if (read_state == ReadOrParseState::Error) {
     config_->stats_.downstream_cx_proxy_proto_error_.inc();
     cb_->continueFilterChain(false);
-  } else if (read_state == ReadOrParseState::SkipFilterError) {
+  } else if (read_state == ReadOrParseState::SkipFilter) {
     resetAndContinue(cb_->socket().ioHandle());
   }
 }
@@ -320,7 +320,7 @@ ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* 
     const auto recv_result = io_handle.recv(buf, to_read, 0);
     if (!recv_result.ok()) {
       if (recv_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLaterError;
+        return ReadOrParseState::TryAgainLater;
       }
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes avail)");
       return ReadOrParseState::Error;
@@ -435,7 +435,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
 
     if (!result.ok()) {
       if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
-        return ReadOrParseState::TryAgainLaterError;
+        return ReadOrParseState::TryAgainLater;
       }
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
@@ -445,8 +445,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
-    } else if (nread < PROXY_PROTO_V2_HEADER_LEN &&
-               config_.get()->allowRequestsWithoutProxyProtocol()) {
+    } else if (config_.get()->allowRequestsWithoutProxyProtocol()) {
       if (memcmp(buf_, PROXY_PROTO_V1_SIGNATURE,
                  std::min<size_t>(buf_off_ + nread, PROXY_PROTO_V1_SIGNATURE_LEN)) &&
           memcmp(buf_, PROXY_PROTO_V2_SIGNATURE,
@@ -454,7 +453,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
         // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
         // short-circuit
         ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
-        return ReadOrParseState::SkipFilterError;
+        return ReadOrParseState::SkipFilter;
       }
     }
 

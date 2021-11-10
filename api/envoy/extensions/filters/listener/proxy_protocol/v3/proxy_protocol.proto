@@ -45,9 +45,10 @@ message ProxyProtocol {
   //
   // .. attention::
   //
+  //   This breaks conformance with the specification.
   //   Only enable if ALL traffic to the listener comes from a trusted source.
   //   For more information on the security implications of this feature, see
-  //   https://www.haproxy.org/download/1.9/doc/proxy-protocol.txt
+  //   https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt
   //
   bool allow_requests_without_proxy_protocol = 2;
 }
