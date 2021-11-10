@@ -30,9 +30,7 @@ Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS:
     return Envoy::Ssl::SanMatcherPtr{std::make_unique<IpAddSanMatcher>(matcher.matcher())};
   default:
-    RELEASE_ASSERT(true, "Invalid san type for "
-                         "envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher");
-    return Envoy::Ssl::SanMatcherPtr();
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
