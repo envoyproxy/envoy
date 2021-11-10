@@ -222,7 +222,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, DetectNoProxyProtocol) {
+TEST_P(ProxyProtocolTest, AllowNoProxyProtocol) {
 
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_detect_proxy_protocol(true);
@@ -927,6 +927,30 @@ TEST_P(ProxyProtocolTest, PartialRead) {
 
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
+  write("54.254 1.2");
+  write(".3.4 65535");
+  write(" 1234\r\n...");
+
+  expectData("...");
+
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "254.254.254.254");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, PartialV1ReadWithAllowNoProxyProtocol) {
+
+  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
+  proto_config.set_detect_proxy_protocol(true);
+  connect(true, &proto_config);
+
+  write("PROXY TCP4");
+
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  write(" 254.254.2");
   write("54.254 1.2");
   write(".3.4 65535");
   write(" 1234\r\n...");
