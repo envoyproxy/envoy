@@ -27,7 +27,7 @@ message MetaProtocolProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The application protocol built on top of the meta protocol proxy.
-  ApplicationProtocol application_protocol = 2 [(validate.rules).string = {min_len: 1}];
+  ApplicationProtocol application_protocol = 2 [(validate.rules).message = {required: true}];
 
   oneof route_specifier {
     option (validate.required) = true;
