@@ -82,11 +82,10 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   return Network::FilterStatus::StopIteration;
 }
 
-ReadOrParseState Filter::resetAndContinue(Network::IoHandle& io_handle) {
+void Filter::resetAndContinue(Network::IoHandle& io_handle) {
   // Release the file event so that we do not interfere with the connection read events.
   io_handle.resetFileEvents();
   cb_->continueFilterChain(true);
-  return ReadOrParseState::Done;
 }
 
 void Filter::onRead() {
@@ -149,7 +148,8 @@ ReadOrParseState Filter::onReadWorker() {
         proxy_protocol_header_.value().remote_address_);
   }
 
-  return resetAndContinue(socket.ioHandle());
+  resetAndContinue(socket.ioHandle());
+  return ReadOrParseState::Done;
 }
 
 absl::optional<size_t> Filter::lenV2Address(char* buf) {

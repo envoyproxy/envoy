@@ -125,7 +125,7 @@ private:
   bool parseV2Header(char* buf);
   absl::optional<size_t> lenV2Address(char* buf);
 
-  ReadOrParseState resetAndContinue(Network::IoHandle& io_handle);
+  void resetAndContinue(Network::IoHandle& io_handle);
 
   Network::ListenerFilterCallbacks* cb_{};
 
