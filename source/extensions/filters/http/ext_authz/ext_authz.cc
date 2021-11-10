@@ -346,6 +346,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info, false);
     }
 
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
@@ -365,8 +367,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           }
         },
         absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
     break;
   }
 
