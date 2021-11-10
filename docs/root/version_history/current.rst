@@ -67,6 +67,7 @@ New Features
 * oauth filter: setting IdToken and RefreshToken cookies if they are provided by Identity provider along with AccessToken.
 * tcp: added a :ref:`FilterState <envoy_v3_api_msg_type.v3.HashPolicy.FilterState>` :ref:`hash policy <envoy_v3_api_msg_type.v3.HashPolicy>`, used by :ref:`TCP proxy <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy>` to allow hashing load balancer algorithms to hash on objects in filter state.
 * tcp_proxy: added support to populate upstream http connect header values from stream info.
+* thrift_proxy: add header to metadata filter for turning headers into dynamic metadata.
 * thrift_proxy: add upstream response zone metrics in the form ``cluster.cluster_name.zone.local_zone.upstream_zone.thrift.upstream_resp_success``.
 * thrift_proxy: add upstream metrics to show decoding errors and whether exception is from local or remote, e.g. ``cluster.cluster_name.thrift.upstream_resp_exception_remote``.
 * thrift_proxy: add host level success/error metrics where success is a reply of type success and error is any other response to a call.
