@@ -129,6 +129,7 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                           [](Event::PostCb) { FAIL(); });
+  server.setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>());
   server.shutdown();
 }
 
