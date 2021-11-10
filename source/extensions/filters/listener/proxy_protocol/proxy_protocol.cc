@@ -46,8 +46,8 @@ namespace ProxyProtocol {
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol& proto_config)
-    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))} {
-  allow_requests_without_proxy_protocol_ = proto_config.allow_requests_without_proxy_protocol();
+    : stats_{ALL_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))}
+    , allow_requests_without_proxy_protocol_(proto_config.allow_requests_without_proxy_protocol()) {
   for (const auto& rule : proto_config.rules()) {
     tlv_types_[0xFF & rule.tlv_type()] = rule.on_tlv_present();
   }
