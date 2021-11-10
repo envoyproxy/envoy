@@ -39,7 +39,7 @@ Make sure that Java 8 set on `PATH` and that `JAVA_HOME` is set to the appropria
 Android requirements
 --------------------
 
-- Android SDK Platform 29
+- Android SDK Platform 30
 - Android NDK 21
 
 For local builds, set ``ANDROID_HOME`` and ``ANDROID_NDK_HOME`` to point to the location of these installs. For example,
