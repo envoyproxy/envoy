@@ -80,6 +80,18 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
     closeStream();
   }
 
+  // The response_data_ is systematically assigned here because resumeData can
+  // incur an asynchronous callback to sendDataToBridge.
+  if (explicit_flow_control_ && !response_data_) {
+    response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
+        [this]() -> void { this->onBufferedDataDrained(); },
+        [this]() -> void { this->onHasBufferedData(); }, []() -> void {});
+    // Default to 1M per stream. This is fairly arbitrary and will result in
+    // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
+    // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
+    response_data_->setWatermarks(1000000);
+  }
+
   // Send data if in default flow control mode, or if resumeData has been called in explicit
   // flow control mode.
   if (bytes_to_send_ > 0 || !explicit_flow_control_) {
@@ -90,15 +102,6 @@ void Client::DirectStreamCallbacks::encodeData(Buffer::Instance& data, bool end_
   // If not all the bytes have been sent up, buffer any remaining data in response_data.
   if (data.length() != 0) {
     ASSERT(explicit_flow_control_);
-    if (!response_data_) {
-      response_data_ = std::make_unique<Buffer::WatermarkBuffer>(
-          [this]() -> void { this->onBufferedDataDrained(); },
-          [this]() -> void { this->onHasBufferedData(); }, []() -> void {});
-      // Default to 1M per stream. This is fairly arbitrary and will result in
-      // Envoy buffering up to 1M + flow-control-window for HTTP/2 and HTTP/3,
-      // and having local data of 1M + kernel-buffer-limit for HTTP/1.1
-      response_data_->setWatermarks(1000000);
-    }
     ENVOY_LOG(
         debug, "[S{}] buffering {} bytes due to explicit flow control. {} total bytes buffered.",
         direct_stream_.stream_handle_, data.length(), data.length() + response_data_->length());
