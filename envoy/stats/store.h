@@ -54,7 +54,8 @@ public:
   /**
    * Iterate over all stats. Note, that implementations can potentially hold on to a mutex that
    * will deadlock if the passed in functors try to create or delete a stat.
-   * @param f_size functor that is provided the current number of all stats.
+   * @param f_size functor that is provided the current number of all stats. Note that this is
+   * called only once, prior to any calls to f_stat.
    * @param f_stat functor that is provided one stat at a time from the stats container.
    */
   virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
@@ -66,6 +67,7 @@ public:
    * potentially hold on to a mutex that will deadlock if the passed in functors try to create
    * or delete a stat.
    * @param f_size functor that is provided the number of all stats that will be flushed to sinks.
+   * Note that this is called only once, prior to any calls to f_stat.
    * @param f_stat functor that is provided one stat that will be flushed to sinks, at a time.
    */
   virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;

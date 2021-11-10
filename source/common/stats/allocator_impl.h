@@ -17,8 +17,6 @@
 namespace Envoy {
 namespace Stats {
 
-class SinkPredicates;
-
 class AllocatorImpl : public Allocator {
 public:
   static const char DecrementToZeroSyncPoint[];
