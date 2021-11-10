@@ -52,7 +52,7 @@ bool KeyValueStoreBase::parseContents(absl::string_view contents,
       ENVOY_LOG(warn, error);
       return false;
     }
-    store.emplace(abs::string_view(key.value()), absl::string_view(value.value()));
+    store.emplace(std::string(key.value()), std::string(value.value()));
   }
   return true;
 }
