@@ -205,6 +205,8 @@ constexpr bool win32SupportsOriginalDestination() {
 #define be16toh(x) OSSwapBigToHostInt16((x))
 #define be32toh(x) OSSwapBigToHostInt32((x))
 #define be64toh(x) OSSwapBigToHostInt64((x))
+
+#undef TRUE
 #else
 #include <endian.h>
 #endif
