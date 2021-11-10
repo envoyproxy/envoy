@@ -12,86 +12,9 @@ import sys
 import textwrap
 import urllib.request
 
-import utils as dep_utils
+from envoy.base import utils
 
-# These CVEs are false positives for the match heuristics. An explanation is
-# required when adding a new entry to this list as a comment.
-IGNORES_CVES = set([
-    # Node.js issue unrelated to http-parser (napi_ API implementation).
-    'CVE-2020-8174',
-    # Node.js HTTP desync attack. Request smuggling due to CR and hyphen
-    # conflation in llhttp
-    # (https://github.com/nodejs/llhttp/commit/9d9da1d0f18599ceddd8f484df5a5ad694d23361).
-    # This was a result of using llparse's toLowerUnsafe() for header keys.
-    # http-parser uses a TOKEN method that doesn't have the same issue for
-    # header fields.
-    'CVE-2020-8201',
-    # Node.js issue unrelated to http-parser. This is a DoS due to a lack of
-    # request/connection timeouts, see
-    # https://github.com/nodejs/node/commit/753f3b247a.
-    'CVE-2020-8251',
-    # Node.js issue unrelated to http-parser (libuv).
-    'CVE-2020-8252',
-    # Fixed via the nghttp2 1.41.0 bump in Envoy 8b6ea4.
-    'CVE-2020-11080',
-    # Node.js issue rooted in a c-ares bug. Does not appear to affect
-    # http-parser or our use of c-ares, c-ares has been bumped regardless.
-    'CVE-2020-8277',
-    # gRPC issue that only affects Javascript bindings.
-    'CVE-2020-7768',
-    # Node.js issue unrelated to http-parser, see
-    # https://github.com/mhart/StringStream/issues/7.
-    'CVE-2018-21270',
-    # These should not affect Curl 7.74.0, but we see false positives due to the
-    # relative release date and CPE wildcard.
-    'CVE-2020-8169',
-    'CVE-2020-8177',
-    'CVE-2020-8284',
-    # Low severity Curl issue with incorrect re-use of connections due to case
-    # in/sensitivity
-    'CVE-2021-22924',
-    # Node.js issue unrelated to http-parser (Node TLS).
-    'CVE-2020-8265',
-    # Node.js request smuggling.
-    # https://github.com/envoyproxy/envoy/pull/14686 validates that this does
-    # not apply to Envoy.
-    'CVE-2020-8287',
-    # Envoy is operating post Brotli 1.0.9 release, so not affected by this.
-    'CVE-2020-8927',
-    # Node.js issue unrelated to http-parser (*).
-    'CVE-2021-22883',
-    'CVE-2021-22884',
-    # False positive on the match heuristic, fixed in Curl 7.76.0.
-    'CVE-2021-22876',
-    'CVE-2021-22890',
-    # Node.js issues unrelated to http-parser.
-    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22918
-    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22921
-    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22931
-    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22939
-    # See https://nvd.nist.gov/vuln/detail/CVE-2021-22940
-    'CVE-2021-22918',
-    'CVE-2021-22921',
-    'CVE-2021-22930',
-    'CVE-2021-22931',
-    'CVE-2021-22939',
-    'CVE-2021-22940',
-    #
-    # Currently, cvescan does not respect/understand versions (see #18354).
-    #
-    # The following CVEs target versions that are not currently used in the Envoy repo.
-    #
-    # libcurl
-    "CVE-2021-22945",
-    #
-    # kafka
-    'CVE-2021-38153',
-    #
-    # wasmtime
-    "CVE-2021-39216",
-    "CVE-2021-39218",
-    "CVE-2021-39219",
-])
+import utils as dep_utils
 
 # Subset of CVE fields that are useful below.
 Cve = namedtuple(
@@ -332,19 +255,18 @@ def cve_scan(cves, cpe_revmap, cve_allowlist, repository_locations):
 
 
 if __name__ == '__main__':
+    cve_config = utils.from_yaml(sys.argv[1])
+
     # Allow local overrides for NIST CVE database URLs via args.
-    urls = sys.argv[1:]
+    urls = sys.argv[2:]
     if not urls:
-        # We only look back a few years, since we shouldn't have any ancient deps.
         current_year = dt.datetime.now().year
-        scan_years = range(2018, current_year + 1)
-        urls = [
-            f'https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz'
-            for year in scan_years
-        ]
+        scan_years = range(cve_config["start_year"], current_year + 1)
+        urls = [cve_config["ndist_url"].format(year=year) for year in scan_years]
     cves, cpe_revmap = download_cve_data(urls)
+
     possible_cves, cve_deps = cve_scan(
-        cves, cpe_revmap, IGNORES_CVES, dep_utils.repository_locations())
+        cves, cpe_revmap, cve_config["ignore"], dep_utils.repository_locations())
     if possible_cves:
         print(
             '\nBased on heuristic matching with the NIST CVE database, Envoy may be vulnerable to:')
