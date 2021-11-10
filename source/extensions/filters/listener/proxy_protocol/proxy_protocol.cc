@@ -447,9 +447,17 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       return ReadOrParseState::Error;
     } else if (nread < PROXY_PROTO_V2_HEADER_LEN &&
                config_.get()->allowRequestsWithoutProxyProtocol()) {
-      if (nread < PROXY_PROTO_V1_SIGNATURE_LEN ||
-          memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
-        ENVOY_LOG(debug, "need more bytes to determine if we have a proxy protocol header");
+      ssize_t to_compare_v1 = buf_off_ + nread;
+      if (to_compare_v1 > PROXY_PROTO_V1_SIGNATURE_LEN) {
+        to_compare_v1 = PROXY_PROTO_V1_SIGNATURE_LEN;
+      }
+      ssize_t to_compare_v2 = buf_off_ + nread;
+      if (to_compare_v2 > PROXY_PROTO_V2_SIGNATURE_LEN) {
+        to_compare_v2 = PROXY_PROTO_V2_SIGNATURE_LEN;
+      }
+      if (memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, to_compare_v1) &&
+          memcmp(buf_, PROXY_PROTO_V2_SIGNATURE, to_compare_v2)) {
+        ENVOY_LOG(debug, "we don't have v1 or v2 header");
         return ReadOrParseState::SkipFilterError;
       }
     }
