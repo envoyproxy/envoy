@@ -126,3 +126,14 @@
  }
  
  }  // namespace adapter
+--- http2/adapter/oghttp2_session.cc
++++ http2/adapter/oghttp2_session.cc
+@@ -11,6 +11,8 @@
+ #include "http2/adapter/oghttp2_util.h"
+ #include "spdy/core/spdy_protocol.h"
+
++#undef NO_ERROR
++
+ namespace http2 {
+ namespace adapter {
+
