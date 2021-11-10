@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:global_lib",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

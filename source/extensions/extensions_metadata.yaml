@@ -393,6 +393,11 @@ envoy.filters.network.zookeeper_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.thrift.header_to_metadata:
+  categories:
+  - envoy.thrift_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.thrift.ratelimit:
   categories:
   - envoy.thrift_proxy.filters

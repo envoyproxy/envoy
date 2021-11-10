@@ -205,6 +205,8 @@ constexpr bool win32SupportsOriginalDestination() {
 #define be16toh(x) OSSwapBigToHostInt16((x))
 #define be32toh(x) OSSwapBigToHostInt32((x))
 #define be64toh(x) OSSwapBigToHostInt64((x))
+
+#undef TRUE
 #else
 #include <endian.h>
 #endif
@@ -230,6 +232,10 @@ constexpr bool win32SupportsOriginalDestination() {
 
 #ifndef UDP_SEGMENT
 #define UDP_SEGMENT 103
+#endif
+
+#ifndef IPPROTO_MPTCP
+#define IPPROTO_MPTCP 262
 #endif
 
 typedef int os_fd_t;            // NOLINT(modernize-use-using)

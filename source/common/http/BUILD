@@ -346,6 +346,7 @@ envoy_cc_library(
     hdrs = ["hash_policy.h"],
     deps = [
         ":utility_lib",
+        "//envoy/common:hashable_interface",
         "//envoy/http:hash_policy_interface",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
