@@ -1,4 +1,5 @@
 #include <cmath>
+#include <memory>
 #include <string>
 
 #include "envoy/stats/sink.h"
@@ -438,11 +439,13 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
-  SinkPredicatesImpl sink_predicates;
+  std::unique_ptr<SinkPredicatesImpl> moved_sink_predicates =
+      std::make_unique<SinkPredicatesImpl>();
+  SinkPredicatesImpl* sink_predicates = moved_sink_predicates.get();
   std::vector<CounterSharedPtr> sinked_counters;
   std::vector<CounterSharedPtr> unsinked_counters;
 
-  alloc_.setSinkPredicates(sink_predicates);
+  alloc_.setSinkPredicates(std::move(moved_sink_predicates));
 
   const size_t num_stats = 11;
 
@@ -450,7 +453,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
-      sink_predicates.sinkedStatNames().insert(stat_name);
+      sink_predicates->sinkedStatNames().insert(stat_name);
       sinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
     } else {
       unsinked_counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
@@ -464,9 +467,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
   size_t num_iterations = 0;
   alloc_.forEachSinkedCounter(
       [&num_sinked_counters](std::size_t size) { num_sinked_counters = size; },
-      [&num_iterations, &sink_predicates](Stats::Counter& counter) {
-        EXPECT_NE(sink_predicates.sinkedStatNames().find(counter.statName()),
-                  sink_predicates.sinkedStatNames().end());
+      [&num_iterations, sink_predicates](Stats::Counter& counter) {
+        EXPECT_NE(sink_predicates->sinkedStatNames().find(counter.statName()),
+                  sink_predicates->sinkedStatNames().end());
         ++num_iterations;
       });
   EXPECT_EQ(num_sinked_counters, 3);
@@ -483,18 +486,20 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
-  SinkPredicatesImpl sink_predicates;
+  std::unique_ptr<SinkPredicatesImpl> moved_sink_predicates =
+      std::make_unique<SinkPredicatesImpl>();
+  SinkPredicatesImpl* sink_predicates = moved_sink_predicates.get();
   std::vector<GaugeSharedPtr> sinked_gauges;
   std::vector<GaugeSharedPtr> unsinked_gauges;
 
-  alloc_.setSinkPredicates(sink_predicates);
+  alloc_.setSinkPredicates(std::move(moved_sink_predicates));
   const size_t num_stats = 11;
 
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
     // sink every 5th stat
     if ((idx + 1) % 5 == 0) {
-      sink_predicates.sinkedStatNames().insert(stat_name);
+      sink_predicates->sinkedStatNames().insert(stat_name);
       sinked_gauges.emplace_back(
           alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
     } else {
@@ -509,9 +514,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   size_t num_sinked_gauges = 0;
   size_t num_iterations = 0;
   alloc_.forEachSinkedGauge([&num_sinked_gauges](std::size_t size) { num_sinked_gauges = size; },
-                            [&num_iterations, &sink_predicates](Stats::Gauge& gauge) {
-                              EXPECT_NE(sink_predicates.sinkedStatNames().find(gauge.statName()),
-                                        sink_predicates.sinkedStatNames().end());
+                            [&num_iterations, sink_predicates](Stats::Gauge& gauge) {
+                              EXPECT_NE(sink_predicates->sinkedStatNames().find(gauge.statName()),
+                                        sink_predicates->sinkedStatNames().end());
                               ++num_iterations;
                             });
   EXPECT_EQ(num_sinked_gauges, 2);
@@ -527,18 +532,20 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
 }
 
 TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
-  SinkPredicatesImpl sink_predicates;
+  std::unique_ptr<SinkPredicatesImpl> moved_sink_predicates =
+      std::make_unique<SinkPredicatesImpl>();
+  SinkPredicatesImpl* sink_predicates = moved_sink_predicates.get();
   std::vector<TextReadoutSharedPtr> sinked_text_readouts;
   std::vector<TextReadoutSharedPtr> unsinked_text_readouts;
 
-  alloc_.setSinkPredicates(sink_predicates);
+  alloc_.setSinkPredicates(std::move(moved_sink_predicates));
   const size_t num_stats = 11;
 
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
     // sink every 2nd stat
     if ((idx + 1) % 2 == 0) {
-      sink_predicates.sinkedStatNames().insert(stat_name);
+      sink_predicates->sinkedStatNames().insert(stat_name);
       sinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
     } else {
       unsinked_text_readouts.emplace_back(alloc_.makeTextReadout(stat_name, StatName(), {}));
@@ -552,9 +559,9 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   size_t num_iterations = 0;
   alloc_.forEachSinkedTextReadout(
       [&num_sinked_text_readouts](std::size_t size) { num_sinked_text_readouts = size; },
-      [&num_iterations, &sink_predicates](Stats::TextReadout& text_readout) {
-        EXPECT_NE(sink_predicates.sinkedStatNames().find(text_readout.statName()),
-                  sink_predicates.sinkedStatNames().end());
+      [&num_iterations, sink_predicates](Stats::TextReadout& text_readout) {
+        EXPECT_NE(sink_predicates->sinkedStatNames().find(text_readout.statName()),
+                  sink_predicates->sinkedStatNames().end());
         ++num_iterations;
       });
   EXPECT_EQ(num_sinked_text_readouts, 5);

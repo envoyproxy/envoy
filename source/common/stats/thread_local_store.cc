@@ -980,10 +980,10 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
 }
 
 void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
-  sink_predicates_ = std::move(sink_predicates);
-  ASSERT(sink_predicates_.get() != nullptr);
-  if (sink_predicates_.get() != nullptr) {
-    alloc_.setSinkPredicates(*sink_predicates_);
+  ASSERT(sink_predicates != nullptr);
+  if (sink_predicates != nullptr) {
+    sink_predicates_.emplace(*sink_predicates);
+    alloc_.setSinkPredicates(std::move(sink_predicates));
   }
 }
 

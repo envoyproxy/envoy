@@ -501,7 +501,7 @@ private:
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
-  std::unique_ptr<SinkPredicates> sink_predicates_;
+  OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
