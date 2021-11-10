@@ -164,7 +164,7 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
     // Defend against creating a session for the same host twice. This happens
     // if start() is called after onClusterMemberUpdate() has already been
     // invoked. start() will be delayed in this fashion for instance if health
-    // checks don't begin until secrets necessary for health checkconnections
+    // checks don't begin until secrets necessary for health check connections
     // have been loaded from SDS.
     if (active_sessions_[host] == nullptr) {
       active_sessions_[host] = makeSession(host);
