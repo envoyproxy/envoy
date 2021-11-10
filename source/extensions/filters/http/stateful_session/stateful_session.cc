@@ -24,7 +24,10 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
       Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SessionStateFactoryConfig>(
           config.session_state().name());
 
-  factory_ = factory.createSessionStateFactory(config.session_state().typed_config(), context);
+  auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.session_state().typed_config(), context.messageValidationVisitor(), *this);
+
+  factory_ = factory.createSessionStateFactory(*typed_config, context);
 }
 
 PerRouteStatefulSession::PerRouteStatefulSession(

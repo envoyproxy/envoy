@@ -12,7 +12,8 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     const Upstream::HostDescription& host, Envoy::Http::ResponseHeaderMap& headers) {
   absl::string_view host_address = host.address()->asStringView();
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
-    std::string encoded_address = Envoy::Base64::encode(host_address.data(), host_address.length());
+    const std::string encoded_address =
+        Envoy::Base64::encode(host_address.data(), host_address.length());
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));
   }

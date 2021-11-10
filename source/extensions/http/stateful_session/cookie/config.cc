@@ -12,10 +12,8 @@ Envoy::Http::SessionStateFactorySharedPtr
 CookieBasedSessionStateFactoryConfig::createSessionStateFactory(
     const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& context) {
 
-  auto new_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const ProtobufWkt::Any&>(config), context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<const CookieBasedSessionStateProto&>(
-      *new_config, context.messageValidationVisitor());
+      config, context.messageValidationVisitor());
   return std::make_shared<CookieBasedSessionStateFactory>(proto_config);
 }
 

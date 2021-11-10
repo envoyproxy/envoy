@@ -17,19 +17,33 @@ TEST(CookieBasedSessionStateFactoryConfigTest, Basic) {
       "envoy.http.stateful_session.cookie");
   ASSERT_NE(factory, nullptr);
 
-  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  CookieBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-    name: envoy.http.stateful_session.cookie
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-      name: override_host
-      path: /path
-      ttl: 5s
-)EOF";
-  TestUtility::loadFromYaml(yaml, typed_config);
+    name: override_host
+    path: /path
+    ttl: 5s
+  )EOF";
+  TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NE(factory->createSessionStateFactory(typed_config.typed_config(), context), nullptr);
+  EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
+}
+
+TEST(CookieBasedSessionStateFactoryConfigTest, NegativeTTL) {
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::SessionStateFactoryConfig>::getFactory(
+      "envoy.http.stateful_session.cookie");
+  ASSERT_NE(factory, nullptr);
+
+  CookieBasedSessionStateProto proto_config;
+  const std::string yaml = R"EOF(
+    name: override_host
+    path: /path
+    ttl: -1s
+  )EOF";
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(factory->createSessionStateFactory(proto_config, context), EnvoyException);
 }
 
 } // namespace

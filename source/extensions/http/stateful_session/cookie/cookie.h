@@ -43,14 +43,14 @@ public:
 
 private:
   absl::optional<std::string> parseAddress(const Envoy::Http::RequestHeaderMap& headers) const {
-    std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
+    const std::string cookie_value = Envoy::Http::Utility::parseCookieValue(headers, name_);
     std::string address = Envoy::Base64::decode(cookie_value);
 
     return !address.empty() ? absl::make_optional(std::move(address)) : absl::nullopt;
   }
 
   std::string makeSetCookie(const std::string& address) const {
-    return Envoy::Http::Utility::makeSetCookieValue(name_, std::string(address), path_, ttl_, true);
+    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, /*httponly=*/true);
   }
 
   const std::string name_;

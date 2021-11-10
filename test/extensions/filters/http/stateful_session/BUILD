@@ -19,7 +19,6 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.stateful_session"],
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
-        "//test/integration:http_integration_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/http:stateful_session_mock",
