@@ -41,8 +41,7 @@ message MetaProtocolProxy {
 
   // A list of individual Layer-7 filters that make up the filter chain for requests made to the
   // meta protocol proxy. Order matters as the filters are processed sequentially as request events
-  // happen. If no meta_protocol_filters are specified, a default router filter
-  // (`aeraki.meta_protocol.filters.router`) is used.
+  // happen.
   repeated config.core.v3.TypedExtensionConfig meta_protocol_filters = 5;
 }
 
