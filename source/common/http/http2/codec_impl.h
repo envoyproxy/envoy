@@ -411,7 +411,7 @@ protected:
     void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
-    void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+    void encode1xxHeaders(const ResponseHeaderMap& headers) override;
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
