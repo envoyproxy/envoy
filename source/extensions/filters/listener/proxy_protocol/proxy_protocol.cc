@@ -64,7 +64,9 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
-bool Config::allowRequestsWithoutProxyProtocol() const { return allow_requests_without_proxy_protocol_; }
+bool Config::allowRequestsWithoutProxyProtocol() const {
+  return allow_requests_without_proxy_protocol_;
+}
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
@@ -443,8 +445,10 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
-    } else if (nread < PROXY_PROTO_V2_HEADER_LEN && config_.get()->allowRequestsWithoutProxyProtocol()) {
-      if (nread < PROXY_PROTO_V1_SIGNATURE_LEN || memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
+    } else if (nread < PROXY_PROTO_V2_HEADER_LEN &&
+               config_.get()->allowRequestsWithoutProxyProtocol()) {
+      if (nread < PROXY_PROTO_V1_SIGNATURE_LEN ||
+          memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
         ENVOY_LOG(debug, "need more bytes to determine if we have a proxy protocol header");
         return ReadOrParseState::SkipFilterError;
       }
