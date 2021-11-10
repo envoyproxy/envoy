@@ -444,7 +444,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
     } else if (nread < PROXY_PROTO_V2_HEADER_LEN && config_.get()->detectProxyProtocol()) {
-      ENVOY_LOG(debug, "need more bytes to read proxy protocol");
+      ENVOY_LOG(debug, "need more bytes to detect proxy protocol header");
       return ReadOrParseState::SkipFilterError;
     }
 
