@@ -1769,9 +1769,6 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
         buffer.move(frame);
       }));
 
-  auto* violation_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-
   // Force the server stream to be read disabled. This will cause it to stop sending window
   // updates to the client.
   server_->getStream(1)->readDisable(true);
@@ -1783,6 +1780,9 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   // Make sure the limits were configured properly in test set up.
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->bufferLimit());
   EXPECT_EQ(initial_stream_window, client_->getStream(1)->bufferLimit());
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
 
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());

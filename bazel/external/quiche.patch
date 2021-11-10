@@ -11,6 +11,17 @@
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
  #include "common/platform/api/quiche_export.h"
 
+--- http2/adapter/http2_protocol.h
++++ http2/adapter/http2_protocol.h
+@@ -10,6 +10,8 @@
+ #include "absl/types/variant.h"
+ #include "common/platform/api/quiche_export.h"
+
++#undef NO_ERROR
++
+ namespace http2 {
+ namespace adapter {
+
 --- http2/adapter/nghttp2_callbacks.h
 +++ http2/adapter/nghttp2_callbacks.h
 @@ -5,6 +5,10 @@
@@ -63,6 +74,24 @@
  #include "third_party/nghttp2/src/lib/includes/nghttp2/nghttp2.h"
  #include "spdy/core/spdy_header_block.h"
 
+--- http2/adapter/oghttp2_session.cc
++++ http2/adapter/oghttp2_session.cc
+@@ -131,6 +131,7 @@ absl::string_view TracePerspectiveAsStri
+     case Perspective::kServer:
+       return "OGHTTP2_SERVER";
+   }
++  return "OGHTTP2_SERVER";
+ }
+
+ class RunOnExit {
+@@ -186,6 +187,7 @@ Http2ErrorCode GetHttp2ErrorCode(SpdyFra
+     case SpdyFramerError::LAST_ERROR:
+       return Http2ErrorCode::INTERNAL_ERROR;
+   }
++  return Http2ErrorCode::INTERNAL_ERROR;
+ }
+
+ }  // namespace
 --- http2/adapter/http2_util.cc
 +++ http2/adapter/http2_util.cc
 @@ -1,5 +1,7 @@
