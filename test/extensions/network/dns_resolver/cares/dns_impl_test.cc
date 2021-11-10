@@ -1116,6 +1116,9 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  if (GetParam() == Network::Address::IpVersion::v6) {
+    vec = {socket_->connectionInfoProvider().localAddress()};
+  }
   resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, vec, dns_resolver_options_);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
