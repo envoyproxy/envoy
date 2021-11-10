@@ -263,7 +263,7 @@ public:
   }
 
   template <typename T>
-  void SubmitSettings(std::unique_ptr<T>& connection,
+  void submitSettings(std::unique_ptr<T>& connection,
                       const std::list<std::pair<uint16_t, uint32_t>>& settings_values) {
     if (enable_new_codec_wrapper_) {
       std::vector<http2::adapter::Http2Setting> settings;
@@ -281,7 +281,7 @@ public:
     }
   }
 
-  template <typename T> int GetHpackEncoderDynamicTableSize(std::unique_ptr<T>& connection) {
+  template <typename T> int getHpackEncoderDynamicTableSize(std::unique_ptr<T>& connection) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetHpackEncoderDynamicTableSize();
     } else {
@@ -289,7 +289,7 @@ public:
     }
   }
 
-  template <typename T> int GetHpackDecoderDynamicTableSize(std::unique_ptr<T>& connection) {
+  template <typename T> int getHpackDecoderDynamicTableSize(std::unique_ptr<T>& connection) {
     if (enable_new_codec_wrapper_) {
       return connection->adapter()->GetHpackDecoderDynamicTableSize();
     } else {
@@ -297,7 +297,7 @@ public:
     }
   }
 
-  template <typename T> void SubmitPing(std::unique_ptr<T>& connection, uint32_t ping_id) {
+  template <typename T> void submitPing(std::unique_ptr<T>& connection, uint32_t ping_id) {
     if (enable_new_codec_wrapper_) {
       connection->adapter()->SubmitPing(ping_id);
     } else {
@@ -1954,7 +1954,7 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
-  SubmitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
+  submitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
 
   request_encoder_ = &client_->newStream(response_decoder_);
   setupDefaultConnectionMocks();
@@ -1979,7 +1979,7 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreErro
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   // This causes the next stream creation to fail with a "invalid frame: Stream was refused" error.
-  SubmitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
+  submitSettings(server_, {{NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS, 1}});
 
   request_encoder_ = &client_->newStream(response_decoder_);
   setupDefaultConnectionMocks();
@@ -2448,18 +2448,18 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   response_encoder_->encodeHeaders(response_headers, true);
 
   // Sanity check to verify that state of encoders and decoders matches.
-  EXPECT_EQ(GetHpackEncoderDynamicTableSize(server_), GetHpackDecoderDynamicTableSize(client_));
-  EXPECT_EQ(GetHpackEncoderDynamicTableSize(client_), GetHpackDecoderDynamicTableSize(server_));
+  EXPECT_EQ(getHpackEncoderDynamicTableSize(server_), getHpackDecoderDynamicTableSize(client_));
+  EXPECT_EQ(getHpackEncoderDynamicTableSize(client_), getHpackDecoderDynamicTableSize(server_));
 
   // Verify that headers are compressed only when both client and server advertise table size
   // > 0:
   if (client_http2_options_.hpack_table_size().value() &&
       server_http2_options_.hpack_table_size().value()) {
-    EXPECT_NE(0, GetHpackEncoderDynamicTableSize(client_));
-    EXPECT_NE(0, GetHpackEncoderDynamicTableSize(server_));
+    EXPECT_NE(0, getHpackEncoderDynamicTableSize(client_));
+    EXPECT_NE(0, getHpackEncoderDynamicTableSize(server_));
   } else {
-    EXPECT_EQ(0, GetHpackEncoderDynamicTableSize(client_));
-    EXPECT_EQ(0, GetHpackEncoderDynamicTableSize(server_));
+    EXPECT_EQ(0, getHpackEncoderDynamicTableSize(client_));
+    EXPECT_EQ(0, getHpackEncoderDynamicTableSize(server_));
   }
 }
 
@@ -2475,7 +2475,7 @@ TEST_P(Http2CodecImplTest, PingFlood) {
   // Send one frame above the outbound control queue size limit
   for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1;
        ++i) {
-    SubmitPing(client_, i);
+    submitPing(client_, i);
   }
 
   int ack_count = 0;
@@ -2507,7 +2507,7 @@ TEST_P(Http2CodecImplTest, PingFloodMitigationDisabled) {
   // Send one frame above the outbound control queue size limit
   for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_CONTROL_FRAMES + 1;
        ++i) {
-    SubmitPing(client_, i);
+    submitPing(client_, i);
   }
 
   EXPECT_CALL(server_connection_, write(_, _))
@@ -2530,7 +2530,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
   for (int i = 0; i < kMaxOutboundControlFrames; ++i) {
-    SubmitPing(client_, i);
+    submitPing(client_, i);
   }
 
   int ack_count = 0;
@@ -2550,7 +2550,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
 
   // Send floor(kMaxOutboundFrames / 2) more pings.
   for (int i = 0; i < kMaxOutboundControlFrames / 2; ++i) {
-    SubmitPing(client_, i);
+    submitPing(client_, i);
   }
   // The number of outbound frames should be half of max so the connection should not be
   // terminated.
@@ -2558,7 +2558,7 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
   EXPECT_EQ(ack_count, kMaxOutboundControlFrames + kMaxOutboundControlFrames / 2);
 
   // 1 more ping frame should overflow the outbound frame limit.
-  SubmitPing(client_, 0);
+  submitPing(client_, 0);
   client_->sendPendingFrames().IgnoreError();
   // The server codec should fail when it gets 1 PING too many.
   EXPECT_FALSE(server_wrapper_.status_.ok());
@@ -2659,7 +2659,7 @@ TEST_P(Http2CodecImplTest, ResponseDataFloodMitigationDisabled) {
   }
   // Presently flood mitigation is done only when processing downstream data
   // So we need to send stream from downstream client to trigger mitigation
-  SubmitPing(client_, 0);
+  submitPing(client_, 0);
   EXPECT_NO_THROW(client_->sendPendingFrames().IgnoreError());
 }
 
@@ -2732,7 +2732,7 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
     EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
   }
   // Send one PING frame above the outbound queue size limit
-  SubmitPing(client_, 0);
+  submitPing(client_, 0);
   client_->sendPendingFrames().IgnoreError();
   // The server codec should fail when it gets 1 frame too many.
   EXPECT_FALSE(server_wrapper_.status_.ok());
@@ -3241,7 +3241,7 @@ TEST_F(Http2CodecMetadataTest, UnknownStreamId) {
   MetadataMapVector metadata_vector;
   metadata_vector.emplace_back(std::make_unique<MetadataMap>(metadata_map));
   // SETTINGS are required as part of the preface.
-  SubmitSettings(client_, {});
+  submitSettings(client_, {});
   // Validate both the ID = 0 special case and a non-zero ID not already bound to a stream (any ID >
   // 0 for this test).
   EXPECT_TRUE(client_->submitMetadata(metadata_vector, 0));

@@ -27,7 +27,7 @@ namespace Http {
 namespace Http2 {
 namespace {
 
-absl::string_view ToStringView(uint8_t* data, size_t length) {
+absl::string_view toStringView(uint8_t* data, size_t length) {
   return absl::string_view(reinterpret_cast<char*>(data), length);
 }
 
@@ -207,7 +207,7 @@ TEST_F(MetadataEncoderTest, VerifyEncoderDecoderMultipleMetadataReachSizeLimit) 
     };
     submitMetadata(metadata_map_vector);
 
-    result = session_->ProcessBytes(ToStringView(output_buffer_.buf, output_buffer_.length));
+    result = session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
     if (result < 0) {
       break;
     }
@@ -266,9 +266,9 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorSmall) {
 
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  session_->ProcessBytes(ToStringView(output_buffer_.buf, consume_size));
+  session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
   session_->ProcessBytes(
-      ToStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
+      toStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
 }
 
 // Tests encoding/decoding large metadata map vectors.
@@ -289,9 +289,9 @@ TEST_F(MetadataEncoderTest, EncodeMetadataMapVectorLarge) {
   submitMetadata(metadata_map_vector);
   // Verifies flag and payload are encoded correctly.
   const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  session_->ProcessBytes(ToStringView(output_buffer_.buf, consume_size));
+  session_->ProcessBytes(toStringView(output_buffer_.buf, consume_size));
   session_->ProcessBytes(
-      ToStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
+      toStringView(output_buffer_.buf + consume_size, output_buffer_.length - consume_size));
 }
 
 // Tests encoding/decoding with fuzzed metadata size.
@@ -316,7 +316,7 @@ TEST_F(MetadataEncoderTest, EncodeFuzzedMetadata) {
   submitMetadata(metadata_map_vector);
 
   // Verifies flag and payload are encoded correctly.
-  session_->ProcessBytes(ToStringView(output_buffer_.buf, output_buffer_.length));
+  session_->ProcessBytes(toStringView(output_buffer_.buf, output_buffer_.length));
 }
 
 TEST_F(MetadataEncoderTest, EncodeDecodeFrameTest) {

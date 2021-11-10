@@ -528,7 +528,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 5,
+    shard_count = 10,
     deps = [
         ":protocol_integration_test_lib",
     ],
