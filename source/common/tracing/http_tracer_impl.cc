@@ -1,8 +1,5 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
-#include <absl/strings/string_view.h>
-#include <absl/types/optional.h>
-
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
