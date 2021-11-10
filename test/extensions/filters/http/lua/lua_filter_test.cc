@@ -2449,6 +2449,22 @@ TEST_F(LuaHttpFilterTest, LogTableInsteadOfString) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+TEST_F(LuaHttpFilterTest, DestructFilterConfigPerRoute) {
+  setupFilter();
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute proto;
+  proto.mutable_source_code()->set_inline_string(HEADER_ONLY_SCRIPT);
+  per_route_config_ = std::make_shared<FilterConfigPerRoute>(proto, server_factory_context_);
+
+  InSequence s;
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
+  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
+  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
+
+  per_route_config_ = std::make_shared<FilterConfigPerRoute>(proto, server_factory_context_);
+  per_route_config_.reset();
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

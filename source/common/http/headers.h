@@ -218,6 +218,7 @@ public:
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString EarlyData{"early-data"};
 
   struct {
     const std::string Close{"close"};
