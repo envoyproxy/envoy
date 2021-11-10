@@ -167,7 +167,7 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
     // checks don't begin until secrets necessary for health checkconnections
     // have been loaded from SDS.
     if (active_sessions_[host] == nullptr) {
-    active_sessions_[host] = makeSession(host);
+      active_sessions_[host] = makeSession(host);
     }
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
