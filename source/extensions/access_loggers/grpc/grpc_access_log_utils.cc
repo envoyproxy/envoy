@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -148,7 +149,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
-    const StreamInfo::StreamInfo& stream_info,
+    const Http::RequestHeaderMap& request_header, const StreamInfo::StreamInfo& stream_info,
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamAddressProvider().remoteAddress() != nullptr) {
@@ -282,6 +283,12 @@ void Utility::extractCommonAccessLogProperties(
         }
       }
     }
+  }
+
+  Tracing::CustomTagContext ctx{&request_header, stream_info};
+  for (const auto& custom_tag : config.custom_tags()) {
+    const auto tag_applier = Tracing::HttpTracerUtility::createCustomTag(custom_tag);
+    tag_applier->applyLog(common_access_log, ctx);
   }
 }
 

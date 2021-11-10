@@ -1,5 +1,8 @@
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include <absl/strings/string_view.h>
+#include <absl/types/optional.h>
+
 #include <string>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -177,7 +180,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
-      it.second->apply(span, ctx);
+      it.second->applySpan(span, ctx);
     }
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
@@ -282,10 +285,19 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& 
   return active_span;
 }
 
-void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
+void CustomTagBase::applySpan(Span& span, const CustomTagContext& ctx) const {
   absl::string_view tag_value = value(ctx);
   if (!tag_value.empty()) {
     span.setTag(tag(), tag_value);
+  }
+}
+
+void CustomTagBase::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                             const CustomTagContext& ctx) const {
+  absl::string_view tag_value = value(ctx);
+  if (!tag_value.empty()) {
+    auto& custom_tags = *entry.mutable_custom_tags();
+    custom_tags[std::string(tag())] = std::string(tag_value);
   }
 }
 
@@ -315,37 +327,59 @@ MetadataCustomTag::MetadataCustomTag(const std::string& tag,
     : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
-void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
+void MetadataCustomTag::applySpan(Span& span, const CustomTagContext& ctx) const {
   const envoy::config::core::v3::Metadata* meta = metadata(ctx);
-  if (!meta) {
+  const auto meta_str = metadataToString(meta);
+
+  if (!meta_str.has_value()) {
     if (!default_value_.empty()) {
       span.setTag(tag(), default_value_);
     }
     return;
   }
-  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(meta, metadata_key_);
+
+  span.setTag(tag(), meta_str.value());
+}
+
+void MetadataCustomTag::applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                                 const CustomTagContext& ctx) const {
+  const envoy::config::core::v3::Metadata* meta = metadata(ctx);
+  const auto meta_str = metadataToString(meta);
+  auto& custom_tags = *entry.mutable_custom_tags();
+
+  if (!meta_str.has_value()) {
+    if (!default_value_.empty()) {
+      custom_tags[std::string(tag())] = default_value_;
+    }
+    return;
+  }
+
+  custom_tags[std::string(tag())] = meta_str.value();
+}
+
+absl::optional<std::string>
+MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* metadata) const {
+  if (!metadata) {
+    return absl::nullopt;
+  }
+
+  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
   switch (value.kind_case()) {
   case ProtobufWkt::Value::kBoolValue:
-    span.setTag(tag(), value.bool_value() ? "true" : "false");
-    return;
+    return value.bool_value() ? "true" : "false";
   case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), absl::StrCat("", value.number_value()));
-    return;
+    return absl::StrCat("", value.number_value());
   case ProtobufWkt::Value::kStringValue:
-    span.setTag(tag(), value.string_value());
-    return;
+    return value.string_value();
   case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
-    return;
+    return MessageUtil::getJsonStringFromMessageOrDie(value.list_value());
   case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
-    return;
+    return MessageUtil::getJsonStringFromMessageOrDie(value.struct_value());
   default:
     break;
   }
-  if (!default_value_.empty()) {
-    span.setTag(tag(), default_value_);
-  }
+
+  return absl::nullopt;
 }
 
 const envoy::config::core::v3::Metadata*

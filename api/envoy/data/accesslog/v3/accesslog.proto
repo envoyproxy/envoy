@@ -79,7 +79,7 @@ message ConnectionProperties {
 }
 
 // Defines fields that are shared by all Envoy access logs.
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message AccessLogCommon {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.accesslog.v2.AccessLogCommon";
@@ -183,6 +183,9 @@ message AccessLogCommon {
   // state serialized to any message other than `google.protobuf.Any` it will be packed into
   // `google.protobuf.Any`.
   map<string, google.protobuf.Any> filter_state_objects = 21;
+
+  // A list of custom tags with unique tag name to create tags for the logs.
+  map<string, string> custom_tags = 22;
 }
 
 // Flags indicating occurrences during request/response processing.

@@ -39,6 +39,7 @@ envoy_cc_library(
         ":trace_context_interface",
         ":trace_reason_interface",
         "//envoy/stream_info:stream_info_interface",
+        "@envoy_api//envoy/data/accesslog/v3:pkg_cc_proto",
     ],
 )
 

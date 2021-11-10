@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_context.h"
 #include "envoy/tracing/trace_reason.h"
@@ -45,7 +46,15 @@ public:
    * @param span the active span.
    * @param ctx the custom tag context.
    */
-  virtual void apply(Span& span, const CustomTagContext& ctx) const PURE;
+  virtual void applySpan(Span& span, const CustomTagContext& ctx) const PURE;
+
+  /**
+   * Get string tag value from various type of custom tags.
+   * @param log entry.
+   * @param ctx the custom tag context.
+   */
+  virtual void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
+                        const CustomTagContext& ctx) const PURE;
 };
 
 using CustomTagConstSharedPtr = std::shared_ptr<const CustomTag>;
