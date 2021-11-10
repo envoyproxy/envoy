@@ -3288,32 +3288,19 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseDownstream) {
   const int request_size = 100;
   const int response_size = 100;
 
-  for (int i = 0; i < 10; ++i) {
-    auto response = sendRequestAndWaitForResponse(default_request_headers_, request_size,
-                                                  default_response_headers_, response_size, 0);
-    checkSimpleRequestSuccess(request_size, response_size, response.get());
-    if (downstreamProtocol() == Http::CodecType::HTTP2) {
-      // Due to dynamic header compression these values change as we send the
-      // same request.
-      switch (i) {
-      case 0:
-        expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 0, 0, 0),
-                                             BytesCountExpectation(177, 137, 68, 28), i);
-        break;
-      case 1:
-        expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 0, 0, 0),
-                                             BytesCountExpectation(148, 137, 16, 27), i);
-        break;
-      default:
-        expectDownstreamBytesSentAndReceived(BytesCountExpectation(0, 0, 0, 0),
-                                             BytesCountExpectation(122, 137, 13, 24), i);
-      }
-    } else {
-      // Only H1
-      expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
-                                           BytesCountExpectation(0, 0, 0, 0), i);
-    }
-  }
+  // Send first request on the connection
+  auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_one.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(177, 137, 68, 28), 0);
+
+  // Reuse connection, send the second request on the connection.
+  auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_two.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(148, 137, 15, 27), 1);
 }
 
 TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
