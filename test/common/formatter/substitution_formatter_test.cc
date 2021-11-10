@@ -753,6 +753,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   std::string body;
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
     std::string virtual_cluster_name = "authN";
     stream_info.setVirtualClusterName(virtual_cluster_name);
