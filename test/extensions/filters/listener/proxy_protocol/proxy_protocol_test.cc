@@ -227,7 +227,7 @@ TEST_P(ProxyProtocolTest, DetectNoProxyProtocol) {
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_detect_proxy_protocol(true);
   connect(true, &proto_config);
-  
+
   write("more data");
 
   expectData("more data");
