@@ -3749,7 +3749,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
 }
 
 // The router filter is responsible for not propagating 100-continue headers after the initial 100.
-TEST_F(RouterTest, Coalesce100ContinueHeaders) {
+TEST_F(RouterTest, Coalesce1xxHeaders) {
   // Setup.
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3771,23 +3771,25 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Initial 100-continue, this is processed normally.
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+    response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
 
-  // No encode100ContinueHeaders() invocation for the second 100-continue (but we continue to track
+  // No encode1xxHeaders() invocation for the second 100-continue (but we continue to track
   // stats from upstream).
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_)).Times(0);
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_)).Times(0);
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+    response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
       2U,
@@ -3801,7 +3803,7 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
-TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
+TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -3825,10 +3827,11 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   // is reset we won't even check shouldRetryReset() (or shouldRetryHeaders()).
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decode1xxHeaders(std::move(continue_headers));
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
