@@ -267,7 +267,7 @@ message SubjectAltNameMatcher {
   }
 
   // Specification of type of SAN. Note that the default enum value is an invalid choice.
-  SanType san_type = 1 [(validate.rules).enum = {in: 1 in: 2 in: 3 in: 4}];
+  SanType san_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 
   // Matcher for SAN value.
   type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
