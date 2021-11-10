@@ -223,7 +223,7 @@ TEST_P(ProxyProtocolTest, V1Basic) {
 }
 
 TEST_P(ProxyProtocolTest, AllowNoProxyProtocol) {
-
+  // allows request through even though it doesn't use proxy protocol
   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
   proto_config.set_allow_requests_without_proxy_protocol(true);
   connect(true, &proto_config);
