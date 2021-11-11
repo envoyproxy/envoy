@@ -55,8 +55,6 @@ public final class GRPCStreamPrototype: NSObject {
     var buffer = Data()
     var state = GRPCMessageProcessor.State.expectingCompressionFlag
     self.underlyingStream.setOnResponseData { chunk, _, streamIntel in
-      // This closure deliberately retains `self` while the underlying handler's
-      // `onData` closure is kept in memory so that messages/errors can be processed.
       // Appending might result in extra copying that can be optimized in the future.
       buffer.append(chunk)
       // gRPC always sends trailers, so the stream will not complete here.
