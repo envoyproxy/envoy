@@ -166,7 +166,7 @@ protected:
   Buffer::InstancePtr read_buffer_;
   uint32_t read_buffer_limit_ = 0;
   bool connecting_{false};
-  ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
+  absl::optional<ConnectionEvent> immediate_error_event_;
   bool bind_error_{false};
   std::string failure_reason_;
 

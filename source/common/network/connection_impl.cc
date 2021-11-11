@@ -83,7 +83,10 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       transport_wants_read_(false) {
 
   if (!connected) {
+    // immediate_error_event_ is nullopt here and event will be ignored.
     connecting_ = true;
+  } else {
+    immediate_error_event_ = ConnectionEvent::Connected;
   }
 
   Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
@@ -238,6 +241,10 @@ bool ConnectionImpl::filterChainWantsData() {
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!ConnectionImpl::ioHandle().isOpen()) {
     return;
+  }
+  if (!immediate_error_event_.has_value()) {
+    // TODO(lambdai): consider setting to close_type?
+    immediate_error_event_ = ConnectionEvent::Connected;
   }
 
   // No need for a delayed close (if pending) now that the socket is being closed.
@@ -553,7 +560,11 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
   ScopeTrackerScopeState scope(this, this->dispatcher_);
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
 
-  if (immediate_error_event_ != ConnectionEvent::Connected) {
+  if (!immediate_error_event_.has_value()) {
+    // connect() is not called and no other error yet.
+    return;
+  }
+  if (*immediate_error_event_ != ConnectionEvent::Connected) {
     if (bind_error_) {
       ENVOY_CONN_LOG(debug, "raising bind error", *this);
       // Update stats here, rather than on bind failure, to give the caller a chance to
@@ -564,7 +575,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     } else {
       ENVOY_CONN_LOG(debug, "raising immediate error", *this);
     }
-    closeSocket(immediate_error_event_);
+    closeSocket(*immediate_error_event_);
     return;
   }
 
@@ -593,7 +604,14 @@ void ConnectionImpl::onReadReady() {
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
-  ASSERT(!connecting_);
+  if (connecting_) {
+    // Client connection read event can be activated if the underlying io handle is user space.
+    // Note that read event can be activated when an OS io handle before connect attempt. However,
+    // it occurs only when the socket is closed and writeReady() early returns. See
+    // ConnectionImpl::onFileEvent().
+    ASSERT(ioHandle().localAddress()->envoyInternalAddress() != nullptr);
+    return;
+  }
 
   // We get here while read disabled in two ways.
   // 1) There was a call to setTransportSocketIsReadable(), for example if a raw buffer socket ceded
@@ -886,11 +904,18 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->connectionInfoProvider().remoteAddress()->asString());
+
+  ENVOY_CONN_LOG(debug, "connecting to {}, see bind_error = {}", *this,
+                 socket_->connectionInfoProvider().remoteAddress()->asString(), bind_error_);
+  // TODO(lambdai): we should avoid calling connect if the bind() fails already.
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   if (result.return_value_ == 0) {
+    if (immediate_error_event_.has_value()) {
+      ASSERT(*immediate_error_event_ == ConnectionEvent::LocalClose);
+    } else {
+      immediate_error_event_ = ConnectionEvent::Connected;
+    }
     // write will become ready.
     ASSERT(connecting_);
     return;
@@ -906,6 +931,13 @@ void ClientConnectionImpl::connect() {
   if (result.errno_ == SOCKET_ERROR_IN_PROGRESS) {
 #endif
     ASSERT(connecting_);
+    // Since connect() is called, Connection should start to check if is connected on event
+    // callback.
+    if (immediate_error_event_.has_value()) {
+      ASSERT(*immediate_error_event_ == ConnectionEvent::LocalClose);
+    } else {
+      immediate_error_event_ = ConnectionEvent::Connected;
+    }
     ENVOY_CONN_LOG(debug, "connection in progress", *this);
   } else {
     immediate_error_event_ = ConnectionEvent::RemoteClose;
