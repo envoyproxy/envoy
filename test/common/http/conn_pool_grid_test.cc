@@ -715,10 +715,19 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
   EXPECT_EQ("HTTP/3", (**optional_it1)->protocolDescription());
 
   const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
+  Api::InterfaceAddressVector interfaces{};
+  ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_));
 
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(supports_getifaddrs));
+  if (supports_getifaddrs) {
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .WillOnce(
+            Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
+              interface_vector.assign(interfaces.begin(), interfaces.end());
+            }));
+  }
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
 #if defined(__APPLE__) || defined(WIN32)
   EXPECT_CALL(os_sys_calls, setsocketblocking(1, false))
