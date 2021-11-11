@@ -263,7 +263,6 @@ public class CronetChunkedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWholeNumberOfChunks() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -288,7 +287,6 @@ public class CronetChunkedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunCronetHttpURLConnection
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   // Regression testing for crbug.com/618872.
   public void testOneMassiveWriteLargerThanInternalBuffer() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());

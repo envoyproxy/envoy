@@ -114,7 +114,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithContentLength() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -146,7 +145,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithContentLengthOneMassiveWrite() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -166,7 +164,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithContentLengthWriteOneByte() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -250,7 +247,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithoutContentLength() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -281,7 +277,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithoutContentLengthOneMassiveWrite() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -300,7 +295,6 @@ public class CronetBufferedOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testPostWithoutContentLengthWriteOneByte() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();

@@ -3,21 +3,10 @@ package org.chromium.net.impl;
 import static android.os.Process.THREAD_PRIORITY_BACKGROUND;
 import static android.os.Process.THREAD_PRIORITY_MORE_FAVORABLE;
 
-import android.content.Context;
 import android.os.ConditionVariable;
 import androidx.annotation.GuardedBy;
 import androidx.annotation.VisibleForTesting;
-import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
-import io.envoyproxy.envoymobile.engine.AndroidJniLibrary;
-import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitor;
-import io.envoyproxy.envoymobile.engine.EnvoyConfiguration;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
-import io.envoyproxy.envoymobile.engine.EnvoyNativeFilterConfig;
-import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
-import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
-import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
-import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import java.io.IOException;
 import java.net.Proxy;
 import java.net.URL;
@@ -25,17 +14,11 @@ import java.net.URLConnection;
 import java.net.URLStreamHandlerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.chromium.net.BidirectionalStream;
@@ -75,7 +58,6 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
   private Thread mNetworkThread;
 
   private final String mUserAgent;
-  private final ExecutorService mExecutorService;
   private final CronetEngineBuilderImpl mBuilder;
   private final AtomicReference<Runnable> mInitializationCompleter = new AtomicReference<>();
 
@@ -103,6 +85,7 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
     synchronized (mLock) {
       mEngine = builder.createEngine(() -> {
         mNetworkThread = Thread.currentThread();
+        android.os.Process.setThreadPriority(threadPriority);
         mInitCompleted.open();
         Runnable taskToExecuteWhenInitializationIsCompleted =
             mInitializationCompleter.getAndSet(() -> {});
@@ -112,13 +95,6 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
         return null;
       });
     }
-    mExecutorService =
-        new ThreadPoolExecutor(2, 10, 50, TimeUnit.SECONDS, new LinkedBlockingQueue<>(),
-                               r -> Executors.defaultThreadFactory().newThread(() -> {
-                                 Thread.currentThread().setName("EnvoyCronetEngine");
-                                 android.os.Process.setThreadPriority(threadPriority);
-                                 r.run();
-                               }));
   }
 
   public EnvoyEngine getEnvoyEngine() {
@@ -149,9 +125,9 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
                 boolean trafficStatsTagSet, int trafficStatsTag, boolean trafficStatsUidSet,
                 int trafficStatsUid, RequestFinishedInfo.Listener requestFinishedListener,
                 int idempotency) {
-    return new CronetUrlRequest(this, callback, mExecutorService, executor, url, mUserAgent,
-                                allowDirectExecutor, trafficStatsTagSet, trafficStatsTag,
-                                trafficStatsUidSet, trafficStatsUid);
+    return new CronetUrlRequest(this, callback, executor, url, mUserAgent, allowDirectExecutor,
+                                trafficStatsTagSet, trafficStatsTag, trafficStatsUidSet,
+                                trafficStatsUid);
   }
 
   @Override
@@ -202,7 +178,6 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
       if (!haveRequestContextAdapter()) {
         return;
       }
-      mExecutorService.shutdown();
       mEngine.terminate();
       mEngine = null;
     }
@@ -309,6 +284,8 @@ public final class CronetUrlRequestContext extends CronetEngineBase {
    * requests.
    */
   void onRequestDestroyed() { mActiveRequestCount.decrementAndGet(); }
+
+  boolean isNetworkThread(Thread thread) { return thread == mNetworkThread; }
 
   @VisibleForTesting
   public boolean hasShutdown() {
