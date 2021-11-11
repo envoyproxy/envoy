@@ -604,14 +604,7 @@ void ConnectionImpl::onReadReady() {
   const bool latched_dispatch_buffered_data = dispatch_buffered_data_;
   dispatch_buffered_data_ = false;
 
-  if (connecting_) {
-    // Client connection read event can be activated if the underlying io handle is user space.
-    // Note that read event can be activated when an OS io handle before connect attempt. However,
-    // it occurs only when the socket is closed and writeReady() early returns. See
-    // ConnectionImpl::onFileEvent().
-    ASSERT(ioHandle().localAddress()->envoyInternalAddress() != nullptr);
-    return;
-  }
+  ASSERT(!connecting_);
 
   // We get here while read disabled in two ways.
   // 1) There was a call to setTransportSocketIsReadable(), for example if a raw buffer socket ceded

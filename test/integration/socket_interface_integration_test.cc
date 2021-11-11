@@ -104,9 +104,7 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),
-               // Attempted to dereference a nullptr client connection factory because the internal
-               // connection factory is not linked.
-               ".*");
+               "panic: not implemented");
 }
 
 // Test that recv from internal address will crash.
