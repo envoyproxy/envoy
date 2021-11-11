@@ -126,6 +126,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  UpstreamTiming upstream_timing_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr upstream_filter_state_;

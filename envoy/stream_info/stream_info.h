@@ -243,7 +243,6 @@ struct UpstreamTiming {
   }
 
   void onUpstreamHandshakeComplete(TimeSource& time_source) {
-    ASSERT(!upstream_handshake_complete_);
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
