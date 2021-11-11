@@ -202,6 +202,10 @@ bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
 }
 
 bool HeaderUtility::isSpecial1xx(const ResponseHeaderMap& response_headers) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.proxy_102") &&
+      response_headers.Status()->value() == "102") {
+    return true;
+  }
   return response_headers.Status()->value() == "100";
 }
 
