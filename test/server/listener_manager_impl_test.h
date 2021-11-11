@@ -232,12 +232,13 @@ protected:
                            Network::Socket::Options::size_type expected_num_options,
                            ListenerComponentFactory::BindType bind_type = default_bind_type,
                            uint32_t worker_index = 0) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, worker_index))
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, bind_type, _, worker_index))
         .WillOnce(
             Invoke([this, expected_num_options, &expected_state](
                        const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
                        const Network::Socket::OptionsSharedPtr& options,
-                       ListenerComponentFactory::BindType, uint32_t) -> Network::SocketSharedPtr {
+                       ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
+                       uint32_t) -> Network::SocketSharedPtr {
               EXPECT_NE(options.get(), nullptr);
               EXPECT_EQ(options->size(), expected_num_options);
               EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,

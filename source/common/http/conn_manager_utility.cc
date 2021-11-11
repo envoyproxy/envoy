@@ -258,6 +258,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     rid_extension->set(request_headers, force_set);
   }
 
+  if (connection.connecting() && request_headers.get(Headers::get().EarlyData).empty()) {
+    // Add an Early-Data header to indicate that this is a 0-RTT request according to
+    // https://datatracker.ietf.org/doc/html/rfc8470#section-5.1.
+    HeaderString value;
+    value.setCopy("1");
+    request_headers.addViaMove(HeaderString(Headers::get().EarlyData), std::move(value));
+  }
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return {final_remote_address, absl::nullopt};

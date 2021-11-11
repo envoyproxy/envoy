@@ -335,12 +335,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   }
 }
 
-std::string SslSocket::protocol() const {
-  const unsigned char* proto;
-  unsigned int proto_len;
-  SSL_get0_alpn_selected(rawSsl(), &proto, &proto_len);
-  return std::string(reinterpret_cast<const char*>(proto), proto_len);
-}
+std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 

@@ -407,16 +407,16 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingEarly1xxWithEncoderFilter) {
   testEnvoyProxying1xx(true, true);
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
   testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
-TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
@@ -429,7 +429,6 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -496,7 +495,6 @@ typed_config:
 // that we are able to skip filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -561,8 +559,6 @@ typed_config:
 
 // Verifies routing via the match tree API.
 TEST_P(IntegrationTest, MatchTreeRouting) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
-
   const std::string vhost_yaml = R"EOF(
     name: vhost
     domains: ["matcher.com"]
@@ -1472,9 +1468,9 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
-TEST_P(IntegrationTest, ViaAppendWith100Continue) {
+TEST_P(IntegrationTest, ViaAppendWith1xx) {
   config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
+  testEnvoyHandling1xx(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is

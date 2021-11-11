@@ -80,7 +80,7 @@ public:
   // allows execution of non-interrupted sequences of operations on the fake stream which may run
   // into trouble if client-side events are interleaved.
   void postToConnectionThread(std::function<void()> cb);
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
+  void encode1xxHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -462,6 +462,10 @@ public:
   // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
 
+  // Update the maximum number of concurrent streams. This is currently only
+  // supported for HTTP/3
+  void updateConcurrentStreams(uint64_t max_streams);
+
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
     ReadFilter(FakeHttpConnection& parent) : parent_(parent) {}
@@ -579,6 +583,7 @@ struct FakeUpstreamConfig {
   absl::optional<UdpConfig> udp_fake_upstream_;
   envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
@@ -760,7 +765,9 @@ private:
       if (is_quic) {
 #if defined(ENVOY_ENABLE_QUIC)
         udp_listener_config_.listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
-            envoy::config::listener::v3::QuicProtocolOptions(), 1, parent_.quic_stat_names_);
+            parent_.quic_options_, 1, parent_.quic_stat_names_);
+        // Initialize QUICHE flags.
+        quiche::FlagRegistry::getInstance();
 #else
         ASSERT(false, "Running a test that requires QUIC without compiling QUIC");
 #endif
@@ -821,6 +828,7 @@ private:
 
   const envoy::config::core::v3::Http2ProtocolOptions http2_options_;
   const envoy::config::core::v3::Http3ProtocolOptions http3_options_;
+  envoy::config::listener::v3::QuicProtocolOptions quic_options_;
   Network::SocketSharedPtr socket_;
   Network::ListenSocketFactoryPtr socket_factory_;
   ConditionalInitializer server_initialized_;

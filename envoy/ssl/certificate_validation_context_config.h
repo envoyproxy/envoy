@@ -78,6 +78,11 @@ public:
    * @return a reference to the api object.
    */
   virtual Api::Api& api() const PURE;
+
+  /**
+   * @return whether to validate certificate chain with all CRL or not.
+   */
+  virtual bool onlyVerifyLeafCertificateCrl() const PURE;
 };
 
 using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;

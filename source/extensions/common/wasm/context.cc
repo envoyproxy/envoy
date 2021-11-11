@@ -1707,7 +1707,7 @@ void Context::setDecoderFilterCallbacks(Envoy::Http::StreamDecoderFilterCallback
   decoder_callbacks_ = &callbacks;
 }
 
-Http::FilterHeadersStatus Context::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Context::encode1xxHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
