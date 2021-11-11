@@ -79,7 +79,7 @@ void onMqSocketEvents(uint32_t flags) {
   }
 
   // There might be more unhandled events, so program drain
-  if (!max_events) {
+  if (max_events == 0) {
     vclInterfaceDrainEvents();
   }
 }
