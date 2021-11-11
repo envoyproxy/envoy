@@ -80,7 +80,7 @@ LogicalDnsCluster::LogicalDnsCluster(
     throw EnvoyException("LOGICAL_DNS clusters must NOT have a custom resolver name set");
   }
 
-  dns_url_ = Network::Utility::getTcpUrl(socket_address.address(), socket_address.port_value());
+  dns_url_ = Network::Utility::formatTcpUrl(socket_address.address(), socket_address.port_value());
   if (lbEndpoint().endpoint().hostname().empty()) {
     hostname_ = Network::Utility::hostFromTcpUrl(dns_url_);
   } else {

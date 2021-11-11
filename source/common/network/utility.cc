@@ -68,9 +68,12 @@ std::string hostFromUrl(const std::string& url, absl::string_view scheme,
 
   const size_t bracket_begin_index = url.find('[', scheme.size());
 
+  // If there is no '[', it means it is ipv4 address, otherwise it is ipv6 address.
   if (bracket_begin_index == std::string::npos) {
     const size_t colon_index = url.find(':', scheme.size());
 
+    // Ensure there is a colon between address and port. If colon is right behind
+    // scheme, it means there is no address.
     if ((colon_index == std::string::npos) || (colon_index == scheme.size())) {
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
@@ -78,6 +81,7 @@ std::string hostFromUrl(const std::string& url, absl::string_view scheme,
     return url.substr(scheme.size(), colon_index - scheme.size());
   } else {
     const size_t bracket_end_index = url.find(']', scheme.size() + 1);
+    // Ensure there is ']', and '[' is right behind the scheme.
     if ((bracket_end_index == std::string::npos) || (bracket_begin_index != scheme.size())) {
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
@@ -100,10 +104,12 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
 
   const size_t bracket_begin_index = url.find('[', scheme.size());
   size_t colon_index = 0;
+  // If there is no '[', it means it is ipv4 address, otherwise it is ipv6 address.
   if (bracket_begin_index == std::string::npos) {
     colon_index = url.find(':', scheme.size());
   } else {
     const size_t bracket_end_index = url.find(']', scheme.size() + 1);
+    // Ensure there is ']', and '[' is right behind the scheme.
     if ((bracket_end_index == std::string::npos) || (bracket_begin_index != scheme.size())) {
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
@@ -145,7 +151,7 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 } // namespace
 
-std::string Utility::getTcpUrl(const std::string& ip_address, uint16_t port) {
+std::string Utility::formatTcpUrl(const std::string& ip_address, uint16_t port) {
   auto address_instance = parseInternetAddressNoThrow(ip_address, port, false);
   if ((address_instance != nullptr) &&
       (address_instance->ip()->version() == Address::IpVersion::v6)) {

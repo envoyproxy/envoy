@@ -26,10 +26,10 @@ namespace Envoy {
 namespace Network {
 namespace {
 
-TEST(NetworkUtility, GetTcpUrl) {
-  EXPECT_EQ("tcp://foo:1234", Utility::getTcpUrl("foo", 1234));
-  EXPECT_EQ("tcp://1.2.3.4:1234", Utility::getTcpUrl("1.2.3.4", 1234));
-  EXPECT_EQ("tcp://[::1]:1234", Utility::getTcpUrl("::1", 1234));
+TEST(NetworkUtility, FormatTcpUrl) {
+  EXPECT_EQ("tcp://foo:1234", Utility::formatTcpUrl("foo", 1234));
+  EXPECT_EQ("tcp://1.2.3.4:1234", Utility::formatTcpUrl("1.2.3.4", 1234));
+  EXPECT_EQ("tcp://[::1]:1234", Utility::formatTcpUrl("::1", 1234));
 }
 
 TEST(NetworkUtility, UrlWithIpv4) {

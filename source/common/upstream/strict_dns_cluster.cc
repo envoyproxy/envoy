@@ -38,7 +38,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       }
 
       const std::string& url =
-          Network::Utility::getTcpUrl(socket_address.address(), socket_address.port_value());
+          Network::Utility::formatTcpUrl(socket_address.address(), socket_address.port_value());
       resolve_targets.emplace_back(new ResolveTarget(*this, factory_context.mainThreadDispatcher(),
                                                      url, locality_lb_endpoint, lb_endpoint));
     }
