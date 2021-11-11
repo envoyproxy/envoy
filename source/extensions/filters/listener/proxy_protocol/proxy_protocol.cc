@@ -455,8 +455,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
 
       if ((nread < PROXY_PROTO_V2_SIGNATURE_LEN ||
            memcmp(buf_, PROXY_PROTO_V2_SIGNATURE, PROXY_PROTO_V2_SIGNATURE_LEN)) &&
-          memcmp(buf_, PROXY_PROTO_V1_SIGNATURE,
-                 std::min<ssize_t>(nread, PROXY_PROTO_V1_SIGNATURE_LEN))) {
+          memcmp(buf_, PROXY_PROTO_V1_SIGNATURE, PROXY_PROTO_V1_SIGNATURE_LEN)) {
         // the bytes we have seen so far do not match v1 or v2 proxy protocol, so we can safely
         // short-circuit
         ENVOY_LOG(debug, "request does not use v1 or v2 proxy protocol, forwarding as is");
