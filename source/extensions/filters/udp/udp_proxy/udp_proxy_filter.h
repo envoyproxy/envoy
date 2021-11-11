@@ -90,7 +90,7 @@ public:
     }
   }
 
-  const std::string& cluster(Network::Address::InstanceConstSharedPtr address) const {
+  const std::string cluster(Network::Address::InstanceConstSharedPtr address) const {
     return router_->route(address);
   }
   const std::vector<std::string>& allClusterNames() const { return router_->allClusterNames(); }

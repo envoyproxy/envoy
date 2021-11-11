@@ -22,7 +22,7 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
   const auto& cluster = route_config.cluster();
 
   // Emplace cluster names to context to get all cluster names
-  context.cluster_name_set_.emplace(cluster);
+  context.cluster_name_.emplace(cluster);
 
   return [cluster]() { return std::make_unique<RouteMatchAction>(cluster); };
 }
@@ -60,13 +60,12 @@ RouterImpl::RouterImpl(const envoy::extensions::filters::udp::udp_proxy::v3::Udp
     }
 
     // Copy all clusters names
-    cluster_names_.insert(cluster_names_.end(), context.cluster_name_set_.begin(),
-                          context.cluster_name_set_.end());
-    cluster_name_set_ = std::move(context.cluster_name_set_);
+    cluster_names_.insert(cluster_names_.end(), context.cluster_name_.begin(),
+                          context.cluster_name_.end());
   }
 }
 
-const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr address) const {
+const std::string RouterImpl::route(Network::Address::InstanceConstSharedPtr address) const {
   if (cluster_.has_value()) {
     return cluster_.value();
   } else {
@@ -76,13 +75,7 @@ const std::string& RouterImpl::route(Network::Address::InstanceConstSharedPtr ad
       auto result = matcher_->match(data);
       if (result.match_state_ == Matcher::MatchState::MatchComplete) {
         if (result.on_match_.has_value()) {
-          // Use the cluster name get by callback may cause "use of memory after it is freed", so
-          // get the cluster name in a roundabout way.
-          auto cluster =
-              result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
-          if (cluster_name_set_.contains(cluster)) {
-            return *cluster_name_set_.find(cluster);
-          }
+          return result.on_match_.value().action_cb_()->getTyped<RouteMatchAction>().cluster();
         }
       }
     }
