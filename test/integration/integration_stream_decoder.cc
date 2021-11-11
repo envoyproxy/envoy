@@ -84,7 +84,7 @@ AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds
   return AssertionSuccess();
 }
 
-void IntegrationStreamDecoder::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
   if (waiting_for_continue_headers_) {
     dispatcher_.exit();

@@ -1318,19 +1318,15 @@ TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
 // The downstream connection is closed when it is read disabled, and on OSX the
 // connection error is not detected under these circumstances.
 #if !defined(__APPLE__)
-TEST_P(ProtocolIntegrationTest, 100ContinueAndClose) {
-  testEnvoyHandling100Continue(false, "", true);
-}
+TEST_P(ProtocolIntegrationTest, 1xxAndClose) { testEnvoyHandling1xx(false, "", true); }
 #endif
 
-TEST_P(ProtocolIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
+TEST_P(ProtocolIntegrationTest, EnvoyHandling1xx) { testEnvoyHandling1xx(); }
 
-TEST_P(ProtocolIntegrationTest, EnvoyHandlingDuplicate100Continue) {
-  testEnvoyHandling100Continue(true);
-}
+TEST_P(ProtocolIntegrationTest, EnvoyHandlingDuplicate1xx) { testEnvoyHandling1xx(true); }
 
 // 100-continue before the request completes.
-TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly100Continue) { testEnvoyProxying1xx(true); }
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarly1xx) { testEnvoyProxying1xx(true); }
 
 // Multiple 1xx before the request completes.
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
@@ -1338,7 +1334,7 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingEarlyMultiple1xx) {
 }
 
 // 100-continue after the request completes.
-TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate100Continue) { testEnvoyProxying1xx(false); }
+TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate1xx) { testEnvoyProxying1xx(false); }
 
 // Multiple 1xx after the request completes.
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
@@ -2746,7 +2742,7 @@ TEST_P(DownstreamProtocolIntegrationTest, Test100AndDisconnect) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  upstream_request_->encode100ContinueHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
+  upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   ASSERT_TRUE(fake_upstream_connection_->close());
 
   // Make sure that a disconnect results in valid 5xx response headers even when preceded by a 100.

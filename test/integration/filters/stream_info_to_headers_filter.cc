@@ -40,6 +40,10 @@ public:
       headers.addCopy(Http::LowerCaseString("dns_end"),
                       absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_end).value())));
     }
+    if (decoder_callbacks_->streamInfo().upstreamSslConnection()) {
+      headers.addCopy(Http::LowerCaseString("alpn"),
+                      decoder_callbacks_->streamInfo().upstreamSslConnection()->alpn());
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 };
