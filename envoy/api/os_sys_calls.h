@@ -28,7 +28,7 @@ struct InterfaceAddress {
                    Envoy::Network::Address::InstanceConstSharedPtr ifa_addr)
       : ifa_name_(ifa_name), ifa_flags_(ifa_flags), ifa_addr_(ifa_addr) {}
 
-  const std::string ifa_name_;
+  std::string ifa_name_;
   unsigned int ifa_flags_;
   Envoy::Network::Address::InstanceConstSharedPtr ifa_addr_;
 };
