@@ -366,7 +366,7 @@ TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
 }
 
-// 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
+// 100 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
 TEST_P(Http2CodecImplTest, ContinueHeaders) {
   initialize();
 
@@ -376,8 +376,8 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -396,15 +396,15 @@ TEST_P(Http2CodecImplTest, TrailerStatus) {
   EXPECT_FALSE(Http2CodecImplTestFixture::slowContainsStreamId(100, *client_));
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
 
   // nghttp2 doesn't allow :status in trailers
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  response_encoder_->encode1xxHeaders(continue_headers);
   EXPECT_FALSE(client_wrapper_.status_.ok());
   EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
@@ -420,10 +420,10 @@ TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -539,8 +539,8 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   response_encoder_->encodeHeaders(continue_headers, true);
   EXPECT_FALSE(client_wrapper_.status_.ok());
@@ -561,8 +561,8 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   // Buffer client data to avoid mock recursion causing lifetime issues.
   ON_CALL(server_connection_, write(_, _))

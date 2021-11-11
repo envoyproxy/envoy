@@ -126,8 +126,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+  ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
@@ -1347,8 +1347,8 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       }
     }
 
-    if (parser_->statusCode() == enumToInt(Http::Code::Continue)) {
-      pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
+    if (HeaderUtility::isSpecial1xx(*headers)) {
+      pending_response_.value().decoder_->decode1xxHeaders(std::move(headers));
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {

@@ -16,13 +16,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit),
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {
-  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
-}
+      quic_stat_names_(quic_stat_names), scope_(scope) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -86,9 +85,7 @@ void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
     return;
   }
   uint32_t streams_available = streamsAvailable();
-  if (streams_available > 0) {
-    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
-  }
+  http_connection_callbacks_->onMaxStreamsChanged(streams_available);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
@@ -131,12 +128,11 @@ uint64_t EnvoyQuicClientSession::streamsAvailable() {
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
 
-  // TODO(alyssawilk) support the case where a connection starts with 0 max streams.
-  ASSERT(streamsAvailable());
-  if (streamsAvailable() > 0) {
-    OnCanCreateNewOutgoingStream(false);
-    raiseConnectionEvent(Network::ConnectionEvent::Connected);
-  }
+  // Fake this to make sure we set the connection pool stream limit correctly
+  // before use. This may result in OnCanCreateNewOutgoingStream with zero
+  // available streams.
+  OnCanCreateNewOutgoingStream(false);
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
@@ -152,7 +148,7 @@ void EnvoyQuicClientSession::setHttp3Options(
     return;
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
-      ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {

@@ -54,6 +54,7 @@ public:
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
 

@@ -195,8 +195,8 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   });
 }
 
-void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+  ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
@@ -354,7 +354,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
 
   if (status == enumToInt(Http::Code::Continue)) {
     ASSERT(!remote_end_stream_);
-    response_decoder_.decode100ContinueHeaders(std::move(headers));
+    response_decoder_.decode1xxHeaders(std::move(headers));
   } else {
     response_decoder_.decodeHeaders(std::move(headers), remote_end_stream_);
   }
