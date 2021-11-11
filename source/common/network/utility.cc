@@ -86,8 +86,11 @@ std::string hostFromUrl(const std::string& url, absl::string_view scheme,
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
 
+    // Find the colon which splits the address and port. The colon should be
+    // after ':'.
     const size_t colon_index = url.find(':', bracket_end_index);
 
+    // Ensure there is colon for split the address and port.
     if (colon_index == std::string::npos) {
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
@@ -113,13 +116,17 @@ uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
     if ((bracket_end_index == std::string::npos) || (bracket_begin_index != scheme.size())) {
       throw EnvoyException(absl::StrCat("malformed url: ", url));
     }
+    // Find the colon which splits the address and port. The colon should be
+    // after ':'.
     colon_index = url.find(':', bracket_end_index);
   }
 
+  // Ensure there is colon for split the address and port.
   if (colon_index == std::string::npos) {
     throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
+  // There should be only one colon after address
   const size_t rcolon_index = url.rfind(':');
   if (colon_index != rcolon_index) {
     throw EnvoyException(absl::StrCat("malformed url: ", url));
