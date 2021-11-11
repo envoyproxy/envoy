@@ -59,6 +59,7 @@ struct HostStats {
  * Weakly-named load metrics to be reported as EndpointLoadMetricStats. Individual stats are
  * accumulated by calling add(), which combines stats with the same name. The aggregated stats are
  * retrieved by calling latch(), which also clears the current load metrics.
+ *
  */
 class LoadMetricStats {
 public:
@@ -74,7 +75,9 @@ public:
 
   // Adds the given stat to the map. If the stat already exists in the map, then the stat is
   // combined with the existing map entry by incrementing num_requests_with_metric and summing the
-  // total_metric_value fields.
+  // total_metric_value fields. Otherwise, the stat is added with the provided value to the map,
+  // which retains all entries until the next call to latch(). This allows metrics to be added
+  // whose keys may not necessarily be known at startup time.
   virtual void add(const std::string& key, double value) PURE;
 
   // Returns an owning pointer to the current load metrics and clears the map.
