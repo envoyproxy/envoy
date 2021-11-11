@@ -29,7 +29,7 @@ public:
   }
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
     StreamInfo::UpstreamTiming& upstream_timing = decoder_callbacks_->streamInfo().upstreamTiming();
-    // Upstrem metrics aren't available until the response is complete.
+    // Upstream metrics aren't available until the response is complete.
     if (upstream_timing.upstream_connect_start_.has_value()) {
       trailers.addCopy(
           Http::LowerCaseString("upstream_connect_start"),
