@@ -54,8 +54,6 @@ void ProxyFilter::onDestroy() {
 }
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  latchTime(decoder_callbacks_, dnsStart());
-
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
   const Router::RouteEntry* route_entry;
   if (!route || !(route_entry = route->routeEntry())) {
@@ -120,6 +118,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     }
   }
 
+  latchTime(decoder_callbacks_, dnsStart());
   // See the comments in dns_cache.h for how loadDnsCacheEntry() handles hosts with embedded ports.
   // TODO(mattklein123): Because the filter and cluster have independent configuration, it is
   //                     not obvious to the user if something is misconfigured. We should see if
