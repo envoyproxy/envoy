@@ -327,7 +327,6 @@ public class CronetFixedModeOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testFixedLengthStreamingModeLargeData() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -361,7 +360,6 @@ public class CronetFixedModeOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testFixedLengthStreamingModeLargeDataWriteOneByte() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
@@ -384,7 +382,6 @@ public class CronetFixedModeOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @OnlyRunCronetHttpURLConnection
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testJavaBufferSizeLargerThanNativeBufferSize() throws Exception {
     // Set an internal buffer of size larger than the buffer size used
     // in network stack internally.
@@ -407,7 +404,6 @@ public class CronetFixedModeOutputStreamTest {
   @SmallTest
   @Feature({"Cronet"})
   @CompareDefaultWithCronet
-  @Ignore("https://github.com/envoyproxy/envoy-mobile/pull/1545")
   public void testOneMassiveWrite() throws Exception {
     URL url = new URL(NativeTestServer.getEchoBodyURL());
     HttpURLConnection connection = (HttpURLConnection)url.openConnection();
