@@ -55,6 +55,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_filter_manager_connection_impl_test",
+    srcs = ["quic_filter_manager_connection_impl_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_filter_manager_connection_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = ["quic_stat_names_test.cc"],
     tags = ["nofips"],

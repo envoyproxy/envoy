@@ -63,6 +63,9 @@ public:
     return network_connection_->connectionSocket()->connectionInfoProvider();
   }
   Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    if (!network_connection_ || !network_connection_->connectionSocket()) {
+      return nullptr;
+    }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
