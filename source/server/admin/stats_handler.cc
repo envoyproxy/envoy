@@ -8,6 +8,7 @@
 #include "source/common/http/utility.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
+#include <vector>
 
 namespace Envoy {
 namespace Server {
@@ -136,9 +137,10 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
   }
+
   PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(), response, used_only,
-                                              regex, server_.api().customStatNamespaces());
+                                              server_.stats().histograms(), server_.stats().textReadouts(),
+                                              response, used_only, regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 

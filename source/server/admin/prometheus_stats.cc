@@ -6,6 +6,7 @@
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include <vector>
 
 namespace Envoy {
 namespace Server {
@@ -146,6 +147,14 @@ std::string generateNumericOutput(const StatType& metric,
   return fmt::format("{0}{{{1}}} {2}\n", prefixed_tag_extracted_name, tags, metric.value());
 }
 
+std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
+                                      const std::string& prefixed_tag_extracted_name) {
+  auto tags = std::vector(text_readout.tags());
+  tags.push_back(Stats::Tag{"text_value", text_readout.value()});
+  const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
+  return fmt::format("{0}{{{1}}} 1\n", prefixed_tag_extracted_name, formattedTags);
+}
+
 /*
  * Returns the prometheus output for a histogram. The output is a multi-line string (with embedded
  * newlines) that contains all the individual bucket counts and sum/count for a single histogram
@@ -223,8 +232,9 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
-    const std::vector<Stats::ParentHistogramSharedPtr>& histograms, Buffer::Instance& response,
-    const bool used_only, const absl::optional<std::regex>& regex,
+    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
+    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
     const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
@@ -232,9 +242,13 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
                                                       generateNumericOutput<Stats::Counter>,
                                                       "counter", custom_namespaces);
 
-  metric_name_count +=
-      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
+  metric_name_count += outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
+                                                    generateNumericOutput<Stats::Gauge>,
+                                                    "gauge", custom_namespaces);
+
+  metric_name_count += outputStatType<Stats::TextReadout>(response, used_only, regex,
+                                                          text_readouts, generateTextReadoutOutput,
+                                                          "gauge", custom_namespaces);
 
   metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
                                                               histograms, generateHistogramOutput,
