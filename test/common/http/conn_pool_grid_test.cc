@@ -726,7 +726,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
         .WillOnce(
             Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
               interface_vector.insert(interfaces.begin(), interfaces.end());
-              return {0,0};
+              return {0, 0};
             }));
   }
   EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{1, 0}));
