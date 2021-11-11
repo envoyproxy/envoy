@@ -16,13 +16,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit),
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {
-  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
-}
+      quic_stat_names_(quic_stat_names), scope_(scope) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
