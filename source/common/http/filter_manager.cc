@@ -395,13 +395,13 @@ void ActiveStreamDecoderFilter::encode1xxHeaders(ResponseHeaderMapPtr&& headers)
   // here. This avoids the potential situation where Envoy strips Expect: 100-Continue and sends a
   // 100-Continue, then proxies a duplicate 100 Continue from upstream.
   if (parent_.proxy_100_continue_) {
-    parent_.filter_manager_callbacks_.setContinueHeaders(std::move(headers));
-    parent_.encode1xxHeaders(nullptr, *parent_.filter_manager_callbacks_.continueHeaders());
+    parent_.filter_manager_callbacks_.setInformationalHeaders(std::move(headers));
+    parent_.encode1xxHeaders(nullptr, *parent_.filter_manager_callbacks_.informationalHeaders());
   }
 }
 
-ResponseHeaderMapOptRef ActiveStreamDecoderFilter::continueHeaders() const {
-  return parent_.filter_manager_callbacks_.continueHeaders();
+ResponseHeaderMapOptRef ActiveStreamDecoderFilter::informationalHeaders() const {
+  return parent_.filter_manager_callbacks_.informationalHeaders();
 }
 
 void ActiveStreamDecoderFilter::encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
@@ -1528,7 +1528,7 @@ bool ActiveStreamEncoderFilter::has1xxheaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
 void ActiveStreamEncoderFilter::do1xxHeaders() {
-  parent_.encode1xxHeaders(this, *parent_.filter_manager_callbacks_.continueHeaders());
+  parent_.encode1xxHeaders(this, *parent_.filter_manager_callbacks_.informationalHeaders());
 }
 void ActiveStreamEncoderFilter::doHeaders(bool end_stream) {
   parent_.encodeHeaders(this, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);

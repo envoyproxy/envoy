@@ -466,7 +466,7 @@ public:
    * Returns the headers provided to encode1xxHeaders. Returns absl::nullopt if
    * no headers have been provided yet.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() const PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() const PURE;
 
   /**
    * Called with headers to be encoded, optionally indicating end of stream.
