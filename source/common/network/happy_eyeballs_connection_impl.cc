@@ -380,24 +380,43 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   }
 }
 
+namespace {
+bool hasMatchingAddressFamily(const Address::InstanceConstSharedPtr& a,
+                              const Address::InstanceConstSharedPtr& b) {
+  return (a->type() == Address::Type::Ip && b->type() == Address::Type::Ip &&
+          a->ip()->version() == b->ip()->version());
+}
+
+}  // namespace
+
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
-  std::vector<Address::InstanceConstSharedPtr> address_list = in;
-  for (auto current = address_list.begin(); current != address_list.end(); ++current) {
-    // Find the first address with a different address family than the current address.
-    auto it = std::find_if(current, address_list.end(), [&](const auto& val) {
-      return (val->type() != Address::Type::Ip || (*current)->type() != Address::Type::Ip ||
-              (*current)->ip()->version() != val->ip()->version());
-    });
-    // If there are no more addresses with different families the sorting is finished.
-    if (it == address_list.end()) {
-      break;
+  std::vector<Address::InstanceConstSharedPtr> address_list;
+  address_list.reserve(in.size());
+  // Iterator which will advance through all addresses matching the first family.
+  auto first = in.begin();
+  // Iterator which will advance through all addresses not matching the first family.
+  // This initial value is ignored and will be overwritten in the loop below.
+  auto other = in.begin();
+  while (first != in.end() || other != in.end()) {
+    if (first != in.end()) {
+      address_list.push_back(*first);
+      first = std::find_if(first + 1, in.end(), [&](const auto& val) {
+        return hasMatchingAddressFamily(in[0], val);
+      });
     }
-    // Bubble the address up to the current position.
-    auto start = std::make_reverse_iterator(it + 1);
-    auto end = std::make_reverse_iterator(current + 1);
-    std::rotate(start, start + 1, end);
+
+    if (other != in.end()) {
+      other = std::find_if(other + 1, in.end(), [&](const auto& val) {
+        return !hasMatchingAddressFamily(in[0], val);
+      });
+
+      if (other != in.end()) {
+        address_list.push_back(*other);
+      }
+    }
   }
+  ASSERT(address_list.size() == in.size());
   return address_list;
 }
 
