@@ -387,7 +387,7 @@ bool hasMatchingAddressFamily(const Address::InstanceConstSharedPtr& a,
           a->ip()->version() == b->ip()->version());
 }
 
-}  // namespace
+} // namespace
 
 std::vector<Address::InstanceConstSharedPtr>
 HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
@@ -401,15 +401,13 @@ HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceCo
   while (first != in.end() || other != in.end()) {
     if (first != in.end()) {
       address_list.push_back(*first);
-      first = std::find_if(first + 1, in.end(), [&](const auto& val) {
-        return hasMatchingAddressFamily(in[0], val);
-      });
+      first = std::find_if(first + 1, in.end(),
+                           [&](const auto& val) { return hasMatchingAddressFamily(in[0], val); });
     }
 
     if (other != in.end()) {
-      other = std::find_if(other + 1, in.end(), [&](const auto& val) {
-        return !hasMatchingAddressFamily(in[0], val);
-      });
+      other = std::find_if(other + 1, in.end(),
+                           [&](const auto& val) { return !hasMatchingAddressFamily(in[0], val); });
 
       if (other != in.end()) {
         address_list.push_back(*other);
