@@ -63,8 +63,8 @@ protected:
                       Stats::StatNameTagVector cluster_tags) {
     Stats::StatNameManagedStorage name_storage(baseName(name, cluster_tags), *symbol_table_);
     Stats::StatNameManagedStorage tag_extracted_name_storage(name, *symbol_table_);
-    auto textReadout = alloc_.makeTextReadout(name_storage.statName(),
-                                              tag_extracted_name_storage.statName(), cluster_tags);
+    Stats::TextReadoutSharedPtr textReadout = alloc_.makeTextReadout(
+        name_storage.statName(), tag_extracted_name_storage.statName(), cluster_tags);
     textReadout->set(value);
     textReadouts_.push_back(textReadout);
   }
