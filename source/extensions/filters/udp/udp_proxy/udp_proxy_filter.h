@@ -289,64 +289,78 @@ private:
   class ClusterInfo {
   public:
     ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    virtual ~ClusterInfo() = default;
+    virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
-    virtual void removeSession(const ActiveSession* session) PURE;
+    void removeSession(const ActiveSession* session);
 
     UdpProxyFilter& filter_;
     Upstream::ThreadLocalCluster& cluster_;
     UdpProxyUpstreamStats cluster_stats_;
+
+  protected:
+    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                 const Upstream::HostConstSharedPtr& host);
+    virtual ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+                                      const Upstream::HostConstSharedPtr& host) const PURE;
 
   private:
     static UdpProxyUpstreamStats generateStats(Stats::Scope& scope) {
       const auto final_prefix = "udp";
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
+    void removeHostSessions(const Upstream::HostConstSharedPtr& host);
+
+    virtual void storeSession(ActiveSessionPtr session) PURE;
+    virtual void removeSessionFromStorage(const ActiveSession* session) PURE;
+
+    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
+    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
+        host_to_sessions_;
   };
 
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
-
-  template <typename SessionHash, typename SessionEqual>
-  class ClusterInfoBase : public ClusterInfo {
-  public:
-    ClusterInfoBase(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    ~ClusterInfoBase() override;
-    void removeSession(const ActiveSession* session) final;
-
-  protected:
-    absl::flat_hash_set<ActiveSessionPtr, SessionHash, SessionEqual> sessions_;
-    absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
-        host_to_sessions_;
-
-    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                 const Upstream::HostConstSharedPtr& host);
-
-  private:
-    Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
-  };
 
   /**
    * Performs forwarding and replying data to one, selected at the beginning upstream host
    * In case of not healthy upstream host, selects a new one
    */
-  class StickySessionClusterInfo
-      : public ClusterInfoBase<HeterogeneousActiveSessionHash, HeterogeneousActiveSessionEqual> {
+  class StickySessionClusterInfo : public ClusterInfo {
   public:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    void onData(Network::UdpRecvData& data) override;
+    ~StickySessionClusterInfo();
+    Network::FilterStatus onData(Network::UdpRecvData& data) override;
+    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+                              const Upstream::HostConstSharedPtr& host) const override;
+
+  private:
+    absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
+                        HeterogeneousActiveSessionEqual>
+        sessions_;
+
+    void storeSession(ActiveSessionPtr session) override;
+    void removeSessionFromStorage(const ActiveSession* session) override;
   };
 
   /**
    * On each data chunk selects another host using underlying load balancing method and communicates
    * with that host
    */
-  class PerPacketLoadBalancingClusterInfo
-      : public ClusterInfoBase<HeterogeneousActiveSessionHashWithUpstreamHost,
-                               HeterogeneousActiveSessionEqualWithUpstreamHost> {
+  class PerPacketLoadBalancingClusterInfo : public ClusterInfo {
   public:
     PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
                                       Upstream::ThreadLocalCluster& cluster);
-    void onData(Network::UdpRecvData& data) override;
+    ~PerPacketLoadBalancingClusterInfo();
+    Network::FilterStatus onData(Network::UdpRecvData& data) override;
+    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+                              const Upstream::HostConstSharedPtr& host) const override;
+
+  private:
+    absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHashWithUpstreamHost,
+                        HeterogeneousActiveSessionEqualWithUpstreamHost>
+        sessions_;
+
+    void storeSession(ActiveSessionPtr session) override;
+    void removeSessionFromStorage(const ActiveSession* session) override;
   };
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
