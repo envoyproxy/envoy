@@ -327,7 +327,7 @@ private:
   class StickySessionClusterInfo : public ClusterInfo {
   public:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    ~StickySessionClusterInfo();
+    ~StickySessionClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
     ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
                               const Upstream::HostConstSharedPtr& host) const override;
@@ -349,7 +349,7 @@ private:
   public:
     PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
                                       Upstream::ThreadLocalCluster& cluster);
-    ~PerPacketLoadBalancingClusterInfo();
+    ~PerPacketLoadBalancingClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
     ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
                               const Upstream::HostConstSharedPtr& host) const override;
