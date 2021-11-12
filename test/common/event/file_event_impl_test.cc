@@ -439,6 +439,41 @@ TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
+// This is a test case that clarifies the event behavior. Read and Write events are activated by the
+// OS before invoke connect() or listen().
+TEST_P(FileEventImplActivateTest, EventTriggeredBeforeConnect) {
+  os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).return_value_;
+  ASSERT_TRUE(SOCKET_VALID(fd));
+
+  Api::ApiPtr api = Api::createApiForTest();
+  DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
+  ReadyWatcher read_event;
+  ReadyWatcher write_event;
+
+  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+
+  // Emulate the behavior of the ConnectionImpl constructor which initializes the file event.
+  Event::FileEventPtr file_event = dispatcher->createFileEvent(
+      fd,
+      [&](uint32_t events) -> void {
+        if (events & FileReadyType::Read) {
+          read_event.ready();
+        }
+
+        if (events & FileReadyType::Write) {
+          write_event.ready();
+        }
+      },
+      trigger, FileReadyType::Read | FileReadyType::Write);
+
+  EXPECT_CALL(read_event, ready());
+  EXPECT_CALL(write_event, ready());
+
+  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+
+  os_sys_calls_.close(fd);
+}
+
 } // namespace
 } // namespace Event
 } // namespace Envoy
