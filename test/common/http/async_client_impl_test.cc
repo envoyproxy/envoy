@@ -147,7 +147,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
-  response_decoder_->decode100ContinueHeaders(
+  response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
   response_decoder_->decodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
