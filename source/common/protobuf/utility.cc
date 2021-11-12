@@ -251,13 +251,13 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
                                       status.ToString());
   } else {
     // If the error has nothing to do with unknown field.
-    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() +
-                         "): " + json);
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
   }
 }
 
-Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
-                                              bool& has_unknown_fileld) {
+Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
+                                                        Protobuf::Message& message,
+                                                        bool& has_unknown_fileld) {
   has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;

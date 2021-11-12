@@ -252,8 +252,9 @@ public:
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
-  static Protobuf::util::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
-                                             bool& has_unknown_fileld);
+  static Protobuf::util::Status loadFromJsonNoThrow(const std::string& json,
+                                                    Protobuf::Message& message,
+                                                    bool& has_unknown_fileld);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
