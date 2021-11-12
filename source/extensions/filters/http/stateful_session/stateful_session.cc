@@ -25,7 +25,7 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
           config.session_state().name());
 
   auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      config.session_state().typed_config(), context.messageValidationVisitor(), *this);
+      config.session_state().typed_config(), context.messageValidationVisitor(), factory);
 
   factory_ = factory.createSessionStateFactory(*typed_config, context);
 }

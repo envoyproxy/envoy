@@ -50,7 +50,7 @@ private:
   }
 
   std::string makeSetCookie(const std::string& address) const {
-    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, /*httponly=*/true);
+    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true);
   }
 
   const std::string name_;

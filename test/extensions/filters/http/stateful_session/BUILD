@@ -29,6 +29,22 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "stateful_session_integration_test",
+    srcs = [
+        "stateful_session_integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.http.stateful_session"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/stateful_session:config",
+        "//source/extensions/http/stateful_session/cookie:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.stateful_session"],

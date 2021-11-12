@@ -26,8 +26,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>`.
 //
 // For example, if the cookie name is set to `sticky-host`, envoy will prefer `1.2.3.4:80`
-// as the upstream endpoint when the request contains the header
-// `cookie: sticky-host=MS4yLjMuNDo4MA==`.
+// as the upstream endpoint when the request contains the following header:
+//
+// .. code-block:: none
+//
+//     cookie: sticky-host="MS4yLjMuNDo4MA=="
+//
 // When processing the upstream response, if endpoint `1.2.3.4:80` is indeed the final choice
 // (endpoint `1.2.3.4:80` exists and it's status is as expected), the extension does nothing.
 // If endpoint `1.2.3.4:80` is not the final choice, the new selected host will be used to
