@@ -207,7 +207,8 @@ envoy_cc_test(
     name = "buffered_message_ttl_manager_test",
     srcs = ["buffered_message_ttl_manager_test.cc"],
     deps = [
+        "//source/common/event:dispatcher_lib",
         "//source/common/grpc:buffered_message_ttl_manager_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "//test/test_common:utility_lib",
     ],
 )
