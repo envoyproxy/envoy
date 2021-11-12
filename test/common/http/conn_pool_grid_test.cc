@@ -725,7 +725,8 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
     EXPECT_CALL(os_sys_calls, getifaddrs(_))
         .WillOnce(
             Invoke([&](Api::InterfaceAddressVector& interface_vector) -> Api::SysCallIntResult {
-              interface_vector.insert(interface_vector.begin(), interfaces.begin(), interfaces.end());
+              interface_vector.insert(interface_vector.begin(), interfaces.begin(),
+                                      interfaces.end());
               return {0, 0};
             }));
   }
