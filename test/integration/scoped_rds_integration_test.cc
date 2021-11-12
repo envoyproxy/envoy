@@ -13,6 +13,7 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/resources.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
@@ -21,10 +22,11 @@
 namespace Envoy {
 namespace {
 
-class InlineScopedRoutesIntegrationTest : public HttpIntegrationTest, public testing::Test {
+class InlineScopedRoutesIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
-  InlineScopedRoutesIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {}
+  InlineScopedRoutesIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void setScopedRoutesConfig(absl::string_view config_yaml) {
     config_helper_.addConfigModifier(
@@ -50,7 +52,11 @@ scope_key_builder:
   }
 };
 
-TEST_F(InlineScopedRoutesIntegrationTest, NoScopeFound) {
+INSTANTIATE_TEST_SUITE_P(IpVersions, InlineScopedRoutesIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(InlineScopedRoutesIntegrationTest, NoScopeFound) {
   absl::string_view config_yaml = R"EOF(
 scoped_route_configurations_list:
   scoped_route_configurations:
@@ -82,7 +88,7 @@ scoped_route_configurations_list:
   cleanupUpstreamAndDownstream();
 }
 
-TEST_F(InlineScopedRoutesIntegrationTest, ScopeWithSingleRouteConfiguration) {
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeWithSingleRouteConfiguration) {
   absl::string_view config_yaml = R"EOF(
 scoped_route_configurations_list:
   scoped_route_configurations:
@@ -112,7 +118,7 @@ scoped_route_configurations_list:
       /*backend_idx=*/0);
 }
 
-TEST_F(InlineScopedRoutesIntegrationTest, ScopeWithMultipleRouteConfigurations) {
+TEST_P(InlineScopedRoutesIntegrationTest, ScopeWithMultipleRouteConfigurations) {
   absl::string_view config_yaml = R"EOF(
 scoped_route_configurations_list:
   scoped_route_configurations:
