@@ -68,7 +68,7 @@ public:
   Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
 
   // Network::InternalListenerManager
-  Network::InternalListenerCallbacksOptRef
+  Network::InternalListenerOptRef
   findByAddress(const Network::Address::InstanceConstSharedPtr& listen_address) override;
 
 private:

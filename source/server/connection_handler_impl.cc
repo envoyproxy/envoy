@@ -159,8 +159,9 @@ void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction)
   }
 }
 
-Network::InternalListenerCallbacksOptRef
+Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
+  ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
   auto listener_it =
       std::find_if(listeners_.begin(), listeners_.end(),
                    [&address](std::pair<Network::Address::InstanceConstSharedPtr,
@@ -172,10 +173,9 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
                    });
 
   if (listener_it != listeners_.end()) {
-    return Network::InternalListenerCallbacksOptRef(
-        listener_it->second.internalListener().value().get());
+    return Network::InternalListenerOptRef(listener_it->second.internalListener().value().get());
   }
-  return OptRef<Network::InternalListenerCallbacks>();
+  return OptRef<Network::InternalListener>();
 }
 
 ConnectionHandlerImpl::ActiveTcpListenerOptRef

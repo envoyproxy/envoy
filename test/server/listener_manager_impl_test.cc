@@ -558,6 +558,55 @@ TEST_F(ListenerManagerImplTest, RejectListenerWithSocketAddressWithInternalListe
                             "address but an internal listener config is provided");
 }
 
+TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
+  auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.internal_address", "true"}});
+
+  const std::string yaml = R"EOF(
+    name: "foo"
+    address:
+      envoy_internal_address:
+        server_listener_name: test_internal_listener_name
+    filter_chains:
+    - filters: []
+  )EOF";
+
+  auto listener = parseListenerFromV3Yaml(yaml);
+  auto listener_mutators = std::vector<std::function<void(envoy::config::listener::v3::Listener&)>>{
+      [](envoy::config::listener::v3::Listener& l) {
+        l.mutable_connection_balance_config()->mutable_exact_balance();
+      },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_enable_reuse_port(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_freebind(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_backlog_size(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_fast_open_queue_length(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_transparent(); },
+  };
+  for (const auto& f : listener_mutators) {
+    auto new_listener = listener;
+    f(new_listener);
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener, "", true), EnvoyException,
+                              "error adding listener 'envoy://test_internal_listener_name': has "
+                              "unsupported tcp listener feature");
+  }
+
+  {
+    auto new_listener = listener;
+    new_listener.mutable_socket_options()->Add();
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener, "", true), EnvoyException,
+                              "error adding listener 'envoy://test_internal_listener_name': does "
+                              "not support socket option")
+  }
+
+  {
+    auto new_listener = listener;
+    new_listener.set_enable_mptcp(true);
+    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener, "", true), EnvoyException,
+                              "listener foo: enable_mptcp can only be used with IP addresses")
+  }
+}
+
 TEST_F(ListenerManagerImplTest, NotDefaultListenerFiltersTimeout) {
   const std::string yaml = R"EOF(
     name: "foo"

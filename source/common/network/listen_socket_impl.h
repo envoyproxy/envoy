@@ -165,6 +165,11 @@ public:
     return std::make_unique<InternalListenSocket>(connectionInfoProvider().localAddress());
   }
 
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override {
+    // internal listener socket does not support bind semantic.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   void close() override { ASSERT(io_handle_ == nullptr); }
   bool isOpen() const override {
     ASSERT(io_handle_ == nullptr);

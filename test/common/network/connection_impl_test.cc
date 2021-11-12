@@ -58,8 +58,7 @@ namespace {
 
 class MockInternalListenerManager : public InternalListenerManager {
 public:
-  MOCK_METHOD(InternalListenerCallbacksOptRef, findByAddress,
-              (const Address::InstanceConstSharedPtr&), ());
+  MOCK_METHOD(InternalListenerOptRef, findByAddress, (const Address::InstanceConstSharedPtr&), ());
 };
 
 TEST(RawBufferSocket, TestBasics) {

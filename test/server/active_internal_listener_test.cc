@@ -26,7 +26,7 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-class MockInternalListenerCallback : public Network::InternalListenerCallbacks {
+class MockInternalListenerCallback : public Network::InternalListener {
 public:
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr && socket), ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());

@@ -27,7 +27,7 @@ namespace Envoy {
 namespace Server {
 
 class ActiveInternalListener : public OwnedActiveStreamListenerBase,
-                               public Network::InternalListenerCallbacks {
+                               public Network::InternalListener {
 public:
   ActiveInternalListener(Network::ConnectionHandler& conn_handler, Event::Dispatcher& dispatcher,
                          Network::ListenerConfig& config);
@@ -75,7 +75,7 @@ public:
   }
   void shutdownListener() override { listener_.reset(); }
 
-  // Network::InternalListenerCallbacks
+  // Network::InternalListener
   void onAccept(Network::ConnectionSocketPtr&& socket) override;
 
   // Network::BalancedConnectionHandler

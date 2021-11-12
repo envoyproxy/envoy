@@ -467,6 +467,18 @@ void ListenerImpl::buildAccessLog() {
 void ListenerImpl::buildInternalListener() {
   if (config_.address().has_envoy_internal_address()) {
     internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
+    if (config_.has_connection_balance_config() || config_.enable_mptcp() ||
+        config_.has_enable_reuse_port() || config_.has_freebind() ||
+        config_.has_tcp_backlog_size() || config_.has_tcp_fast_open_queue_length() ||
+        config_.has_transparent()) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': has unsupported tcp listener feature",
+                      address_->asString()));
+    }
+    if (!config_.socket_options().empty()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': does not support socket option",
+                                       address_->asString()));
+    }
   } else {
     if (config_.has_internal_listener()) {
       throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "
