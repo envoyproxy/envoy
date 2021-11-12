@@ -229,7 +229,6 @@ PrometheusStatsFormatter::metricName(const std::string& extracted_name,
   return absl::StrCat("envoy_", sanitizeName(extracted_name));
 }
 
-// TODO(efimki): Add support of text readouts stats.
 uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
