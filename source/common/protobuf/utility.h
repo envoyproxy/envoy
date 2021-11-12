@@ -254,9 +254,10 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
    * Return ok only when strict conversion(don't ignore unknownfield) succeeds.
-   * Return error status  for strict conversion and set has_unknow_field to true if relaxed
-   * conversion(ignore unknow field) succeeds. Return error status  relaxed conversion and set
-   * has_unknow_field to false if relaxed conversion(ignore unknow field) fails.
+   * Return error status  for strict conversion and set has_unknown_field to true if relaxed
+   * conversion(ignore unknow field) succeeds.
+   * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
+   * conversion(ignore unknow field) fails.
    */
   static Protobuf::util::Status loadFromJsonNoThrow(const std::string& json,
                                                     Protobuf::Message& message,
