@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:envoy_build_system.bzl", "envoy_cmake", "envoy_package")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 

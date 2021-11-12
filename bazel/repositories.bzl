@@ -232,7 +232,6 @@ def envoy_dependencies(skip_targets = []):
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/external:envoy_build_tools.patch"],
     )
-    external_http_archive("rules_cc")
     external_http_archive("rules_pkg")
     _com_github_fdio_vpp_vcl()
 

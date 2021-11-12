@@ -4,7 +4,6 @@ load(
     "envoy_cc_library",
     "envoy_contrib_package",
 )
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@base_pip3//:requirements.bzl", "requirement")
 

@@ -1,4 +1,3 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@envoy_large_machine_exec_property//:constants.bzl", "LARGE_MACHINE")
 load(":genrule_cmd.bzl", "genrule_cmd")
 
