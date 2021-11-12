@@ -25,6 +25,10 @@ public:
     }
   }
 
+  const std::map<MonotonicTime, absl::flat_hash_set<uint64_t>, std::greater<>>& deadline() {
+    return deadline_;
+  }
+
 private:
   void checkMessages() {
     const auto now = dispatcher_.timeSource().monotonicTime();
