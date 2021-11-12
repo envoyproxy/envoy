@@ -1,12 +1,13 @@
 #include "source/server/admin/prometheus_stats.h"
 
+#include <vector>
+
 #include "source/common/common/empty_string.h"
 #include "source/common/common/macros.h"
 #include "source/common/common/regex.h"
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
-#include <vector>
 
 namespace Envoy {
 namespace Server {
