@@ -12,11 +12,33 @@ namespace Grpc {
 
 enum class BufferState { Buffered, PendingFlush };
 
+class BufferedAsyncClientCallbacks {
+public:
+  virtual ~BufferedAsyncClientCallbacks() = default;
+
+  /**
+   * Called if a message related with id has been proceeded successfully.
+   *
+   * @param id the ID related with buffered messages. This ID must be already published by client.
+   * If not, this callback will do nothing.
+   */
+  virtual void onSuccess(uint64_t id) PURE;
+
+  /**
+   * Called if a message related with id has not been proceeded.
+   *
+   * @param id the ID related with buffered messages. This ID must be already published by client.
+   * If not, this callback will do nothing.
+   */
+  virtual void onError(uint64_t id) PURE;
+};
+
 // This class wraps bidirectional gRPC and provides message arrival guarantee.
 // It stores messages to be sent or in the process of being sent in a buffer,
 // and can track the status of the message based on the ID assigned to each message.
 // If a message fails to be sent, it can be re-buffered to guarantee its arrival.
-template <class RequestType, class ResponseType> class BufferedAsyncClient {
+template <class RequestType, class ResponseType>
+class BufferedAsyncClient : public BufferedAsyncClientCallbacks {
 public:
   BufferedAsyncClient(uint32_t max_buffer_bytes, const Protobuf::MethodDescriptor& service_method,
                       Grpc::AsyncStreamCallbacks<ResponseType>& callbacks,
@@ -73,10 +95,13 @@ public:
     return inflight_message_ids;
   }
 
-  void onSuccess(uint64_t message_id) { erasePendingMessage(message_id); }
+  void onSuccess(uint64_t message_id) override { erasePendingMessage(message_id); }
 
-  void onError(uint64_t message_id) {
-    if (message_buffer_.find(message_id) == message_buffer_.end()) {
+  void onError(uint64_t message_id) override {
+    const auto& message_it = message_buffer_.find(message_id);
+
+    if (message_it == message_buffer_.end() ||
+        message_it->second.first != Grpc::BufferState::PendingFlush) {
       return;
     }
 

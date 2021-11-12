@@ -215,3 +215,12 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "buffered_message_ttl_manager_lib",
+    hdrs = ["buffered_message_ttl_manager.h"],
+    deps = [
+        ":buffered_async_client_lib",
+        "//envoy/event:dispatcher_interface",
+    ],
+)
