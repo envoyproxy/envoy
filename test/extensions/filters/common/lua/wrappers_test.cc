@@ -82,7 +82,7 @@ TEST_F(LuaBufferWrapperTest, Methods) {
 
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
-  Http::RequestOrResponseHeaderMap headers;
+  Http::TestRequestHeaderMapImpl headers;
   BufferWrapper::create(coroutine_->luaState(), headers, data);
   EXPECT_CALL(printer_, testPrint("11"));
   EXPECT_CALL(printer_, testPrint("he"));
@@ -102,7 +102,7 @@ TEST_F(LuaBufferWrapperTest, GetBytesInvalidParams) {
 
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
-  Http::RequestOrResponseHeaderMap headers;
+  Http::TestRequestHeaderMapImpl headers;
   BufferWrapper::create(coroutine_->luaState(), headers, data);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), LuaException,
