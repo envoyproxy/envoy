@@ -439,8 +439,8 @@ TEST_F(FileEventImplTest, RegisterIfEmulatedEdge) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
-// This is a test case that clarifies the event behavior. Read and Write events are activated by the
-// OS before invoke connect() or listen().
+#ifndef WIN32 // This is a test case that clarifies the event behavior.
+// Read and Write events are activated by the kernel before invoke connect() or listen().
 TEST_P(FileEventImplActivateTest, EventTriggeredBeforeConnect) {
   os_fd_t fd = os_sys_calls_.socket(domain(), SOCK_STREAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
@@ -450,9 +450,8 @@ TEST_P(FileEventImplActivateTest, EventTriggeredBeforeConnect) {
   ReadyWatcher read_event;
   ReadyWatcher write_event;
 
-  const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
-
-  // Emulate the behavior of the ConnectionImpl constructor which initializes the file event.
+  // Emulate the behavior of the ConnectionImpl constructor which initializes the file event before
+  // connect().
   Event::FileEventPtr file_event = dispatcher->createFileEvent(
       fd,
       [&](uint32_t events) -> void {
@@ -464,7 +463,7 @@ TEST_P(FileEventImplActivateTest, EventTriggeredBeforeConnect) {
           write_event.ready();
         }
       },
-      trigger, FileReadyType::Read | FileReadyType::Write);
+      Event::PlatformDefaultTriggerType, FileReadyType::Read | FileReadyType::Write);
 
   EXPECT_CALL(read_event, ready());
   EXPECT_CALL(write_event, ready());
@@ -473,6 +472,7 @@ TEST_P(FileEventImplActivateTest, EventTriggeredBeforeConnect) {
 
   os_sys_calls_.close(fd);
 }
+#endif
 
 } // namespace
 } // namespace Event
