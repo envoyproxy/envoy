@@ -1,5 +1,3 @@
-#include <google/protobuf/repeated_field.h>
-
 #include <memory>
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
@@ -84,25 +82,12 @@ class HttpGrpcAccessLogTest : public testing::Test {
 public:
   void init() {
     ON_CALL(*filter_, evaluate(_, _, _, _)).WillByDefault(Return(true));
-    const std::string common_config_yaml = R"EOF(
-log_name: hello_log
-transport_api_version: V3
-filter_state_objects_to_log:
-- string_accessor
-- uint32_accessor
-- serialized
-custom_tags:
-- tag: ltag
-  literal:
-    value: lvalue
-- tag: etag
-  environment:
-    name: E_TAG
-    )EOF";
-    envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig common_config;
-    TestUtility::loadFromYaml(common_config_yaml, common_config);
-    *config_.mutable_common_config() = common_config;
-
+    config_.mutable_common_config()->set_log_name("hello_log");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("uint32_accessor");
+    config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
+    config_.mutable_common_config()->set_transport_api_version(
+        envoy::config::core::v3::ApiVersion::V3);
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
         .WillOnce(
             [this](const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig&
@@ -126,7 +111,6 @@ custom_tags:
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
         .WillOnce(
             Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
-              std::cout << entry.DebugString() << std::endl;
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
@@ -156,8 +140,6 @@ common_properties:
       port_value: 0
   start_time:
     seconds: 3600
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: {}
   request_headers_bytes: {}
@@ -241,8 +223,6 @@ common_properties:
     serialized:
       "@type": type.googleapis.com/google.protobuf.Duration
       value: 10s
-  custom_tags:
-    ltag: lvalue
 request: {}
 response: {}
 )EOF");
@@ -273,8 +253,6 @@ common_properties:
     seconds: 3600
   time_to_last_downstream_tx_byte:
     nanos: 2000000
-  custom_tags:
-    ltag: lvalue
 request: {}
 response: {}
 )EOF");
@@ -360,8 +338,6 @@ common_properties:
   response_flags:
     fault_injected: true
   route_name: "route-name-test"
-  custom_tags:
-    ltag: lvalue
 protocol_version: HTTP10
 request:
   scheme: "scheme_value"
@@ -412,8 +388,6 @@ common_properties:
   start_time:
     seconds: 3600
   upstream_transport_failure_reason: "TLS error"
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
@@ -480,8 +454,6 @@ common_properties:
       - uri: peerSan2
       subject: peerSubject
     tls_session_id: D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
   request_headers_bytes: 16
@@ -533,8 +505,6 @@ common_properties:
     tls_sni_hostname: sni
     local_certificate_properties: {}
     peer_certificate_properties: {}
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
@@ -585,8 +555,6 @@ common_properties:
     tls_sni_hostname: sni
     local_certificate_properties: {}
     peer_certificate_properties: {}
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
@@ -637,8 +605,6 @@ common_properties:
     tls_sni_hostname: sni
     local_certificate_properties: {}
     peer_certificate_properties: {}
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
@@ -689,8 +655,6 @@ common_properties:
     tls_sni_hostname: sni
     local_certificate_properties: {}
     peer_certificate_properties: {}
-  custom_tags:
-    ltag: lvalue
 request:
   request_method: "METHOD_UNSPECIFIED"
 response: {}
@@ -762,8 +726,6 @@ common_properties:
       port_value: 0
   start_time:
     seconds: 3600
-  custom_tags:
-    ltag: lvalue
 request:
   scheme: "scheme_value"
   authority: "authority_value"
@@ -799,6 +761,97 @@ TEST_F(HttpGrpcAccessLogTest, LogWithRequestMethod) {
   expectLogRequestMethod("OPTIONS");
   expectLogRequestMethod("TRACE");
   expectLogRequestMethod("PATCH");
+}
+
+TEST_F(HttpGrpcAccessLogTest, CustomTagTestLiteral) {
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: ltag
+literal:
+  value: lvalue    
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  *config_.mutable_common_config()->add_custom_tags() = tag;
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.host_ = nullptr;
+  stream_info.start_time_ = SystemTime(1h);
+
+  expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  custom_tags:
+    ltag: lvalue
+request: {}
+response: {}
+)EOF");
+  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+}
+
+TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadata) {
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: mtag
+metadata:
+  kind: { host: {} }
+  metadata_key:
+    key: foo
+    path:
+    - key: bar
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  *config_.mutable_common_config()->add_custom_tags() = tag;
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      "foo", MessageUtil::keyValueStruct("bar", "baz")));
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+
+  expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_cluster: fake_cluster
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  custom_tags:
+    mtag: baz
+request: {}
+response: {}
+)EOF");
+  access_log_->log(nullptr, nullptr, nullptr, stream_info);
 }
 
 } // namespace
