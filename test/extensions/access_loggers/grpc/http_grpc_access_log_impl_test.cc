@@ -768,7 +768,7 @@ TEST_F(HttpGrpcAccessLogTest, CustomTagTestLiteral) {
   const auto tag_yaml = R"EOF(
 tag: ltag
 literal:
-  value: lvalue    
+  value: lvalue
   )EOF";
   TestUtility::loadFromYaml(tag_yaml, tag);
   *config_.mutable_common_config()->add_custom_tags() = tag;
