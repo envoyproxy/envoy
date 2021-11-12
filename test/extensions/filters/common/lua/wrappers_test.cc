@@ -83,7 +83,7 @@ TEST_F(LuaBufferWrapperTest, Methods) {
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
   Http::RequestOrResponseHeaderMap headers;
-  BufferWrapper::create(coroutine_->luaState(), heders, data);
+  BufferWrapper::create(coroutine_->luaState(), headers, data);
   EXPECT_CALL(printer_, testPrint("11"));
   EXPECT_CALL(printer_, testPrint("he"));
   EXPECT_CALL(printer_, testPrint("world"));
