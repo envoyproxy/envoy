@@ -234,8 +234,8 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
+    const bool used_only, const absl::optional<std::regex>& regex,
     const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
@@ -243,13 +243,13 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
                                                       generateNumericOutput<Stats::Counter>,
                                                       "counter", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
-                                                    generateNumericOutput<Stats::Gauge>,
-                                                    "gauge", custom_namespaces);
+  metric_name_count +=
+      outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
+                                   generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
-  metric_name_count += outputStatType<Stats::TextReadout>(response, used_only, regex,
-                                                          text_readouts, generateTextReadoutOutput,
-                                                          "gauge", custom_namespaces);
+  metric_name_count +=
+      outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
+                                         generateTextReadoutOutput, "gauge", custom_namespaces);
 
   metric_name_count += outputStatType<Stats::ParentHistogram>(response, used_only, regex,
                                                               histograms, generateHistogramOutput,
