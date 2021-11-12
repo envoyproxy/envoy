@@ -197,9 +197,9 @@ for how to update or override dependencies.
 
     Set the `TMPDIR` environment variable to a path usable as a temporary directory (e.g.
     `C:\Windows\TEMP`), and create a directory symlink `C:\c` to `C:\`, so that the MSYS2
-    path `/c/Windows/TEMP` is equivalent to the Windows path `C:\Windows\TEMP`:
+    path `/c/Windows/TEMP` is equivalent to the Windows path `C:/Windows/TEMP`:
     ```cmd
-    set TMPDIR=C:\Windows\TEMP
+    set TMPDIR=C:/Windows/TEMP
     mklink /d C:\c C:\
     ```
 
