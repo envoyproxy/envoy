@@ -252,6 +252,8 @@ public:
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static Protobuf::util::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+                                             bool& has_unknown_fileld);
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -416,7 +418,8 @@ public:
   static void jsonConvert(const ProtobufWkt::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Protobuf::Message& dest);
-  static void jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
+  // Convert a message to a ProtobufWkt::Value, return false upon failure.
+  static bool jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.
