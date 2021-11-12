@@ -18,7 +18,7 @@ namespace Router {
 
 /**
  * The RouteConfigProviderManager exposes the ability to get a RouteConfigProvider. This interface
- * is exposed to the Server's FactoryContext in order to allow HttpConnectionManagers to get
+ * is exposed to the Server's FactoryContext in order to allow ThriftProxy to get
  * RouteConfigProviders.
  */
 class RouteConfigProviderManager {
@@ -27,12 +27,11 @@ public:
 
   /**
    * Get a RouteConfigProviderPtr for a route from RDS. Ownership of the RouteConfigProvider is the
-   * HttpConnectionManagers who calls this function. The RouteConfigProviderManager holds raw
+   * ThriftProxy who calls this function. The RouteConfigProviderManager holds raw
    * pointers to the RouteConfigProviders. Clean up of the pointers happen from the destructor of
    * the RouteConfigProvider. This method creates a RouteConfigProvider which may share the
    * underlying RDS subscription with the same (route_config_name, cluster).
-   * @param rds supplies the proto configuration of an RDS-configured RouteConfigProvider.
-   * @param optional_http_filters a set of optional http filter names.
+   * @param trds supplies the proto configuration of an RDS-configured RouteConfigProvider.
    * @param factory_context is the context to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
    * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
@@ -45,11 +44,9 @@ public:
 
   /**
    * Get a RouteConfigSharedPtr for a statically defined route. Ownership is as described for
-   * getRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
+   * createRdsRouteConfigProvider above. This method always create a new RouteConfigProvider.
    * @param route_config supplies the RouteConfiguration for this route
-   * @param optional_http_filters a set of optional http filter names.
    * @param factory_context is the context to use for the route config provider.
-   * @param validator is the message validator for route config.
    */
   virtual Rds::RouteConfigProviderPtr createStaticRouteConfigProvider(
       const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route_config,

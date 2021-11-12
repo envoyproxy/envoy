@@ -87,7 +87,7 @@ message ThriftProxy {
   string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
 
   // The route table for the connection manager is static and is specified in this property.
-  // If trds is also defined this field is ignored.
+  // It is invalid to define both route_config and trds.
   RouteConfiguration route_config = 4
       [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 
@@ -107,7 +107,7 @@ message ThriftProxy {
   // Optional maximum requests for a single downstream connection. If not specified, there is no limit.
   google.protobuf.UInt32Value max_requests_per_connection = 7;
 
-  // Use xDS to fetch the route configuration. If both route_config and trds defined, trds has priority.
+  // Use xDS to fetch the route configuration. It is invalid to define both route_config and trds.
   Trds trds = 8 [(udpa.annotations.field_migrate).oneof_promotion = "route_specifier"];
 }
 

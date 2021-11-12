@@ -21,35 +21,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
-std::string ConfigTraitsImpl::resourceType() const {
-  return Envoy::Config::getResourceName<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>();
-}
-
-Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig() const {
+Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<const NullConfigImpl>();
-}
-
-ProtobufTypes::MessagePtr ConfigTraitsImpl::createProto() const {
-  return std::make_unique<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>();
-}
-
-const Protobuf::Message& ConfigTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
-  return dynamic_cast<
-      const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(rc);
-}
-
-const Protobuf::Message& ConfigTraitsImpl::validateConfig(const Protobuf::Message& rc) const {
-  return rc;
-}
-
-const std::string& ConfigTraitsImpl::resourceName(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<
-         const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration*>(&rc));
-  return static_cast<
-             const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(rc)
-      .name();
 }
 
 Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
@@ -60,53 +33,48 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message
           rc));
 }
 
-ProtobufTypes::MessagePtr ConfigTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<
-         const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration*>(&rc));
+ProtoTraitsImpl::ProtoTraitsImpl()
+    : resource_type_(Envoy::Config::getResourceName<
+                     envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>()) {
+}
+
+ProtobufTypes::MessagePtr ProtoTraitsImpl::createEmptyProto() const {
   return std::make_unique<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(
-      static_cast<const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&>(
-          rc));
+      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>();
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
-    : Rds::RouteConfigProviderManagerImpl(admin) {}
+    : manager_(admin, "thrift_routes", proto_traits_) {}
 
 Rds::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::thrift_proxy::v3::Trds& trds,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
-  // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
-  const uint64_t manager_identifier = MessageUtil::hash(trds);
-
-  auto existing_provider =
-      reuseDynamicProvider(manager_identifier, init_manager, trds.route_config_name());
-
-  if (existing_provider) {
-    return existing_provider;
-  }
-  auto config_update =
-      std::make_unique<Rds::RouteConfigUpdateReceiverImpl>(config_traits_, factory_context);
-  auto resource_decoder = std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<
-      envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>>(
-      factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
-  auto subscription = std::make_shared<Rds::RdsRouteConfigSubscription>(
-      std::move(config_update), std::move(resource_decoder), trds.config_source(),
-      trds.route_config_name(), manager_identifier, factory_context, stat_prefix, *this);
-  auto new_provider =
-      std::make_shared<Rds::RdsRouteConfigProviderImpl>(std::move(subscription), factory_context);
-  insertDynamicProvider(manager_identifier, new_provider,
-                        &new_provider->subscription().initTarget(), init_manager);
-  return new_provider;
+  return manager_.addDynamicProvider(
+      trds, trds.route_config_name(), init_manager,
+      [&factory_context, &trds, &stat_prefix, this](uint64_t manager_identifier) {
+        auto config_update = std::make_unique<Rds::RouteConfigUpdateReceiverImpl>(
+            config_traits_, proto_traits_, factory_context);
+        auto resource_decoder = std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<
+            envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>>(
+            factory_context.messageValidationContext().dynamicValidationVisitor(), "name");
+        auto subscription = std::make_shared<Rds::RdsRouteConfigSubscription>(
+            std::move(config_update), std::move(resource_decoder), trds.config_source(),
+            trds.route_config_name(), manager_identifier, factory_context, stat_prefix + "trds.",
+            "TRDS", manager_);
+        auto provider = std::make_shared<Rds::RdsRouteConfigProviderImpl>(std::move(subscription),
+                                                                          factory_context);
+        return std::make_pair(provider, &provider->subscription().initTarget());
+      });
 }
 
 Rds::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
     const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& route_config,
     Server::Configuration::ServerFactoryContext& factory_context) {
-  auto provider = std::make_unique<Rds::StaticRouteConfigProviderImpl>(route_config, config_traits_,
-                                                                       factory_context, *this);
-  insertStaticProvider(provider.get());
-  return provider;
+  return manager_.addStaticProvider([&factory_context, &route_config, this]() {
+    return std::make_unique<Rds::StaticRouteConfigProviderImpl>(route_config, config_traits_,
+                                                                factory_context, manager_);
+  });
 }
 
 } // namespace Router

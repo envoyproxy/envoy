@@ -7,7 +7,7 @@
 #include "envoy/rds/config_traits.h"
 #include "envoy/singleton/instance.h"
 
-#include "source/common/rds/route_config_provider_manager_impl.h"
+#include "source/common/rds/route_config_provider_manager.h"
 #include "source/extensions/filters/network/thrift_proxy/router/rds.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 
@@ -19,23 +19,23 @@ namespace Router {
 
 class ConfigTraitsImpl : public Rds::ConfigTraits {
 public:
-  std::string resourceType() const override;
-
-  Rds::ConfigConstSharedPtr createConfig() const override;
-  ProtobufTypes::MessagePtr createProto() const override;
-
-  const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override;
-  const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const override;
-
-  const std::string& resourceName(const Protobuf::Message& rc) const override;
-
+  Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override;
-  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override;
+};
+
+class ProtoTraitsImpl : public Rds::ProtoTraits {
+public:
+  ProtoTraitsImpl();
+  const std::string& resourceType() const override { return resource_type_; };
+  int resourceNameFieldNumber() const override { return 1; }
+  ProtobufTypes::MessagePtr createEmptyProto() const override;
+
+private:
+  const std::string resource_type_;
 };
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
-                                       public Singleton::Instance,
-                                       public Rds::RouteConfigProviderManagerImpl {
+                                       public Singleton::Instance {
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
@@ -50,7 +50,9 @@ public:
       Server::Configuration::ServerFactoryContext& factory_context) override;
 
 private:
+  Rds::RouteConfigProviderManager manager_;
   ConfigTraitsImpl config_traits_;
+  ProtoTraitsImpl proto_traits_;
 };
 
 using RouteConfigProviderManagerImplPtr = std::unique_ptr<RouteConfigProviderManagerImpl>;

@@ -148,6 +148,9 @@ ConfigImpl::ConfigImpl(
   }
 
   if (config.has_trds()) {
+    if (config.has_route_config()) {
+      throw EnvoyException("both trds and route_config is present in ThriftProxy");
+    }
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         config.trds(), context_.getServerFactoryContext(), stats_prefix_, context_.initManager());
   } else {
