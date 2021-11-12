@@ -1,4 +1,4 @@
-#include "extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
+#include "source/extensions/filters/network/client_ssl_auth/client_ssl_auth.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,19 +8,21 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ClientSslAuth {
+
+constexpr absl::string_view AuthDigestNoMatch = "auth_digest_no_match";
 
 ClientSslAuthConfig::ClientSslAuthConfig(
     const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& config,
@@ -113,7 +115,7 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
 
   ASSERT(read_callbacks_->connection().ssl());
   if (config_->ipAllowlist().contains(
-          *read_callbacks_->connection().addressProvider().remoteAddress())) {
+          *read_callbacks_->connection().connectionInfoProvider().remoteAddress())) {
     config_->stats().auth_ip_allowlist_.inc();
     read_callbacks_->continueReading();
     return;
@@ -121,6 +123,9 @@ void ClientSslAuthFilter::onEvent(Network::ConnectionEvent event) {
 
   if (!config_->allowedPrincipals().allowed(
           read_callbacks_->connection().ssl()->sha256PeerCertificateDigest())) {
+    read_callbacks_->connection().streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UpstreamProtocolError);
+    read_callbacks_->connection().streamInfo().setResponseCodeDetails(AuthDigestNoMatch);
     config_->stats().auth_digest_no_match_.inc();
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return;

@@ -37,6 +37,9 @@ public:
 
   // Returns the current number of requests and how many of them are successful.
   virtual RequestData requestCounts() PURE;
+
+  // return the average RPS across the sampling window
+  virtual uint32_t averageRps() const PURE;
 };
 
 /**
@@ -62,6 +65,8 @@ public:
     maybeUpdateHistoricalData();
     return global_data_;
   }
+
+  uint32_t averageRps() const override;
 
 private:
   void recordRequest(bool success);

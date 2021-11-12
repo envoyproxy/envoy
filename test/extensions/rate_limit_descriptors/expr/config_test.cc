@@ -3,10 +3,9 @@
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
-#include "common/protobuf/utility.h"
-#include "common/router/router_ratelimit.h"
-
-#include "extensions/rate_limit_descriptors/expr/config.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/router/router_ratelimit.h"
+#include "source/extensions/rate_limit_descriptors/expr/config.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
@@ -27,7 +26,7 @@ class RateLimitPolicyEntryTest : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
     envoy::config::route::v3::RateLimit rate_limit;
-    TestUtility::loadFromYaml(yaml, rate_limit, false, true);
+    TestUtility::loadFromYaml(yaml, rate_limit);
     TestUtility::validate(rate_limit);
     rate_limit_entry_ = std::make_unique<Router::RateLimitPolicyEntryImpl>(
         rate_limit, ProtobufMessage::getStrictValidationVisitor());

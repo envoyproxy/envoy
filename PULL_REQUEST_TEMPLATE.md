@@ -8,9 +8,9 @@ Thank you in advance for helping to keep Envoy secure.
 
 !!!ATTENTION!!!
 
--->
 For an explanation of how to fill out the fields, please see the relevant section
 in [PULL_REQUESTS.md](https://github.com/envoyproxy/envoy/blob/main/PULL_REQUESTS.md)
+-->
 
 Commit Message:
 Additional Description:
@@ -21,5 +21,6 @@ Release Notes:
 Platform Specific Features:
 [Optional Runtime guard:]
 [Optional Fixes #Issue]
+[Optional Fixes commit #PR or SHA]
 [Optional Deprecated:]
 [Optional [API Considerations](https://github.com/envoyproxy/envoy/blob/main/api/review_checklist.md):]

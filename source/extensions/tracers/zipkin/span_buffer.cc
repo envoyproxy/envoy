@@ -1,12 +1,11 @@
-#include "extensions/tracers/zipkin/span_buffer.h"
+#include "source/extensions/tracers/zipkin/span_buffer.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_json_field_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
@@ -49,8 +48,10 @@ SerializerPtr SpanBuffer::makeSerializer(
     const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context) {
   switch (version) {
-  case envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
-    return std::make_unique<JsonV1Serializer>();
+  case envoy::config::trace::v3::ZipkinConfig::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
+    throw EnvoyException(
+        "hidden_envoy_deprecated_HTTP_JSON_V1 has been deprecated. Please use a non-default "
+        "envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion value.");
   case envoy::config::trace::v3::ZipkinConfig::HTTP_JSON:
     return std::make_unique<JsonV2Serializer>(shared_span_context);
   case envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO:
@@ -58,14 +59,6 @@ SerializerPtr SpanBuffer::makeSerializer(
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-}
-
-std::string JsonV1Serializer::serialize(const std::vector<Span>& zipkin_spans) {
-  const std::string serialized_elements =
-      absl::StrJoin(zipkin_spans, ",", [](std::string* element, const Span& zipkin_span) {
-        absl::StrAppend(element, zipkin_span.toJson());
-      });
-  return absl::StrCat("[", serialized_elements, "]");
 }
 
 JsonV2Serializer::JsonV2Serializer(const bool shared_span_context)
@@ -133,7 +126,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       auto* annotation_entry_fields = annotation_entry.mutable_fields();
       (*annotation_entry_fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(annotation.value());
       (*annotation_entry_fields)[ANNOTATION_TIMESTAMP] =
-          Util::uint64Value(annotation.timestamp(), annotation.value(), replacements);
+          Util::uint64Value(annotation.timestamp(), ANNOTATION_TIMESTAMP, replacements);
       annotation_entries.push_back(ValueUtil::structValue(annotation_entry));
       continue;
     }

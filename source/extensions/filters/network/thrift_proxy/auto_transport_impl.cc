@@ -1,15 +1,14 @@
-#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {

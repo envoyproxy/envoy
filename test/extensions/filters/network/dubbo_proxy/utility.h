@@ -2,8 +2,8 @@
 
 #include <initializer_list>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/byte_order.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/byte_order.h"
 
 namespace Envoy {
 namespace Extensions {

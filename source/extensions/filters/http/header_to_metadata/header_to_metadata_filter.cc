@@ -1,15 +1,13 @@
-#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
 
-#include "common/common/base64.h"
-#include "common/common/regex.h"
-#include "common/config/well_known_names.h"
-#include "common/http/header_utility.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/regex.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -213,7 +211,8 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 }
 
 const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& nspace) const {
-  return nspace.empty() ? HttpFilterNames::get().HeaderToMetadata : nspace;
+  static const std::string& headerToMetadata = "envoy.filters.http.header_to_metadata";
+  return nspace.empty() ? headerToMetadata : nspace;
 }
 
 // add metadata['key']= value depending on header present or missing case
@@ -268,7 +267,7 @@ const Config* HeaderToMetadataFilter::getConfig() const {
   }
 
   effective_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<Config>(
-      HttpFilterNames::get().HeaderToMetadata, decoder_callbacks_->route());
+      "envoy.filters.http.header_to_metadata", decoder_callbacks_->route());
   if (effective_config_) {
     return effective_config_;
   }

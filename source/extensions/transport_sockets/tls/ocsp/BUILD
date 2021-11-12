@@ -15,8 +15,8 @@ envoy_cc_library(
     repository = "",
     deps = [
         ":asn1_utility_lib",
-        "//include/envoy/common:time_interface",
-        "//include/envoy/ssl:context_config_interface",
+        "//envoy/common:time_interface",
+        "//envoy/ssl:context_config_interface",
         "//source/extensions/transport_sockets/tls:utility_lib",
     ],
 )
@@ -27,8 +27,8 @@ envoy_cc_library(
     hdrs = ["asn1_utility.h"],
     repository = "",
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/ssl:context_config_interface",
+        "//envoy/common:time_interface",
+        "//envoy/ssl:context_config_interface",
         "//source/common/common:c_smart_ptr_lib",
     ],
 )

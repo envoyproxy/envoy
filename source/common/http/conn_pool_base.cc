@@ -1,17 +1,17 @@
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/conn_pool_base.h"
 
-#include "common/common/assert.h"
-#include "common/http/utility.h"
-#include "common/network/transport_socket_options_impl.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Http {
 
-Network::TransportSocketOptionsSharedPtr
-wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_socket_options,
+Network::TransportSocketOptionsConstSharedPtr
+wrapTransportSocketOptions(Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                            std::vector<Protocol> protocols) {
   std::vector<std::string> fallbacks;
   for (auto protocol : protocols) {
@@ -44,7 +44,7 @@ wrapTransportSocketOptions(Network::TransportSocketOptionsSharedPtr transport_so
 HttpConnPoolImplBase::HttpConnPoolImplBase(
     Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
     std::vector<Http::Protocol> protocols)
     : Envoy::ConnectionPool::ConnPoolImplBase(
@@ -60,7 +60,7 @@ ConnectionPool::Cancellable*
 HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  return Envoy::ConnectionPool::ConnPoolImplBase::newStream(context);
+  return newStreamImpl(context);
 }
 
 bool HttpConnPoolImplBase::hasActiveConnections() const {
@@ -96,7 +96,7 @@ static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
   parent_.host()->cluster().stats().upstream_cx_close_notify_.inc();
-  if (state_ != ActiveClient::State::DRAINING) {
+  if (state() != ActiveClient::State::DRAINING) {
     if (codec_client_->numActiveRequests() == 0) {
       codec_client_->close();
     } else {
@@ -113,8 +113,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // not considering http/2 connections connected until the SETTINGS frame is
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.improved_stream_limit_handling") &&
-      settings.maxConcurrentStreams().has_value() &&
+  if (settings.maxConcurrentStreams().has_value() &&
       settings.maxConcurrentStreams().value() < concurrent_stream_limit_) {
     int64_t old_unused_capacity = currentUnusedCapacity();
     // Given config limits old_unused_capacity should never exceed int32_t.
@@ -141,7 +140,7 @@ void MultiplexedActiveClientBase::onStreamDestroy() {
   // wait until the connection has been fully drained of streams and then check in the connection
   // event callback.
   if (!closed_with_active_rq_) {
-    parent().checkForDrained();
+    parent().checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 
@@ -154,6 +153,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
     break;
   case StreamResetReason::LocalReset:
   case StreamResetReason::ProtocolError:
+  case StreamResetReason::OverloadManager:
     parent_.host()->cluster().stats().upstream_rq_tx_reset_.inc();
     break;
   case StreamResetReason::RemoteReset:

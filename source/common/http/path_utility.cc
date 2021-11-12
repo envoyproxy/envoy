@@ -1,8 +1,7 @@
-#include "common/http/path_utility.h"
+#include "source/common/http/path_utility.h"
 
-#include "common/common/logger.h"
-#include "common/http/legacy_path_canonicalizer.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/logger.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -15,20 +14,26 @@ namespace Http {
 
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_forked_chromium_url")) {
-    std::string canonical_path;
-    url::Component in_component(0, original_path.size());
-    url::Component out_component;
-    url::StdStringCanonOutput output(&canonical_path);
-    if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
-      return absl::nullopt;
-    } else {
-      output.Complete();
-      return absl::make_optional(std::move(canonical_path));
-    }
+  std::string canonical_path;
+  url::Component in_component(0, original_path.size());
+  url::Component out_component;
+  url::StdStringCanonOutput output(&canonical_path);
+  if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
+    return absl::nullopt;
   }
-  return LegacyPathCanonicalizer::canonicalizePath(original_path);
+  output.Complete();
+  return absl::make_optional(std::move(canonical_path));
 }
+
+void unescapeInPath(std::string& path, absl::string_view escape_sequence,
+                    absl::string_view substitution) {
+  std::vector<absl::string_view> split = absl::StrSplit(path, escape_sequence);
+  if (split.size() == 1) {
+    return;
+  }
+  path = absl::StrJoin(split, substitution);
+}
+
 } // namespace
 
 /* static */
@@ -73,6 +78,31 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   headers.setPath(absl::StrCat(path_prefix,
                                absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
                                path_suffix, query));
+}
+
+PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
+  const auto original_length = original_path.length();
+  // Only operate on path component in URL.
+  const absl::string_view::size_type query_start = original_path.find('?');
+  const absl::string_view path = original_path.substr(0, query_start);
+  if (path.find('%') == absl::string_view::npos) {
+    return UnescapeSlashesResult::NotFound;
+  }
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
+
+  // TODO(yanavlasov): optimize this by adding case insensitive matcher
+  std::string decoded_path{path};
+  unescapeInPath(decoded_path, "%2F", "/");
+  unescapeInPath(decoded_path, "%2f", "/");
+  unescapeInPath(decoded_path, "%5C", "\\");
+  unescapeInPath(decoded_path, "%5c", "\\");
+  headers.setPath(absl::StrCat(decoded_path, query));
+  // Path length will not match if there were unescaped %2f or %5c
+  return headers.getPathValue().length() != original_length
+             ? UnescapeSlashesResult::FoundAndUnescaped
+             : UnescapeSlashesResult::NotFound;
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {

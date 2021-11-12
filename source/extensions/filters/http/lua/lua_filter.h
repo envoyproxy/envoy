@@ -4,14 +4,12 @@
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/crypto/utility.h"
-#include "common/http/utility.h"
-
-#include "extensions/common/utility.h"
-#include "extensions/filters/common/lua/wrappers.h"
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/lua/wrappers.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/utility.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
+#include "source/extensions/filters/http/common/factory_base.h"
+#include "source/extensions/filters/http/lua/wrappers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -412,7 +410,7 @@ PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
   const FilterConfigPerRoute* config_per_route = nullptr;
   if (callbacks && callbacks->route()) {
     config_per_route = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
-        HttpFilterNames::get().Lua, callbacks->route());
+        "envoy.filters.http.lua", callbacks->route());
   }
 
   if (config_per_route != nullptr) {
@@ -443,7 +441,7 @@ public:
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const Filters::Common::Lua::LuaException& e);
-  virtual void scriptLog(spdlog::level::level_enum level, const char* message);
+  virtual void scriptLog(spdlog::level::level_enum level, absl::string_view message);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -467,7 +465,7 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,

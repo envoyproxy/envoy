@@ -2,19 +2,20 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <string>
 
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 
-#include "common/common/utility.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/null_counter.h"
-#include "common/stats/null_gauge.h"
-#include "common/stats/store_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_utility.h"
-#include "common/stats/utility.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/null_counter.h"
+#include "source/common/stats/null_gauge.h"
+#include "source/common/stats/store_impl.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/common/stats/tag_utility.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -98,6 +99,14 @@ public:
       }
     }
     return true;
+  }
+
+  void forEachStat(std::function<void(std::size_t)> f_size,
+                   std::function<void(Base&)> f_stat) const {
+    f_size(stats_.size());
+    for (auto const& stat : stats_) {
+      f_stat(*stat.second);
+    }
   }
 
 private:
@@ -203,6 +212,21 @@ public:
   TextReadout& textReadoutFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
+  }
+
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override {
+    counters_.forEachStat(f_size, f_stat);
+  }
+
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override {
+    gauges_.forEachStat(f_size, f_stat);
+  }
+
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+    text_readouts_.forEachStat(f_size, f_stat);
   }
 
 private:

@@ -3,8 +3,6 @@
 #include "envoy/router/internal_redirect.h"
 #include "envoy/stream_info/filter_state.h"
 
-#include "extensions/internal_redirect/well_known_names.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -20,7 +18,7 @@ public:
                          bool) override;
 
   absl::string_view name() const override {
-    return InternalRedirectPredicateValues::get().PreviousRoutesPredicate;
+    return "envoy.internal_redirect_predicates.previous_routes";
   }
 
 private:

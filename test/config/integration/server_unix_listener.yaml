@@ -21,8 +21,8 @@ static_resources:
               - "*"
               name: vhost_0
               routes:
-              - match: { prefix: "/" }
-                route: { cluster: cluster_0 }
+              - match: {prefix: "/"}
+                route: {cluster: cluster_0}
   clusters:
   - name: cluster_0
     connect_timeout: 5s

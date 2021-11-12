@@ -2,8 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -34,8 +34,7 @@ private:
  */
 class StaticClusterFactory : public ClusterFactoryImplBase {
 public:
-  StaticClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().Static) {}
+  StaticClusterFactory() : ClusterFactoryImplBase("envoy.cluster.static") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

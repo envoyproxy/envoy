@@ -3,9 +3,9 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/config/well_known_names.h"
-#include "common/stats/tag_extractor_impl.h"
-#include "common/stats/tag_producer_impl.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/stats/tag_extractor_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 
 #include "test/test_common/utility.h"
 

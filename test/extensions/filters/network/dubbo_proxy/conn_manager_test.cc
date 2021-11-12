@@ -1,14 +1,13 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/dubbo_proxy/app_exception.h"
-#include "extensions/filters/network/dubbo_proxy/config.h"
-#include "extensions/filters/network/dubbo_proxy/conn_manager.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/app_exception.h"
+#include "source/extensions/filters/network/dubbo_proxy/config.h"
+#include "source/extensions/filters/network/dubbo_proxy/conn_manager.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
@@ -121,7 +120,7 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  TimeSource& timeSystem() { return factory_context_.dispatcher().timeSource(); }
+  TimeSource& timeSystem() { return factory_context_.mainThreadDispatcher().timeSource(); }
 
   void initializeFilter() { initializeFilter(""); }
 
@@ -432,14 +431,12 @@ TEST_F(ConnectionManagerTest, OnDataHandlesProtocolErrorOnWrite) {
 
   // Start the read buffer
   writePartialHessianRequestMessage(buffer_, false, false, 0x0F, true);
-  uint64_t len = buffer_.length();
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
       .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
-  len -= buffer_.length();
 
   // Disable sniffing
   writeInvalidRequestMessage(write_buffer_);
@@ -835,7 +832,7 @@ TEST_F(ConnectionManagerTest, ResponseWithUnknownSequenceID) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233333);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -850,8 +847,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233333);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::SuccessReply;
       }));
@@ -881,7 +880,7 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
 TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   initializeFilter();
-  writeHessianRequestMessage(buffer_, false, false, 1);
+  writeHessianRequestMessage(buffer_, false, false, 233334);
 
   config_->setupFilterChain(2, 0);
   config_->expectOnDestroy();
@@ -896,8 +895,10 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
                            Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+        // Validate request id.
+        EXPECT_EQ(metadata.requestId(), 233334);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
       }));
@@ -1024,26 +1025,6 @@ TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
   // The connection closed.
   EXPECT_CALL(direct_response, encode(_, _, _)).Times(0);
   conn_manager_->sendLocalReply(metadata, direct_response, true);
-}
-
-TEST_F(ConnectionManagerTest, ContinueDecodingWithHalfClose) {
-  initializeFilter();
-  writeHessianRequestMessage(buffer_, true, false, 0x0F);
-
-  config_->setupFilterChain(1, 0);
-  config_->expectOnDestroy();
-  auto& decoder_filter = config_->decoder_filters_[0];
-
-  EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
-        return FilterStatus::StopIteration;
-      }));
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
-  EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-
-  conn_manager_->continueDecoding();
 }
 
 TEST_F(ConnectionManagerTest, RoutingSuccess) {

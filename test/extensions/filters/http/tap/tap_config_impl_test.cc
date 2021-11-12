@@ -1,4 +1,4 @@
-#include "extensions/filters/http/tap/tap_config_impl.h"
+#include "source/extensions/filters/http/tap/tap_config_impl.h"
 
 #include "test/extensions/common/tap/common.h"
 #include "test/extensions/filters/http/tap/common.h"

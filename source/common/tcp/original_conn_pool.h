@@ -12,9 +12,9 @@
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/network/filter_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -24,13 +24,17 @@ public:
   OriginalConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                        Upstream::ResourcePriority priority,
                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       Network::TransportSocketOptionsSharedPtr transport_socket_options);
+                       Network::TransportSocketOptionsConstSharedPtr transport_socket_options);
 
   ~OriginalConnPoolImpl() override;
 
+  // Event::DeferredDeletable
+  void deleteIsPending() override { deferred_deleting_ = true; }
+
   // ConnectionPool::Instance
-  void addDrainedCallback(DrainedCb cb) override;
-  void drainConnections() override;
+  void addIdleCallback(IdleCb cb) override;
+  bool isIdle() const override;
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override;
   void closeConnections() override;
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
   // The old pool does not implement preconnecting.
@@ -148,22 +152,25 @@ protected:
   virtual void onConnDestroyed(ActiveConn& conn);
   void onUpstreamReady();
   void processIdleConnection(ActiveConn& conn, bool new_connection, bool delay);
-  void checkForDrained();
+  void checkForIdleAndCloseIdleConnsIfDraining();
 
   Event::Dispatcher& dispatcher_;
   Upstream::HostConstSharedPtr host_;
   Upstream::ResourcePriority priority_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
   std::list<ActiveConnPtr> pending_conns_; // conns awaiting connected event
   std::list<ActiveConnPtr> ready_conns_;   // conns ready for assignment
   std::list<ActiveConnPtr> busy_conns_;    // conns assigned
   std::list<PendingRequestPtr> pending_requests_;
-  std::list<DrainedCb> drained_callbacks_;
+  std::list<IdleCb> idle_callbacks_;
   Stats::TimespanPtr conn_connect_ms_;
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+
   bool upstream_ready_enabled_{false};
+  bool is_draining_{false};
+  bool deferred_deleting_{false};
 };
 
 } // namespace Tcp

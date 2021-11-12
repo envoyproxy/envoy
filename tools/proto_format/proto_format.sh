@@ -20,12 +20,6 @@ read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTIONS:-}"
         exit 0
     }
 
-if [[ "$2" == "--test" ]]; then
-    echo "protoxform_test..."
-    ./tools/protoxform/protoxform_test.sh
-    bazel test "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:merge_active_shadow_test
-fi
-
 # Generate //versioning:active_protos.
 ./tools/proto_format/active_protos_gen.py ./api > ./api/versioning/BUILD
 
@@ -41,13 +35,13 @@ if [[ "$1" == "freeze" ]]; then
 fi
 
 # Invoke protoxform aspect.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api_canonical//versioning:active_protos ${FREEZE_ARG} \
-  @envoy_api_canonical//versioning:active_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" --//tools/api_proto_plugin:default_type_db_target=@envoy_api//:all_protos ${FREEZE_ARG} \
+  @envoy_api//versioning:active_protos @envoy_api//versioning:frozen_protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto
 
 # Find all source protos.
 PROTO_TARGETS=()
 for proto_type in active frozen; do
-    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//versioning:${proto_type}_protos))")
+    protos=$(bazel query "labels(srcs, labels(deps, @envoy_api//versioning:${proto_type}_protos))")
     while read -r line; do PROTO_TARGETS+=("$line"); done \
         <<< "$protos"
 done
@@ -56,13 +50,12 @@ done
 TOOLS="$(dirname "$(dirname "$(realpath "$0")")")"
 # To satisfy dependency on api_proto_plugin.
 export PYTHONPATH="$TOOLS"
-# Build protoprint and merge_active_shadow_tools for use in proto_sync.py.
-bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint //tools/protoxform:merge_active_shadow
+# Build protoprint for use in proto_sync.py.
+bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/protoxform:protoprint
 
 # Copy back the FileDescriptorProtos that protoxform emitted to the source tree. This involves
-# pretty-printing to format with protoprint and potentially merging active/shadow versions of protos
-# with merge_active_shadow.
-./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}"
+# pretty-printing to format with protoprint.
+./tools/proto_format/proto_sync.py "--mode=${PROTO_SYNC_CMD}" "${PROTO_TARGETS[@]}" --ci
 
 # Need to regenerate //versioning:active_protos before building type DB below if freezing.
 if [[ "$1" == "freeze" ]]; then
@@ -72,7 +65,3 @@ fi
 # Generate api/BUILD file based on updated type database.
 bazel build "${BAZEL_BUILD_OPTIONS[@]}" //tools/type_whisperer:api_build_file
 cp -f bazel-bin/tools/type_whisperer/BUILD.api_build_file api/BUILD
-
-# Misc. manual copies to keep generated_api_shadow/ in sync with api/.
-cp -f ./api/bazel/*.bzl ./api/bazel/BUILD ./generated_api_shadow/bazel
-cp -f ./api/BUILD ./generated_api_shadow/

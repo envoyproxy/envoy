@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/http/rbac/v3/rbac.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class RoleBasedAccessControlFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::rbac::v3::RBAC,
                                  envoy::extensions::filters::http::rbac::v3::RBACPerRoute> {
 public:
-  RoleBasedAccessControlFilterConfigFactory() : FactoryBase(HttpFilterNames::get().Rbac) {}
+  RoleBasedAccessControlFilterConfigFactory() : FactoryBase("envoy.filters.http.rbac") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

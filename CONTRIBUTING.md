@@ -102,7 +102,7 @@ versioning guidelines:
 
   Please see [support/README.md](support/README.md) for more information on these hooks.
 
-* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code.
+* Create your PR. If your PR adds new code, it should include tests [covering](source/docs/coverage.md) the new code. Please note that draft PRs may not be reviewed and will likely not be triaged, so do not create your PR as a draft if you want prompt reviews!
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.
 * PRs are expected to have 100% test coverage for added code. This can be verified with a coverage
@@ -253,15 +253,20 @@ Extension configuration should be located in a directory structure like
 The code for the extension should be located under the equivalent
 `source/extensions/area/plugin`, and include an *envoy_cc_extension* with the
 configuration and tagged with the appropriate security posture, and an
-*envoy_cc_library* with the code. More details on how to add a new extension
-API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
+*envoy_cc_library* with the code.
 
-Other changes will likely include
+More details on how to add a new extension API can be found [here](api/STYLE.md#adding-an-extension-configuration-to-the-api):
 
-  * Editing [source/extensions/extensions_build_config.bzl](source/extensions/extensions_build_config.bzl) to include the new extensions
-  * Editing [docs/root/api-v3/config/config.rst](docs/root/api-v3/config/config.rst) to add area/area
-  * Adding `docs/root/api-v3/config/area/area.rst` to add a table of contents for the API docs
-  * Adding `source/extensions/area/well_known_names.h` for registered plugins
+# Adding contrib extensions
+
+See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for more information on contrib. Adding a contrib
+extension mostly mirrors adding a normal extension above. Some differences are noted here:
+
+* API files should be added in `api/contrib/envoy/`, but the protos' namespaces should still be as
+  in normal extensions (which will make file movement easier later if the extension gets promoted
+  to core).
+* Build config and metadata should be included in [contrib/contrib_build_config.bzl](contrib/contrib_build_config.bzl)
+  and [contrib/extensions_metadata.yaml](contrib/extensions_metadata.yaml).
 
 # DCO: Sign your work
 

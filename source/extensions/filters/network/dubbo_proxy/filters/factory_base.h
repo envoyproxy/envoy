@@ -5,9 +5,8 @@
 
 #include "envoy/common/pure.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter_config.h"
 
 namespace Envoy {
 namespace Extensions {

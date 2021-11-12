@@ -1,13 +1,12 @@
-#include "extensions/common/wasm/wasm_vm.h"
+#include "source/extensions/common/wasm/wasm_vm.h"
 
 #include <algorithm>
 #include <memory>
 
-#include "extensions/common/wasm/context.h"
-#include "extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
-#include "extensions/common/wasm/wasm_extension.h"
-#include "extensions/common/wasm/wasm_runtime_factory.h"
-#include "extensions/common/wasm/well_known_names.h"
+#include "source/extensions/common/wasm/context.h"
+#include "source/extensions/common/wasm/ext/envoy_null_vm_wasm_api.h"
+#include "source/extensions/common/wasm/stats_handler.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 
 #include "include/proxy-wasm/null_plugin.h"
 
@@ -36,10 +35,10 @@ proxy_wasm::LogLevel EnvoyWasmVmIntegration::getLogLevel() {
   }
 }
 
-void EnvoyWasmVmIntegration::error(absl::string_view message) { ENVOY_LOG(error, message); }
-void EnvoyWasmVmIntegration::trace(absl::string_view message) { ENVOY_LOG(trace, message); }
+void EnvoyWasmVmIntegration::error(std::string_view message) { ENVOY_LOG(error, message); }
+void EnvoyWasmVmIntegration::trace(std::string_view message) { ENVOY_LOG(trace, message); }
 
-bool EnvoyWasmVmIntegration::getNullVmFunction(absl::string_view function_name, bool returns_word,
+bool EnvoyWasmVmIntegration::getNullVmFunction(std::string_view function_name, bool returns_word,
                                                int number_of_arguments,
                                                proxy_wasm::NullPlugin* plugin,
                                                void* ptr_to_function_return) {

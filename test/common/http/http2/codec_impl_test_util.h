@@ -2,8 +2,8 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/http2/codec_impl.h"
-#include "common/http/utility.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
 
@@ -77,6 +77,7 @@ public:
 
   nghttp2_session* session() { return session_; }
   using ServerConnectionImpl::getStream;
+  using ServerConnectionImpl::sendPendingFrames;
 
 protected:
   // Overrides ServerConnectionImpl::onSettings().

@@ -1,7 +1,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -17,9 +17,6 @@ TEST(Utility, ParseStdRegex) {
   EXPECT_THROW_WITH_REGEX(Utility::parseStdRegex("(+invalid)"), EnvoyException,
                           "Invalid regex '\\(\\+invalid\\)': .+");
 
-  EXPECT_THROW_WITH_REGEX(Utility::parseStdRegexAsCompiledMatcher("(+invalid)"), EnvoyException,
-                          "Invalid regex '\\(\\+invalid\\)': .+");
-
   {
     std::regex regex = Utility::parseStdRegex("x*");
     EXPECT_NE(0, regex.flags() & std::regex::optimize);
@@ -29,15 +26,6 @@ TEST(Utility, ParseStdRegex) {
     std::regex regex = Utility::parseStdRegex("x*", std::regex::icase);
     EXPECT_NE(0, regex.flags() & std::regex::icase);
     EXPECT_EQ(0, regex.flags() & std::regex::optimize);
-  }
-
-  {
-    // Regression test to cover high-complexity regular expressions that throw on std::regex_match.
-    // Note that not all std::regex_match implementations will throw when matching against the
-    // expression below, but at least clang 9.0.0 under linux does.
-    auto matcher = Utility::parseStdRegexAsCompiledMatcher(
-        "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||");
-    EXPECT_FALSE(matcher->match("0"));
   }
 }
 
@@ -58,6 +46,18 @@ TEST(Utility, ParseRegex) {
     const auto compiled_matcher = Utility::parseRegex(matcher);
     const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
     EXPECT_TRUE(compiled_matcher->match(long_string));
+  }
+
+  // Regression test for https://github.com/envoyproxy/envoy/issues/15826
+  {
+    envoy::type::matcher::v3::RegexMatcher matcher;
+    matcher.mutable_google_re2();
+    matcher.set_regex("/status/200(/.*)?$");
+    const auto compiled_matcher = Utility::parseRegex(matcher);
+    EXPECT_TRUE(compiled_matcher->match("/status/200"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/"));
+    EXPECT_TRUE(compiled_matcher->match("/status/200/foo"));
+    EXPECT_FALSE(compiled_matcher->match("/status/200foo"));
   }
 
   // Positive case to ensure no max program size is enforced.

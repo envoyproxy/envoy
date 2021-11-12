@@ -1,4 +1,4 @@
-#include "extensions/filters/http/cdn_loop/utils.h"
+#include "source/extensions/filters/http/cdn_loop/utils.h"
 
 #include "test/test_common/status_utility.h"
 

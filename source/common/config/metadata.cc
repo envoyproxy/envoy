@@ -1,9 +1,9 @@
-#include "common/config/metadata.h"
+#include "source/common/config/metadata.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/type/metadata/v3/metadata.pb.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {

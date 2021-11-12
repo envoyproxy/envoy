@@ -12,9 +12,9 @@ static_resources:
           codec_type: AUTO
           stat_prefix: ingress_http
           access_log:
-            - name: envoy.access_loggers.stdout
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+          - name: envoy.access_loggers.stdout
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
           route_config:
             name: local_route
             virtual_hosts:
@@ -28,10 +28,8 @@ static_resources:
                   cluster: generic_service
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: generic_service
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

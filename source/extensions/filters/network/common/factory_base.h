@@ -4,7 +4,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,13 +44,22 @@ public:
 
   std::string name() const override { return name_; }
 
-  bool isTerminalFilter() override { return is_terminal_filter_; }
+  bool isTerminalFilterByProto(const Protobuf::Message& proto_config,
+                               Server::Configuration::FactoryContext& context) override {
+    return isTerminalFilterByProtoTyped(MessageUtil::downcastAndValidate<const ConfigProto&>(
+                                            proto_config, context.messageValidationVisitor()),
+                                        context);
+  }
 
 protected:
   FactoryBase(const std::string& name, bool is_terminal = false)
       : name_(name), is_terminal_filter_(is_terminal) {}
 
 private:
+  virtual bool isTerminalFilterByProtoTyped(const ConfigProto&,
+                                            Server::Configuration::FactoryContext&) {
+    return is_terminal_filter_;
+  }
   virtual Network::FilterFactoryCb
   createFilterFactoryFromProtoTyped(const ConfigProto& proto_config,
                                     Server::Configuration::FactoryContext& context) PURE;

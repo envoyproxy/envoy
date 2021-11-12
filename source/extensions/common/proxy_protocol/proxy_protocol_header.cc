@@ -1,11 +1,11 @@
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include <sstream>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/address.h"
 
-#include "common/network/address_impl.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -101,8 +101,10 @@ void generateV2Header(const Network::Address::Ip& source_address,
 
 void generateProxyProtoHeader(const envoy::config::core::v3::ProxyProtocolConfig& config,
                               const Network::Connection& connection, Buffer::Instance& out) {
-  const Network::Address::Ip& dest_address = *connection.addressProvider().localAddress()->ip();
-  const Network::Address::Ip& source_address = *connection.addressProvider().remoteAddress()->ip();
+  const Network::Address::Ip& dest_address =
+      *connection.connectionInfoProvider().localAddress()->ip();
+  const Network::Address::Ip& source_address =
+      *connection.connectionInfoProvider().remoteAddress()->ip();
   if (config.version() == envoy::config::core::v3::ProxyProtocolConfig::V1) {
     generateV1Header(source_address, dest_address, out);
   } else if (config.version() == envoy::config::core::v3::ProxyProtocolConfig::V2) {

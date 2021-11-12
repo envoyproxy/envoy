@@ -8,8 +8,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/ratelimit/ratelimit.h"
 
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "common/config/xds_context_params.h"
+#include "source/common/config/xds_context_params.h"
 
 #include "test/common/config/xds_test_utility.h"
 #include "test/test_common/logging.h"

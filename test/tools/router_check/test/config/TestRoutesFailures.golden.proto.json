@@ -17,7 +17,9 @@
         "response_header_matches": [
           {
             "name": "content-type",
-            "exact_match": "text/plain",
+            "string_match": {
+              "exact": "text/plain"
+            },
             "invert_match": true
           },
           {
@@ -30,7 +32,9 @@
           },
           {
             "name": "x-ping-response",
-            "exact_match": "pong"
+            "string_match": {
+              "exact": "pong"
+            }
           },
           {
             "name": "x-ping-response",

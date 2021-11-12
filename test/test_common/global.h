@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 
 #include "absl/container/flat_hash_map.h"
 

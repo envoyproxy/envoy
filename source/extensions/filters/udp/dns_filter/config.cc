@@ -1,4 +1,4 @@
-#include "extensions/filters/udp/dns_filter/config.h"
+#include "source/extensions/filters/udp/dns_filter/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ Network::UdpListenerFilterFactoryCb DnsFilterConfigFactory::createFilterFactoryF
     const Protobuf::Message& config, Server::Configuration::ListenerFactoryContext& context) {
   auto shared_config = std::make_shared<DnsFilterEnvoyConfig>(
       context, MessageUtil::downcastAndValidate<
-                   const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig&>(
+                   const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig&>(
                    config, context.messageValidationVisitor()));
 
   return [shared_config](Network::UdpListenerFilterManager& filter_manager,
@@ -19,7 +19,7 @@ Network::UdpListenerFilterFactoryCb DnsFilterConfigFactory::createFilterFactoryF
 }
 
 ProtobufTypes::MessagePtr DnsFilterConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig>();
+  return std::make_unique<envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig>();
 }
 
 std::string DnsFilterConfigFactory::name() const { return "envoy.filters.udp.dns_filter"; }

@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/dynamic_ot.pb.validate.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
 
-#include "extensions/tracers/dynamic_ot/config.h"
+#include "source/extensions/tracers/dynamic_ot/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -49,15 +49,16 @@ TEST(DynamicOtTracerConfigTest, DynamicOpentracingHttpTracer) {
   DynamicOpenTracingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  const Tracing::HttpTracerSharedPtr tracer = factory.createHttpTracer(*message, context);
+  auto tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, tracer);
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(DynamicOtTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.dynamic.ot";
 
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
                          deprecated_name));
 }
 

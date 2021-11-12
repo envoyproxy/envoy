@@ -4,8 +4,8 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/tracing/http_tracer_manager.h"
 
-#include "common/common/logger.h"
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Tracing {

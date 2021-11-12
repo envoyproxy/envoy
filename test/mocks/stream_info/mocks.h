@@ -4,8 +4,8 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/network/socket_impl.h"
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/network/socket_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
@@ -48,6 +48,8 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
+  MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
+  MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
@@ -57,6 +59,8 @@ public:
   MOCK_METHOD(const absl::optional<std::string>&, connectionTerminationDetails, (), (const));
   MOCK_METHOD(void, addBytesSent, (uint64_t));
   MOCK_METHOD(uint64_t, bytesSent, (), (const));
+  MOCK_METHOD(void, addWireBytesSent, (uint64_t));
+  MOCK_METHOD(uint64_t, wireBytesSent, (), (const));
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
   MOCK_METHOD(uint64_t, responseFlags, (), (const));
@@ -65,12 +69,10 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
-  MOCK_METHOD(const Network::SocketAddressProvider&, downstreamAddressProvider, (), (const));
-  MOCK_METHOD(void, setDownstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, downstreamSslConnection, (), (const));
+  MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(void, setUpstreamSslConnection, (const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
-  MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
@@ -80,8 +82,6 @@ public:
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
   MOCK_METHOD(void, setUpstreamFilterState, (const FilterStateSharedPtr&));
-  MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));
-  MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(void, setUpstreamTransportFailureReason, (absl::string_view));
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
@@ -98,7 +98,14 @@ public:
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
   MOCK_METHOD(const std::string&, filterChainName, (), (const));
-
+  MOCK_METHOD(void, setUpstreamConnectionId, (uint64_t));
+  MOCK_METHOD(absl::optional<uint64_t>, upstreamConnectionId, (), (const));
+  MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
+  MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
+  MOCK_METHOD(const BytesMeterSharedPtr&, getUpstreamBytesMeter, (), (const));
+  MOCK_METHOD(const BytesMeterSharedPtr&, getDownstreamBytesMeter, (), (const));
+  MOCK_METHOD(void, setUpstreamBytesMeter, (const BytesMeterSharedPtr&));
+  MOCK_METHOD(void, setDownstreamBytesMeter, (const BytesMeterSharedPtr&));
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};
   Envoy::Event::SimulatedTimeSystem ts_;
@@ -124,13 +131,16 @@ public:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  std::shared_ptr<Network::SocketAddressSetterImpl> downstream_address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> downstream_connection_info_provider_;
+  BytesMeterSharedPtr upstream_bytes_meter_;
+  BytesMeterSharedPtr downstream_bytes_meter_;
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
-  std::string requested_server_name_;
   std::string route_name_;
   std::string upstream_transport_failure_reason_;
   std::string filter_chain_name_;
+  absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<uint32_t> attempt_count_;
 };
 
 } // namespace StreamInfo

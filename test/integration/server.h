@@ -11,16 +11,15 @@
 #include "envoy/server/process_context.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/assert.h"
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/stats/allocator_impl.h"
-
-#include "server/drain_manager_impl.h"
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
-#include "server/server.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/server/drain_manager_impl.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
+#include "source/server/server.h"
 
 #include "test/integration/server_stats.h"
 #include "test/integration/tcp_dump.h"
@@ -46,14 +45,13 @@ createTestOptionsImpl(const std::string& config_path, const std::string& config_
                       FieldValidationConfig validation_config = FieldValidationConfig(),
                       uint32_t concurrency = 1,
                       std::chrono::seconds drain_time = std::chrono::seconds(1),
-                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-                      bool v2_bootstrap = false);
+                      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual);
 
 class TestComponentFactory : public ComponentFactory {
 public:
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    return Server::DrainManagerPtr{
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY)};
+    return Server::DrainManagerPtr{new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher())};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
                                    Server::Configuration::Initial& config) override {
@@ -283,6 +281,21 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+  void forEachCounter(std::function<void(std::size_t)> f_size,
+                      std::function<void(Stats::Counter&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachCounter(f_size, f_stat);
+  }
+  void forEachGauge(std::function<void(std::size_t)> f_size,
+                    std::function<void(Stats::Gauge&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachGauge(f_size, f_stat);
+  }
+  void forEachTextReadout(std::function<void(std::size_t)> f_size,
+                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachTextReadout(f_size, f_stat);
+  }
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
@@ -373,11 +386,14 @@ public:
   void setHistogramSettings(HistogramSettingsConstPtr&&) override {}
   void initializeThreading(Event::Dispatcher&, ThreadLocal::Instance&) override {}
   void shutdownThreading() override {}
-  void mergeHistograms(PostMergeCb) override {}
+  void mergeHistograms(PostMergeCb cb) override { merge_cb_ = cb; }
+
+  void runMergeCallback() { merge_cb_(); }
 
 private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
+  PostMergeCb merge_cb_;
 };
 
 } // namespace Stats
@@ -396,18 +412,16 @@ class IntegrationTestServer : public Logger::Loggable<Logger::Id::testing>,
                               public IntegrationTestServerStats,
                               public Server::ComponentFactory {
 public:
-  static IntegrationTestServerPtr
-  create(const std::string& config_path, const Network::Address::IpVersion version,
-         std::function<void(IntegrationTestServer&)> on_server_ready_function,
-         std::function<void()> on_server_init_function, bool deterministic,
-         Event::TestTimeSystem& time_system, Api::Api& api,
-         bool defer_listener_finalization = false,
-         ProcessObjectOptRef process_object = absl::nullopt,
-         Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
-         uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
-         Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
-         Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false,
-         bool v2_bootstrap = false);
+  static IntegrationTestServerPtr create(
+      const std::string& config_path, const Network::Address::IpVersion version,
+      std::function<void(IntegrationTestServer&)> on_server_ready_function,
+      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
+      Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
+      ProcessObjectOptRef process_object = absl::nullopt,
+      Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
+      uint32_t concurrency = 1, std::chrono::seconds drain_time = std::chrono::seconds(1),
+      Server::DrainStrategy drain_strategy = Server::DrainStrategy::Gradual,
+      Buffer::WatermarkFactorySharedPtr watermark_factory = nullptr, bool use_real_stats = false);
   // Note that the derived class is responsible for tearing down the server in its
   // destructor.
   ~IntegrationTestServer() override;
@@ -428,43 +442,52 @@ public:
   void setOnServerReadyCb(std::function<void(IntegrationTestServer&)> on_server_ready) {
     on_server_ready_cb_ = std::move(on_server_ready);
   }
-  void onRuntimeCreated() override {}
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-             Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
+             std::function<void()> on_server_init_function,
+             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+             uint32_t concurrency, std::chrono::seconds drain_time,
+             Server::DrainStrategy drain_strategy,
+             Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
-                        std::chrono::milliseconds timeout = std::chrono::milliseconds::zero(),
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout,
                         Event::Dispatcher* dispatcher = nullptr) override {
     ASSERT_TRUE(
         TestUtility::waitForCounterEq(statStore(), name, value, time_system_, timeout, dispatcher));
   }
 
-  void
-  waitForCounterGe(const std::string& name, uint64_t value,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForCounterGe(const std::string& name, uint64_t value,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForCounterGe(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeEq(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeEq(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeEq(statStore(), name, value, time_system_, timeout));
   }
 
-  void
-  waitForGaugeGe(const std::string& name, uint64_t value,
-                 std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+  void waitForGaugeGe(const std::string& name, uint64_t value,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) override {
     ASSERT_TRUE(TestUtility::waitForGaugeGe(statStore(), name, value, time_system_, timeout));
   }
 
   void waitForCounterExists(const std::string& name) override {
     notifyingStatsAllocator().waitForCounterExists(name);
+  }
+
+  // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
+  void waitForGaugeDestroyed(const std::string& name) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
+  }
+
+  void waitUntilHistogramHasSamples(
+      const std::string& name,
+      std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
+    ASSERT_TRUE(TestUtility::waitUntilHistogramHasSamples(statStore(), name, time_system_,
+                                                          server().dispatcher(), timeout));
   }
 
   Stats::CounterSharedPtr counter(const std::string& name) override {
@@ -479,9 +502,17 @@ public:
     return TestUtility::findGauge(statStore(), name);
   }
 
+  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
+    return TestUtility::findHistogram(statStore(), name);
+  }
+
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
 
   std::vector<Stats::GaugeSharedPtr> gauges() override { return statStore().gauges(); }
+
+  std::vector<Stats::ParentHistogramSharedPtr> histograms() override {
+    return statStore().histograms();
+  }
 
   // ListenerHooks
   void onWorkerListenerAdded() override;
@@ -489,8 +520,8 @@ public:
 
   // Server::ComponentFactory
   Server::DrainManagerPtr createDrainManager(Server::Instance& server) override {
-    drain_manager_ =
-        new Server::DrainManagerImpl(server, envoy::config::listener::v3::Listener::MODIFY_ONLY);
+    drain_manager_ = new Server::DrainManagerImpl(
+        server, envoy::config::listener::v3::Listener::MODIFY_ONLY, server.dispatcher());
     return Server::DrainManagerPtr{drain_manager_};
   }
   Runtime::LoaderPtr createRuntime(Server::Instance& server,
@@ -532,11 +563,12 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
+  void threadRoutine(const Network::Address::IpVersion version,
+                     absl::optional<uint64_t> deterministic_value,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
-                     Buffer::WatermarkFactorySharedPtr watermark_factory, bool v2_bootstrap);
+                     Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   Event::TestTimeSystem& time_system_;
   Api::Api& api_;

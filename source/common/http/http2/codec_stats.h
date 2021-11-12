@@ -3,7 +3,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/thread.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Http {
@@ -19,11 +19,13 @@ namespace Http2 {
   COUNTER(inbound_empty_frames_flood)                                                              \
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
+  COUNTER(metadata_empty_frames)                                                                   \
   COUNTER(outbound_control_flood)                                                                  \
   COUNTER(outbound_flood)                                                                          \
   COUNTER(requests_rejected_with_underscores_in_headers)                                           \
   COUNTER(rx_messaging_error)                                                                      \
   COUNTER(rx_reset)                                                                                \
+  COUNTER(stream_refused_errors)                                                                   \
   COUNTER(trailers)                                                                                \
   COUNTER(tx_flush_timeout)                                                                        \
   COUNTER(tx_reset)                                                                                \

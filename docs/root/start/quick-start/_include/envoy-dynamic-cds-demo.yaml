@@ -1,7 +1,6 @@
 resources:
 - "@type": type.googleapis.com/envoy.config.cluster.v3.Cluster
   name: example_proxy_cluster
-  connect_timeout: 1s
   type: STRICT_DNS
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

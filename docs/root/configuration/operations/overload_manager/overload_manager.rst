@@ -58,8 +58,8 @@ Triggers connect resource monitors to actions. There are two types of triggers s
   * - :ref:`scaled <envoy_v3_api_msg_config.overload.v3.ScaledTrigger>`
     - Sets the action state to 0 when the resource pressure is below the
       :ref:`scaling_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.scaling_threshold>`,
-      `(pressure - scaling_threshold)/(saturation_threshold - scaling_threshold)` when
-      `scaling_threshold < pressure < saturation_threshold`, and to 1 (*saturated*) when the
+      ``(pressure - scaling_threshold)/(saturation_threshold - scaling_threshold)`` when
+      ``scaling_threshold < pressure < saturation_threshold``, and to 1 (*saturated*) when the
       pressure is above the
       :ref:`saturation_threshold <envoy_v3_api_field_config.overload.v3.ScaledTrigger.saturation_threshold>`."
 
@@ -96,12 +96,16 @@ The following overload actions are supported:
     - Envoy will reduce the waiting period for a configured set of timeouts. See
       :ref:`below <config_overload_manager_reducing_timeouts>` for details on configuration.
 
+  * - envoy.overload_actions.reset_high_memory_stream
+    - Envoy will reset expensive streams to terminate them. See
+      :ref:`below <config_overload_manager_reset_streams>` for details on configuration.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
 ^^^^^^^^^^^^^^^^^
 
-The `envoy.overload_actions.reduce_timeouts` overload action will reduce the amount of time Envoy
+The ``envoy.overload_actions.reduce_timeouts`` overload action will reduce the amount of time Envoy
 will spend waiting for some interactions to finish in response to resource pressure. The amount of
 reduction can be configured per timeout type by specifying the minimum timer value to use when the
 triggering resource monitor detects saturation. The minimum value for each timeout can be specified
@@ -129,14 +133,14 @@ to remain idle before being closed in response to heap size. When the heap usage
 idle connections will time out at their usual time, which is configured through
 :ref:`HttpConnectionManager.common_http_protocol_options.idle_timeout <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.idle_timeout>`.
 When the heap usage is at or above 95%, idle connections will be closed after the specified
-`min_timeout`, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
+``min_timeout``, here 2 seconds. If the heap usage is between 85% and 95%, the idle connection timeout
 will vary between those two based on the formula for the :ref:`scaled trigger <config_overload_manager_triggers>`
-So if `RouteAction.idle_timeout = 600 seconds` and heap usage is at 92%, idle connections will time
+So if ``RouteAction.idle_timeout = 600 seconds`` and heap usage is at 92%, idle connections will time
 out after :math:`2s + (600s - 2s) \cdot (95\% - 92\%) / (95\% - 85\%) = 181.4s`.
 
 Note in the example that the minimum idle time is specified as an absolute duration. If, instead,
-`min_timeout: 2s` were to be replaced with `min_scale: { value: 10 }`, the minimum timer value
-would be computed based on the maximum (specified elsewhere). So if `idle_timeout` is
+``min_timeout: 2s`` were to be replaced with ``min_scale: { value: 10 }``, the minimum timer value
+would be computed based on the maximum (specified elsewhere). So if ``idle_timeout`` is
 again 600 seconds, then the minimum timer value would be :math:`10\% \cdot 600s = 60s`.
 
 Limiting Active Connections
@@ -162,6 +166,92 @@ limit for that specific listener and allow the global limit to enforce resource 
 all listeners.
 
 An example configuration can be found in the :ref:`edge best practices document <best_practices_edge>`.
+
+.. _config_overload_manager_reset_streams:
+
+Reset Streams
+^^^^^^^^^^^^^
+
+.. warning::
+   Resetting streams via an overload action currently only works with HTTP2.
+
+The ``envoy.overload_actions.reset_high_memory_stream`` overload action will reset
+expensive streams. This requires `minimum_account_to_track_power_of_two` to be
+configured via :ref:`buffer_factory_config
+<envoy_v3_api_field_config.overload.v3.OverloadManager.buffer_factory_config>`.
+To understand the memory class scheme in detail see :ref:`minimum_account_to_track_power_of_two
+<envoy_v3_api_field_config.overload.v3.BufferFactoryConfig.minimum_account_to_track_power_of_two>`
+
+As an example, here is a partial Overload Manager configuration with minimum
+threshold for tracking and a single overload action entry that resets streams:
+
+.. code-block:: yaml
+
+  buffer_factory_config:
+    minimum_account_to_track_power_of_two: 20
+  actions:
+    name: "envoy.overload_actions.reset_high_memory_stream"
+    triggers:
+      - name: "envoy.resource_monitors.fixed_heap"
+        scaled:
+          scaling_threshold: 0.85
+          saturation_threshold: 0.95
+  ...
+
+We will only track streams using >=
+:math:`2^{minimum\_account\_to\_track\_power\_of\_two}` worth of allocated memory in
+buffers. In this case, by setting the `minimum_account_to_track_power_of_two`
+to `20` we will track streams using >= 1MiB since :math:`2^{20}` is 1MiB. Streams
+using >= 1MiB will be classified into 8 power of two sized buckets. Currently,
+the number of buckets is hardcoded to 8.  For this example, the buckets are as
+follows:
+
+.. list-table::
+  :header-rows: 1
+  :widths: 1, 2
+
+  * - Bucket index
+    - Contains streams using
+  * - 0
+    - [1MiB,2MiB)
+  * - 1
+    - [2MiB,4MiB)
+  * - 2
+    - [4MiB,8MiB)
+  * - 3
+    - [8MiB,16MiB)
+  * - 4
+    - [16MiB,32MiB)
+  * - 5
+    - [32MiB,64MiB)
+  * - 6
+    - [64MiB,128MiB)
+  * - 7
+    - >= 128MiB
+
+The above configuration also configures the overload manager to reset our tracked
+streams based on heap usage as a trigger. When the heap usage is less than 85%,
+no streams will be reset.  When heap usage is at or above 85%, we start to
+reset buckets according to the strategy described below. When the heap
+usage is at 95% all streams using >= 1MiB memory are eligible for reset.
+This overload action will reset up to 50 streams (this is a hardcoded limit)
+per worker everytime the action is invoked. This is both to reduce the amount
+of streams that end up getting reset and to prevent the worker thread from
+locking up and triggering the Watchdog system.
+
+Given that there are only 8 buckets, we partition the space with a gradation of
+:math:`gradation = (saturation\_threshold - scaling\_threshold)/8`. Hence at 85%
+heap usage we reset streams in the last bucket e.g. those using `>= 128MiB`. At
+:math:`85% + 1 * gradation` heap usage we reset streams in the last two buckets
+e.g. those using `>= 64MiB`, prioritizing the streams in the last bucket since
+there's a hard limit on the number of streams we can reset per invokation.
+At :math:`85% + 2 * gradation` heap usage we reset streams in the last three
+buckets e.g. those using `>= 32MiB`. And so forth as the heap usage is higher.
+
+It's expected that the first few gradations shouldn't trigger anything, unless
+there's something seriously wrong e.g. in this example streams using `>=
+128MiB` in buffers.
+
 
 Statistics
 ----------

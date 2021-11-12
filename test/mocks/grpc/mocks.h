@@ -9,7 +9,7 @@
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/grpc/typed_async_client.h"
+#include "source/common/grpc/typed_async_client.h"
 
 #include "test/test_common/utility.h"
 
@@ -90,6 +90,8 @@ public:
                const Http::AsyncClient::StreamOptions& options));
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
+  // Keep track of the number of requests to detect potential race condition.
+  int send_count_{};
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {
@@ -97,7 +99,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD(RawAsyncClientPtr, create, ());
+  MOCK_METHOD(RawAsyncClientPtr, createUncachedRawAsyncClient, ());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {
@@ -108,6 +110,10 @@ public:
   MOCK_METHOD(AsyncClientFactoryPtr, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
                bool skip_cluster_check));
+
+  MOCK_METHOD(RawAsyncClientSharedPtr, getOrCreateRawAsyncClient,
+              (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
+               bool skip_cluster_check, Grpc::CacheOption cache_option));
 };
 
 MATCHER_P(ProtoBufferEq, expected, "") {

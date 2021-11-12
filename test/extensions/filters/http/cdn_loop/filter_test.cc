@@ -1,7 +1,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 
-#include "extensions/filters/http/cdn_loop/filter.h"
+#include "source/extensions/filters/http/cdn_loop/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"

@@ -3,11 +3,12 @@
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/protobuf_link_hacks.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
@@ -153,11 +154,13 @@ routes:
 )EOF";
 
 class VhdsInitializationTest : public HttpIntegrationTest,
-                               public Grpc::GrpcClientIntegrationParamTest {
+                               public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
-  VhdsInitializationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
+  VhdsInitializationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
@@ -169,8 +172,8 @@ public:
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     // BaseIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
@@ -211,7 +214,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsInitializationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // tests a scenario when:
 //  - RouteConfiguration without VHDS is received
@@ -250,11 +253,13 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
 }
 
 class VhdsIntegrationTest : public HttpIntegrationTest,
-                            public Grpc::GrpcClientIntegrationParamTest {
+                            public Grpc::UnifiedOrLegacyMuxIntegrationParamTest {
 public:
-  VhdsIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config()) {
+  VhdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config()) {
     use_lds_ = false;
+    if (isUnified()) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
   }
 
   void TearDown() override { cleanUpXdsConnection(); }
@@ -291,8 +296,8 @@ public:
     // BaseIntegrationTest::createUpstreams() (which is part of initialize()).
     // Make sure this number matches the size of the 'clusters' repeated field in the bootstrap
     // config that you use!
-    setUpstreamCount(2);                                  // the CDS cluster
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2); // CDS uses gRPC uses HTTP2.
+    setUpstreamCount(2);                         // the CDS cluster
+    setUpstreamProtocol(Http::CodecType::HTTP2); // CDS uses gRPC uses HTTP2.
 
     // BaseIntegrationTest::initialize() does many things:
     // 1) It appends to fake_upstreams_ as many as you asked for via setUpstreamCount().
@@ -398,7 +403,8 @@ public:
   bool use_rds_with_vhosts{false};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest,
+                         UNIFIED_LEGACY_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
@@ -691,7 +697,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateHttpConnectionCloses) {
   vhds_stream_->sendGrpcMessage(vhds_update);
 
   codec_client_->sendReset(encoder);
-  response->waitForReset();
+  ASSERT_TRUE(response->waitForReset());
   EXPECT_TRUE(codec_client_->connected());
 
   cleanupUpstreamAndDownstream();

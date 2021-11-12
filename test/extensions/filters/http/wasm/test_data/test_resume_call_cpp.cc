@@ -6,7 +6,7 @@
 #ifndef NULL_PLUGIN
 #include "proxy_wasm_intrinsics_lite.h"
 #else
-#include "extensions/common/wasm/ext/envoy_null_plugin.h"
+#include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #endif
 
 START_WASM_PLUGIN(HttpWasmTestCpp)

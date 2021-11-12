@@ -35,6 +35,16 @@ MATCHER_P2(SingleHeaderValueIs, key, value,
   return hdr[0]->value() == value;
 }
 
+MATCHER_P2(SingleProtoHeaderValueIs, key, value,
+           absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
+  for (const auto& hdr : arg.headers()) {
+    if (key == hdr.key()) {
+      return value == hdr.value();
+    }
+  }
+  return false;
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

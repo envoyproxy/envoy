@@ -13,7 +13,7 @@ envoy_cc_library(
     name = "omit_canary_hosts_predicate_lib",
     hdrs = ["omit_canary_hosts.h"],
     deps = [
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/upstream:retry_interface",
     ],
 )
 
@@ -21,12 +21,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.retry_host_predicates",
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":omit_canary_hosts_predicate_lib",
-        "//include/envoy/registry",
-        "//include/envoy/upstream:retry_interface",
+        "//envoy/registry",
+        "//envoy/upstream:retry_interface",
         "@envoy_api//envoy/extensions/retry/host/omit_canary_hosts/v3:pkg_cc_proto",
     ],
 )

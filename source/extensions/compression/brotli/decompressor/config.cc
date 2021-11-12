@@ -1,4 +1,4 @@
-#include "extensions/compression/brotli/decompressor/config.h"
+#include "source/extensions/compression/brotli/decompressor/config.h"
 
 namespace Envoy {
 namespace Extensions {

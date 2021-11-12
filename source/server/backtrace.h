@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "common/common/logger.h"
-#include "common/version/version.h"
+#include "source/common/common/logger.h"
+#include "source/common/version/version.h"
 
 #include "absl/debugging/stacktrace.h"
 #include "absl/debugging/symbolize.h"

@@ -1,15 +1,20 @@
 #include <codecvt>
 #include <locale>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/thread.h"
-#include "common/event/signal_impl.h"
-
-#include "exe/main_common.h"
-#include "exe/service_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/signal_impl.h"
+#include "source/exe/main_common.h"
+#include "source/exe/service_base.h"
 
 #include "absl/debugging/symbolize.h"
+
+// Logging macro for SCM
+#define ENVOY_LOG_SCM(LOGGER, LEVEL, ...)                                                          \
+  do {                                                                                             \
+    LOGGER.log(::spdlog::source_loc{__FILE__, __LINE__, __func__}, LEVEL, __VA_ARGS__);            \
+  } while (0)
 
 namespace Envoy {
 
@@ -50,8 +55,10 @@ bool ServiceBase::TryRunAsService(ServiceBase& service) {
     if (last_error == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
       return false;
     } else {
-      PANIC(
-          fmt::format("Could not dispatch Envoy to start as a service with error {}", last_error));
+      std::string error_msg{
+          fmt::format("Could not dispatch Envoy to start as a service with error {}", last_error)};
+      ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+      PANIC(error_msg);
     }
   }
   return true;
@@ -84,10 +91,11 @@ DWORD ServiceBase::Start(std::vector<std::string> args) {
     return S_OK;
   }
   catch (const Envoy::MalformedArgvException& e) {
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_INVALIDARG;
   }
   catch (const Envoy::EnvoyException& e) {
-    ENVOY_LOG_MISC(warn, "Envoy failed to start with {}", e.what());
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, e.what());
     return E_FAIL;
   }
 
@@ -103,7 +111,7 @@ void ServiceBase::Stop(DWORD control) {
   char data[] = {'a'};
   Buffer::RawSlice buffer{data, 1};
   auto result = handler->writev(&buffer, 1);
-  RELEASE_ASSERT(result.rc_ == 1,
+  RELEASE_ASSERT(result.return_value_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 }
 
@@ -132,11 +140,19 @@ void WINAPI ServiceBase::ServiceMain(DWORD argc, LPSTR* argv) {
   RELEASE_ASSERT(service_static != nullptr, "Global pointer to service should not be null");
   if (argc < 1 || argv == 0 || argv[0] == 0) {
     service_static->UpdateState(SERVICE_STOPPED, E_INVALIDARG, true);
+    constexpr absl::string_view error_msg{"insufficient arguments provided"};
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+    PANIC(error_msg);
   }
 
   service_static->handle_ = ::RegisterServiceCtrlHandlerA("ENVOY\0", Handler);
   if (service_static->handle_ == 0) {
-    service_static->UpdateState(SERVICE_STOPPED, ::GetLastError(), false);
+    auto last_error = ::GetLastError();
+    service_static->UpdateState(SERVICE_STOPPED, last_error, false);
+    std::string error_msg{
+        fmt::format("Could not register service control handler with error {}", last_error)};
+    ENVOY_LOG_SCM(service_static->windows_event_logger_, spdlog::level::err, error_msg);
+    PANIC(error_msg);
   }
 
   // Windows Services can get their arguments in two different ways

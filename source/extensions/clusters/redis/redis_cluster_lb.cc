@@ -6,13 +6,19 @@ namespace Clusters {
 namespace Redis {
 
 bool ClusterSlot::operator==(const Envoy::Extensions::Clusters::Redis::ClusterSlot& rhs) const {
-  return start_ == rhs.start_ && end_ == rhs.end_ && primary_ == rhs.primary_ &&
-         replicas_ == rhs.replicas_;
+  if (start_ != rhs.start_ || end_ != rhs.end_ || *primary_ != *rhs.primary_ ||
+      replicas_.size() != rhs.replicas_.size()) {
+    return false;
+  }
+  // The value type is shared_ptr, and the shared_ptr is not same one even for same ip:port.
+  // so, just compare the key here.
+  return std::equal(replicas_.begin(), replicas_.end(), rhs.replicas_.begin(), rhs.replicas_.end(),
+                    [](const auto& it1, const auto& it2) { return it1.first == it2.first; });
 }
 
 // RedisClusterLoadBalancerFactory
 bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slots,
-                                                          Envoy::Upstream::HostMap all_hosts) {
+                                                          Envoy::Upstream::HostMap& all_hosts) {
   // The slots is sorted, allowing for a quick comparison to make sure we need to update the slot
   // array sort based on start and end to enable efficient comparison
   std::sort(
@@ -43,7 +49,7 @@ bool RedisClusterLoadBalancerFactory::onClusterSlotUpdate(ClusterSlotsPtr&& slot
       primary_and_replicas->push_back(primary_host->second);
 
       for (auto const& replica : slot.replicas()) {
-        auto replica_host = all_hosts.find(replica->asString());
+        auto replica_host = all_hosts.find(replica.first);
         ASSERT(replica_host != all_hosts.end(),
                "we expect all address to be found in the updated_hosts");
         replicas->push_back(replica_host->second);

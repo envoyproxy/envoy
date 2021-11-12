@@ -1,13 +1,11 @@
 #include "envoy/extensions/access_loggers/wasm/v3/wasm.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/wasm/config.h"
-#include "extensions/access_loggers/wasm/wasm_access_log_impl.h"
-#include "extensions/access_loggers/well_known_names.h"
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/wasm/config.h"
+#include "source/extensions/access_loggers/wasm/wasm_access_log_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -42,7 +40,7 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().Wasm);
+          "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
@@ -66,7 +64,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
 #endif
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().Wasm);
+          "envoy.access_loggers.wasm");
   ASSERT_NE(factory, nullptr);
 
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
@@ -94,6 +92,9 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
       factory->createAccessLogInstance(config, std::move(filter), context);
   EXPECT_NE(nullptr, instance);
   EXPECT_NE(nullptr, dynamic_cast<WasmAccessLog*>(instance.get()));
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api->customStatNamespaces().registered("wasmcustom"));
+
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;

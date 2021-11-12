@@ -1,11 +1,11 @@
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include <lua.h>
 
 #include <cstdint>
 
-#include "common/common/assert.h"
-#include "common/common/hex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
 
 #include "absl/time/time.h"
 
@@ -42,7 +42,6 @@ int64_t timestampInSeconds(const absl::optional<SystemTime>& system_time) {
                                        .count()
                                  : 0;
 }
-
 } // namespace
 
 int BufferWrapper::luaLength(lua_State* state) {
@@ -67,7 +66,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
 
 int BufferWrapper::luaSetBytes(lua_State* state) {
   data_.drain(data_.length());
-  absl::string_view bytes = luaL_checkstring(state, 2);
+  absl::string_view bytes = getStringViewFromLuaString(state, 2);
   data_.add(bytes);
   lua_pushnumber(state, data_.length());
   return 1;

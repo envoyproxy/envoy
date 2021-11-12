@@ -7,7 +7,7 @@
 #define ENVOY_PERF_ANNOTATION
 #endif
 
-#include "common/common/perf_annotation.h"
+#include "source/common/common/perf_annotation.h"
 
 #include "gtest/gtest.h"
 

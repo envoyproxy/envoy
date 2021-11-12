@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-
-#include "extensions/common/crypto/crypto_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/crypto_impl.h"
+#include "source/common/crypto/utility.h"
 
 #include "gtest/gtest.h"
 

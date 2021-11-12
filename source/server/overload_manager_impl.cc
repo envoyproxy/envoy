@@ -1,4 +1,4 @@
-#include "server/overload_manager_impl.h"
+#include "source/server/overload_manager_impl.h"
 
 #include <chrono>
 
@@ -7,13 +7,12 @@
 #include "envoy/config/overload/v3/overload.pb.validate.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/fmt.h"
-#include "common/config/utility.h"
-#include "common/event/scaled_range_timer_manager_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "server/resource_monitor_config_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/utility.h"
+#include "source/common/event/scaled_range_timer_manager_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table_impl.h"
+#include "source/server/resource_monitor_config_impl.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -107,10 +106,13 @@ private:
   OverloadActionState state_;
 };
 
-Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
-  Stats::StatNameManagedStorage stat_name(absl::StrCat("overload.", a, ".", b),
-                                          scope.symbolTable());
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view name_of_stat) {
+  Stats::StatNameManagedStorage stat_name(name_of_stat, scope.symbolTable());
   return scope.counterFromStatName(stat_name.statName());
+}
+
+Stats::Counter& makeCounter(Stats::Scope& scope, absl::string_view a, absl::string_view b) {
+  return makeCounter(scope, absl::StrCat("overload.", a, ".", b));
 }
 
 Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_view b,
@@ -300,6 +302,12 @@ OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::S
     if (name == OverloadActionNames::get().ReduceTimeouts) {
       timer_minimums_ = std::make_shared<const Event::ScaledTimerTypeMap>(
           parseTimerMinimums(action.typed_config(), validation_visitor));
+    } else if (name == OverloadActionNames::get().ResetStreams) {
+      if (!config.has_buffer_factory_config()) {
+        throw EnvoyException(
+            fmt::format("Overload action \"{}\" requires buffer_factory_config.", name));
+      }
+      makeCounter(api.rootScope(), OverloadActionStatsNames::get().ResetStreamsCount);
     } else if (action.has_typed_config()) {
       throw EnvoyException(fmt::format(
           "Overload action \"{}\" has an unexpected value for the typed_config field", name));

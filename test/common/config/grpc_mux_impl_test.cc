@@ -1,18 +1,16 @@
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/api_version.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/config/protobuf_link_hacks.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/grpc_mux_impl.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/common.h"
@@ -24,7 +22,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
@@ -61,17 +58,16 @@ public:
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true);
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_, stats_, rate_limit_settings_, true);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
     grpc_mux_ = std::make_unique<GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, custom_rate_limit_settings,
-        true);
+            "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_, stats_, custom_rate_limit_settings, true);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -79,9 +75,9 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
+    envoy::service::discovery::v3::DiscoveryRequest expected_request;
     if (first) {
-      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(local_info_.node()));
+      expected_request.mutable_node()->CopyFrom(local_info_.node());
     }
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -456,6 +452,40 @@ TEST_F(GrpcMuxImplTest, ResourceTTL) {
   ttl_timer->invokeCallback();
 
   expectSendMessage(type_url, {}, "1");
+}
+
+// Checks that the control plane identifier is logged
+TEST_F(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
+  setup();
+  std::string type_url = "foo";
+  auto foo_sub = grpc_mux_->addWatch(type_url, {}, callbacks_, resource_decoder_, {});
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "", true);
+  grpc_mux_->start();
+
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("1");
+    response->mutable_control_plane()->set_identifier("control_plane_ID");
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _));
+    expectSendMessage(type_url, {}, "1");
+    EXPECT_LOG_CONTAINS("debug", "for foo from control_plane_ID",
+                        grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response)));
+  }
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_version_info("2");
+    response->mutable_control_plane()->set_identifier("different_ID");
+
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _));
+    expectSendMessage(type_url, {}, "2");
+    EXPECT_LOG_CONTAINS("debug", "for foo from different_ID",
+                        grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response)));
+  }
 }
 
 // Validate behavior when watches has an unknown resource name.
@@ -850,8 +880,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_, rate_limit_settings_, true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -863,94 +893,11 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
       GrpcMuxImpl(
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          envoy::config::core::v3::ApiVersion::AUTO, random_, stats_, rate_limit_settings_, true),
+              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+          random_, stats_, rate_limit_settings_, true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
-}
-
-// Send discovery request with v2 resource type_url, receive discovery response with v3 resource
-// type_url.
-TEST_F(GrpcMuxImplTest, WatchV2ResourceV3) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
-  setup();
-
-  InSequence s;
-  const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  const std::string& v3_type_url =
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V3);
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  auto foo_sub = grpc_mux_->addWatch(v2_type_url, {}, callbacks_, resource_decoder, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(v2_type_url, {}, "", true);
-  grpc_mux_->start();
-
-  {
-    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-    response->set_type_url(v3_type_url);
-    response->set_version_info("1");
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
-    load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
-          EXPECT_EQ(1, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
-        }));
-    expectSendMessage(v2_type_url, {}, "1");
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-  }
-}
-
-// Send discovery request with v3 resource type_url, receive discovery response with v2 resource
-// type_url.
-TEST_F(GrpcMuxImplTest, WatchV3ResourceV2) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_type_url_downgrade_and_upgrade", "true"}});
-  setup();
-
-  InSequence s;
-  const std::string& v2_type_url = Config::TypeUrl::get().ClusterLoadAssignment;
-  const std::string& v3_type_url =
-      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-          envoy::config::core::v3::ApiVersion::V3);
-  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
-      resource_decoder("cluster_name");
-  auto foo_sub = grpc_mux_->addWatch(v3_type_url, {}, callbacks_, resource_decoder, {});
-  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage(v3_type_url, {}, "", true);
-  grpc_mux_->start();
-
-  {
-
-    auto response = std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>();
-    response->set_type_url(v2_type_url);
-    response->set_version_info("1");
-    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
-    load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
-    EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
-          EXPECT_EQ(1, resources.size());
-          const auto& expected_assignment =
-              dynamic_cast<const envoy::config::endpoint::v3::ClusterLoadAssignment&>(
-                  resources[0].get().resource());
-          EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
-        }));
-    expectSendMessage(v3_type_url, {}, "1");
-    grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
-  }
 }
 
 } // namespace

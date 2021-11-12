@@ -25,36 +25,35 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains:
-                - "*"
+              - "*"
               routes:
-                - match:
-                    connect_matcher:
-                      {}
-                  route:
-                    cluster: cluster_0
-                    upgrade_configs:
-                      - upgrade_type: CONNECT
+              - match:
+                  connect_matcher:
+                    {}
+                route:
+                  cluster: cluster_0
+                  upgrade_configs:
+                  - upgrade_type: CONNECT
           http_filters:
           - name: envoy.filters.http.router
           http2_protocol_options:
             allow_connect: true
           upgrade_configs:
-            - upgrade_type: CONNECT
+          - upgrade_type: CONNECT
   clusters:
-    - name: cluster_0
-      connect_timeout: 5s
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {}
-      load_assignment:
-        cluster_name: cluster_0
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: 127.0.0.1
-                      port_value: 10002
-
+  - name: cluster_0
+    connect_timeout: 5s
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 10002

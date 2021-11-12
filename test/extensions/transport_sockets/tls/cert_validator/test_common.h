@@ -3,8 +3,8 @@
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
-#include "common/common/macros.h"
-#include "common/common/matchers.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/matchers.h"
 
 #include "test/test_common/utility.h"
 
@@ -47,9 +47,6 @@ public:
   const std::string& certificateRevocationListPath() const final {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
-  const std::vector<std::string>& verifySubjectAltNameList() const override {
-    CONSTRUCT_ON_FIRST_USE(std::vector<std::string>, {});
-  }
   const std::vector<envoy::type::matcher::v3::StringMatcher>&
   subjectAltNameMatchers() const override {
     return san_matchers_;
@@ -75,6 +72,7 @@ public:
   }
 
   Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
 private:
   bool allow_expired_certificate_{false};

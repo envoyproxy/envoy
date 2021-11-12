@@ -4,10 +4,10 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/metadata.pb.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/expr/evaluator.h"
-#include "extensions/filters/common/rbac/matchers.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -34,6 +34,10 @@ void checkMatcher(
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
 }
 
+PortRangeMatcher createPortRangeMatcher(envoy::type::v3::Int32Range range) {
+  return PortRangeMatcher(range);
+}
+
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
@@ -41,7 +45,7 @@ TEST(AndMatcher, Permission_Set) {
   envoy::config::rbac::v3::Permission* perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::AndMatcher(set), true);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true);
 
   perm = set.add_rules();
   perm->set_destination_port(123);
@@ -51,14 +55,16 @@ TEST(AndMatcher, Permission_Set) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
+               headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::AndMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
 }
 
 TEST(AndMatcher, Principal_Set) {
@@ -78,12 +84,12 @@ TEST(AndMatcher, Principal_Set) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_address_provider_->setDirectRemoteAddressForTest(addr);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
   checkMatcher(RBAC::AndMatcher(set), true, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
-  info.downstream_address_provider_->setDirectRemoteAddressForTest(addr);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
   checkMatcher(RBAC::AndMatcher(set), false, conn, headers, info);
 }
@@ -98,14 +104,23 @@ TEST(OrMatcher, Permission_Set) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
-  checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
+
+  perm = set.add_rules();
+  perm->mutable_destination_port_range()->set_start(123);
+  perm->mutable_destination_port_range()->set_end(456);
+
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), false, conn,
+               headers, info);
 
   perm = set.add_rules();
   perm->set_any(true);
 
-  checkMatcher(RBAC::OrMatcher(set), true, conn, headers, info);
+  checkMatcher(RBAC::OrMatcher(set, ProtobufMessage::getStrictValidationVisitor()), true, conn,
+               headers, info);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -120,7 +135,7 @@ TEST(OrMatcher, Principal_Set) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
-  info.downstream_address_provider_->setDirectRemoteAddressForTest(addr);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(addr);
 
   checkMatcher(RBAC::OrMatcher(set), false, conn, headers, info);
 
@@ -134,7 +149,8 @@ TEST(NotMatcher, Permission) {
   envoy::config::rbac::v3::Permission perm;
   perm.set_any(true);
 
-  checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(perm, ProtobufMessage::getStrictValidationVisitor()), false,
+               Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
@@ -147,7 +163,7 @@ TEST(NotMatcher, Principal) {
 TEST(HeaderMatcher, HeaderMatcher) {
   envoy::config::route::v3::HeaderMatcher config;
   config.set_name("foo");
-  config.set_exact_match("bar");
+  config.mutable_string_match()->set_exact("bar");
 
   Envoy::Http::TestRequestHeaderMapImpl headers;
   Envoy::Http::LowerCaseString key("foo");
@@ -177,10 +193,10 @@ TEST(IPMatcher, IPMatcher) {
       Envoy::Network::Utility::parseInternetAddress("4.5.6.7", 456, false);
   Envoy::Network::Address::InstanceConstSharedPtr downstream_remote =
       Envoy::Network::Utility::parseInternetAddress("8.9.10.11", 456, false);
-  conn.stream_info_.downstream_address_provider_->setRemoteAddress(connection_remote);
-  info.downstream_address_provider_->setLocalAddress(direct_local);
-  info.downstream_address_provider_->setDirectRemoteAddressForTest(direct_remote);
-  info.downstream_address_provider_->setRemoteAddress(downstream_remote);
+  conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(connection_remote);
+  info.downstream_connection_info_provider_->setLocalAddress(direct_local);
+  info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(direct_remote);
+  info.downstream_connection_info_provider_->setRemoteAddress(downstream_remote);
 
   envoy::config::core::v3::CidrRange connection_remote_cidr;
   connection_remote_cidr.set_address_prefix("12.13.14.15");
@@ -228,10 +244,62 @@ TEST(PortMatcher, PortMatcher) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
   checkMatcher(PortMatcher(123), true, conn, headers, info);
   checkMatcher(PortMatcher(456), false, conn, headers, info);
+}
+
+// Test valid and invalid destination_port_range permission rule in RBAC.
+TEST(PortRangeMatcher, PortRangeMatcher) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::TestRequestHeaderMapImpl headers;
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  Envoy::Network::Address::InstanceConstSharedPtr addr =
+      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
+
+  // IP address with port 456 is in range [123, 789) and [456, 789), but not in range [123, 456) or
+  // [12, 34).
+  envoy::type::v3::Int32Range range;
+  range.set_start(123);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(456);
+  range.set_end(789);
+  checkMatcher(PortRangeMatcher(range), true, conn, headers, info);
+
+  range.set_start(123);
+  range.set_end(456);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  range.set_start(12);
+  range.set_end(34);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info);
+
+  // Only IP address is valid for the permission rule.
+  NiceMock<StreamInfo::MockStreamInfo> info2;
+  Envoy::Network::Address::InstanceConstSharedPtr addr2 =
+      std::make_shared<const Envoy::Network::Address::PipeInstance>("test");
+  info2.downstream_connection_info_provider_->setLocalAddress(addr2);
+  checkMatcher(PortRangeMatcher(range), false, conn, headers, info2);
+
+  // Invalid rule will cause an exception.
+  range.set_start(-1);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* is out of bounds");
+
+  range.set_start(80);
+  range.set_end(65537);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range end .* is out of bounds");
+
+  range.set_start(80);
+  range.set_end(80);
+  EXPECT_THROW_WITH_REGEX(createPortRangeMatcher(range), EnvoyException,
+                          "range start .* cannot be greater or equal than range end .*");
 }
 
 TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
@@ -316,7 +384,7 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   envoy::config::rbac::v3::Principal::Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
-  auth.mutable_principal_name()->set_hidden_envoy_deprecated_regex(".*");
+  auth.mutable_principal_name()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
@@ -357,7 +425,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
   Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder.get());
+  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor());
 
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -374,17 +442,17 @@ TEST(PolicyMatcher, PolicyMatcher) {
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject));
 
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(ssl));
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
   checkMatcher(matcher, true, conn, headers, info);
 
   EXPECT_CALL(Const(conn), ssl()).Times(2).WillRepeatedly(Return(nullptr));
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
   checkMatcher(matcher, false, conn, headers, info);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 789, false);
-  info.downstream_address_provider_->setLocalAddress(addr);
+  info.downstream_connection_info_provider_->setLocalAddress(addr);
 
   checkMatcher(matcher, false, conn, headers, info);
 }

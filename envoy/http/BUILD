@@ -1,0 +1,184 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+licenses(["notice"])  # Apache 2
+
+envoy_package()
+
+envoy_cc_library(
+    name = "alternate_protocols_cache_interface",
+    hdrs = ["alternate_protocols_cache.h"],
+    deps = [
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_listener_interface",
+    hdrs = ["api_listener.h"],
+    deps = [":codec_interface"],
+)
+
+envoy_cc_library(
+    name = "async_client_interface",
+    hdrs = ["async_client.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":message_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/tracing:http_tracer_interface",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "codec_interface",
+    hdrs = ["codec.h"],
+    deps = [
+        ":header_map_interface",
+        ":metadata_interface",
+        ":protocol_interface",
+        ":stream_reset_handler_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/grpc:status",
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//source/common/http:status_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "stream_reset_handler_interface",
+    hdrs = ["stream_reset_handler.h"],
+)
+
+envoy_cc_library(
+    name = "codes_interface",
+    hdrs = ["codes.h"],
+    deps = ["//envoy/stats:stats_interface"],
+)
+
+envoy_cc_library(
+    name = "conn_pool_interface",
+    hdrs = ["conn_pool.h"],
+    deps = [
+        ":codec_interface",
+        "//envoy/common:conn_pool_interface",
+        "//envoy/event:deferred_deletable",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "context_interface",
+    hdrs = ["context.h"],
+    deps = [
+        ":codes_interface",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_interface",
+    hdrs = ["filter.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":codec_interface",
+        ":header_map_interface",
+        "//envoy/access_log:access_log_interface",
+        "//envoy/common:scope_tracker_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/grpc:status",
+        "//envoy/matcher:matcher_interface",
+        "//envoy/router:router_interface",
+        "//envoy/ssl:connection_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/tracing:http_tracer_interface",
+        "//source/common/common:scope_tracked_object_stack",
+    ],
+)
+
+envoy_cc_library(
+    name = "hash_policy_interface",
+    hdrs = ["hash_policy.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/network:address_interface",
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_map_interface",
+    hdrs = ["header_map.h"],
+    external_deps = [
+        "abseil_inlined_vector",
+    ],
+    deps = [
+        ":header_formatter_interface",
+        "//envoy/tracing:trace_context_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "message_interface",
+    hdrs = ["message.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "protocol_interface",
+    hdrs = ["protocol.h"],
+)
+
+envoy_cc_library(
+    name = "query_params_interface",
+    hdrs = ["query_params.h"],
+)
+
+envoy_cc_library(
+    name = "metadata_interface",
+    hdrs = ["metadata_interface.h"],
+    external_deps = ["abseil_node_hash_map"],
+)
+
+envoy_cc_library(
+    name = "request_id_extension_interface",
+    hdrs = ["request_id_extension.h"],
+    deps = [
+        ":header_map_interface",
+        "//envoy/tracing:trace_reason_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_formatter_interface",
+    hdrs = ["header_formatter.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "original_ip_detection_interface",
+    hdrs = ["original_ip_detection.h"],
+    deps = [
+        ":codes_interface",
+        ":header_map_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/network:address_interface",
+        "//envoy/server:factory_context_interface",
+    ],
+)

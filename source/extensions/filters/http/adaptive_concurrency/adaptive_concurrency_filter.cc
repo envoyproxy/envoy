@@ -1,4 +1,4 @@
-#include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
+#include "source/extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
 
 #include <chrono>
 #include <cstdint>
@@ -7,11 +7,9 @@
 
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 namespace Envoy {
 namespace Extensions {

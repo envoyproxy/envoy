@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include <cstdint>
 #include <string>
@@ -10,10 +10,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_join.h"
 #include "openssl/ssl.h"
@@ -95,12 +93,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     socket.ioHandle().initializeFileEvent(
         cb.dispatcher(),
         [this](uint32_t events) {
-          if (events & Event::FileReadyType::Closed) {
-            config_->stats().connection_closed_.inc();
-            done(false);
-            return;
-          }
-
           ASSERT(events == Event::FileReadyType::Read);
           ParseState parse_state = onRead();
           switch (parse_state) {
@@ -115,8 +107,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             break;
           }
         },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -168,7 +159,7 @@ ParseState Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   const auto result = cb_->socket().ioHandle().recv(buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
+  ENVOY_LOG(trace, "tls inspector: recv: {}", result.return_value_);
 
   if (!result.ok()) {
     if (result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
@@ -178,12 +169,17 @@ ParseState Filter::onRead() {
     return ParseState::Error;
   }
 
+  if (result.return_value_ == 0) {
+    config_->stats().connection_closed_.inc();
+    return ParseState::Error;
+  }
+
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(result.rc_) > read_) {
+  if (static_cast<uint64_t>(result.return_value_) > read_) {
     const uint8_t* data = buf_ + read_;
-    const size_t len = result.rc_ - read_;
-    read_ = result.rc_;
+    const size_t len = result.return_value_ - read_;
+    read_ = result.return_value_;
     return parseClientHello(data, len);
   }
   return ParseState::Continue;
@@ -227,8 +223,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(
-          TransportSockets::TransportProtocolNames::get().Tls);
+      cb_->socket().setDetectedTransportProtocol("tls");
     } else {
       config_->stats().tls_not_found_.inc();
     }

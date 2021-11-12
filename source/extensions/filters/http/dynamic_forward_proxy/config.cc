@@ -1,10 +1,10 @@
-#include "extensions/filters/http/dynamic_forward_proxy/config.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
-#include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +15,7 @@ Http::FilterFactoryCb DynamicForwardProxyFilterFactory::createFilterFactoryFromP
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.singletonManager(), context.dispatcher(), context.threadLocal(),
-      context.api().randomGenerator(), context.runtime(), context.scope());
+      context);
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
       proto_config, cache_manager_factory, context.clusterManager()));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

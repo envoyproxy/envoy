@@ -1,4 +1,4 @@
-#include "extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
 
 namespace Envoy {
 namespace Extensions {

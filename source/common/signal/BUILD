@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["fatal_error_handler.h"],
     deps = [
         ":fatal_action_lib",
-        "//include/envoy/event:dispatcher_interface",
+        "//envoy/event:dispatcher_interface",
         "//source/common/common:macros",
     ],
 )
@@ -37,7 +37,7 @@ envoy_cc_library(
     name = "fatal_action_lib",
     hdrs = ["fatal_action.h"],
     deps = [
-        "//include/envoy/server:fatal_action_interface",
-        "//include/envoy/thread:thread_interface",
+        "//envoy/server:fatal_action_interface",
+        "//envoy/thread:thread_interface",
     ],
 )

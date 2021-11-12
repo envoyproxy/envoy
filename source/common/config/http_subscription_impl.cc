@@ -1,19 +1,18 @@
-#include "common/config/http_subscription_impl.h"
+#include "source/common/config/http_subscription_impl.h"
 
 #include <memory>
 
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/config/decoded_resource_impl.h"
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/http/headers.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "google/api/annotations.pb.h"
 
@@ -25,15 +24,15 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
     Random::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    absl::string_view type_url, envoy::config::core::v3::ApiVersion transport_api_version,
-    SubscriptionCallbacks& callbacks, OpaqueResourceDecoder& resource_decoder,
-    SubscriptionStats stats, std::chrono::milliseconds init_fetch_timeout,
+    absl::string_view type_url, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoder& resource_decoder, SubscriptionStats stats,
+    std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                            request_timeout),
       callbacks_(callbacks), resource_decoder_(resource_decoder), stats_(stats),
       dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout),
-      validation_visitor_(validation_visitor), transport_api_version_(transport_api_version) {
+      validation_visitor_(validation_visitor) {
   request_.mutable_node()->CopyFrom(local_info.node());
   request_.set_type_url(std::string(type_url));
   ASSERT(service_method.options().HasExtension(google::api::http));
@@ -74,7 +73,7 @@ void HttpSubscriptionImpl::createRequest(Http::RequestMessage& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body().add(VersionConverter::getJsonStringFromMessage(request_, transport_api_version_));
+  request.body().add(MessageUtil::getJsonStringFromMessageOrDie(request_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   request.headers().setContentLength(request.body().length());
 }

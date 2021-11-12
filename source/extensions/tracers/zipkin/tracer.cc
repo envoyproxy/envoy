@@ -1,12 +1,11 @@
-#include "extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/tracer.h"
 
 #include <chrono>
 
-#include "common/common/utility.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/utility.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {

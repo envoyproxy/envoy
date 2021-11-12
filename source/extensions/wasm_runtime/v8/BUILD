@@ -11,14 +11,11 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
-    srcs = ["config.cc"],
-    category = "envoy.wasm.runtime",
-    security_posture = "unknown",
-    status = "alpha",
-    deps = [
-        "//include/envoy/registry",
+    srcs = envoy_select_wasm_v8(["config.cc"]),
+    deps = envoy_select_wasm_v8([
+        "//envoy/registry",
         "//source/extensions/common/wasm:wasm_runtime_factory_interface",
-    ] + envoy_select_wasm_v8([
+        "@proxy_wasm_cpp_host//:base_lib",
         "@proxy_wasm_cpp_host//:v8_lib",
     ]),
 )

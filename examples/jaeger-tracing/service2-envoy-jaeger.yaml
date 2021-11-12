@@ -36,10 +36,8 @@ static_resources:
                   operation: checkStock
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: local_service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -52,7 +50,6 @@ static_resources:
                 address: 127.0.0.1
                 port_value: 8080
   - name: jaeger
-    connect_timeout: 1s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

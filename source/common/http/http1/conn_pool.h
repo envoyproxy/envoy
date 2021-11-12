@@ -4,8 +4,8 @@
 #include "envoy/http/codec.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_wrappers.h"
-#include "common/http/conn_pool_base.h"
+#include "source/common/http/codec_wrappers.h"
+#include "source/common/http/conn_pool_base.h"
 
 namespace Envoy {
 namespace Http {
@@ -18,6 +18,7 @@ class ActiveClient : public Envoy::Http::ActiveClient {
 public:
   ActiveClient(HttpConnPoolImplBase& parent);
   ActiveClient(HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data);
+  ~ActiveClient() override;
 
   // ConnPoolImplBase::ActiveClient
   bool closingWithIncompleteStream() const override;
@@ -30,11 +31,17 @@ public:
     // capacity and assign a new stream before decode is complete.
     return stream_wrapper_.get() ? 1 : 0;
   }
+  void releaseResources() override {
+    parent_.dispatcher().deferredDelete(std::move(stream_wrapper_));
+    Envoy::Http::ActiveClient::releaseResources();
+  }
 
   struct StreamWrapper : public RequestEncoderWrapper,
                          public ResponseDecoderWrapper,
                          public StreamCallbacks,
+                         public Event::DeferredDeletable,
                          protected Logger::Loggable<Logger::Id::pool> {
+  public:
     StreamWrapper(ResponseDecoder& response_decoder, ActiveClient& parent);
     ~StreamWrapper() override;
 
@@ -51,8 +58,6 @@ public:
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    void onStreamDestroy();
-
     ActiveClient& parent_;
     bool stream_incomplete_{};
     bool encode_complete_{};
@@ -68,7 +73,7 @@ ConnectionPool::InstancePtr
 allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_generator,
                  Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                  const Network::ConnectionSocket::OptionsSharedPtr& options,
-                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                 const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state);
 
 } // namespace Http1

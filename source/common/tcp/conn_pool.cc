@@ -1,4 +1,4 @@
-#include "common/tcp/conn_pool.h"
+#include "source/common/tcp/conn_pool.h"
 
 #include <memory>
 
@@ -6,8 +6,8 @@
 #include "envoy/event/timer.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -39,22 +39,22 @@ ActiveTcpClient::~ActiveTcpClient() {
   // TcpConnectionData. Make sure the TcpConnectionData will not refer to this ActiveTcpClient
   // and handle clean up normally done in clearCallbacks()
   if (tcp_connection_data_) {
-    ASSERT(state_ == ActiveClient::State::CLOSED);
+    ASSERT(state() == ActiveClient::State::CLOSED);
     tcp_connection_data_->release();
     parent_.onStreamClosed(*this, true);
-    parent_.checkForDrained();
+    parent_.checkForIdleAndCloseIdleConnsIfDraining();
   }
 }
 
 void ActiveTcpClient::clearCallbacks() {
-  if (state_ == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
+  if (state() == Envoy::ConnectionPool::ActiveClient::State::BUSY && parent_.hasPendingStreams()) {
     auto* pool = &parent_;
     pool->scheduleOnUpstreamReady();
   }
   callbacks_ = nullptr;
   tcp_connection_data_ = nullptr;
   parent_.onStreamClosed(*this, true);
-  parent_.checkForDrained();
+  parent_.checkForIdleAndCloseIdleConnsIfDraining();
 }
 
 void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
@@ -65,14 +65,12 @@ void ActiveTcpClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::Connected) {
     connection_->readDisable(true);
   }
-  Envoy::ConnectionPool::ActiveClient::onEvent(event);
+  parent_.onConnectionEvent(*this, connection_->transportFailureReason(), event);
   if (callbacks_) {
     // Do not pass the Connected event to any session which registered during onEvent above.
     // Consumers of connection pool connections assume they are receiving already connected
     // connections.
-    if (event == Network::ConnectionEvent::Connected) {
-      connection_->streamInfo().setDownstreamSslConnection(connection_->ssl());
-    } else {
+    if (event != Network::ConnectionEvent::Connected) {
       if (tcp_connection_data_) {
         Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(parent_.host(), event);
       }

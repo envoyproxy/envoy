@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/cache/cache_headers_utils.h"
-#include "extensions/filters/http/cache/http_cache.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/http_cache.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +24,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public Logger::Loggable<Logger::Id::cache_filter>,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
-  CacheFilter(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config,
+  CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source,
               HttpCache& http_cache);
   // Http::StreamFilterBase
@@ -90,7 +89,7 @@ private:
   // of doing it per-request. A good example of such config is found in the gzip filter:
   // source/extensions/filters/http/gzip/gzip_filter.h.
   // Stores the allow list rules that decide if a header can be varied upon.
-  VaryHeader vary_allow_list_;
+  VaryAllowList vary_allow_list_;
 
   // True if the response has trailers.
   // TODO(toddmgreer): cache trailers.
@@ -122,6 +121,7 @@ private:
   };
 
   FilterState filter_state_ = FilterState::Initial;
+  bool is_head_request_ = false;
 };
 
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;

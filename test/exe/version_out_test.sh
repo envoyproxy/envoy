@@ -2,6 +2,9 @@
 
 set -e -o pipefail
 
+# Undo LC_ALL=en_US.UTF-8, since it breaks sed.
+export LC_ALL=C
+
 ENVOY_BIN="${TEST_SRCDIR}/envoy/source/exe/envoy-static"
 
 COMMIT=$(${ENVOY_BIN} --version | \

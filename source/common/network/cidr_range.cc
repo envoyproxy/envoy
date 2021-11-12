@@ -1,4 +1,4 @@
-#include "common/network/cidr_range.h"
+#include "source/common/network/cidr_range.h"
 
 #include <array>
 #include <cstdint>
@@ -9,12 +9,12 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -32,8 +32,6 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
     ASSERT(length_ >= 0);
   }
 }
-
-CidrRange::CidrRange(const CidrRange& other) = default;
 
 CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
@@ -192,10 +190,11 @@ InstanceConstSharedPtr CidrRange::truncateIpAddressAndLength(InstanceConstShared
 }
 
 IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& cidrs) {
+  ip_list_.reserve(cidrs.size());
   for (const envoy::config::core::v3::CidrRange& entry : cidrs) {
     CidrRange list_entry = CidrRange::create(entry);
     if (list_entry.isValid()) {
-      ip_list_.push_back(list_entry);
+      ip_list_.push_back(std::move(list_entry));
     } else {
       throw EnvoyException(
           fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",

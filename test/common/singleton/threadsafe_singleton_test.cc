@@ -1,9 +1,9 @@
 #include <memory>
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-#include "common/singleton/threadsafe_singleton.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/common/singleton/threadsafe_singleton.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"

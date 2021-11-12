@@ -2,8 +2,7 @@
 
 #include "envoy/common/exception.h"
 
-#include "extensions/common/wasm/plugin.h"
-#include "extensions/common/wasm/well_known_names.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -74,7 +73,7 @@ TEST(TestWasmConfig, EnvKeyException) {
 
 TEST(TestWasmConfig, NullVMEnv) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
-  plugin_config.mutable_vm_config()->set_runtime(WasmRuntimeNames::get().Null);
+  plugin_config.mutable_vm_config()->set_runtime("envoy.wasm.runtime.null");
   (*plugin_config.mutable_vm_config()
         ->mutable_environment_variables()
         ->mutable_key_values())["key"] = "value";

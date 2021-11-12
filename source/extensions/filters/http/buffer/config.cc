@@ -1,4 +1,4 @@
-#include "extensions/filters/http/buffer/config.h"
+#include "source/extensions/filters/http/buffer/config.h"
 
 #include <chrono>
 #include <cstdint>
@@ -8,7 +8,7 @@
 #include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/http/buffer/buffer_filter.h"
+#include "source/extensions/filters/http/buffer/buffer_filter.h"
 
 namespace Envoy {
 namespace Extensions {

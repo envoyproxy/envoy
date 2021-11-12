@@ -1,7 +1,7 @@
-#include "server/admin/utils.h"
+#include "source/server/admin/utils.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/http/headers.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/http/headers.h"
 
 namespace Envoy {
 namespace Server {

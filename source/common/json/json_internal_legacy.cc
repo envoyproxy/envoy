@@ -1,4 +1,4 @@
-#include "common/json/json_internal_legacy.h"
+#include "source/common/json/json_internal_legacy.h"
 
 #include <cstdint>
 #include <fstream>
@@ -9,11 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
 
 // Do not let RapidJson leak outside of this file.
 #include "rapidjson/document.h"

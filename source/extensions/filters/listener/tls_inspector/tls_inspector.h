@@ -6,7 +6,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "openssl/ssl.h"
 
@@ -85,7 +85,7 @@ private:
   void onServername(absl::string_view name);
 
   ConfigSharedPtr config_;
-  Network::ListenerFilterCallbacks* cb_;
+  Network::ListenerFilterCallbacks* cb_{};
 
   bssl::UniquePtr<SSL> ssl_;
   uint64_t read_{0};

@@ -2,8 +2,8 @@
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 
-#include "extensions/filters/common/rbac/engine.h"
-#include "extensions/filters/common/rbac/matchers.h"
+#include "source/extensions/filters/common/rbac/engine.h"
+#include "source/extensions/filters/common/rbac/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,6 +28,7 @@ enum class EnforcementMode { Enforced, Shadow };
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v3::RBAC& rules,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
                                    const EnforcementMode mode = EnforcementMode::Enforced);
 
   bool handleAction(const Network::Connection& connection,

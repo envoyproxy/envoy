@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
+#include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -13,17 +13,15 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/safe_memcpy.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
-#include "extensions/filters/listener/well_known_names.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/safe_memcpy.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE;
 using Envoy::Extensions::Common::ProxyProtocol::PROXY_PROTO_V1_SIGNATURE_LEN;
@@ -66,7 +64,7 @@ const KeyValuePair* Config::isTlvTypeNeeded(uint8_t type) const {
 size_t Config::numberOfNeededTlvTypes() const { return tlv_types_.size(); }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
-  ENVOY_LOG(debug, "proxy_protocol: New connection accepted");
+  ENVOY_LOG(debug, "proxy_protocol: new connection accepted");
   Network::ConnectionSocket& socket = cb.socket();
   socket.ioHandle().initializeFileEvent(
       cb.dispatcher(),
@@ -129,10 +127,12 @@ ReadOrParseState Filter::onReadWorker() {
 
     // Only set the local address if it really changed, and mark it as address being restored.
     if (*proxy_protocol_header_.value().local_address_ !=
-        *socket.addressProvider().localAddress()) {
-      socket.addressProvider().restoreLocalAddress(proxy_protocol_header_.value().local_address_);
+        *socket.connectionInfoProvider().localAddress()) {
+      socket.connectionInfoProvider().restoreLocalAddress(
+          proxy_protocol_header_.value().local_address_);
     }
-    socket.addressProvider().setRemoteAddress(proxy_protocol_header_.value().remote_address_);
+    socket.connectionInfoProvider().setRemoteAddress(
+        proxy_protocol_header_.value().remote_address_);
   }
 
   // Release the file event so that we do not interfere with the connection read events.
@@ -315,10 +315,10 @@ ReadOrParseState Filter::parseExtensions(Network::IoHandle& io_handle, uint8_t* 
       return ReadOrParseState::Error;
     }
 
-    proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
+    proxy_protocol_header_.value().extensions_length_ -= recv_result.return_value_;
 
     if (nullptr != buf_off) {
-      *buf_off += recv_result.rc_;
+      *buf_off += recv_result.return_value_;
     }
   }
 
@@ -373,7 +373,7 @@ bool Filter::parseTlvs(const std::vector<uint8_t>& tlvs) {
                                       tlv_value_length);
 
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
-                                     ? ListenerFilterNames::get().ProxyProtocol
+                                     ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
 
       ProtobufWkt::Struct metadata(
@@ -429,7 +429,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
       return ReadOrParseState::Error;
     }
-    ssize_t nread = result.rc_;
+    ssize_t nread = result.return_value_;
 
     if (nread < 1) {
       ENVOY_LOG(debug, "failed to read proxy protocol (no bytes read)");
@@ -456,12 +456,12 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
         ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
         const auto read_result = io_handle.recv(buf_ + buf_off_, exp, 0);
-        if (!result.ok() || read_result.rc_ != uint64_t(exp)) {
+        if (!read_result.ok() || read_result.return_value_ != uint64_t(exp)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.rc_;
-        nread -= read_result.rc_;
+        buf_off_ += read_result.return_value_;
+        nread -= read_result.return_value_;
       }
       absl::optional<ssize_t> addr_len_opt = lenV2Address(buf_);
       if (!addr_len_opt.has_value()) {
@@ -478,11 +478,11 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
         ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
         const auto read_result = io_handle.recv(buf_ + buf_off_, missing, 0);
-        if (!result.ok() || read_result.rc_ != uint64_t(missing)) {
+        if (!read_result.ok() || read_result.return_value_ != uint64_t(missing)) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
         }
-        buf_off_ += read_result.rc_;
+        buf_off_ += read_result.return_value_;
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
         if (parseV2Header(buf_)) {
@@ -490,9 +490,9 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
         } else {
           return ReadOrParseState::Error;
         }
-      } else {
+      } else if (nread != 0) {
         const auto result = io_handle.recv(buf_ + buf_off_, nread, 0);
-        nread = result.rc_;
+        nread = result.return_value_;
         if (!result.ok()) {
           ENVOY_LOG(debug, "failed to read proxy protocol (remote closed)");
           return ReadOrParseState::Error;
@@ -526,7 +526,7 @@ ReadOrParseState Filter::readProxyHeader(Network::IoHandle& io_handle) {
       }
 
       const auto result = io_handle.recv(buf_ + buf_off_, ntoread, 0);
-      nread = result.rc_;
+      nread = result.return_value_;
       ASSERT(result.ok() && size_t(nread) == ntoread);
 
       buf_off_ += nread;

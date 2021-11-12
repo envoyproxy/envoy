@@ -6,8 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/matchers.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +39,8 @@ public:
       : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl>(additional_origin));
+          std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
+              additional_origin));
     }
   }
 

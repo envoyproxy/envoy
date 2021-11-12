@@ -1,11 +1,11 @@
-#include "extensions/transport_sockets/raw_buffer/config.h"
+#include "source/extensions/transport_sockets/raw_buffer/config.h"
 
 #include <iostream>
 
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 
-#include "common/network/raw_buffer_socket.h"
+#include "source/common/network/raw_buffer_socket.h"
 
 namespace Envoy {
 namespace Extensions {

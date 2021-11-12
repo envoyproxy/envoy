@@ -14,12 +14,8 @@ level the router takes an incoming HTTP request, matches it to an upstream clust
 request. The router filter supports the following features:
 
 * Virtual hosts that map domains/authorities to a set of routing rules.
-* Prefix and exact path matching rules (both :ref:`case sensitive
-  <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive). Regex/slug
-  matching is not currently supported, mainly because it makes it difficult/impossible to
-  programmatically determine whether routing rules conflict with each other. For this reason we
-  don’t recommend regex/slug routing at the reverse proxy level, however we may add support in the
-  future depending on demand.
+* Prefix and exact path matching rules (both :ref:`case sensitive <envoy_v3_api_field_config.route.v3.RouteMatch.case_sensitive>` and case insensitive).
+* :ref:`Regex path matching <envoy_v3_api_field_config.route.v3.RouteMatch.safe_regex>` rules.
 * :ref:`TLS redirection <envoy_v3_api_field_config.route.v3.VirtualHost.require_tls>` at the virtual host
   level.
 * :ref:`Path <envoy_v3_api_field_config.route.v3.RedirectAction.path_redirect>`/:ref:`host
@@ -57,8 +53,8 @@ Route Scope
 -----------
 
 Scoped routing enables Envoy to put constraints on search space of domains and route rules.
-A :ref:`Route Scope<envoy_api_msg_ScopedRouteConfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
-For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table<envoy_api_msg_RouteConfiguration>`.
+A :ref:`Route Scope <envoy_v3_api_msg_config.route.v3.scopedrouteconfiguration>` associates a key with a :ref:`route table <arch_overview_http_routing_route_table>`.
+For each request, a scope key is computed dynamically by the HTTP connection manager to pick the :ref:`route table <envoy_v3_api_msg_config.route.v3.routeconfiguration>`.
 RouteConfiguration associated with scope can be loaded on demand with :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>` configured and on demand filed in protobuf set to true.
 
 The Scoped RDS (SRDS) API contains a set of :ref:`Scopes <envoy_v3_api_msg_config.route.v3.ScopedRouteConfiguration>` resources, each defining independent routing configuration,
@@ -114,7 +110,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 * **Retry conditions**: Envoy can retry on different types of conditions depending on application
   requirements. For example, network failure, all 5xx response codes, idempotent 4xx response codes,
   etc.
-* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.retry_budget>` that can be retries to
+* **Retry budgets**: Envoy can limit the proportion of active requests via :ref:`retry budgets <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` that can be retries to
   prevent their contribution to large increases in traffic volume.
 * **Host selection retry plugins**: Envoy can be configured to apply additional logic to the host
   selection logic when selecting hosts for retries. Specifying a
@@ -126,7 +122,7 @@ headers <config_http_filters_router_headers_consumed>`. The following configurat
 
 Note that Envoy retries requests when :ref:`x-envoy-overloaded
 <config_http_filters_router_x-envoy-overloaded_set>` is present. It is recommended to either configure
-:ref:`retry budgets (preferred) <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>` or set
+:ref:`retry budgets (preferred) <envoy_v3_api_field_config.cluster.v3.circuitbreakers.thresholds.retry_budget>` or set
 :ref:`maximum active retries circuit breaker <arch_overview_circuit_break>` to an appropriate value to avoid retry storms.
 
 .. _arch_overview_http_routing_hedging:
@@ -196,3 +192,63 @@ upon configuration load and cache the contents.
 
 If **response_headers_to_add** has been set for the Route or the enclosing Virtual Host,
 Envoy will include the specified headers in the direct HTTP response.
+
+Routing Via Generic Matching
+----------------------------
+
+Envoy recently added support for utilzing a :ref:`generic match tree <arch_overview_matching_api>` to
+specify the route table. This is a more expressive matching engine than the original one, allowing
+for sublinear matching on arbitrary headers (unlike the original matching engine which could only
+do this for :authority in some cases).
+
+To use the generic matching tree, specify a matcher on a virtual host with a RouteAction action:
+
+.. code-block:: yaml
+
+  matcher:
+    "@type": type.googleapis.com/xds.type.matcher.v3.Matcher
+    matcher_tree:
+      input:
+        name: request-headers
+        typed_config:
+          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+          header_name: :path
+      exact_match_map:
+        map:
+          "/new_endpoint/foo":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: cluster_foo
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: new-value
+          "/new_endpoint/bar":
+            action:
+              name: route
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.route.v3.Route
+                match:
+                  prefix: /
+                route:
+                  cluster: cluster_bar
+                request_headers_to_add:
+                - header:
+                    key: x-route-header
+                    value: new-value
+
+This allows resolving the same Route proto message used for the `routes`-based routing using the additional
+matching flexibility provided by the generic matching framework.
+
+Note that the resulting Route also specifies a match criteria. This must be satisfied in addition to resolving
+the route in order to achieve a route match. When path rewrites are used, the matched path will only depend on
+the match criteria of the resolved Route. Path matching done during the match tree traversal does not contribute
+to path rewrites.
+
+The only inputs supported are request headers (via `envoy.type.matcher.v3.HttpRequestHeaderMatchInput`). See
+the docs for the :ref:`matching API <arch_overview_matching_api>` for more information about the API as a whole.

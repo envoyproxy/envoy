@@ -7,10 +7,6 @@ from an upstream service upon client request. Compression is useful in
 situations when bandwidth is scarce and large payloads can be effectively compressed
 at the expense of higher CPU load or offloading it to a compression accelerator.
 
-.. note::
-
- This filter deprecates the :ref:`HTTP Gzip filter <config_http_filters_gzip>`.
-
 Configuration
 -------------
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`
@@ -53,8 +49,8 @@ An example configuration of the filter may look like the following:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best_compression
-            compression_strategy: default_strategy
+            compression_level: BEST_COMPRESSION
+            compression_strategy: DEFAULT_STRATEGY
 
 By *default* request compression is disabled, but when enabled it will be *skipped* if:
 
@@ -138,8 +134,8 @@ multiple compressor filters enabled only for requests or responses. For instance
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 3
             window_bits: 10
-            compression_level: best_compression
-            compression_strategy: default_strategy
+            compression_level: BEST_COMPRESSION
+            compression_strategy: DEFAULT_STRATEGY
     # This filter is only enabled for requests.
     - name: envoy.filters.http.compressor
       typed_config:
@@ -160,8 +156,8 @@ multiple compressor filters enabled only for requests or responses. For instance
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
             memory_level: 9
             window_bits: 15
-            compression_level: best_speed
-            compression_strategy: default_strategy
+            compression_level: BEST_SPEED
+            compression_strategy: DEFAULT_STRATEGY
 
 .. _compressor-statistics:
 

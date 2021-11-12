@@ -1,8 +1,8 @@
-#include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
+#include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/guarddog_config.h"
 
-#include "extensions/watchdog/profile_action/config.h"
+#include "source/extensions/watchdog/profile_action/config.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -30,8 +30,8 @@ TEST(ProfileActionFactoryTest, CanCreateAction) {
           "config": {
             "name": "envoy.watchdog.profile_action",
             "typed_config": {
-              "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
-              "type_url": "type.googleapis.com/envoy.extensions.watchdog.profile_action.v3alpha.ProfileActionConfig",
+              "@type": "type.googleapis.com/xds.type.v3.TypedStruct",
+              "type_url": "type.googleapis.com/envoy.extensions.watchdog.profile_action.v3.ProfileActionConfig",
               "value": {
                 "profile_duration": "2s",
                 "profile_path": "/tmp/envoy/",

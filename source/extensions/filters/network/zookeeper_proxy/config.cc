@@ -1,4 +1,4 @@
-#include "extensions/filters/network/zookeeper_proxy/config.h"
+#include "source/extensions/filters/network/zookeeper_proxy/config.h"
 
 #include <string>
 
@@ -7,9 +7,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/zookeeper_proxy/filter.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -31,7 +30,7 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
 
   ZooKeeperFilterConfigSharedPtr filter_config(
       std::make_shared<ZooKeeperFilterConfig>(stat_prefix, max_packet_bytes, context.scope()));
-  auto& time_source = context.dispatcher().timeSource();
+  auto& time_source = context.mainThreadDispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));

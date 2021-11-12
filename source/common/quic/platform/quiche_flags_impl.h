@@ -13,6 +13,10 @@
 
 namespace quiche {
 
+const std::string EnvoyQuicheReloadableFlagPrefix =
+    "envoy.reloadable_features.FLAGS_quic_reloadable_flag_";
+const std::string EnvoyFeaturePrefix = "envoy.reloadable_features.";
+
 class Flag;
 
 // TODO: modify flags implementation to be backed by
@@ -32,12 +36,14 @@ public:
   void resetFlags() const;
 
   // Look up a flag by name.
-  Flag* findFlag(const std::string& name) const;
+  Flag* findFlag(absl::string_view name) const;
+
+  void updateReloadableFlags(const absl::flat_hash_map<std::string, bool>& quiche_flags_override);
 
 private:
   FlagRegistry();
 
-  const absl::flat_hash_map<std::string, Flag*> flags_;
+  const absl::flat_hash_map<absl::string_view, Flag*> flags_;
 };
 
 // Abstract class for QUICHE protocol and feature flags.
@@ -53,11 +59,13 @@ public:
   // Reset flag to default value.
   virtual void resetValue() = 0;
 
+  virtual void resetReloadedValue() = 0;
+
   // Return flag name.
-  std::string name() const { return name_; }
+  absl::string_view name() const { return name_; }
 
   // Return flag help string.
-  std::string help() const { return help_; }
+  absl::string_view help() const { return help_; }
 
 private:
   std::string name_;
@@ -86,13 +94,29 @@ public:
   // Return flag value.
   T value() const {
     absl::MutexLock lock(&mutex_);
+    if (has_reloaded_value_) {
+      return reloaded_value_;
+    }
     return value_;
+  }
+
+  void setReloadedValue(T value) {
+    absl::MutexLock lock(&mutex_);
+    has_reloaded_value_ = true;
+    reloaded_value_ = value;
+  }
+
+  void resetReloadedValue() override {
+    absl::MutexLock lock(&mutex_);
+    has_reloaded_value_ = false;
   }
 
 private:
   mutable absl::Mutex mutex_;
   T value_ ABSL_GUARDED_BY(mutex_);
-  T default_value_;
+  const T default_value_;
+  bool has_reloaded_value_ ABSL_GUARDED_BY(mutex_) = false;
+  T reloaded_value_ ABSL_GUARDED_BY(mutex_);
 };
 
 // SetValueFromString specializations

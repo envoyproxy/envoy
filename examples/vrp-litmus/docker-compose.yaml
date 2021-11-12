@@ -9,9 +9,9 @@ services:
       ENVOY_EDGE_EXTRA_ARGS: ""
       ENVOY_ORIGIN_EXTRA_ARGS: ""
     networks:
-      - envoymesh
+    - envoymesh
     ports:
-      - "10000:10000"
+    - "10000:10000"
 
 networks:
   envoymesh: {}

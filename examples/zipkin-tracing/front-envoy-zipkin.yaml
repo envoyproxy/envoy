@@ -43,10 +43,8 @@ static_resources:
                   value: "%REQ(x-request-id)%"
           http_filters:
           - name: envoy.filters.http.router
-            typed_config: {}
   clusters:
   - name: service1
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -59,7 +57,6 @@ static_resources:
                 address: service1
                 port_value: 8000
   - name: zipkin
-    connect_timeout: 1s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

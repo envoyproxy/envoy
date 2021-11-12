@@ -11,8 +11,8 @@
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
-#include "common/config/metadata.h"
-#include "common/http/header_utility.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/header_utility.h"
 
 #include "absl/types/optional.h"
 

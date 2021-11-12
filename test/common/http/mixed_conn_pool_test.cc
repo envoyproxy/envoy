@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "common/http/mixed_conn_pool.h"
-#include "common/http/utility.h"
+#include "source/common/http/mixed_conn_pool.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
@@ -86,7 +86,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
     EXPECT_EQ(protocol.value(), conn_pool_->protocol());
   }
 
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
   conn_pool_.reset();

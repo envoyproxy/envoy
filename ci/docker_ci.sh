@@ -23,6 +23,7 @@ config_env() {
 build_platforms() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
 
   if is_windows; then
     echo "windows/amd64"
@@ -36,8 +37,18 @@ build_platforms() {
 build_args() {
   TYPE=$1
   FILE_SUFFIX="${TYPE/-debug/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-contrib/}"
+  FILE_SUFFIX="${FILE_SUFFIX/-ltsc2022/}"
 
   printf ' -f ci/Dockerfile-envoy%s' "${FILE_SUFFIX}"
+  if [[ "${TYPE}" == *-windows* ]]; then
+   printf ' --build-arg BUILD_OS=%s --build-arg BUILD_TAG=%s' "${WINDOWS_IMAGE_BASE}" "${WINDOWS_IMAGE_TAG}"
+  fi
+
+  if [[ "${TYPE}" == *-contrib* ]]; then
+      printf ' --build-arg ENVOY_BINARY=envoy-contrib'
+  fi
+
   if [[ "${TYPE}" == *-debug ]]; then
       printf ' --build-arg ENVOY_BINARY_SUFFIX='
   elif [[ "${TYPE}" == "-google-vrp" ]]; then
@@ -78,7 +89,6 @@ build_images() {
     else
       IMAGE_TAG="${BUILD_TAG}-${ARCH/linux\//}"
     fi
-    IMAGES_TO_SAVE+=("${IMAGE_TAG}")
 
     # docker buildx load cannot have multiple platform, load individually
     if ! is_windows; then
@@ -98,7 +108,7 @@ push_images() {
   PLATFORM="$(build_platforms "${TYPE}")"
   # docker buildx doesn't do push with default builder
   docker "${BUILD_COMMAND[@]}" --platform "${PLATFORM}" "${args[@]}" -t "${BUILD_TAG}" . --push || \
-    docker push "${BUILD_TAG}"
+  docker push "${BUILD_TAG}"
 }
 
 MAIN_BRANCH="refs/heads/main"
@@ -120,12 +130,12 @@ DOCKER_IMAGE_PREFIX="${DOCKER_IMAGE_PREFIX:-envoyproxy/envoy}"
 
 
 if is_windows; then
-  BUILD_TYPES=("-windows")
+  BUILD_TYPES=("-${WINDOWS_BUILD_TYPE}")
   # BuildKit is not available for Windows images, use standard build command
   BUILD_COMMAND=("build")
 else
   # "-google-vrp" must come afer "" to ensure we rebuild the local base image dependency.
-  BUILD_TYPES=("" "-debug" "-alpine" "-google-vrp")
+  BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-alpine" "-distroless" "-google-vrp")
 
   # Configure docker-buildx tools
   BUILD_COMMAND=("buildx" "build")
@@ -138,13 +148,25 @@ fi
 # Test the docker build in all cases, but use a local tag that we will overwrite before push in the
 # cases where we do push.
 for BUILD_TYPE in "${BUILD_TYPES[@]}"; do
-  build_images "${BUILD_TYPE}" "${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+    image_tag="${DOCKER_IMAGE_PREFIX}${BUILD_TYPE}${IMAGE_POSTFIX}:${IMAGE_NAME}"
+    build_images "${BUILD_TYPE}" "$image_tag"
+
+    if ! is_windows; then
+        if [[ "$BUILD_TYPE" == "" || "$BUILD_TYPE" == "-contrib" || "$BUILD_TYPE" == "-alpine" || "$BUILD_TYPE" == "-distroless" ]]; then
+            # verify_examples expects the base and alpine images, and for them to be named `-dev`
+            dev_image="envoyproxy/envoy${BUILD_TYPE}-dev:latest"
+            docker tag "$image_tag" "$dev_image"
+            IMAGES_TO_SAVE+=("$dev_image")
+        fi
+    fi
 done
 
 mkdir -p "${ENVOY_DOCKER_IMAGE_DIRECTORY}"
-ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
-echo "Saving built images to ${ENVOY_DOCKER_TAR}."
-docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
+if [[ ${#IMAGES_TO_SAVE[@]} -ne 0 ]]; then
+    ENVOY_DOCKER_TAR="${ENVOY_DOCKER_IMAGE_DIRECTORY}/envoy-docker-images.tar.xz"
+    echo "Saving built images to ${ENVOY_DOCKER_TAR}: ${IMAGES_TO_SAVE[*]}"
+    docker save "${IMAGES_TO_SAVE[@]}" | xz -T0 -2 >"${ENVOY_DOCKER_TAR}"
+fi
 
 # Only push images for main builds, release branch builds, and tag builds.
 if [[ "${AZP_BRANCH}" != "${MAIN_BRANCH}" ]] &&

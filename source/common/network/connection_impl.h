@@ -9,10 +9,10 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/event/libevent.h"
-#include "common/network/connection_impl_base.h"
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/event/libevent.h"
+#include "source/common/network/connection_impl_base.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -21,6 +21,8 @@ class RandomPauseFilter;
 class TestPauseFilter;
 
 namespace Network {
+
+class HappyEyeballsConnectionImpl;
 
 /**
  * Utility functions for the connection implementation.
@@ -45,9 +47,7 @@ public:
  * Implementation of Network::Connection, Network::FilterManagerConnection and
  * Envoy::ScopeTrackedObject.
  */
-class ConnectionImpl : public ConnectionImplBase,
-                       public TransportSocketCallbacks,
-                       public ScopeTrackedObject {
+class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, StreamInfo::StreamInfo& stream_info,
@@ -72,11 +72,11 @@ public:
   void readDisable(bool disable) override;
   void detectEarlyCloseWhenReadDisabled(bool value) override { detect_early_close_ = value; }
   bool readEnabled() const override;
-  const SocketAddressProvider& addressProvider() const override {
-    return socket_->addressProvider();
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return socket_->connectionInfoProvider();
   }
-  SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return socket_->addressProviderSharedPtr();
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return socket_->connectionInfoProviderSharedPtr();
   }
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
@@ -122,6 +122,7 @@ public:
   // Reconsider how to make fairness happen.
   void setTransportSocketIsReadable() override;
   void flushWriteBuffer() override;
+  TransportSocketPtr& transportSocket() { return transport_socket_; }
 
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
@@ -167,8 +168,10 @@ protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
+  std::string failure_reason_;
 
 private:
+  friend class HappyEyeballsConnectionImpl;
   friend class Envoy::RandomPauseFilter;
   friend class Envoy::TestPauseFilter;
 
@@ -218,7 +221,8 @@ public:
                        bool connected);
 
   // ServerConnection impl
-  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout) override;
+  void setTransportSocketConnectTimeout(std::chrono::milliseconds timeout,
+                                        Stats::Counter& timeout_stat) override;
   void raiseEvent(ConnectionEvent event) override;
 
 private:
@@ -228,6 +232,7 @@ private:
   // Implements a timeout for the transport socket signaling connection. The timer is enabled by a
   // call to setTransportSocketConnectTimeout and is reset when the connection is established.
   Event::TimerPtr transport_socket_connect_timer_;
+  Stats::Counter* transport_socket_timeout_stat_;
 };
 
 /**
@@ -237,6 +242,10 @@ class ClientConnectionImpl : public ConnectionImpl, virtual public ClientConnect
 public:
   ClientConnectionImpl(Event::Dispatcher& dispatcher,
                        const Address::InstanceConstSharedPtr& remote_address,
+                       const Address::InstanceConstSharedPtr& source_address,
+                       Network::TransportSocketPtr&& transport_socket,
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
+  ClientConnectionImpl(Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
                        const Address::InstanceConstSharedPtr& source_address,
                        Network::TransportSocketPtr&& transport_socket,
                        const Network::ConnectionSocket::OptionsSharedPtr& options);

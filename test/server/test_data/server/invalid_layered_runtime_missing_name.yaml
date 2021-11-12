@@ -1,4 +1,4 @@
 layered_runtime:
   layers:
-    - static_layer:
-        foo: bar
+  - static_layer:
+      foo: bar

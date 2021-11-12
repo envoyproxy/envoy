@@ -13,3 +13,25 @@ def _protodoc_impl(target, ctx):
 # The aspect builds the transitive docs, so any .proto in the dependency graph
 # get docs created.
 protodoc_aspect = api_proto_plugin_aspect("//tools/protodoc", _protodoc_impl)
+
+def _protodoc_rule_impl(ctx):
+    return [
+        DefaultInfo(
+            files = depset(
+                transitive = [
+                    depset([
+                        x
+                        for x in ctx.attr.deps[0][OutputGroupInfo].rst.to_list()
+                        if x.short_path.startswith("../envoy_api")
+                    ]),
+                ],
+            ),
+        ),
+    ]
+
+protodoc_rule = rule(
+    implementation = _protodoc_rule_impl,
+    attrs = {
+        "deps": attr.label_list(aspects = [protodoc_aspect]),
+    },
+)

@@ -1,7 +1,7 @@
-#include "common/upstream/cds_api_impl.h"
+#include "source/common/upstream/cds_api_impl.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/common.h"
+#include "source/common/common/assert.h"
+#include "source/common/grpc/common.h"
 
 #include "absl/strings/str_join.h"
 
@@ -20,8 +20,8 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        const xds::core::v3::ResourceLocator* cds_resources_locator,
                        ClusterManager& cm, Stats::Scope& scope,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
-          cds_config.resource_api_version(), validation_visitor, "name"),
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
+                                                                           "name"),
       helper_(cm, "cds"), cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
   const auto resource_name = getResourceName();
   if (cds_resources_locator == nullptr) {

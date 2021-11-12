@@ -10,7 +10,7 @@
 
 #include "envoy/stats/tag_extractor.h"
 
-#include "common/common/regex.h"
+#include "source/common/common/regex.h"
 
 #include "absl/strings/string_view.h"
 #include "re2/re2.h"

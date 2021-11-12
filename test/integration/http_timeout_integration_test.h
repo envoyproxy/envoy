@@ -14,11 +14,11 @@ class HttpTimeoutIntegrationTest : public testing::TestWithParam<Network::Addres
 public:
   // Arbitrarily choose HTTP2 here, the tests for this class are around
   // timeouts which don't have version specific behavior.
-  HttpTimeoutIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+  HttpTimeoutIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
   }
 
   void testRouterRequestAndResponseWithHedgedPerTryTimeout(uint64_t request_size,

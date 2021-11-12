@@ -2,7 +2,7 @@
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/config/trace/v3/skywalking.pb.validate.h"
 
-#include "extensions/tracers/skywalking/config.h"
+#include "source/extensions/tracers/skywalking/config.h"
 
 #include "test/mocks/server/tracer_factory.h"
 #include "test/mocks/server/tracer_factory_context.h"
@@ -45,7 +45,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracer) {
   SkyWalkingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr skywalking_tracer = factory.createHttpTracer(*message, context);
+  auto skywalking_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, skywalking_tracer);
 }
 
@@ -79,7 +79,7 @@ TEST(SkyWalkingTracerConfigTest, SkyWalkingHttpTracerWithClientConfig) {
   SkyWalkingTracerFactory factory;
   auto message = Config::Utility::translateToFactoryConfig(
       configuration.http(), ProtobufMessage::getStrictValidationVisitor(), factory);
-  Tracing::HttpTracerSharedPtr skywalking_tracer = factory.createHttpTracer(*message, context);
+  auto skywalking_tracer = factory.createTracerDriver(*message, context);
   EXPECT_NE(nullptr, skywalking_tracer);
 }
 

@@ -1,13 +1,12 @@
 #include <chrono>
 #include <thread>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/thread_impl.h"
-#include "common/event/signal_impl.h"
-#include "common/filesystem/filesystem_impl.h"
-
-#include "exe/platform_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/event/signal_impl.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/exe/platform_impl.h"
 
 namespace Envoy {
 
@@ -31,7 +30,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
   char data[] = {'a'};
   Buffer::RawSlice buffer{data, 1};
   auto result = handler->writev(&buffer, 1);
-  RELEASE_ASSERT(result.rc_ == 1,
+  RELEASE_ASSERT(result.return_value_ == 1,
                  fmt::format("failed to write 1 byte: {}", result.err_->getErrorDetails()));
 
   if (fdwCtrlType == CTRL_LOGOFF_EVENT || fdwCtrlType == CTRL_SHUTDOWN_EVENT) {

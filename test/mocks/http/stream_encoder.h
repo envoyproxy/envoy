@@ -2,7 +2,7 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/http/status.h"
+#include "source/common/http/status.h"
 
 #include "test/mocks/http/stream.h"
 
@@ -45,7 +45,7 @@ public:
   ~MockResponseEncoder() override;
 
   // Http::ResponseEncoder
-  MOCK_METHOD(void, encode100ContinueHeaders, (const ResponseHeaderMap& headers));
+  MOCK_METHOD(void, encode1xxHeaders, (const ResponseHeaderMap& headers));
   MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream));
   MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
 

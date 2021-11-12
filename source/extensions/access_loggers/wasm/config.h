@@ -2,7 +2,7 @@
 
 #include "envoy/server/access_log_config.h"
 
-#include "common/config/datasource.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Extensions {

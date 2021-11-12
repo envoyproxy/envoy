@@ -20,7 +20,7 @@ envoy_extension_cc_test(
             "-DUSE_CEL_PARSER",
         ],
     }),
-    extension_name = "envoy.rate_limit_descriptors.expr",
+    extension_names = ["envoy.rate_limit_descriptors.expr"],
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/common/router:router_ratelimit_lib",

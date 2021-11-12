@@ -9,7 +9,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "spdlog/spdlog.h"
 
@@ -44,7 +44,8 @@ public:
   OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
-  // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
+  // Default constructor; creates "reasonable" defaults, but desired values should be set
+  // explicitly.
   OptionsImpl(const std::string& service_cluster, const std::string& service_node,
               const std::string& service_zone, spdlog::level::level_enum log_level);
 
@@ -58,7 +59,6 @@ public:
     config_proto_ = config_proto;
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
-  void setBootstrapVersion(uint32_t bootstrap_version) { bootstrap_version_ = bootstrap_version; }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -90,7 +90,7 @@ public:
     signal_handling_enabled_ = signal_handling_enabled;
   }
   void setCpusetThreads(bool cpuset_threads_enabled) { cpuset_threads_ = cpuset_threads_enabled; }
-  void setAllowUnkownFields(bool allow_unknown_static_fields) {
+  void setAllowUnknownFields(bool allow_unknown_static_fields) {
     allow_unknown_static_fields_ = allow_unknown_static_fields;
   }
   void setRejectUnknownFieldsDynamic(bool reject_unknown_dynamic_fields) {
@@ -104,6 +104,8 @@ public:
 
   void setSocketMode(mode_t socket_mode) { socket_mode_ = socket_mode; }
 
+  void setStatsTags(const Stats::TagVector& stats_tags) { stats_tags_ = stats_tags; }
+
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
   bool useDynamicBaseId() const override { return use_dynamic_base_id_; }
@@ -113,7 +115,6 @@ public:
   const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
   }
-  const absl::optional<uint32_t>& bootstrapVersion() const override { return bootstrap_version_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool allowUnknownStaticFields() const override { return allow_unknown_static_fields_; }
   bool rejectUnknownDynamicFields() const override { return reject_unknown_dynamic_fields_; }
@@ -147,6 +148,7 @@ public:
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
   bool coreDumpEnabled() const override { return core_dump_enabled_; }
+  const Stats::TagVector& statsTags() const override { return stats_tags_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
@@ -165,51 +167,57 @@ public:
   static void disableExtensions(const std::vector<std::string>&);
   static std::string allowedLogLevels();
 
-private:
-  void logError(const std::string& error) const;
-  spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
+  /**
+   * Parses and validates the provided log_level, returning the corresponding
+   * spdlog::level::level_enum.
+   * @throws MalformedArgvException if the provided string is not a valid spdlog string.
+   */
+  static spdlog::level::level_enum parseAndValidateLogLevel(absl::string_view log_level);
 
-  uint64_t base_id_;
-  bool use_dynamic_base_id_;
+private:
+  static void logError(const std::string& error);
+
+  uint64_t base_id_{0};
+  bool use_dynamic_base_id_{false};
   std::string base_id_path_;
-  uint32_t concurrency_;
+  uint32_t concurrency_{1};
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
-  absl::optional<uint32_t> bootstrap_version_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
   bool ignore_unknown_dynamic_fields_{false};
   std::string admin_address_path_;
-  Network::Address::IpVersion local_address_ip_version_;
-  spdlog::level::level_enum log_level_;
+  Network::Address::IpVersion local_address_ip_version_{Network::Address::IpVersion::v4};
+  spdlog::level::level_enum log_level_{spdlog::level::info};
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
-  std::string log_format_;
-  bool log_format_escaped_;
+  std::string log_format_{Logger::Logger::DEFAULT_LOG_FORMAT};
+  bool log_format_escaped_{false};
   std::string log_path_;
-  uint64_t restart_epoch_;
+  uint64_t restart_epoch_{0};
   std::string service_cluster_;
   std::string service_node_;
   std::string service_zone_;
-  std::chrono::milliseconds file_flush_interval_msec_;
-  std::chrono::seconds drain_time_;
-  std::chrono::seconds parent_shutdown_time_;
-  Server::DrainStrategy drain_strategy_;
-  Server::Mode mode_;
-  bool hot_restart_disabled_;
-  bool signal_handling_enabled_;
-  bool mutex_tracing_enabled_;
-  bool core_dump_enabled_;
-  bool cpuset_threads_;
+  std::chrono::milliseconds file_flush_interval_msec_{10000};
+  std::chrono::seconds drain_time_{600};
+  std::chrono::seconds parent_shutdown_time_{900};
+  Server::DrainStrategy drain_strategy_{Server::DrainStrategy::Gradual};
+  Server::Mode mode_{Server::Mode::Serve};
+  bool hot_restart_disabled_{false};
+  bool signal_handling_enabled_{true};
+  bool mutex_tracing_enabled_{false};
+  bool core_dump_enabled_{false};
+  bool cpuset_threads_{false};
   std::vector<std::string> disabled_extensions_;
-  uint32_t count_;
+  Stats::TagVector stats_tags_;
+  uint32_t count_{0};
 
   // Initialization added here to avoid integration_admin_test failure caused by uninitialized
   // enable_fine_grain_logging_.
   bool enable_fine_grain_logging_ = false;
-  std::string socket_path_;
-  mode_t socket_mode_;
+  std::string socket_path_{"@envoy_domain_socket"};
+  mode_t socket_mode_{0};
 };
 
 /**

@@ -69,12 +69,12 @@ enum TrafficDirection {
 message Locality {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Locality";
 
-  // Region this :ref:`zone <envoy_api_field_config.core.v3.Locality.zone>` belongs to.
+  // Region this :ref:`zone <envoy_v3_api_field_config.core.v3.Locality.zone>` belongs to.
   string region = 1;
 
   // Defines the local service zone where Envoy is running. Though optional, it
   // should be set if discovery service routing is used and the discovery
-  // service exposes :ref:`zone data <envoy_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
+  // service exposes :ref:`zone data <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`,
   // either in this message or via :option:`--service-zone`. The meaning of zone
   // is context dependent, e.g. `Availability Zone (AZ)
   // <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_
@@ -154,10 +154,10 @@ message Node {
   // optional, it should be set if any of the following features are used:
   // :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
   // verification
-  // <envoy_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
-  // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v3.Runtime>`,
+  // <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.service_name_matcher>`,
+  // :ref:`runtime override directory <envoy_v3_api_msg_config.bootstrap.v3.Runtime>`,
   // :ref:`user agent addition
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.add_user_agent>`,
   // :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   // <arch_overview_tracing>`, either in this message or via
@@ -236,7 +236,19 @@ message Metadata {
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
+  // If both *filter_metadata* and
+  // :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>`
+  // fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
   map<string, google.protobuf.Struct> filter_metadata = 1;
+
+  // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
+  // namespace is reserved for Envoy's built-in filters.
+  // The value is encoded as google.protobuf.Any.
+  // If both :ref:`filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.filter_metadata>`
+  // and *typed_filter_metadata* fields are present in the metadata with same keys,
+  // only *typed_filter_metadata* field will be parsed.
+  map<string, google.protobuf.Any> typed_filter_metadata = 2;
 }
 
 // Runtime derived uint32 with a default when not specified.
@@ -284,6 +296,15 @@ message RuntimeFeatureFlag {
   string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
 }
 
+// Query parameter name/value pair.
+message QueryParameter {
+  // The key of the query parameter. Case sensitive.
+  string key = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The value of the query parameter.
+  string value = 2;
+}
+
 // Header name/value pair.
 message HeaderValue {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
@@ -308,12 +329,33 @@ message HeaderValueOption {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
+  // Describes the supported actions types for header append action.
+  enum HeaderAppendAction {
+    // This action will append the specified value to the existing values if the header
+    // already exists. If the header doesn't exist then this will add the header with
+    // specified key and value.
+    APPEND_IF_EXISTS_OR_ADD = 0;
+
+    // This action will add the header if it doesn't already exist. If the header
+    // already exists then this will be a no-op.
+    ADD_IF_ABSENT = 1;
+
+    // This action will overwrite the specified value by discarding any existing values if
+    // the header already exists. If the header doesn't exist then this will add the header
+    // with specified key and value.
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+  }
+
   // Header name/value pair that this option applies to.
   HeaderValue header = 1 [(validate.rules).message = {required: true}];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values. Otherwise it replaces any existing values.
   google.protobuf.BoolValue append = 2;
+
+  // [#not-implemented-hide:] Describes the action taken to append/overwrite the given value for an existing header
+  // or to only add this header if it's absent. Value defaults to :ref:`APPEND_IF_EXISTS_OR_ADD<envoy_v3_api_enum_value_config.core.v3.HeaderValueOption.HeaderAppendAction.APPEND_IF_EXISTS_OR_ADD>`.
+  HeaderAppendAction append_action = 3 [(validate.rules).enum = {defined_only: true}];
 }
 
 // Wrapper for a set of headers.
@@ -330,7 +372,7 @@ message WatchedDirectory {
   string path = 1 [(validate.rules).string = {min_len: 1}];
 }
 
-// Data source consisting of either a file or an inline value.
+// Data source consisting of a file, an inline value, or an environment variable.
 message DataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
@@ -345,6 +387,9 @@ message DataSource {
 
     // String inlined in the configuration.
     string inline_string = 3;
+
+    // Environment variable data source.
+    string environment_variable = 4 [(validate.rules).string = {min_len: 1}];
   }
 }
 
@@ -352,7 +397,7 @@ message DataSource {
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
 
-  // Specifies parameters that control :ref:`retry backoff strategy <envoy_api_msg_config.core.v3.BackoffStrategy>`.
+  // Specifies parameters that control :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
   // This parameter is optional, in which case the default base interval is 1000 milliseconds. The
   // default maximum interval is 10 times the base interval.
   BackoffStrategy retry_back_off = 1;
@@ -393,7 +438,7 @@ message AsyncDataSource {
 }
 
 // Configuration for transport socket in :ref:`listeners <config_listeners>` and
-// :ref:`clusters <envoy_api_msg_config.cluster.v3.Cluster>`. If the configuration is
+// :ref:`clusters <envoy_v3_api_msg_config.cluster.v3.Cluster>`. If the configuration is
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {
@@ -420,7 +465,7 @@ message TransportSocket {
 // .. note::
 //
 //   Parsing of the runtime key's data is implemented such that it may be represented as a
-//   :ref:`FractionalPercent <envoy_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
+//   :ref:`FractionalPercent <envoy_v3_api_msg_type.v3.FractionalPercent>` proto represented as JSON/YAML
 //   and may also be represented as an integer with the assumption that the value is an integral
 //   percentage out of 100. For instance, a runtime key lookup returning the value "42" would parse
 //   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.

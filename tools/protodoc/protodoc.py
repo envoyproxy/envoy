@@ -6,8 +6,6 @@
 from collections import defaultdict
 import json
 import functools
-import os
-import pathlib
 import sys
 
 from google.protobuf import json_format
@@ -23,6 +21,8 @@ from jinja2 import Template
 # just remove it from the sys.path.
 sys.path = [p for p in sys.path if not p.endswith('bazel_tools')]
 
+from envoy.base import utils
+
 from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
@@ -30,11 +30,15 @@ from tools.config_validation import validate_fragment
 
 from tools.protodoc import manifest_pb2
 from udpa.annotations import security_pb2
-from udpa.annotations import status_pb2
+from udpa.annotations import status_pb2 as udpa_status_pb2
 from validate import validate_pb2
+from xds.annotations.v3 import status_pb2 as xds_status_pb2
 
 # Namespace prefix for Envoy core APIs.
 ENVOY_API_NAMESPACE_PREFIX = '.envoy.api.v2.'
+
+# Last documented v2 api version
+ENVOY_LAST_V2_VERSION = "1.17"
 
 # Namespace prefix for Envoy top-level APIs.
 ENVOY_PREFIX = '.envoy.'
@@ -48,17 +52,13 @@ RPC_NAMESPACE_PREFIX = '.google.rpc.'
 # http://www.fileformat.info/info/unicode/char/2063/index.htm
 UNICODE_INVISIBLE_SEPARATOR = u'\u2063'
 
-# Template for data plane API URLs.
-DATA_PLANE_API_URL_FMT = 'https://github.com/envoyproxy/envoy/blob/{}/api/%s#L%d'.format(
-    os.environ['ENVOY_BLOB_SHA'])
-
 # Template for formating extension descriptions.
 EXTENSION_TEMPLATE = Template(
     """
 .. _extension_{{extension}}:
 
-This extension may be referenced by the qualified name *{{extension}}*
-
+This extension may be referenced by the qualified name ``{{extension}}``
+{{contrib}}
 .. note::
   {{status}}
 
@@ -79,11 +79,21 @@ EXTENSION_CATEGORY_TEMPLATE = Template(
 .. _extension_category_{{category}}:
 
 .. tip::
+{% if extensions %}
   This extension category has the following known extensions:
 
 {% for ext in extensions %}
   - :ref:`{{ext}} <extension_{{ext}}>`
 {% endfor %}
+
+{% endif %}
+{% if contrib_extensions %}
+  The following extensions are available in :ref:`contrib <install_contrib>` images only:
+
+{% for ext in contrib_extensions %}
+  - :ref:`{{ext}} <extension_{{ext}}>`
+{% endfor %}
+{% endif %}
 
 """)
 
@@ -116,13 +126,42 @@ EXTENSION_STATUS_VALUES = {
         'This extension is work-in-progress. Functionality is incomplete and it is not intended for production use.',
 }
 
-EXTENSION_DB = json.loads(pathlib.Path(os.getenv('EXTENSION_DB_PATH')).read_text())
+WIP_WARNING = (
+    '.. warning::\n   This API feature is currently work-in-progress. API features marked as '
+    'work-in-progress are not considered stable, are not covered by the :ref:`threat model '
+    '<arch_overview_threat_model>`, are not supported by the security team, and are subject to '
+    'breaking changes. Do not use this feature without understanding each of the previous '
+    'points.\n\n')
+
+r = runfiles.Create()
+
+EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
+CONTRIB_EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/contrib/extensions_metadata.yaml"))
+
 
 # create an index of extension categories from extension db
-EXTENSION_CATEGORIES = {}
-for _k, _v in EXTENSION_DB.items():
-    for _cat in _v['categories']:
-        EXTENSION_CATEGORIES.setdefault(_cat, []).append(_k)
+def build_categories(extensions_db):
+    ret = {}
+    for _k, _v in extensions_db.items():
+        for _cat in _v['categories']:
+            ret.setdefault(_cat, []).append(_k)
+    return ret
+
+
+EXTENSION_CATEGORIES = build_categories(EXTENSION_DB)
+CONTRIB_EXTENSION_CATEGORIES = build_categories(CONTRIB_EXTENSION_DB)
+
+V2_LINK_TEMPLATE = Template(
+    """
+This documentation is for the Envoy v3 API.
+
+As of Envoy v1.18 the v2 API has been removed and is no longer supported.
+
+If you are upgrading from v2 API config you may wish to view the v2 API documentation:
+
+    :ref:`{{v2_text}} <{{v2_url}}>`
+
+""")
 
 
 class ProtodocError(Exception):
@@ -134,7 +173,7 @@ def hide_not_implemented(comment):
     return annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION in comment.annotations
 
 
-def github_url(type_context):
+def github_url(text, type_context):
     """Obtain data plane API Github URL by path from a TypeContext.
 
     Args:
@@ -143,23 +182,23 @@ def github_url(type_context):
     Returns:
         A string with a corresponding data plane API GitHub Url.
     """
-    if type_context.location is not None:
-        return DATA_PLANE_API_URL_FMT % (
-            type_context.source_code_info.name, type_context.location.span[0])
-    return ''
+    return f":repo:`{text} <api/{type_context.source_code_info.name}#L{type_context.location.span[0]}>`"
 
 
-def format_comment_with_annotations(comment, type_name=''):
+def format_comment_with_annotations(comment, show_wip_warning=False):
     """Format a comment string with additional RST for annotations.
 
     Args:
         comment: comment string.
-        type_name: optional, 'message' or 'enum' may be specified for additional
-           message/enum specific annotations.
+        show_wip_warning: whether to show the work in progress warning.
 
     Returns:
         A string with additional RST from annotations.
     """
+    wip_warning = ''
+    if show_wip_warning:
+        wip_warning = WIP_WARNING
+
     formatted_extension = ''
     if annotations.EXTENSION_ANNOTATION in comment.annotations:
         extension = comment.annotations[annotations.EXTENSION_ANNOTATION]
@@ -169,7 +208,7 @@ def format_comment_with_annotations(comment, type_name=''):
         for category in comment.annotations[annotations.EXTENSION_CATEGORY_ANNOTATION].split(","):
             formatted_extension_category += format_extension_category(category)
     comment = annotations.without_annotations(strip_leading_space(comment.raw) + '\n')
-    return comment + formatted_extension + formatted_extension_category
+    return comment + wip_warning + formatted_extension + formatted_extension_category
 
 
 def map_lines(f, s):
@@ -226,18 +265,29 @@ def format_extension(extension):
         RST formatted extension description.
     """
     try:
-        extension_metadata = EXTENSION_DB[extension]
-        status = EXTENSION_STATUS_VALUES.get(extension_metadata['status'], '')
+        extension_metadata = EXTENSION_DB.get(extension, None)
+        contrib = ''
+        if extension_metadata is None:
+            extension_metadata = CONTRIB_EXTENSION_DB[extension]
+            contrib = """
+
+.. note::
+  This extension is only available in :ref:`contrib <install_contrib>` images.
+
+"""
+        status = EXTENSION_STATUS_VALUES.get(extension_metadata.get('status'), '')
         security_posture = EXTENSION_SECURITY_POSTURES[extension_metadata['security_posture']]
         categories = extension_metadata["categories"]
     except KeyError as e:
         sys.stderr.write(
-            f"\n\nDid you forget to add '{extension}' to source/extensions/extensions_build_config.bzl?\n\n"
-        )
+            f"\n\nDid you forget to add '{extension}' to extensions_build_config.bzl, "
+            "extensions_metadata.yaml, contrib_build_config.bzl, "
+            "or contrib/extensions_metadata.yaml?\n\n")
         exit(1)  # Raising the error buries the above message in tracebacks.
 
     return EXTENSION_TEMPLATE.render(
         extension=extension,
+        contrib=contrib,
         status=status,
         security_posture=security_posture,
         categories=categories)
@@ -252,15 +302,17 @@ def format_extension_category(extension_category):
     Returns:
         RST formatted extension category description.
     """
-    try:
-        extensions = EXTENSION_CATEGORIES[extension_category]
-    except KeyError as e:
+    extensions = EXTENSION_CATEGORIES.get(extension_category, [])
+    contrib_extensions = CONTRIB_EXTENSION_CATEGORIES.get(extension_category, [])
+    if not extensions and not contrib_extensions:
         raise ProtodocError(f"\n\nUnable to find extension category:  {extension_category}\n\n")
     return EXTENSION_CATEGORY_TEMPLATE.render(
-        category=extension_category, extensions=sorted(extensions))
+        category=extension_category,
+        extensions=sorted(extensions),
+        contrib_extensions=sorted(contrib_extensions))
 
 
-def format_header_from_file(style, source_code_info, proto_name):
+def format_header_from_file(style, source_code_info, proto_name, v2_link):
     """Format RST header based on special file level title
 
     Args:
@@ -281,9 +333,10 @@ def format_header_from_file(style, source_code_info, proto_name):
         formatted_extension = format_extension(extension)
     if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
         return anchor + format_header(
-            style, source_code_info.file_level_annotations[
-                annotations.DOC_TITLE_ANNOTATION]) + formatted_extension, stripped_comment
-    return anchor + format_header(style, proto_name) + formatted_extension, stripped_comment
+            style, source_code_info.file_level_annotations[annotations.DOC_TITLE_ANNOTATION]
+        ) + v2_link + "\n\n" + formatted_extension, stripped_comment
+    return anchor + format_header(
+        style, proto_name) + v2_link + "\n\n" + formatted_extension, stripped_comment
 
 
 def format_field_type_as_json(type_context, field):
@@ -321,8 +374,7 @@ def format_message_as_json(type_context, msg):
 
     if lines:
         return '.. code-block:: json\n\n  {\n' + ',\n'.join(indent_lines(4, lines)) + '\n  }\n\n'
-    else:
-        return '.. code-block:: json\n\n  {}\n\n'
+    return ""
 
 
 def normalize_field_type_name(field_fqn):
@@ -433,27 +485,27 @@ def strip_leading_space(s):
 
 def file_cross_ref_label(msg_name):
     """File cross reference label."""
-    return 'envoy_api_file_%s' % msg_name
+    return 'envoy_v3_api_file_%s' % msg_name
 
 
 def message_cross_ref_label(msg_name):
     """Message cross reference label."""
-    return 'envoy_api_msg_%s' % msg_name
+    return 'envoy_v3_api_msg_%s' % msg_name
 
 
 def enum_cross_ref_label(enum_name):
     """Enum cross reference label."""
-    return 'envoy_api_enum_%s' % enum_name
+    return 'envoy_v3_api_enum_%s' % enum_name
 
 
 def field_cross_ref_label(field_name):
     """Field cross reference label."""
-    return 'envoy_api_field_%s' % field_name
+    return 'envoy_v3_api_field_%s' % field_name
 
 
 def enum_value_cross_ref_label(enum_value_name):
     """Enum value cross reference label."""
-    return 'envoy_api_enum_value_%s' % enum_value_name
+    return 'envoy_v3_api_enum_value_%s' % enum_value_name
 
 
 def format_anchor(label):
@@ -512,7 +564,10 @@ def format_field_as_definition_list_item(
                 or (rule.HasField('repeated') and rule.repeated.min_items > 0)):
             field_annotations = ['*REQUIRED*']
     leading_comment = type_context.leading_comment
-    formatted_leading_comment = format_comment_with_annotations(leading_comment)
+    formatted_leading_comment = format_comment_with_annotations(
+        leading_comment,
+        field.options.HasExtension(xds_status_pb2.field_status)
+        and field.options.Extensions[xds_status_pb2.field_status].work_in_progress)
     if hide_not_implemented(leading_comment):
         return ''
 
@@ -648,22 +703,23 @@ class RstFormatVisitor(visitor.Visitor):
     """
 
     def __init__(self):
-        r = runfiles.Create()
-        with open(r.Rlocation('envoy/docs/protodoc_manifest.yaml'), 'r') as f:
-            # Load as YAML, emit as JSON and then parse as proto to provide type
-            # checking.
-            protodoc_manifest_untyped = yaml.safe_load(f.read())
-            self.protodoc_manifest = manifest_pb2.Manifest()
-            json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
+        with open(r.Rlocation('envoy/docs/v2_mapping.json'), 'r') as f:
+            self.v2_mapping = json.load(f)
+
+        # Load as YAML, emit as JSON and then parse as proto to provide type
+        # checking.
+        protodoc_manifest_untyped = utils.from_yaml(
+            r.Rlocation('envoy/docs/protodoc_manifest.yaml'))
+        self.protodoc_manifest = manifest_pb2.Manifest()
+        json_format.Parse(json.dumps(protodoc_manifest_untyped), self.protodoc_manifest)
 
     def visit_enum(self, enum_proto, type_context):
         normal_enum_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(enum_cross_ref_label(normal_enum_type))
         header = format_header('-', 'Enum %s' % normal_enum_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_enum_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_enum_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'enum')
+        formatted_leading_comment = format_comment_with_annotations(leading_comment)
         if hide_not_implemented(leading_comment):
             return ''
         return anchor + header + proto_link + formatted_leading_comment + format_enum_as_definition_list(
@@ -676,12 +732,15 @@ class RstFormatVisitor(visitor.Visitor):
         normal_msg_type = normalize_type_context_name(type_context.name)
         anchor = format_anchor(message_cross_ref_label(normal_msg_type))
         header = format_header('-', normal_msg_type)
-        _github_url = github_url(type_context)
-        proto_link = format_external_link('[%s proto]' % normal_msg_type, _github_url) + '\n\n'
+        proto_link = github_url(f"[{normal_msg_type} proto]", type_context) + '\n\n'
         leading_comment = type_context.leading_comment
-        formatted_leading_comment = format_comment_with_annotations(leading_comment, 'message')
+        formatted_leading_comment = format_comment_with_annotations(
+            leading_comment,
+            msg_proto.options.HasExtension(xds_status_pb2.message_status)
+            and msg_proto.options.Extensions[xds_status_pb2.message_status].work_in_progress)
         if hide_not_implemented(leading_comment):
             return ''
+
         return anchor + header + proto_link + formatted_leading_comment + format_message_as_json(
             type_context, msg_proto) + format_message_as_definition_list(
                 type_context, msg_proto,
@@ -691,6 +750,13 @@ class RstFormatVisitor(visitor.Visitor):
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
+
+        v2_link = ""
+        if file_proto.name in self.v2_mapping:
+            v2_filepath = f"envoy_api_file_{self.v2_mapping[file_proto.name]}"
+            v2_text = v2_filepath.split('/', 1)[1]
+            v2_url = f"v{ENVOY_LAST_V2_VERSION}:{v2_filepath}"
+            v2_link = V2_LINK_TEMPLATE.render(v2_url=v2_url, v2_text=v2_text)
 
         # TODO(mattklein123): The logic in both the doc and transform tool around files without messages
         # is confusing and should be cleaned up. This is a stop gap to have titles for all proto docs
@@ -705,19 +771,22 @@ class RstFormatVisitor(visitor.Visitor):
         # Find the earliest detached comment, attribute it to file level.
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
-            '=', type_context.source_code_info, file_proto.name)
+            '=', type_context.source_code_info, file_proto.name, v2_link)
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
         # toctrees.
         if not has_messages:
             header = ':orphan:\n\n' + header
         warnings = ''
-        if file_proto.options.HasExtension(status_pb2.file_status):
-            if file_proto.options.Extensions[status_pb2.file_status].work_in_progress:
-                warnings += (
-                    '.. warning::\n   This API is work-in-progress and is '
-                    'subject to breaking changes.\n\n')
-        debug_proto = format_proto_as_block_comment(file_proto)
+        added_wip_warning = False
+        if file_proto.options.HasExtension(udpa_status_pb2.file_status):
+            if file_proto.options.Extensions[udpa_status_pb2.file_status].work_in_progress:
+                added_wip_warning = True
+                warnings += WIP_WARNING
+        if not added_wip_warning and file_proto.options.HasExtension(xds_status_pb2.file_status):
+            if file_proto.options.Extensions[xds_status_pb2.file_status].work_in_progress:
+                warnings += WIP_WARNING
+        # debug_proto = format_proto_as_block_comment(file_proto)
         return header + warnings + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 
 

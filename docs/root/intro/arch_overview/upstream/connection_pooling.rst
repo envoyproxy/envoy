@@ -4,7 +4,7 @@ Connection pooling
 ==================
 
 For HTTP traffic, Envoy supports abstract connection pools that are layered on top of the underlying
-wire protocol (HTTP/1.1 or HTTP/2). The utilizing filter code does not need to be aware of whether
+wire protocol (HTTP/1.1, HTTP/2, HTTP/3). The utilizing filter code does not need to be aware of whether
 the underlying protocol supports true multiplexing or not. In practice the underlying
 implementations have the following high level properties:
 
@@ -32,17 +32,69 @@ pool will drain the affected connection. Once a connection reaches its :ref:`max
 stream limit <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`, it
 will be marked as busy until a stream is available. New connections are established anytime there is
 a pending request without a connection that can be dispatched to (up to circuit breaker limits for
-connections). HTTP/2 is the preferred communication protocol, as connections rarely, if ever, get
-severed.
+connections). HTTP/2 is the preferred communication protocol when Envoy is operating as a reverse proxy,
+as connections rarely, if ever, get severed.
+
+HTTP/3
+------
+
+The HTTP/3 connection pool multiplexes multiple requests over a single connection, up to the limits
+imposed by :ref:`max concurrent streams
+<envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>` and :ref:`max
+requests per connection <envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>`.
+The HTTP/3 connection pool establishes as many connections as are needed to serve requests. With no
+limits, this will be only a single connection. If a GOAWAY frame is received or if the connection
+reaches the :ref:`maximum requests per connection
+<envoy_v3_api_field_config.cluster.v3.Cluster.max_requests_per_connection>` limit, the connection
+pool will drain the affected connection. Once a connection reaches its :ref:`maximum concurrent
+stream limit <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`, it
+will be marked as busy until a stream is available. New connections are established anytime there is
+a pending request without a connection that can be dispatched to (up to circuit breaker limits for
+connections).
+
+Automatic protocol selection
+----------------------------
+
+For Envoy acting as a forward proxy, the preferred configuration is the
+:ref:`AutoHttpConfig <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig>`
+, configued via
+:ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`.
+By default it will use TCP and ALPN to select the best available protocol of HTTP/2 and HTTP/1.1.
+
+.. _arch_overview_http3_upstream:
+
+If HTTP/3 is configured in the automatic pool it will currently attempt an QUIC connection first,
+then 300ms later, if a QUIC connection is not established, will also attempt to establish a TCP connection.
+Whichever handshake succeeds will be used for the initial
+stream, but if both TCP and QUIC connections are established, QUIC will eventually be preferred.
+
+If an alternate protocol cache is configured via
+:ref:`alternate_protocols_cache_options <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.AutoHttpConfig.alternate_protocols_cache_options>`
+then HTTP/3 connections will only be attempted to servers which
+advertise HTTP/3 support either via `HTTP Alternative Services <https://tools.ietf.org/html/rfc7838>`, (eventually
+the `HTTPS DNS resource record<https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04>` or "QUIC hints"
+which will be manually configured).
+If no such advertisement exists, then HTTP/2 or HTTP/1 will be used instead.
+
+If no alternate protocol cache is configured, then HTTP/3 connections will be attempted to
+all servers, even those which do not advertise HTTP/3.
+
+Further, HTTP/3 runs over QUIC (which uses UDP) and not over TCP (which HTTP/1 and HTTP/2 use).
+It is not uncommon for network devices to block UDP traffic, and hence block HTTP/3. This
+means that upstream HTTP/3 connection attempts might be blocked by the network and will fall
+back to using HTTP/2 or HTTP/1.  This path is alpha and rapidly undergoing improvements with the goal of having
+the default behavior result in optimal latency for internet environments, so please be patient and follow along with Envoy release notes
+to stay aprised of the latest and greatest changes.
+
 
 .. _arch_overview_conn_pool_how_many:
 
 Number of connection pools
 --------------------------
 
-Each host in each cluster will have one or more connection pools. If the cluster is HTTP/1 or HTTP/2
-only, then the host may have only a single connection pool. However, if the cluster supports multiple
-upstream protocols, then at least one connection pool per protocol will be allocated. Separate
+Each host in each cluster will have one or more connection pools. If the cluster has a single explicit
+protocol configured, then the host may have only a single connection pool. However, if the cluster supports multiple
+upstream protocols, then unless it is using ALPN, one connection pool per protocol may be allocated. Separate
 connection pools are also allocated for each of the following features:
 
 * :ref:`Routing priority <arch_overview_http_routing_priority>`

@@ -7,10 +7,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/mongo_proxy/bson.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/bson.h"
 
 namespace Envoy {
 namespace Extensions {

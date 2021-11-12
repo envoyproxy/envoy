@@ -1,4 +1,4 @@
-#include "server/admin/server_cmd_handler.h"
+#include "source/server/admin/server_cmd_handler.h"
 
 namespace Envoy {
 namespace Server {

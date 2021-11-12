@@ -1,5 +1,4 @@
 use log::trace;
-use proxy_wasm::hostcalls;
 use proxy_wasm::traits::{Context, StreamContext};
 use proxy_wasm::types::*;
 
@@ -33,7 +32,7 @@ impl StreamContext for TestStream {
                 String::from_utf8(data).unwrap()
             );
         }
-        hostcalls::set_buffer(BufferType::DownstreamData, 0, data_size, b"write").unwrap();
+        self.set_downstream_data(0, data_size, b"write");
         Action::Continue
     }
 

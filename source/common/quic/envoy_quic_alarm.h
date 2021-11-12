@@ -3,7 +3,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "quiche/quic/core/quic_alarm.h"
 #include "quiche/quic/core/quic_clock.h"

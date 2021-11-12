@@ -1,7 +1,6 @@
-#include "common/http/utility.h"
-#include "common/network/io_socket_handle_impl.h"
-
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+#include "source/common/http/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
@@ -18,6 +17,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
+using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -47,11 +47,10 @@ public:
         .WillOnce(
             Invoke([](os_fd_t fd, void* buffer, size_t length, int flag) -> Api::SysCallSizeResult {
               ENVOY_LOG_MISC(error, "In mock syscall recv {} {} {} {}", fd, buffer, length, flag);
-              return Api::SysCallSizeResult{static_cast<ssize_t>(0), 0};
+              return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
             }));
-    EXPECT_CALL(dispatcher_,
-                createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
-                                 Event::FileReadyType::Read | Event::FileReadyType::Closed))
+    EXPECT_CALL(dispatcher_, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                              Event::FileReadyType::Read))
         .WillOnce(
             DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
     filter_->onAccept(cb_);
@@ -86,8 +85,10 @@ TEST_P(TlsInspectorTest, MaxClientHelloSize) {
 // Test that the filter detects Closed events and terminates.
 TEST_P(TlsInspectorTest, ConnectionClosed) {
   init();
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   EXPECT_CALL(cb_, continueFilterChain(false));
-  file_event_callback_(Event::FileReadyType::Closed);
+  file_event_callback_(Event::FileReadyType::Read);
   EXPECT_EQ(1, cfg_->stats().connection_closed_.value());
 }
 
@@ -283,11 +284,12 @@ TEST_P(TlsInspectorTest, InlineReadSucceed) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onAccept(cb_));
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(TlsInspectorConfigFactoryTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.listener.tls_inspector";
 
-  ASSERT_NE(
+  ASSERT_EQ(
       nullptr,
       Registry::FactoryRegistry<
           Server::Configuration::NamedListenerFilterConfigFactory>::getFactory(deprecated_name));

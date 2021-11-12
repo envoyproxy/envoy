@@ -1,11 +1,11 @@
-#include "extensions/filters/http/tap/tap_config_impl.h"
+#include "source/extensions/filters/http/tap/tap_config_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/http.pb.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {

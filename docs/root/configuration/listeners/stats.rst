@@ -6,7 +6,9 @@ Statistics
 Listener
 --------
 
-Every listener has a statistics tree rooted at *listener.<address>.* with the following statistics:
+Every listener has a statistics tree rooted at *listener.<address>.* (or *listener.<stat_prefix>.* if
+:ref:`stat_prefix <envoy_v3_api_field_config.listener.v3.Listener.stat_prefix>` is non-empty)
+with the following statistics:
 
 .. csv-table::
    :header: Name, Type, Description
@@ -16,8 +18,10 @@ Every listener has a statistics tree rooted at *listener.<address>.* with the fo
    downstream_cx_destroy, Counter, Total destroyed connections
    downstream_cx_active, Gauge, Total active connections
    downstream_cx_length_ms, Histogram, Connection length milliseconds
+   downstream_cx_transport_socket_connect_timeout, Counter, Total connections that timed out during transport socket connection negotiation
    downstream_cx_overflow, Counter, Total connections rejected due to enforcement of listener connection limit
    downstream_cx_overload_reject, Counter, Total connections rejected due to configured overload actions
+   downstream_global_cx_overflow, Counter, Total connections rejected due to enforcement of global connection limit
    downstream_pre_cx_timeout, Counter, Sockets that timed out during listener filter processing
    downstream_pre_cx_active, Gauge, Sockets currently undergoing listener filter processing
    global_cx_overflow, Counter, Total connections rejected due to enforcement of the global connection limit
@@ -31,6 +35,16 @@ TLS statistics
 The following TLS statistics are rooted at *listener.<address>.ssl.*:
 
 .. include:: ../../_include/ssl_stats.rst
+
+.. _config_listener_stats_tcp:
+
+TCP statistics
+--------------
+
+The following TCP statistics, which are available when using the :ref:`TCP stats transport socket <envoy_v3_api_msg_extensions.transport_sockets.tcp_stats.v3.Config>`,
+are rooted at *listener.<address>.tcp_stats.*:
+
+.. include:: ../../_include/tcp_stats.rst
 
 .. _config_listener_stats_udp:
 

@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "common/json/json_loader.h"
-#include "common/stats/isolated_store_impl.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/utility.h"
 

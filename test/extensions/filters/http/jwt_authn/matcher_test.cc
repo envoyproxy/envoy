@@ -1,8 +1,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/jwt_authn/matcher.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/jwt_authn/matcher.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -37,25 +36,6 @@ TEST_F(MatcherTest, TestMatchPrefix) {
   headers = TestRequestHeaderMapImpl{{":path", "/matc"}};
   EXPECT_FALSE(matcher->matches(headers));
   headers = TestRequestHeaderMapImpl{{":path", "/no"}};
-  EXPECT_FALSE(matcher->matches(headers));
-}
-
-TEST_F(MatcherTest, TestMatchRegex) {
-  TestDeprecatedV2Api _deprecated_v2_api;
-  const char config[] = R"(match:
-  regex: "/[^c][au]t")";
-  RequirementRule rule;
-  TestUtility::loadFromYaml(config, rule);
-  MatcherConstPtr matcher = Matcher::create(rule);
-  auto headers = TestRequestHeaderMapImpl{{":path", "/but"}};
-  EXPECT_TRUE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/mat?ok=bye"}};
-  EXPECT_TRUE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/maut"}};
-  EXPECT_FALSE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/cut"}};
-  EXPECT_FALSE(matcher->matches(headers));
-  headers = TestRequestHeaderMapImpl{{":path", "/mut/"}};
   EXPECT_FALSE(matcher->matches(headers));
 }
 

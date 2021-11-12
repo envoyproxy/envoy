@@ -12,16 +12,16 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/assert.h"
-#include "common/common/statusor.h"
-#include "common/http/codec_helper.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/http1/codec_stats.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/parser.h"
-#include "common/http/status.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/statusor.h"
+#include "source/common/http/codec_helper.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/http1/codec_stats.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/parser.h"
+#include "source/common/http/status.h"
 
 namespace Envoy {
 namespace Http {
@@ -69,14 +69,24 @@ public:
     // require a flush timeout not already covered by other timeouts.
   }
 
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    // TODO(kbaichoo): implement account tracking for H1. Particularly, binding
+    // the account to the buffers used. The current wiring is minimal, and used
+    // to ensure the memory_account gets notified that the downstream request is
+    // closing.
+    buffer_memory_account_ = account;
+  }
+
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }
 
   void clearReadDisableCallsForTests() { read_disable_calls_ = 0; }
 
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
+
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection);
+  StreamEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter);
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
@@ -84,6 +94,7 @@ protected:
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
 
+  Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
   bool disable_chunk_encoding_ : 1;
@@ -118,7 +129,10 @@ private:
   void encodeFormattedHeader(absl::string_view key, absl::string_view value,
                              HeaderKeyFormatterOptConstRef formatter);
 
+  void flushOutput(bool end_encode = false);
+
   absl::string_view details_;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_;
 };
 
 /**
@@ -126,20 +140,36 @@ private:
  */
 class ResponseEncoderImpl : public StreamEncoderImpl, public ResponseEncoder {
 public:
-  ResponseEncoderImpl(ConnectionImpl& connection, bool stream_error_on_invalid_http_message)
-      : StreamEncoderImpl(connection),
+  ResponseEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
+                      bool stream_error_on_invalid_http_message)
+      : StreamEncoderImpl(connection, std::move(bytes_meter)),
         stream_error_on_invalid_http_message_(stream_error_on_invalid_http_message) {}
+
+  ~ResponseEncoderImpl() override {
+    // Only the downstream stream should clear the downstream of the
+    // memory account.
+    //
+    // There are cases where a corresponding upstream stream dtor might
+    // be called, but the downstream stream isn't going to terminate soon
+    // such as StreamDecoderFilterCallbacks::recreateStream().
+    if (buffer_memory_account_) {
+      buffer_memory_account_->clearDownstream();
+    }
+  }
 
   bool startedResponse() { return started_response_; }
 
   // Http::ResponseEncoder
-  void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+  void encode1xxHeaders(const ResponseHeaderMap& headers) override;
   void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
   void encodeTrailers(const ResponseTrailerMap& trailers) override { encodeTrailersBase(trailers); }
 
   bool streamErrorOnInvalidHttpMessage() const override {
     return stream_error_on_invalid_http_message_;
   }
+
+  // Http1::StreamEncoderImpl
+  void resetStream(StreamResetReason reason) override;
 
 private:
   bool started_response_{};
@@ -151,7 +181,8 @@ private:
  */
 class RequestEncoderImpl : public StreamEncoderImpl, public RequestEncoder {
 public:
-  RequestEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
+  RequestEncoderImpl(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter)
+      : StreamEncoderImpl(connection, std::move(bytes_meter)) {}
   bool upgradeRequest() const { return upgrade_request_; }
   bool headRequest() const { return head_request_; }
   bool connectRequest() const { return connect_request_; }
@@ -186,6 +217,8 @@ public:
    */
   virtual void onEncodeComplete() PURE;
 
+  virtual StreamInfo::BytesMeter& getBytesMeter() PURE;
+
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
    * valid operation after this point is for the connection to get blown away, but we will not
@@ -196,7 +229,7 @@ public:
   /**
    * Flush all pending output from encoding.
    */
-  void flushOutput(bool end_encode = false);
+  uint64_t flushOutput(bool end_encode = false);
 
   void addToBuffer(absl::string_view data);
   void addCharToBuffer(char c);
@@ -229,7 +262,7 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override { onAboveHighWatermark(); }
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override { onBelowLowWatermark(); }
 
-  bool strict1xxAnd204Headers() { return strict_1xx_and_204_headers_; }
+  bool sendStrict1xxAnd204Headers() const { return send_strict_1xx_and_204_headers_; }
 
   // Codec errors found in callbacks are overridden within the http_parser library. This holds those
   // errors to propagate them through to dispatch() where we can handle the error.
@@ -237,6 +270,8 @@ public:
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  bool noChunkedEncodingHeaderFor304() const { return no_chunked_encoding_header_for_304_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, CodecStats& stats, const Http1Settings& settings,
@@ -280,9 +315,12 @@ protected:
   // HTTP/1 message has been flushed from the parser. This allows raising an HTTP/2 style headers
   // block with end stream set to true with no further protocol data remaining.
   bool deferred_end_stream_headers_ : 1;
-  const bool strict_1xx_and_204_headers_ : 1;
+  const bool require_strict_1xx_and_204_headers_ : 1;
+  const bool send_strict_1xx_and_204_headers_ : 1;
   bool dispatching_ : 1;
   bool dispatching_slice_already_drained_ : 1;
+  const bool no_chunked_encoding_header_for_304_ : 1;
+  StreamInfo::BytesMeterSharedPtr bytes_meter_before_stream_;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -327,6 +365,8 @@ private:
    * @len supplies the length of the span.
    */
   Envoy::StatusOr<size_t> dispatchSlice(const char* slice, size_t len);
+
+  void onDispatch(const Buffer::Instance& data);
 
   // ParserCallbacks.
   Status onHeaderField(const char* data, size_t length) override;
@@ -428,10 +468,11 @@ protected:
    * An active HTTP/1.1 request.
    */
   struct ActiveRequest {
-    ActiveRequest(ServerConnectionImpl& connection)
-        : response_encoder_(connection,
+    ActiveRequest(ServerConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter)
+        : response_encoder_(connection, std::move(bytes_meter),
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
 
+    void dumpState(std::ostream& os, int indent_level) const;
     HeaderString request_url_;
     RequestDecoder* request_decoder_{};
     ResponseEncoderImpl response_encoder_;
@@ -459,6 +500,15 @@ private:
   Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
   void onEncodeComplete() override;
+  StreamInfo::BytesMeter& getBytesMeter() override {
+    if (active_request_.has_value()) {
+      return *(active_request_->response_encoder_.getStream().bytesMeter());
+    }
+    if (bytes_meter_before_stream_ == nullptr) {
+      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
+    }
+    return *bytes_meter_before_stream_;
+  }
   Status onMessageBeginBase() override;
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   // If upgrade behavior is not allowed, the HCM will have sanitized the headers out.
@@ -495,6 +545,7 @@ private:
 
   void releaseOutboundResponse(const Buffer::OwnedBufferFragmentImpl* fragment);
   void maybeAddSentinelBufferFragment(Buffer::Instance& output_buffer) override;
+
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
 
@@ -530,9 +581,9 @@ public:
 
 private:
   struct PendingResponse {
-    PendingResponse(ConnectionImpl& connection, ResponseDecoder* decoder)
-        : encoder_(connection), decoder_(decoder) {}
-
+    PendingResponse(ConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter,
+                    ResponseDecoder* decoder)
+        : encoder_(connection, std::move(bytes_meter)), decoder_(decoder) {}
     RequestEncoderImpl encoder_;
     ResponseDecoder* decoder_;
   };
@@ -544,6 +595,15 @@ private:
   // ConnectionImpl
   Http::Status dispatch(Buffer::Instance& data) override;
   void onEncodeComplete() override {}
+  StreamInfo::BytesMeter& getBytesMeter() override {
+    if (pending_response_.has_value()) {
+      return *(pending_response_->encoder_.getStream().bytesMeter());
+    }
+    if (bytes_meter_before_stream_ == nullptr) {
+      bytes_meter_before_stream_ = std::make_shared<StreamInfo::BytesMeter>();
+    }
+    return *bytes_meter_before_stream_;
+  }
   Status onMessageBeginBase() override { return okStatus(); }
   Envoy::StatusOr<ParserStatus> onHeadersCompleteBase() override;
   bool upgradeAllowed() const override;

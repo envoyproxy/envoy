@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["terminate_thread.cc"],
     hdrs = ["terminate_thread.h"],
     deps = [
-        "//include/envoy/thread:thread_interface",
+        "//envoy/thread:thread_interface",
         "//source/common/common:minimal_logger_lib",
     ],
 )

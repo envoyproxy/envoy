@@ -78,11 +78,13 @@ An example POST body:
           - http_request_headers_match:
               headers:
                 - name: foo
-                  exact_match: bar
+                  string_match:
+                    exact: bar
           - http_response_headers_match:
               headers:
                 - name: bar
-                  exact_match: baz
+                  string_match:
+                    exact: baz
     output_config:
       sinks:
         - streaming_admin: {}
@@ -103,11 +105,13 @@ Another example POST body:
           - http_request_headers_match:
               headers:
                 - name: foo
-                  exact_match: bar
+                  string_match:
+                    exact: bar
           - http_response_headers_match:
               headers:
                 - name: bar
-                  exact_match: baz
+                  string_match:
+                    exact: baz
     output_config:
       sinks:
         - streaming_admin: {}
@@ -143,7 +147,8 @@ Another example POST body:
           - http_request_headers_match:
               headers:
                 - name: foo
-                  exact_match: bar
+                  string_match:
+                    exact: bar
           - http_request_generic_body_match:
               patterns:
                 - string_match: test
@@ -242,7 +247,8 @@ An static filter configuration to enable streaming output looks like:
           http_response_headers_match:
             headers:
               - name: bar
-                exact_match: baz
+                string_match:
+                  exact: baz
         output_config:
           streaming: true
           sinks:

@@ -85,7 +85,6 @@ static_resources:
 
   clusters:
   - name: proxy-domain1
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -99,7 +98,6 @@ static_resources:
                 port_value: 80
 
   - name: proxy-domain2
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -113,7 +111,6 @@ static_resources:
                 port_value: 80
 
   - name: proxy-domain3
-    connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:

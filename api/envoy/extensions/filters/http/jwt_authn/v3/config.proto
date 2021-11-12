@@ -52,7 +52,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 11]
+// [#next-free-field: 15]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -137,6 +137,7 @@ message JwtProvider {
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
   // not removed in the request. Default value is false.
+  // caveat: only works for from_header & has no effect for JWTs extracted through from_params & from_cookies.
   bool forward = 5;
 
   // Two fields below define where to extract the JWT from an HTTP request.
@@ -181,6 +182,19 @@ message JwtProvider {
   //
   repeated string from_params = 7;
 
+  // JWT is sent in a cookie. `from_cookies` represents the cookie names to extract from.
+  //
+  // For example, if config is:
+  //
+  // .. code-block:: yaml
+  //
+  //   from_cookies:
+  //   - auth-token
+  //
+  // Then JWT will be extracted from `auth-token` cookie in the request.
+  //
+  repeated string from_cookies = 13;
+
   // This field specifies the header name to forward a successfully verified JWT payload to the
   // backend. The forwarded data is::
   //
@@ -189,6 +203,15 @@ message JwtProvider {
   // If it is not specified, the payload will not be forwarded.
   string forward_payload_header = 8
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // When :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
+  // is specified, the base64 encoded payload will be added to the headers.
+  // Normally JWT based64 encode doesn't add padding. If this field is true,
+  // the header will be padded.
+  //
+  // This field is only relevant if :ref:`forward_payload_header <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward_payload_header>`
+  // is specified.
+  bool pad_forward_payload_header = 11;
 
   // If non empty, successfully verified JWT payloads will be written to StreamInfo DynamicMetadata
   // in the format as: *namespace* is the jwt_authn filter name as **envoy.filters.http.jwt_authn**
@@ -208,9 +231,59 @@ message JwtProvider {
   //
   string payload_in_metadata = 9;
 
+  // If not empty, similar to :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`,
+  // a successfully verified JWT header will be written to :ref:`Dynamic State <arch_overview_data_sharing_between_filters>`
+  // as an entry (``protobuf::Struct``) in **envoy.filters.http.jwt_authn** *namespace* with the
+  // value of this field as the key.
+  //
+  // For example, if ``header_in_metadata`` is *my_header*:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_header:
+  //       alg: JWT
+  //       kid: EF71iSaosbC5C4tC6Syq1Gm647M
+  //       alg: PS256
+  //
+  // When the metadata has **envoy.filters.http.jwt_authn** entry already (for example if
+  // :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  // is not empty), it will be inserted as a new entry in the same *namespace* as shown below:
+  //
+  // .. code-block:: yaml
+  //
+  //   envoy.filters.http.jwt_authn:
+  //     my_payload:
+  //       iss: https://example.com
+  //       sub: test@example.com
+  //       aud: https://example.com
+  //       exp: 1501281058
+  //     my_header:
+  //       alg: JWT
+  //       kid: EF71iSaosbC5C4tC6Syq1Gm647M
+  //       alg: PS256
+  //
+  // .. warning::
+  //   Using the same key name for :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   and :ref:`payload_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.payload_in_metadata>`
+  //   is not suggested due to potential override of existing entry, while it is not enforced during
+  //   config validation.
+  //
+  string header_in_metadata = 14;
+
   // Specify the clock skew in seconds when verifying JWT time constraint,
   // such as `exp`, and `nbf`. If not specified, default is 60 seconds.
   uint32 clock_skew_seconds = 10;
+
+  // Enables JWT cache, its size is specified by *jwt_cache_size*.
+  // Only valid JWT tokens are cached.
+  JwtCacheConfig jwt_cache_config = 12;
+}
+
+// This message specifies JWT Cache configuration.
+message JwtCacheConfig {
+  // The unit is number of JWT tokens, default to 100.
+  uint32 jwt_cache_size = 1;
 }
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
@@ -232,6 +305,66 @@ message RemoteJwks {
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.
   google.protobuf.Duration cache_duration = 2;
+
+  // Fetch Jwks asynchronously in the main thread before the listener is activated.
+  // Fetched Jwks can be used by all worker threads.
+  //
+  // If this feature is not enabled:
+  //
+  // * The Jwks is fetched on-demand when the requests come. During the fetching, first
+  //   few requests are paused until the Jwks is fetched.
+  // * Each worker thread fetches its own Jwks since Jwks cache is per worker thread.
+  //
+  // If this feature is enabled:
+  //
+  // * Fetched Jwks is done in the main thread before the listener is activated. Its fetched
+  //   Jwks can be used by all worker threads. Each worker thread doesn't need to fetch its own.
+  // * Jwks is ready when the requests come, not need to wait for the Jwks fetching.
+  //
+  JwksAsyncFetch async_fetch = 3;
+
+  // Retry policy for fetching Jwks. optional. turned off by default.
+  //
+  // For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     retry_back_off:
+  //       base_interval: 0.01s
+  //       max_interval: 20s
+  //     num_retries: 10
+  //
+  // will yield a randomized truncated exponential backoff policy with an initial delay of 10ms
+  // 10 maximum attempts spaced at most 20s seconds.
+  //
+  // .. code-block:: yaml
+  //
+  //   retry_policy:
+  //     num_retries:1
+  //
+  // uses the default :ref:`retry backoff strategy <envoy_v3_api_msg_config.core.v3.BackoffStrategy>`.
+  // with the default base interval is 1000 milliseconds. and the default maximum interval of 10 times the base interval.
+  //
+  // if num_retries is omitted, the default is to allow only one retry.
+  //
+  //
+  // If enabled, the retry policy will apply to all Jwks fetching approaches, e.g. on demand or asynchronously in background.
+  //
+  //
+  config.core.v3.RetryPolicy retry_policy = 4;
+}
+
+// Fetch Jwks asynchronously in the main thread when the filter config is parsed.
+// The listener is activated only after the Jwks is fetched.
+// When the Jwks is expired in the cache, it is fetched again in the main thread.
+// The fetched Jwks from the main thread can be used by all worker threads.
+message JwksAsyncFetch {
+  // If false, the listener is activated after the initial fetch is completed.
+  // The initial fetch result can be either successful or failed.
+  // If true, it is activated without waiting for the initial fetch to complete.
+  // Default is false.
+  bool fast_listener = 1;
 }
 
 // This message specifies a header location to extract JWT token.
@@ -449,7 +582,8 @@ message FilterStateRule {
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.
-  map<string, JwtRequirement> requires = 3;
+  map<string, JwtRequirement>
+  requires = 3;
 }
 
 // This is the Envoy HTTP filter config for JWT authentication.

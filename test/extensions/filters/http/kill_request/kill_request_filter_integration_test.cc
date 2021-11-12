@@ -12,7 +12,7 @@ class KillRequestFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                          public HttpProtocolIntegrationTest {
 protected:
   void initializeFilter(const std::string& filter_config) {
-    config_helper_.addFilter(filter_config);
+    config_helper_.prependFilter(filter_config);
     initialize();
   }
 
@@ -43,7 +43,7 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoy) {
                                                  {"x-envoy-kill-request", "true"}};
 
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "");
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
 // Request crash Envoy controlled via response.
@@ -70,9 +70,12 @@ TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyOnResp
   Http::TestResponseHeaderMapImpl kill_response_headers = default_response_headers_;
   kill_response_headers.addCopy("x-envoy-kill-request", "true");
 
-  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024), "");
+  EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, kill_response_headers, 1024),
+               "KillRequestFilter is crashing Envoy!!!");
 }
 
+// Disabled for coverage per #18569
+#if !defined(ENVOY_CONFIG_COVERAGE)
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestCrashEnvoyWithCustomKillHeader) {
   const std::string filter_config_with_custom_kill_header =
       R"EOF(
@@ -93,8 +96,9 @@ typed_config:
                                                  {"x-custom-kill-request", "true"}};
 
   EXPECT_DEATH(sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 1024),
-               "");
+               "KillRequestFilter is crashing Envoy!!!");
 }
+#endif
 
 TEST_P(KillRequestFilterIntegrationTestAllProtocols, KillRequestDisabledWhenHeaderIsMissing) {
   initializeFilter(filter_config_);

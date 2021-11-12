@@ -1,11 +1,10 @@
-#include "server/admin/server_info_handler.h"
+#include "source/server/admin/server_info_handler.h"
 
 #include "envoy/admin/v3/memory.pb.h"
 
-#include "common/memory/stats.h"
-#include "common/version/version.h"
-
-#include "server/admin/utils.h"
+#include "source/common/memory/stats.h"
+#include "source/common/version/version.h"
+#include "source/server/admin/utils.h"
 
 namespace Envoy {
 namespace Server {

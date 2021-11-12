@@ -11,9 +11,9 @@
 #include "envoy/common/interval_set.h"
 #include "envoy/common/time.h"
 
-#include "common/common/assert.h"
-#include "common/common/hash.h"
-#include "common/common/non_copyable.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 

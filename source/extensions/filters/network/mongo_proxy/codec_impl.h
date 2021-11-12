@@ -5,9 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/mongo_proxy/codec.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/mongo_proxy/codec.h"
 
 namespace Envoy {
 namespace Extensions {

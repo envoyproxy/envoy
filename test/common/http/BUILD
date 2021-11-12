@@ -156,8 +156,8 @@ envoy_cc_test_library(
     srcs = ["common.cc"],
     hdrs = ["common.h"],
     deps = [
-        "//include/envoy/http:conn_pool_interface",
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:conn_pool_interface",
+        "//envoy/http:header_map_interface",
         "//source/common/http:codec_client_lib",
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
@@ -214,6 +214,8 @@ envoy_cc_test(
     ],
     shard_count = 3,
     deps = [
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
@@ -227,6 +229,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:delegating_route_utility_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
@@ -237,6 +240,8 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
+        ":custom_header_extension_lib",
+        ":xff_extension_lib",
         "//source/common/common:random_generator_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
@@ -315,6 +320,15 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test(
+    name = "inline_cookie_test",
+    srcs = ["inline_cookie_test.cc"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "header_utility_test",
     srcs = ["header_utility_test.cc"],
     deps = [
@@ -371,22 +385,13 @@ envoy_cc_test(
     ],
 )
 
-PATH_UTILITY_TEST_DEPS = [
-    "//source/common/http:header_map_lib",
-    "//source/common/http:path_utility_lib",
-]
-
 envoy_cc_test(
     name = "path_utility_test",
     srcs = ["path_utility_test.cc"],
-    deps = PATH_UTILITY_TEST_DEPS,
-)
-
-envoy_cc_test(
-    name = "legacy_path_utility_test",
-    srcs = ["path_utility_test.cc"],
-    args = ["--runtime-feature-disable-for-tests=envoy.reloadable_features.remove_forked_chromium_url"],
-    deps = PATH_UTILITY_TEST_DEPS,
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:path_utility_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -415,8 +420,6 @@ envoy_cc_test(
     ],
 )
 
-# TODO(alyssawilk): The conn pool grid should work correctly without H3. Circle back and figure
-# out the right way of handling the lack of H3 in the build.
 envoy_cc_test(
     name = "conn_pool_grid_test",
     srcs = envoy_select_enable_http3(["conn_pool_grid_test.cc"]),
@@ -433,10 +436,47 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//source/common/quic:quic_factory_lib",
         "//source/common/quic:quic_transport_socket_factory_lib",
         "//source/common/quic:client_connection_factory_lib",
     ]),
+)
+
+envoy_cc_test(
+    name = "http3_status_tracker_test",
+    srcs = ["http3_status_tracker_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:http3_status_tracker",
+        "//test/mocks:common_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_impl_test",
+    srcs = ["alternate_protocols_cache_impl_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//test/mocks:common_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "alternate_protocols_cache_manager_test",
+    srcs = ["alternate_protocols_cache_manager_test.cc"],
+    deps = [
+        ":common_lib",
+        "//source/common/http:alternate_protocols_cache",
+        "//source/common/singleton:manager_impl_lib",
+        "//test/mocks:common_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ],
 )
 
 envoy_proto_library(
@@ -456,5 +496,23 @@ envoy_cc_fuzz_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:path_utility_lib",
         "//test/fuzz:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "custom_header_extension_lib",
+    srcs = ["custom_header_extension.cc"],
+    hdrs = ["custom_header_extension.h"],
+    deps = [
+        "//source/extensions/http/original_ip_detection/custom_header:custom_header_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "xff_extension_lib",
+    srcs = ["xff_extension.cc"],
+    hdrs = ["xff_extension.h"],
+    deps = [
+        "//source/extensions/http/original_ip_detection/xff:xff_lib",
     ],
 )

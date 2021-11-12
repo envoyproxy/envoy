@@ -10,9 +10,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/message.h"
 
-#include "common/common/hash.h"
-#include "common/grpc/status.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/hash.h"
+#include "source/common/grpc/status.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 #include "google/rpc/status.pb.h"
@@ -178,6 +178,8 @@ public:
 
 private:
   static void checkForHeaderOnlyError(Http::ResponseMessage& http_response);
+
+  static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
 };
 
 } // namespace Grpc

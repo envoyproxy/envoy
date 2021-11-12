@@ -40,19 +40,19 @@ logic for a specific key. Incoming config metadata (via xDS) is converted
 to class objects at config load time. Filters can then obtain a typed
 variant of the metadata at runtime (per request or connection), thereby
 eliminating the need for filters to repeatedly convert from
-`ProtobufWkt::Struct` to some internal object during request/connection
+``ProtobufWkt::Struct`` to some internal object during request/connection
 processing.
 
 For example, a filter that desires to have a convenience wrapper class over
-an opaque metadata with key `xxx.service.policy` in `ClusterInfo` could
-register a factory `ServicePolicyFactory` that inherits from
-`ClusterTypedMetadataFactory`. The factory translates the `ProtobufWkt::Struct`
-into an instance of `ServicePolicy` class (inherited from
-`FilterState::Object`). When a `Cluster` is created, the associated
-`ServicePolicy` instance will be created and cached. Note that typed
+an opaque metadata with key ``xxx.service.policy`` in ``ClusterInfo`` could
+register a factory ``ServicePolicyFactory`` that inherits from
+``ClusterTypedMetadataFactory``. The factory translates the ``ProtobufWkt::Struct``
+into an instance of ``ServicePolicy`` class (inherited from
+``FilterState::Object``). When a ``Cluster`` is created, the associated
+``ServicePolicy`` instance will be created and cached. Note that typed
 metadata is not a new source of metadata. It is obtained from metadata that
-is specified as part of the configuration. A `FilterState::Object` implements
-`serializeAsProto` method can be configured in access loggers to log it.
+is specified as part of the configuration. A ``FilterState::Object`` implements
+``serializeAsProto`` method can be configured in access loggers to log it.
 
 HTTP Per-Route Filter Configuration
 -----------------------------------
@@ -66,9 +66,9 @@ implementation to treat the route-specific filter config as a replacement
 to global config or an enhancement. For example, the HTTP fault filter uses
 this technique to provide per-route fault configuration.
 
-`typed_per_filter_config` is a `map<string, google.protobuf.Any>`. The Connection
+``typed_per_filter_config`` is a ``map<string, google.protobuf.Any>``. The Connection
 manager iterates over this map and invokes the filter factory interface
-`createRouteSpecificFilterConfigTyped` to parse/validate the struct value and
+``createRouteSpecificFilterConfigTyped`` to parse/validate the struct value and
 convert it into a typed class object that’s stored with the route
 itself. HTTP filters can then query the route-specific filter config during
 request processing.
@@ -80,11 +80,11 @@ Dynamic state is generated per network connection or per HTTP
 stream. Dynamic state can be mutable if desired by the filter generating
 the state.
 
-`Envoy::Network::Connection` and `Envoy::Http::Filter` provide a
-`StreamInfo` object that contains information about the current TCP
+``Envoy::Network::Connection`` and ``Envoy::Http::Filter`` provide a
+``StreamInfo`` object that contains information about the current TCP
 connection and HTTP stream (i.e., HTTP request/response pair)
-respectively. `StreamInfo` contains a set of fixed attributes as part of
+respectively. ``StreamInfo`` contains a set of fixed attributes as part of
 the class definition (e.g., HTTP protocol, requested server name, etc.). In
 addition, it provides a facility to store typed objects in a map
-(`map<string, FilterState::Object>`). The state stored per filter can be
+(``map<string, FilterState::Object>``). The state stored per filter can be
 either write-once (immutable), or write-many (mutable).

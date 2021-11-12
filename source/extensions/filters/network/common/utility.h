@@ -1,9 +1,8 @@
 #pragma once
 
-#include "common/common/macros.h"
-
-#include "extensions/common/utility.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/macros.h"
+#include "source/extensions/common/utility.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

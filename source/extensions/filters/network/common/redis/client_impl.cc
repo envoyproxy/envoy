@@ -1,4 +1,4 @@
-#include "extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 

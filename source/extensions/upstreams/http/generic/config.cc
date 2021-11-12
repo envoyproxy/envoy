@@ -1,7 +1,7 @@
-#include "extensions/upstreams/http/generic/config.h"
+#include "source/extensions/upstreams/http/generic/config.h"
 
-#include "extensions/upstreams/http/http/upstream_request.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/extensions/upstreams/http/http/upstream_request.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {

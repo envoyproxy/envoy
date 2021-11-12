@@ -8,15 +8,9 @@ import copy
 import functools
 
 from tools.api_proto_plugin import plugin, visitor
-from tools.protoxform import migrate, utils
+from tools.protoxform import utils
 
 from udpa.annotations import status_pb2
-
-PROTO_PACKAGES = (
-    "google.api.annotations", "validate.validate",
-    "envoy_api_canonical.envoy.annotations.deprecation",
-    "envoy_api_canonical.envoy.annotations.resource", "udpa.annotations.migrate",
-    "udpa.annotations.security", "udpa.annotations.status", "udpa.annotations.sensitive")
 
 
 class ProtoXformError(Exception):
@@ -56,8 +50,6 @@ class ProtoFormatVisitor(visitor.Visitor):
         if existing_pkg_version_status == status_pb2.UNKNOWN and not pkg_version_status_exempt:
             raise ProtoXformError('package_version_status must be set in %s' % file_proto.name)
         # Only update package_version_status for .active_or_frozen.proto,
-        # migrate.version_upgrade_xform has taken care of next major version
-        # candidates.
         if self._active_or_frozen and not pkg_version_status_exempt:
             # Freeze if this is an active package with a next major version. Preserve
             # frozen status otherwise.
@@ -74,23 +66,13 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 
 def main():
-    utils.load_protos(PROTO_PACKAGES)
+    utils.load_protos()
 
     plugin.plugin([
         plugin.direct_output_descriptor(
             '.active_or_frozen.proto',
             functools.partial(ProtoFormatVisitor, True),
             want_params=True),
-        plugin.OutputDescriptor(
-            '.next_major_version_candidate.proto',
-            functools.partial(ProtoFormatVisitor, False),
-            functools.partial(migrate.version_upgrade_xform, 2, False),
-            want_params=True),
-        plugin.OutputDescriptor(
-            '.next_major_version_candidate.envoy_internal.proto',
-            functools.partial(ProtoFormatVisitor, False),
-            functools.partial(migrate.version_upgrade_xform, 2, True),
-            want_params=True)
     ])
 
 

@@ -3,7 +3,7 @@
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
 #include "envoy/udp/hash_policy.h"
 
-#include "common/common/hash.h"
+#include "source/common/common/hash.h"
 
 namespace Envoy {
 namespace Extensions {

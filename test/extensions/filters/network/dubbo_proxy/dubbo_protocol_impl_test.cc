@@ -1,5 +1,5 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -146,11 +146,24 @@ TEST(DubboProtocolImplTest, encode) {
       body_buffer, content, RpcResponseType::ResponseWithValue);
   auto context = result.first;
   EXPECT_EQ(context->bodySize(), serialized_body_size);
-  EXPECT_EQ(false, context->hasAttachments());
-  EXPECT_EQ(0, context->attachments().size());
 
   buffer.drain(context->headerSize());
   EXPECT_TRUE(dubbo_protocol.decodeData(buffer, context, output_metadata));
+}
+
+TEST(DubboProtocolImplTest, HeartBeatResponseTest) {
+  MessageMetadata metadata;
+  metadata.setMessageType(MessageType::HeartbeatResponse);
+  metadata.setResponseStatus(ResponseStatus::Ok);
+  metadata.setSerializationType(SerializationType::Hessian2);
+  metadata.setRequestId(100);
+
+  Buffer::OwnedImpl buffer;
+  DubboProtocolImpl dubbo_protocol;
+  dubbo_protocol.initSerializer(SerializationType::Hessian2);
+  EXPECT_TRUE(dubbo_protocol.encode(buffer, metadata, "", RpcResponseType::ResponseWithValue));
+  // 16 bytes header and one byte null object body.
+  EXPECT_EQ(17, buffer.length());
 }
 
 TEST(DubboProtocolImplTest, decode) {

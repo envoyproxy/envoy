@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/common/hex.h"
-
-#include "extensions/compression/gzip/compressor/config.h"
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 #include "test/test_common/utility.h"
 

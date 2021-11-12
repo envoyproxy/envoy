@@ -18,7 +18,7 @@ class SslSPIFFECertValidatorIntegrationTest
       public HttpIntegrationTest {
 public:
   SslSPIFFECertValidatorIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   void initialize() override;
   void TearDown() override;

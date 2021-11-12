@@ -36,6 +36,12 @@ host when forwarding. See the example below within the configured routes.
 .. literalinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml
 
+Above example is using typed config :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`.
+To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), follow below example:
+
+.. literalinclude:: _include/dns-cache-circuit-breaker-apple.yaml
+    :language: yaml
+
 Statistics
 ----------
 
@@ -49,6 +55,7 @@ namespace.
   dns_query_attempt, Counter, Number of DNS query attempts.
   dns_query_success, Counter, Number of DNS query successes.
   dns_query_failure, Counter, Number of DNS query failures.
+  dns_query_timeout, Counter, Number of DNS query :ref:`timeouts <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_query_timeout>`.
   host_address_changed, Counter, Number of DNS queries that resulted in a host address change.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.

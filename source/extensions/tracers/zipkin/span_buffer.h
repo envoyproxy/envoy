@@ -2,10 +2,9 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "zipkin.pb.h"
 
@@ -25,7 +24,7 @@ public:
    * the method allocateBuffer(size).
    *
    * @param version The selected Zipkin collector version. @see
-   * api/envoy/config/trace/v2/trace.proto.
+   * api/envoy/config/trace/v3/trace.proto.
    * @param shared_span_context To determine whether client and server spans will share the same
    * span context.
    */
@@ -36,7 +35,7 @@ public:
    * Constructor that initializes a buffer with the given size.
    *
    * @param version The selected Zipkin collector version. @see
-   * api/envoy/config/trace/v2/trace.proto.
+   * api/envoy/config/trace/v3/trace.proto.
    * @param shared_span_context To determine whether client and server spans will share the same
    * span context.
    * @param size The desired buffer size.
@@ -92,21 +91,6 @@ private:
 };
 
 using SpanBufferPtr = std::unique_ptr<SpanBuffer>;
-
-/**
- * JsonV1Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON
- * Zipkin v1 array.
- */
-class JsonV1Serializer : public Serializer {
-public:
-  JsonV1Serializer() = default;
-
-  /**
-   * Serialize list of Zipkin spans into Zipkin v1 JSON array.
-   * @return std::string serialized pending spans as Zipkin v1 JSON array.
-   */
-  std::string serialize(const std::vector<Span>& pending_spans) override;
-};
 
 /**
  * JsonV2Serializer implements Zipkin::Serializer that serializes list of Zipkin spans into JSON

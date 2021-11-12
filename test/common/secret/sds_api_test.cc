@@ -6,11 +6,11 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/service/secret/v3/sds.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/config/filesystem_subscription_impl.h"
-#include "common/secret/sds_api.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/config/datasource.h"
+#include "source/common/config/filesystem_subscription_impl.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/config/mocks.h"
@@ -20,6 +20,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/transport_socket_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
@@ -176,7 +177,8 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -572,7 +574,8 @@ TEST_F(SdsApiTest, DeltaUpdateSuccess) {
   initialize();
   subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "");
 
-  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), nullptr, *api_);
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
+  Ssl::TlsCertificateConfigImpl tls_config(*sds_api.secret(), ctx, *api_);
   const std::string cert_pem =
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),

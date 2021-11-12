@@ -2,7 +2,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 
-#include "common/api/os_sys_calls_impl_hot_restart.h"
+#include "source/common/api/os_sys_calls_impl_hot_restart.h"
 
 #include "gmock/gmock.h"
 

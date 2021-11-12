@@ -23,9 +23,17 @@ MockStream::MockStream() {
   }));
 
   ON_CALL(*this, connectionLocalAddress()).WillByDefault(ReturnRef(connection_local_address_));
+
+  ON_CALL(*this, setAccount(_))
+      .WillByDefault(Invoke(
+          [this](Buffer::BufferMemoryAccountSharedPtr account) -> void { account_ = account; }));
 }
 
-MockStream::~MockStream() = default;
+MockStream::~MockStream() {
+  if (account_) {
+    account_->clearDownstream();
+  }
+}
 
 } // namespace Http
 } // namespace Envoy

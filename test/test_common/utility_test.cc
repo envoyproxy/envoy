@@ -149,4 +149,16 @@ TEST(BuffersEqual, NonAligned) {
   EXPECT_TRUE(TestUtility::buffersEqual(buffer1, buffer2));
 }
 
+TEST(JsonEquals, RootMessage) {
+  EXPECT_TRUE(TestUtility::jsonStringEqual(R"({ "a" : "b" })", R"({ "a" : "b" })"));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(R"({ "a" : "b" })", R"({"a":"b"})"));
+}
+
+TEST(JsonEquals, RootArray) {
+  EXPECT_TRUE(TestUtility::jsonStringEqual(R"([{ "a" : "b" }, { "c" : "d" }])",
+                                           R"([{ "a" : "b" }, { "c" : "d" }])", true));
+  EXPECT_TRUE(TestUtility::jsonStringEqual(R"([{ "a" : "b" }, { "c" : "d" }])",
+                                           R"([{"a":"b"},{"c":"d"}])", true));
+}
+
 } // namespace Envoy

@@ -2,8 +2,8 @@
 #include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/http/header_map_impl.h"
-#include "common/router/config_impl.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/config_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
@@ -45,7 +45,7 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
     new_routes->mutable_route()->set_cluster(country_name);
     auto headers_matcher = new_routes->mutable_match()->mutable_headers()->Add();
     headers_matcher->set_name(country_header_name.get());
-    headers_matcher->set_exact_match(country_name);
+    headers_matcher->mutable_string_match()->set_exact(country_name);
   }
   // Add the default route.
   auto new_routes = main_virtual_host->mutable_routes()->Add();
@@ -56,14 +56,12 @@ static void manyCountryRoutesLongHeaders(benchmark::State& state) {
   Api::ApiPtr api(Api::createApiForTest());
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ON_CALL(factory_context, api()).WillByDefault(ReturnRef(*api));
-  ConfigImpl config(proto_config, factory_context, ProtobufMessage::getNullValidationVisitor(),
-                    true);
+  ConfigImpl config(proto_config, OptionalHttpFilters(), factory_context,
+                    ProtobufMessage::getNullValidationVisitor(), true);
 
   const auto stream_info = NiceMock<Envoy::StreamInfo::MockStreamInfo>();
-  auto req_headers = Http::TestRequestHeaderMapImpl{{":authority", "www.lyft.com"},
-                                                    {":path", "/"},
-                                                    {":method", "GET"},
-                                                    {"x-forwarded-proto", "http"}};
+  auto req_headers = Http::TestRequestHeaderMapImpl{
+      {":authority", "www.lyft.com"}, {":path", "/"}, {":method", "GET"}, {":scheme", "http"}};
   // Add dummy headers to reach ~100 headers (limit per request).
   for (int i = 0; i < 90; i++) {
     req_headers.addCopy(Http::LowerCaseString(absl::StrCat("dummyheader", i)), "some_value");

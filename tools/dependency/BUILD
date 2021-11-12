@@ -1,30 +1,25 @@
-load("@rules_python//python:defs.bzl", "py_binary")
-load("@deps_pip3//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-py_binary(
+py_library(
     name = "exports",
     srcs = ["exports.py"],
     data = [
         "//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations.bzl",
-        "@envoy_api_canonical//bazel:repository_locations_utils.bzl",
+        "@envoy_api//bazel:repository_locations.bzl",
+        "@envoy_api//bazel:repository_locations_utils.bzl",
     ],
 )
 
-py_binary(
-    name = "generate_external_dep_rst",
-    srcs = [
-        "generate_external_dep_rst.py",
-        "utils.py",
-    ],
-    data = [
-        ":exports",
-    ],
+py_library(
+    name = "utils",
+    srcs = ["utils.py"],
+    deps = [":exports"],
 )
 
 py_binary(
@@ -33,8 +28,11 @@ py_binary(
         "cve_scan.py",
         "utils.py",
     ],
+    args = ["$(location :cve.yaml)"],
     data = [
+        ":cve.yaml",
         ":exports",
+        requirement("envoy.base.utils"),
     ],
 )
 
@@ -49,8 +47,8 @@ py_binary(
 py_binary(
     name = "pip_check",
     srcs = ["pip_check.py"],
-    visibility = ["//visibility:public"],
     deps = [
-        requirement("PyYaml"),
+        "@envoy_repo",
+        requirement("envoy.dependency.pip_check"),
     ],
 )

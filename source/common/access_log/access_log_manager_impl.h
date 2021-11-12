@@ -9,9 +9,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "absl/container/node_hash_map.h"
 

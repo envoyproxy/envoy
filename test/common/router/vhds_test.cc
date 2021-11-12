@@ -7,11 +7,10 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/router/rds_impl.h"
-
-#include "server/admin/admin.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/router/rds_impl.h"
+#include "source/server/admin/admin.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/init/mocks.h"
@@ -76,7 +75,7 @@ vhds:
   RouteConfigUpdatePtr
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
     RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_);
+        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_, OptionalHttpFilters());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }

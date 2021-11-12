@@ -8,11 +8,10 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/oauth2/oauth.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
 namespace Extensions {

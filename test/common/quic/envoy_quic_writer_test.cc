@@ -3,18 +3,19 @@
 #include <memory>
 #include <string>
 
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/quic/envoy_quic_packet_writer.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/quic/envoy_quic_packet_writer.h"
 
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Return;
 
 namespace Envoy {
@@ -23,7 +24,7 @@ namespace Quic {
 class EnvoyQuicWriterTest : public ::testing::Test {
 public:
   EnvoyQuicWriterTest()
-      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(socket_.ioHandle())) {
+      : envoy_quic_writer_(std::make_unique<Network::UdpDefaultWriter>(io_handle_)) {
     self_address_.FromString("::");
     quic::QuicIpAddress peer_ip;
     peer_ip.FromString("::1");
@@ -33,10 +34,11 @@ public:
   }
 
   void verifySendData(const std::string& content, const msghdr* message) {
-    EXPECT_EQ(peer_address_.ToString(), Network::Address::addressFromSockAddr(
-                                            *reinterpret_cast<sockaddr_storage*>(message->msg_name),
-                                            message->msg_namelen, /*v6only=*/false)
-                                            ->asString());
+    EXPECT_EQ(peer_address_.ToString(),
+              (*Network::Address::addressFromSockAddr(
+                   *reinterpret_cast<sockaddr_storage*>(message->msg_name), message->msg_namelen,
+                   /*v6only=*/false))
+                  ->asString());
     cmsghdr* const cmsg = CMSG_FIRSTHDR(message);
     auto pktinfo = reinterpret_cast<in6_pktinfo*>(CMSG_DATA(cmsg));
     EXPECT_EQ(0, memcmp(self_address_.GetIPv6().s6_addr, pktinfo->ipi6_addr.s6_addr,
@@ -49,7 +51,7 @@ public:
 protected:
   testing::NiceMock<Api::MockOsSysCalls> os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
-  testing::NiceMock<Network::MockListenSocket> socket_;
+  Network::IoSocketHandleImpl io_handle_;
   quic::QuicIpAddress self_address_;
   quic::QuicSocketAddress peer_address_;
   EnvoyQuicPacketWriter envoy_quic_writer_;
@@ -88,7 +90,7 @@ TEST_F(EnvoyQuicWriterTest, SendBlocked) {
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                             peer_address_, nullptr);
   EXPECT_EQ(quic::WRITE_STATUS_BLOCKED, result.status);
-  EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::Again), result.error_code);
+  EXPECT_EQ(SOCKET_ERROR_AGAIN, result.error_code);
   EXPECT_TRUE(envoy_quic_writer_.IsWriteBlocked());
   // Writing while blocked is not allowed.
 #ifdef NDEBUG
@@ -115,7 +117,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailure) {
   quic::WriteResult result = envoy_quic_writer_.WritePacket(str.data(), str.length(), self_address_,
                                                             peer_address_, nullptr);
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);
-  EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::NoSupport), result.error_code);
+  EXPECT_EQ(SOCKET_ERROR_NOT_SUP, result.error_code);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
 }
 
@@ -131,7 +133,7 @@ TEST_F(EnvoyQuicWriterTest, SendFailureMessageTooBig) {
   // Currently MessageSize should be propagated through error_code. This test
   // would fail if QUICHE changes to propagate through status in the future.
   EXPECT_EQ(quic::WRITE_STATUS_ERROR, result.status);
-  EXPECT_EQ(static_cast<int>(Api::IoError::IoErrorCode::MessageTooBig), result.error_code);
+  EXPECT_EQ(SOCKET_ERROR_MSG_SIZE, result.error_code);
   EXPECT_FALSE(envoy_quic_writer_.IsWriteBlocked());
 }
 

@@ -5,11 +5,10 @@
 #include "envoy/extensions/filters/http/decompressor/v3/decompressor.pb.h"
 #include "envoy/http/filter.h"
 
-#include "common/common/macros.h"
-#include "common/http/headers.h"
-#include "common/runtime/runtime_protos.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/headers.h"
+#include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -175,11 +174,11 @@ private:
       headers.removeContentLength();
       modifyContentEncoding(headers);
 
-      ENVOY_STREAM_LOG(debug, "do decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     } else {
       direction_config.stats().not_decompressed_.inc();
-      ENVOY_STREAM_LOG(debug, "do not decompress {}: {}", callbacks, direction_config.logString(),
+      ENVOY_STREAM_LOG(trace, "do not decompress {}: {}", callbacks, direction_config.logString(),
                        headers);
     }
 

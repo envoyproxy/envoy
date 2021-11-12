@@ -37,8 +37,8 @@
 * Triage GitHub issues and perform pull request reviews for other maintainers and the community.
   The areas of specialization listed in [OWNERS.md](OWNERS.md) can be used to help with routing
   an issue/question to the right person.
-* Triage build issues - file issues for known flaky builds or bugs, and either fix or find someone
-  to fix any main build breakages.
+* Triage build and CI issues. Monitor #envoy-ci and #test-flaky and file issues for failing builds,
+  flaky tests or new bugs, and either fix or find someone to fix any main build breakages.
 * During GitHub issue triage, apply all applicable [labels](https://github.com/envoyproxy/envoy/labels)
   to each new issue. Labels are extremely useful for future issue follow up. Which labels to apply
   is somewhat subjective so just use your best judgment. A few of the most important labels that are
@@ -98,7 +98,8 @@ or you can subscribe to the iCal feed [here](webcal://kubernetes.app.opsgenie.co
 * From the envoy [landing page](https://github.com/envoyproxy/envoy) use the branch drop-down to create a branch
   from the tagged release, e.g. "release/v1.6". It will be used for the
   [stable releases](RELEASES.md#stable-releases).
-* Monitor the AZP tag build to make sure that the final docker images get pushed along with
+* Tagging will kick off another run of [AZP postsubmit](https://dev.azure.com/cncf/envoy/_build?definitionId=11). Monitor that
+  tag build to make sure that the final docker images get pushed along with
   the final docs. The final documentation will end up in the
   [envoyproxy.github.io repository](https://github.com/envoyproxy/envoyproxy.github.io/tree/main/docs/envoy).
 * Update the website ([example PR](https://github.com/envoyproxy/envoyproxy.github.io/pull/148)) for the new release.
@@ -140,7 +141,7 @@ New Features
 Deprecated
 ----------
 ```
-* Run the deprecate_versions.py script (e.g. `sh tools/deprecate_version/deprecate_version.sh`)
+* Run the deprecate_versions.py script (e.g. `bazel run //tools/deprecate_version:deprecate_version`)
   to file tracking issues for runtime guarded code which can be removed.
 * Check source/common/runtime/runtime_features.cc and see if any runtime guards in
   disabled_runtime_features should be reassessed, and ping on the relevant issues.

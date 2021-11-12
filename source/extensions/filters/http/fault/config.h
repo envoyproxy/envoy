@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +16,7 @@ namespace Fault {
 class FaultFilterFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::fault::v3::HTTPFault> {
 public:
-  FaultFilterFactory() : FactoryBase(HttpFilterNames::get().Fault) {}
+  FaultFilterFactory() : FactoryBase("envoy.filters.http.fault") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

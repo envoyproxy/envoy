@@ -1,11 +1,10 @@
 #include <memory>
 #include <string>
 
-#include "common/http/message_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/oauth.h"
-#include "extensions/filters/http/oauth2/oauth_client.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
+#include "source/extensions/filters/http/oauth2/oauth_client.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -29,7 +28,8 @@ using testing::Return;
 class MockCallbacks : public FilterCallbacks {
 public:
   MOCK_METHOD(void, sendUnauthorizedResponse, ());
-  MOCK_METHOD(void, onGetAccessTokenSuccess, (const std::string&, std::chrono::seconds));
+  MOCK_METHOD(void, onGetAccessTokenSuccess,
+              (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
 };
 
 class OAuth2ClientTest : public testing::Test {
@@ -97,7 +97,7 @@ TEST_F(OAuth2ClientTest, RequestAccessTokenSuccess) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncGetAccessToken("a", "b", "c", "d");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _));
+  EXPECT_CALL(*mock_callbacks_, onGetAccessTokenSuccess(_, _, _, _));
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));

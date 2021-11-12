@@ -1,17 +1,17 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 
-#include "common/common/macros.h"
-#include "common/http/message_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
+#include "source/common/common/macros.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/secret_manager_impl.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -96,12 +96,12 @@ public:
 
   // Set up proto fields with standard config.
   FilterConfigSharedPtr getConfig() {
-    envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
     endpoint->set_uri("auth.example.com/_oauth");
     endpoint->mutable_timeout()->set_seconds(1);
-    p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+    p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
     p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
     p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
     p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
@@ -114,11 +114,13 @@ public:
     p.add_resources("https://example.com");
     auto* matcher = p.add_pass_through_matcher();
     matcher->set_name(":method");
-    matcher->set_exact_match("OPTIONS");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
     auto credentials = p.mutable_credentials();
     credentials->set_client_id(TEST_CLIENT_ID);
     credentials->mutable_token_secret()->set_name("secret");
     credentials->mutable_hmac_secret()->set_name("hmac");
+    // Skipping setting credentials.cookie_names field should give default cookie names:
+    // BearerToken, OauthHMAC, and OauthExpires.
 
     MessageUtil::validate(p, ProtobufMessage::getStrictValidationVisitor());
 
@@ -141,6 +143,43 @@ public:
     return callbacks;
   }
 
+  // Validates the behavior of the cookie validator.
+  void expectValidCookies(const CookieNames& cookie_names) {
+    // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+    test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+    const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
+
+    Http::TestRequestHeaderMapImpl request_headers{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/anypath"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+        {Http::Headers::get().Cookie.get(),
+         fmt::format("{}={};version=test", cookie_names.oauth_expires_, expires_at_s)},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.bearer_token_, "=xyztoken;version=test")},
+        {Http::Headers::get().Cookie.get(),
+         absl::StrCat(cookie_names.oauth_hmac_, "="
+                                                "NGQ3MzVjZGExNGM5NTFiZGJjODBkMjBmYjAyYjNiOTFjMmNjYj"
+                                                "IxMTUzNmNiNWU0NjQzMmMxMWUzZmE2ZWJjYg=="
+                                                ";version=test")},
+    };
+
+    auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_, cookie_names);
+    EXPECT_EQ(cookie_validator->token(), "");
+    cookie_validator->setParams(request_headers, "mock-secret");
+
+    EXPECT_TRUE(cookie_validator->hmacIsValid());
+    EXPECT_TRUE(cookie_validator->timestampIsValid());
+    EXPECT_TRUE(cookie_validator->isValid());
+
+    // If we advance time beyond 10s the timestamp should no longer be valid.
+    test_time_.advanceTimeWait(std::chrono::seconds(11));
+
+    EXPECT_FALSE(cookie_validator->timestampIsValid());
+    EXPECT_FALSE(cookie_validator->isValid());
+  }
+
   NiceMock<Event::MockTimer>* attachmentTimeout_timer_{};
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -155,6 +194,81 @@ public:
   Event::SimulatedTimeSystem test_time_;
 };
 
+// Verifies that the OAuth SDSSecretReader correctly updates dynamic generic secret.
+TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
+  NiceMock<Server::MockConfigTracker> config_tracker;
+  Secret::SecretManagerImpl secret_manager{config_tracker};
+  envoy::config::core::v3::ConfigSource config_source;
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  Api::ApiPtr api = Api::createApiForTest();
+  Stats::IsolatedStoreImpl stats;
+  NiceMock<Init::MockManager> init_manager;
+  Init::TargetHandlePtr init_handle;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
+  EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
+  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
+  EXPECT_CALL(init_manager, add(_))
+      .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
+        init_handle = target.createHandle("test");
+      }));
+
+  auto client_secret_provider =
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "client", secret_context);
+  auto client_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+  auto token_secret_provider =
+      secret_manager.findOrCreateGenericSecretProvider(config_source, "token", secret_context);
+  auto token_callback = secret_context.cluster_manager_.subscription_factory_.callbacks_;
+
+  SDSSecretReader secret_reader(client_secret_provider, token_secret_provider, *api);
+  EXPECT_TRUE(secret_reader.clientSecret().empty());
+  EXPECT_TRUE(secret_reader.tokenSecret().empty());
+
+  const std::string yaml_client = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml_client, typed_secret);
+  const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "");
+
+  const std::string yaml_token = R"EOF(
+name: token
+generic_secret:
+  secret:
+    inline_string: "token_test"
+)EOF";
+  TestUtility::loadFromYaml(yaml_token, typed_secret);
+  const auto decoded_resources_token = TestUtility::decodeResources({typed_secret});
+
+  token_callback->onConfigUpdate(decoded_resources_token.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+
+  const std::string yaml_client_recheck = R"EOF(
+name: client
+generic_secret:
+  secret:
+    inline_string: "client_test_recheck"
+)EOF";
+  TestUtility::loadFromYaml(yaml_client_recheck, typed_secret);
+  const auto decoded_resources_client_recheck = TestUtility::decodeResources({typed_secret});
+
+  client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "");
+  EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
+  EXPECT_EQ(secret_reader.tokenSecret(), "token_test");
+}
 // Verifies that we fail constructing the filter if the configured cluster doesn't exist.
 TEST_F(OAuth2Test, InvalidCluster) {
   ON_CALL(factory_context_.cluster_manager_, clusters())
@@ -170,19 +284,19 @@ TEST_F(OAuth2Test, InvalidCluster) {
 TEST_F(OAuth2Test, DefaultAuthScope) {
 
   // Set up proto fields with no auth scope set.
-  envoy::extensions::filters::http::oauth2::v3alpha::OAuth2Config p;
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
   endpoint->set_uri("auth.example.com/_oauth");
   endpoint->mutable_timeout()->set_seconds(1);
-  p.set_redirect_uri("%REQ(x-forwarded-proto)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
   p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
   p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
   p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
   p.set_forward_bearer_token(true);
   auto* matcher = p.add_pass_through_matcher();
   matcher->set_name(":method");
-  matcher->set_exact_match("OPTIONS");
+  matcher->mutable_string_match()->set_exact("OPTIONS");
 
   auto credentials = p.mutable_credentials();
   credentials->set_client_id(TEST_CLIENT_ID);
@@ -211,7 +325,6 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "http"},
-      {Http::Headers::get().ForwardedProto.get(), "http"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -245,7 +358,7 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -254,6 +367,10 @@ TEST_F(OAuth2Test, RequestSignout) {
        "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -275,7 +392,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer injected_malice!"},
   };
 
@@ -283,7 +400,7 @@ TEST_F(OAuth2Test, OAuthOkPass) {
       {Http::Headers::get().Path.get(), "/anypath"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer legit_token"},
   };
 
@@ -319,7 +436,6 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "http"},
-      {Http::Headers::get().ForwardedProto.get(), "http"},
   };
 
   Http::TestResponseHeaderMapImpl response_headers{
@@ -384,7 +500,7 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=https://asdf&method=GET"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
   };
 
@@ -420,37 +536,12 @@ TEST_F(OAuth2Test, OAuthOptionsRequestAndContinue) {
 
 // Validates the behavior of the cookie validator.
 TEST_F(OAuth2Test, CookieValidator) {
-  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
-  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+  expectValidCookies(CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
+}
 
-  const auto expires_at_s = DateUtil::nowToSeconds(test_time_.timeSystem()) + 10;
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {Http::Headers::get().Host.get(), "traffic.example.com"},
-      {Http::Headers::get().Path.get(), "/anypath"},
-      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().Cookie.get(),
-       fmt::format("OauthExpires={};version=test", expires_at_s)},
-      {Http::Headers::get().Cookie.get(), "BearerToken=xyztoken;version=test"},
-      {Http::Headers::get().Cookie.get(),
-       "OauthHMAC="
-       "NGQ3MzVjZGExNGM5NTFiZGJjODBkMjBmYjAyYjNiOTFjMmNjYjIxMTUzNmNiNWU0NjQzMmMxMWUzZmE2ZWJjYg=="
-       ";version=test"},
-  };
-
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
-  EXPECT_EQ(cookie_validator->token(), "");
-  cookie_validator->setParams(request_headers, "mock-secret");
-
-  EXPECT_TRUE(cookie_validator->hmacIsValid());
-  EXPECT_TRUE(cookie_validator->timestampIsValid());
-  EXPECT_TRUE(cookie_validator->isValid());
-
-  // If we advance time beyond 10s the timestamp should no longer be valid.
-  test_time_.advanceTimeWait(std::chrono::seconds(11));
-
-  EXPECT_FALSE(cookie_validator->timestampIsValid());
-  EXPECT_FALSE(cookie_validator->isValid());
+// Validates the behavior of the cookie validator with custom cookie names.
+TEST_F(OAuth2Test, CookieValidatorWithCustomNames) {
+  expectValidCookies(CookieNames{"CustomBearerToken", "CustomOauthHMAC", "CustomOauthExpires"});
 }
 
 // Validates the behavior of the cookie validator when the expires_at value is not a valid integer.
@@ -467,7 +558,8 @@ TEST_F(OAuth2Test, CookieValidatorInvalidExpiresAt) {
        ";version=test"},
   };
 
-  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(test_time_);
+  auto cookie_validator = std::make_shared<OAuth2CookieValidator>(
+      test_time_, CookieNames{"BearerToken", "OauthHMAC", "OauthExpires"});
   cookie_validator->setParams(request_headers, "mock-secret");
 
   EXPECT_TRUE(cookie_validator->hmacIsValid());
@@ -629,7 +721,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
       {Http::Headers::get().Path.get(), "/test?name=admin&level=trace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Post},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // This is the immediate response - a redirect to the auth cluster.
@@ -664,7 +756,7 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithParameters) {
                                         "2Ftest%3Fname%3Dadmin%26level%3Dtrace"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
 
   // Deliberately fail the HMAC validation check.
@@ -708,7 +800,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
   // Expected decoded headers after the callback & validation of the bearer token is complete.
@@ -716,7 +808,7 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromHeader) {
       {Http::Headers::get().Path.get(), "/test?role=bearer"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-header-token"},
   };
 
@@ -736,13 +828,13 @@ TEST_F(OAuth2Test, OAuthBearerTokenFlowFromQueryParameters) {
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
   };
   Http::TestRequestHeaderMapImpl request_headers_after{
       {Http::Headers::get().Path.get(), "/test?role=bearer&token=xyz-queryparam-token"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
-      {Http::Headers::get().ForwardedProto.get(), "https"},
+      {Http::Headers::get().Scheme.get(), "https"},
       {Http::CustomHeaders::get().Authorization.get(), "Bearer xyz-queryparam-token"},
   };
 

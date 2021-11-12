@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +13,7 @@ namespace HealthCheck {
 class HealthCheckFilterConfig
     : public Common::FactoryBase<envoy::extensions::filters::http::health_check::v3::HealthCheck> {
 public:
-  HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HealthCheck) {}
+  HealthCheckFilterConfig() : FactoryBase("envoy.filters.http.health_check") {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

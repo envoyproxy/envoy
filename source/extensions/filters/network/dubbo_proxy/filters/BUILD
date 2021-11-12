@@ -12,9 +12,9 @@ envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/stream_info:stream_info_interface",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/extensions/filters/network/dubbo_proxy:decoder_events_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
@@ -28,8 +28,8 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":filter_interface",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/server:filter_config_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:filter_config_interface",
         "//source/common/common:macros",
         "//source/common/protobuf:cc_wkt_protos",
     ],
@@ -41,13 +41,5 @@ envoy_cc_library(
     deps = [
         ":filter_config_interface",
         "//source/common/protobuf:utility_lib",
-    ],
-)
-
-envoy_cc_library(
-    name = "well_known_names",
-    hdrs = ["well_known_names.h"],
-    deps = [
-        "//source/common/singleton:const_singleton",
     ],
 )

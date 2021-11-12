@@ -13,7 +13,7 @@ set -e
 #   tree structure.)
 
 # Determine base directory of unmodified QUICHE source files. In practice, this
-# ends up being "external/com_googlesource_quiche".
+# ends up being "external/com_github_google_quiche".
 src_base_dir=$$(dirname $$(dirname $$(dirname $(rootpath quic/core/quic_constants.h))))
 
 # sed commands to apply to each source file.
@@ -30,7 +30,7 @@ cat <<EOF >sed_commands
 /^#include/ s!net/quic/platform/impl/quic_test_output_impl.h!test/common/quic/platform/quic_test_output_impl.h!
 /^#include/ s!net/quic/platform/impl/quic_thread_impl.h!test/common/quic/platform/quic_thread_impl.h!
 /^#include/ s!net/quiche/common/platform/impl/quiche_test_impl.h!test/common/quic/platform/quiche_test_impl.h!
-/^#include/ s!net/spdy/platform/impl/spdy_test_helpers_impl.h!test/common/quic/platform/spdy_test_helpers_impl.h!
+/^#include/ s!net/quiche/common/platform/impl/quiche_test_helpers_impl.h!test/common/quic/platform/quiche_test_helpers_impl.h!
 /^#include/ s!net/spdy/platform/impl/spdy_test_impl.h!test/common/quic/platform/spdy_test_impl.h!
 
 # Rewrite include directives for platform impl files.
@@ -47,10 +47,13 @@ cat <<EOF >sed_commands
 /^#include/ s!"epoll_server/!"quiche/epoll_server/!
 
 # The above global substitutions will prepend "quiche" to the platform code which we want to undo.
-/^#include/ s!"quiche/common/quic/platform/!"common/quic/platform/!
+/^#include/ s!"quiche/common/quic/platform/!"source/common/quic/platform/!
 
 # Use envoy specific implementations for below platform APIs.
-/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"common/quic/platform/quiche_logging_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_logging_impl.h!"source/common/quic/platform/quiche_logging_impl.h!
+/^#include/ s!"quiche_platform_impl/quiche_bug_tracker_impl.h!"source/common/quic/platform/quiche_bug_tracker_impl.h!
+
+# The reset platform APIs use the QUICHE default implementations.
 /^#include/ s!"quiche_platform_impl/!"quiche/common/platform/default/quiche_platform_impl/!
 
 # Rewrite gmock & gtest includes.
@@ -70,7 +73,7 @@ EOF
 
 for src_file in $(SRCS); do
   # Extract relative path (e.g. "quic/core/quic_utils.cc") from full path in
-  # src_path (e.g. "external/com_googlesource_quiche/quic/core/quic_utils.cc").
+  # src_path (e.g. "external/com_github_google_quiche/quic/core/quic_utils.cc").
   src_path="$${src_file#$$src_base_dir/}"
 
   # Map to output file with quiche/ base directory inserted in path.

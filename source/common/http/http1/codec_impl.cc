@@ -1,4 +1,4 @@
-#include "common/http/http1/codec_impl.h"
+#include "source/common/http/http1/codec_impl.h"
 
 #include <memory>
 #include <string>
@@ -9,20 +9,20 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/common/cleanup.h"
-#include "common/common/dump_state_utils.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/scope_tracker.h"
-#include "common/common/statusor.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/exception.h"
-#include "common/http/header_utility.h"
-#include "common/http/headers.h"
-#include "common/http/http1/header_formatter.h"
-#include "common/http/http1/legacy_parser_impl.h"
-#include "common/http/utility.h"
-#include "common/runtime/runtime_features.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/dump_state_utils.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/statusor.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/exception.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/http1/header_formatter.h"
+#include "source/common/http/http1/legacy_parser_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
@@ -33,7 +33,7 @@ namespace Http1 {
 namespace {
 
 // Changes or additions to details should be reflected in
-// docs/root/configuration/http/http_conn_man/response_code_details_details.rst
+// docs/root/configuration/http/http_conn_man/response_code_details.rst
 struct Http1ResponseCodeDetailValues {
   const absl::string_view TooManyHeaders = "http1.too_many_headers";
   const absl::string_view HeadersTooLarge = "http1.headers_too_large";
@@ -80,16 +80,22 @@ StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Set
   return nullptr;
 }
 
+constexpr size_t CRLF_SIZE = 2;
+
 } // namespace
 
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n";
 
-StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection)
+StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
+                                     StreamInfo::BytesMeterSharedPtr&& bytes_meter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false) {
+      is_response_to_connect_request_(false), bytes_meter_(bytes_meter) {
+  if (!bytes_meter_) {
+    bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
+  }
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
   }
@@ -99,12 +105,13 @@ void StreamEncoderImpl::encodeHeader(const char* key, uint32_t key_size, const c
                                      uint32_t value_size) {
 
   ASSERT(key_size > 0);
-
+  const uint64_t old_buffer_length = connection_.buffer().length();
   connection_.copyToBuffer(key, key_size);
   connection_.addCharToBuffer(':');
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(value, value_size);
   connection_.addToBuffer(CRLF);
+  bytes_meter_->addHeaderBytesSent(connection_.buffer().length() - old_buffer_length);
 }
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   this->encodeHeader(key.data(), key.size(), value.data(), value.size());
@@ -119,8 +126,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+  ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
@@ -177,6 +184,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     if (status && *status == 100) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
       chunk_encoding_ = false;
+    } else if (status && *status == 304 && connection_.noChunkedEncodingHeaderFor304()) {
+      // For 304 response, since it should never have a body, we should not need to chunk_encode at
+      // all.
+      chunk_encoding_ = false;
     } else if (end_stream && !is_response_to_head_request_) {
       // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
       // response to a HEAD request.
@@ -185,9 +196,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
       // Also do not add content length for requests which should not have a
       // body, per https://tools.ietf.org/html/rfc7230#section-3.3.2
       if (!status || (*status >= 200 && *status != 204)) {
-        if (!bodiless_request ||
-            !Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.dont_add_content_length_for_bodiless_requests")) {
+        if (!bodiless_request) {
           encodeFormattedHeader(header_values.ContentLength.get(), "0", formatter);
         }
       }
@@ -195,9 +204,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     } else if (connection_.protocol() == Protocol::Http10) {
       chunk_encoding_ = false;
     } else if (status && (*status < 200 || *status == 204) &&
-               connection_.strict1xxAnd204Headers()) {
-      // TODO(zuercher): when the "envoy.reloadable_features.strict_1xx_and_204_response_headers"
-      // feature flag is removed, this block can be coalesced with the 100 Continue logic above.
+               connection_.sendStrict1xxAnd204Headers()) {
+      // TODO(zuercher): when the
+      // "envoy.reloadable_features.send_strict_1xx_and_204_response_headers" feature flag is
+      // removed, this block can be coalesced with the 100 Continue logic above.
 
       // For 1xx and 204 responses, do not send the chunked encoding header or enable chunked
       // encoding: https://tools.ietf.org/html/rfc7230#section-3.3.1
@@ -226,7 +236,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
   if (end_stream) {
     endEncode();
   } else {
-    connection_.flushOutput();
+    flushOutput();
   }
 }
 
@@ -235,7 +245,8 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   // actually write the zero length buffer out.
   if (data.length() > 0) {
     if (chunk_encoding_) {
-      connection_.buffer().add(absl::StrCat(absl::Hex(data.length()), CRLF));
+      std::string chunk_header = absl::StrCat(absl::Hex(data.length()), CRLF);
+      connection_.buffer().add(std::move(chunk_header));
     }
 
     connection_.buffer().move(data);
@@ -248,8 +259,13 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     endEncode();
   } else {
-    connection_.flushOutput();
+    flushOutput();
   }
+}
+
+void StreamEncoderImpl::flushOutput(bool end_encode) {
+  auto encoded_bytes = connection_.flushOutput(end_encode);
+  bytes_meter_->addWireBytesSent(encoded_bytes);
 }
 
 void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
@@ -269,11 +285,11 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    connection_.flushOutput();
+    flushOutput();
     connection_.buffer().add(CRLF);
   }
 
-  connection_.flushOutput();
+  flushOutput();
   connection_.onEncodeComplete();
 }
 
@@ -287,7 +303,7 @@ void StreamEncoderImpl::endEncode() {
     connection_.buffer().add(CRLF);
   }
 
-  connection_.flushOutput(true);
+  flushOutput(true);
   connection_.onEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
   if (connect_request_ || is_tcp_tunneling_) {
@@ -321,14 +337,16 @@ Status ServerConnectionImpl::doFloodProtectionChecks() const {
   return okStatus();
 }
 
-void ConnectionImpl::flushOutput(bool end_encode) {
+uint64_t ConnectionImpl::flushOutput(bool end_encode) {
   if (end_encode) {
     // If this is an HTTP response in ServerConnectionImpl, track outbound responses for flood
     // protection
     maybeAddSentinelBufferFragment(*output_buffer_);
   }
+  const uint64_t bytes_encoded = output_buffer_->length();
   connection().write(*output_buffer_, false);
   ASSERT(0UL == output_buffer_->length());
+  return bytes_encoded;
 }
 
 void ConnectionImpl::addToBuffer(absl::string_view data) { output_buffer_->add(data); }
@@ -343,6 +361,21 @@ void ConnectionImpl::copyToBuffer(const char* data, uint64_t length) {
 
 void StreamEncoderImpl::resetStream(StreamResetReason reason) {
   connection_.onResetStreamBase(reason);
+}
+
+void ResponseEncoderImpl::resetStream(StreamResetReason reason) {
+  // Clear the downstream on the account since we're resetting the downstream.
+  if (buffer_memory_account_) {
+    buffer_memory_account_->clearDownstream();
+  }
+
+  // For H1, we use idleTimeouts to cancel streams unless there was an
+  // explicit protocol error prior to sending a response to the downstream
+  // in which case we send a local reply.
+  // TODO(kbaichoo): If we want snappier resets of H1 streams we can
+  //  1) Send local reply if no response data sent yet
+  //  2) Invoke the idle timeout sooner to close underlying connection
+  StreamEncoderImpl::resetStream(reason);
 }
 
 void StreamEncoderImpl::readDisable(bool disable) {
@@ -360,7 +393,7 @@ void StreamEncoderImpl::readDisable(bool disable) {
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
 const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
-  return connection_.connection().addressProvider().localAddress();
+  return connection_.connection().connectionInfoProvider().localAddress();
 }
 
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
@@ -401,7 +434,7 @@ static const char REQUEST_POSTFIX[] = " HTTP/1.1\r\n";
 Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool end_stream) {
   // Required headers must be present. This can only happen by some erroneous processing after the
   // downstream codecs decode.
-  RETURN_IF_ERROR(HeaderUtility::checkRequiredHeaders(headers));
+  RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
   const HeaderEntry* path = headers.Path();
@@ -458,12 +491,16 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       encode_only_header_key_formatter_(encodeOnlyFormatterFromSettings(settings)),
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false),
-      strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.strict_1xx_and_204_response_headers")),
-      dispatching_(false), output_buffer_(connection.dispatcher().getWatermarkFactory().create(
-                               [&]() -> void { this->onBelowLowWatermark(); },
-                               [&]() -> void { this->onAboveHighWatermark(); },
-                               []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
+      require_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.require_strict_1xx_and_204_response_headers")),
+      send_strict_1xx_and_204_headers_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.send_strict_1xx_and_204_response_headers")),
+      dispatching_(false), no_chunked_encoding_header_for_304_(Runtime::runtimeFeatureEnabled(
+                               "envoy.reloadable_features.no_chunked_encoding_header_for_304")),
+      output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
+          [&]() -> void { this->onBelowLowWatermark(); },
+          [&]() -> void { this->onAboveHighWatermark(); },
+          []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
       max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
@@ -473,9 +510,13 @@ Status ConnectionImpl::completeLastHeader() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "completed header: key={} value={}", connection_,
                  current_header_field_.getStringView(), current_header_value_.getStringView());
-
-  RETURN_IF_ERROR(checkHeaderNameForUnderscores());
   auto& headers_or_trailers = headersOrTrailers();
+
+  // Account for ":" and "\r\n" bytes between the header key value pair.
+  getBytesMeter().addHeaderBytesReceived(CRLF_SIZE + 1);
+
+  // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
+  RETURN_IF_ERROR(checkHeaderNameForUnderscores());
   if (!current_header_field_.empty()) {
     // Strip trailing whitespace of the current header value if any. Leading whitespace was trimmed
     // in ConnectionImpl::onHeaderValue. http_parser does not strip leading or trailing whitespace
@@ -538,6 +579,10 @@ bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
   return true;
 }
 
+void ConnectionImpl::onDispatch(const Buffer::Instance& data) {
+  getBytesMeter().addWireBytesReceived(data.length());
+}
+
 Http::Status ClientConnectionImpl::dispatch(Buffer::Instance& data) {
   Http::Status status = ConnectionImpl::dispatch(data);
   if (status.ok() && data.length() > 0) {
@@ -560,6 +605,7 @@ Http::Status ConnectionImpl::dispatch(Buffer::Instance& data) {
   ASSERT(buffered_body_.length() == 0);
 
   dispatching_ = true;
+  onDispatch(data);
   if (maybeDirectDispatch(data)) {
     return Http::okStatus();
   }
@@ -630,6 +676,9 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
 
 Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
   ASSERT(dispatching_);
+
+  getBytesMeter().addHeaderBytesReceived(length);
+
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
@@ -652,6 +701,9 @@ Status ConnectionImpl::onHeaderField(const char* data, size_t length) {
 
 Status ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   ASSERT(dispatching_);
+
+  getBytesMeter().addHeaderBytesReceived(length);
+
   if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
     return okStatus();
@@ -852,8 +904,9 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http1::ConnectionImpl " << this << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(dispatching_slice_already_drained_) << DUMP_MEMBER(reset_stream_called_)
      << DUMP_MEMBER(handling_upgrade_) << DUMP_MEMBER(deferred_end_stream_headers_)
-     << DUMP_MEMBER(strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
-     << DUMP_MEMBER(buffered_body_.length());
+     << DUMP_MEMBER(require_strict_1xx_and_204_headers_)
+     << DUMP_MEMBER(send_strict_1xx_and_204_headers_) << DUMP_MEMBER(processing_trailers_)
+     << DUMP_MEMBER(no_chunked_encoding_header_for_304_) << DUMP_MEMBER(buffered_body_.length());
 
   // Dump header parsing state, and any progress on headers.
   os << DUMP_MEMBER(header_parsing_state_);
@@ -888,11 +941,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
 
 void ServerConnectionImpl::dumpAdditionalState(std::ostream& os, int indent_level) const {
   const char* spaces = spacesForLevel(indent_level);
-  os << DUMP_MEMBER_AS(active_request_.request_url_,
-                       active_request_.has_value() &&
-                               !active_request_.value().request_url_.getStringView().empty()
-                           ? active_request_.value().request_url_.getStringView()
-                           : "null");
+
+  DUMP_DETAILS(active_request_);
   os << '\n';
 
   // Dump header map, it may be null if it was moved to the request, and
@@ -1001,8 +1051,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   headers.setHost(absolute_url.hostAndPort());
   // Add the scheme and validate to ensure no https://
   // requests are accepted over unencrypted connections by front-line Envoys.
-  if (!is_connect &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!is_connect) {
     headers.setScheme(absolute_url.scheme());
     if (!HeaderUtility::schemeIsValid(absolute_url.scheme())) {
       RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidScheme));
@@ -1093,7 +1142,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
 Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this);
+    active_request_.emplace(*this, std::move(bytes_meter_before_stream_));
     auto& active_request = active_request_.value();
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
@@ -1171,17 +1220,8 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 
   active_request_.value().response_encoder_.setDetails(details);
   if (!active_request_.value().response_encoder_.startedResponse()) {
-    // Note that the correctness of is_grpc_request and is_head_request is best-effort.
-    // If headers have not been fully parsed they may not be inferred correctly.
-    bool is_grpc_request = false;
-    if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_) &&
-        absl::get<RequestHeaderMapPtr>(headers_or_trailers_) != nullptr) {
-      is_grpc_request =
-          Grpc::Common::isGrpcRequestHeaders(*absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-    }
-    active_request_->request_decoder_->sendLocalReply(is_grpc_request, error_code_,
-                                                      CodeUtility::toString(error_code_), nullptr,
-                                                      absl::nullopt, details);
+    active_request_->request_decoder_->sendLocalReply(
+        error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
   return okStatus();
 }
@@ -1226,6 +1266,13 @@ Status ServerConnectionImpl::checkHeaderNameForUnderscores() {
   return okStatus();
 }
 
+void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent_level) const {
+  (void)indent_level;
+  os << DUMP_MEMBER_AS(
+      request_url_, !request_url_.getStringView().empty() ? request_url_.getStringView() : "null");
+  os << DUMP_MEMBER(response_encoder_.local_end_stream_);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
                                            const uint32_t max_response_headers_count)
@@ -1253,7 +1300,7 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
 
   ASSERT(!pending_response_.has_value());
   ASSERT(pending_response_done_);
-  pending_response_.emplace(*this, &response_decoder);
+  pending_response_.emplace(*this, std::move(bytes_meter_before_stream_), &response_decoder);
   pending_response_done_ = false;
   return pending_response_.value().encoder_;
 }
@@ -1278,7 +1325,7 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       handling_upgrade_ = true;
     }
 
-    if (strict_1xx_and_204_headers_ &&
+    if (require_strict_1xx_and_204_headers_ &&
         (parser_->statusCode() < 200 || parser_->statusCode() == 204)) {
       if (headers->TransferEncoding()) {
         RETURN_IF_ERROR(
@@ -1300,8 +1347,8 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       }
     }
 
-    if (parser_->statusCode() == enumToInt(Http::Code::Continue)) {
-      pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
+    if (HeaderUtility::isSpecial1xx(*headers)) {
+      pending_response_.value().decoder_->decode1xxHeaders(std::move(headers));
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {

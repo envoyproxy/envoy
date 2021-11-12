@@ -4,19 +4,22 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "common/quic/platform/quiche_flags_impl.h"
+#include "source/common/quic/platform/quiche_flags_impl.h"
 
 #include <set>
 
+#include "source/common/common/assert.h"
+
 #include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
 #include "absl/strings/numbers.h"
 
 namespace quiche {
 
 namespace {
 
-absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
-  absl::flat_hash_map<std::string, Flag*> flags;
+absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
+  absl::flat_hash_map<absl::string_view, Flag*> flags;
 
 #define QUIC_FLAG(flag, ...) flags.emplace(flag->name(), flag);
 #include "quiche/quic/core/quic_flags_list.h"
@@ -29,11 +32,17 @@ absl::flat_hash_map<std::string, Flag*> makeFlagMap() {
   QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_false, false)
   QUIC_FLAG(FLAGS_quic_restart_flag_http2_testonly_default_true, true)
 #undef QUIC_FLAG
+  // Envoy only supports RFC-v1 in the long term, so disable IETF draft 29 implementation by
+  // default.
+  FLAGS_quic_reloadable_flag_quic_disable_version_draft_29->setValue(true);
+  // This flag fixes a QUICHE issue which may crash Envoy during connection close.
+  FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2->setValue(true);
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"
 #undef QUIC_PROTOCOL_FLAG
-
+  // Do not include 32-byte per-entry overhead while counting header size.
+  FLAGS_quic_header_size_limit_includes_overhead->setValue(false);
   return flags;
 }
 
@@ -53,9 +62,21 @@ void FlagRegistry::resetFlags() const {
   }
 }
 
-Flag* FlagRegistry::findFlag(const std::string& name) const {
+Flag* FlagRegistry::findFlag(absl::string_view name) const {
   auto it = flags_.find(name);
   return (it != flags_.end()) ? it->second : nullptr;
+}
+
+void FlagRegistry::updateReloadableFlags(
+    const absl::flat_hash_map<std::string, bool>& quiche_flags_override) {
+  for (auto& kv : flags_) {
+    const auto it = quiche_flags_override.find(kv.first);
+    if (it != quiche_flags_override.end()) {
+      static_cast<TypedFlag<bool>*>(kv.second)->setReloadedValue(it->second);
+    } else {
+      kv.second->resetReloadedValue();
+    }
+  }
 }
 
 template <> bool TypedFlag<bool>::setValueFromString(const std::string& value_str) {

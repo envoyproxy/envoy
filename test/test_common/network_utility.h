@@ -8,11 +8,22 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/network/win32_socket_handle_impl.h"
+
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Network {
 namespace Test {
+
+#if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
+using IoSocketHandlePlatformImpl = Win32SocketHandleImpl;
+#else
+using IoSocketHandlePlatformImpl = IoSocketHandleImpl;
+#endif
 
 /**
  * Determines if the passed in address and port is available for binding. If the port is zero,
@@ -200,13 +211,25 @@ public:
 
   // Return the local peer's socket address.
   const Network::Address::InstanceConstSharedPtr& localAddress() {
-    return socket_->addressProvider().localAddress();
+    return socket_->connectionInfoProvider().localAddress();
   }
 
 private:
   const Network::SocketPtr socket_;
   const uint64_t max_rx_datagram_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
+};
+
+/**
+ * A test version of TcpListenSocket that immediately listens which is a common pattern in tests.
+ */
+class TcpListenSocketImmediateListen : public Network::TcpListenSocket {
+public:
+  TcpListenSocketImmediateListen(const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options = nullptr)
+      : TcpListenSocket(address, options, true) {
+    EXPECT_EQ(0, io_handle_->listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+  }
 };
 
 } // namespace Test

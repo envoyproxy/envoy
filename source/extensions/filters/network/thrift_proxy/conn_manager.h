@@ -7,18 +7,17 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/linked_object.h"
-#include "common/common/logger.h"
-#include "common/stats/timespan_impl.h"
-#include "common/stream_info/stream_info_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/protocol_converter.h"
-#include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/linked_object.h"
+#include "source/common/common/logger.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol_converter.h"
+#include "source/extensions/filters/network/thrift_proxy/stats.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/types/any.h"
 
@@ -41,17 +40,6 @@ public:
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
   virtual uint64_t maxRequestsPerConnection() const PURE;
-};
-
-/**
- * Extends Upstream::ProtocolOptionsConfig with Thrift-specific cluster options.
- */
-class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
-public:
-  ~ProtocolOptionsConfig() override = default;
-
-  virtual TransportType transport(TransportType downstream_transport) const PURE;
-  virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
 };
 
 /**
@@ -86,17 +74,15 @@ private:
   struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
-          complete_(false), first_reply_field_(false) {
+          complete_(false), passthrough_{false} {
       initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
+    FilterStatus passthroughData(Buffer::Instance& data) override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-    FilterStatus messageEnd() override;
-    FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
-                            int16_t& field_id) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
       return FilterStatus::Continue;
@@ -113,7 +99,7 @@ private:
     MessageMetadataSharedPtr metadata_;
     absl::optional<bool> success_;
     bool complete_ : 1;
-    bool first_reply_field_ : 1;
+    bool passthrough_ : 1;
   };
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
@@ -127,6 +113,7 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
     const Network::Connection* connection() const override { return parent_.connection(); }
+    Event::Dispatcher& dispatcher() override { return parent_.dispatcher(); }
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override { return parent_.route(); }
     TransportType downstreamTransportType() const override {
@@ -146,6 +133,8 @@ private:
     }
     void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
     StreamInfo::StreamInfo& streamInfo() override { return parent_.streamInfo(); }
+    MessageMetadataSharedPtr responseMetadata() override { return parent_.responseMetadata(); }
+    bool responseSuccess() override { return parent_.responseSuccess(); }
 
     ActiveRpc& parent_;
     ThriftFilters::DecoderFilterSharedPtr handle_;
@@ -163,8 +152,8 @@ private:
                                parent_.stats_.request_time_ms_, parent_.time_source_)),
           stream_id_(parent_.random_generator_.random()),
           stream_info_(parent_.time_source_,
-                       parent_.read_callbacks_->connection().addressProviderSharedPtr()),
-          local_response_sent_{false}, pending_transport_end_{false} {
+                       parent_.read_callbacks_->connection().connectionInfoProviderSharedPtr()),
+          local_response_sent_{false}, pending_transport_end_{false}, passthrough_{false} {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() override {
@@ -204,6 +193,9 @@ private:
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
+    Event::Dispatcher& dispatcher() override {
+      return parent_.read_callbacks_->connection().dispatcher();
+    }
     void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
@@ -217,6 +209,8 @@ private:
     ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
     StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
+    MessageMetadataSharedPtr responseMetadata() override { return response_decoder_->metadata_; }
+    bool responseSuccess() override { return response_decoder_->success_.value_or(false); }
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -249,6 +243,7 @@ private:
     absl::any filter_context_;
     bool local_response_sent_ : 1;
     bool pending_transport_end_ : 1;
+    bool passthrough_ : 1;
   };
 
   using ActiveRpcPtr = std::unique_ptr<ActiveRpc>;

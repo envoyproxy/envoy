@@ -3,6 +3,11 @@
 Matching API
 ============
 
+.. attention::
+
+   The matching API is alpha and is currently under active development.
+   Capabilities will be expanded over time and the configuration structures are likely to change.
+
 Envoy makes use of a :ref:`matching API <envoy_v3_api_msg_config.common.matcher.v3.Matcher>`
 to allow the various subsystems to express actions that should be performed based on incoming data.
 
@@ -10,6 +15,9 @@ The matching API is designed as a tree structure to allow for sublinear matching
 better performance than the linear list matching as seen in Envoy's HTTP routing. It makes heavy
 use of extension points to make it easy to extend to different inputs based on protocol or
 environment data as well as custom sublinear matchers and direct matchers.
+
+Filter Integration
+##################
 
 Within supported environments (currently only HTTP filters), a wrapper proto can be used to
 instantiate a matching filter associated with the wrapped structure:
@@ -23,15 +31,15 @@ The above example wraps a HTTP filter (the
 allowing us to define a match tree to be evaluated in conjunction with evaluation of the wrapped
 filter. Prior to data being made available to the filter, it will be provided to the match tree,
 which will then attempt to evaluate the matching rules with the provided data, triggering an
-action if match evaluation completes in an action.
+action if match evaluation results in an action.
 
 In the above example, we are specifying that we want to match on the incoming request header
-`some-header` by setting the `input` to
+``some-header`` by setting the ``input`` to
 :ref:`HttpRequestHeaderMatchInput <envoy_v3_api_msg_type.matcher.v3.HttpRequestHeaderMatchInput>`
 and configuring the header key to use. Using the value contained by this header, the provided
-`exact_match_map` specifies which values we care about: we've configured a single value
-(`some_value_to_match_on`) to match against. As a result, this config means that if we
-receive a request which contains `some-header: some_value_to_match_on` as a header, the
+``exact_match_map`` specifies which values we care about: we've configured a single value
+(``some_value_to_match_on``) to match against. As a result, this config means that if we
+receive a request which contains ``some-header: some_value_to_match_on`` as a header, the
 :ref:`SkipFilter <envoy_v3_api_msg_extensions.filters.common.matcher.action.v3.SkipFilter>`
 action will be resolved (causing the associated HTTP filter to be skipped). If no such header is
 present, no action will be resolved and the filter will be applied as usual.
@@ -43,13 +51,13 @@ Above is a slightly more complicated example which combines a top level tree mat
 linear matcher. While the tree matchers provide very efficient matching, they are not very
 expressive. The list matcher can be used to provide a much richer matching API, and can be combined
 with the tree matcher in an arbitrary order. The example describes the following match logic: skip
-the filter if `some-header: skip_filter` is present and `second-header` is set to *either* `foo` or
-`bar`.
+the filter if ``some-header: skip_filter`` is present and ``second-header`` is set to *either* ``foo`` or
+``bar``.
 
 .. _arch_overview_matching_api_iteration_impact:
 
 HTTP Filter Iteration Impact
-============================
+****************************
 
 The above example only demonstrates matching on request headers, which ends up being the simplest
 case due to it happening before the associated filter receives any data. Matching on other HTTP
@@ -75,8 +83,15 @@ client will receive an invalid response back from Envoy. If the skip action was 
 trailers, the same gRPC-Web filter would consume all the data but never write it back out (as this
 happens when it sees the trailers), resulting in a gRPC-Web response with an empty body.
 
+HTTP Routing Integration
+########################
+
+The matching API can be used with HTTP routing, by specifying a match tree as part of the virtual host
+and specifying a Route as the resulting action. See examples in the above sections for how the match
+tree can be configured.
+
 Match Tree Validation
-=====================
+#####################
 
 As the match tree structure is very flexible, some filters might need to impose additional restrictions
 on what kind of match trees can be used. This system is somewhat inflexible at the moment, only supporting
@@ -86,7 +101,7 @@ will fail during configuration load, reporting back which data input was invalid
 
 This is done for example to limit the issues talked about in
 :ref:`the above section <arch_overview_matching_api_iteration_impact>` or to help users understand in what
-context a match tree can be used for a specific filter. Due to the limitations of the validations framework
+context a match tree can be used for a specific filter. Due to the limitations of the validation framework
 at the current time, it is not used for all filters.
 
 For HTTP filters, the restrictions are specified by the filter implementation, so consult the individual

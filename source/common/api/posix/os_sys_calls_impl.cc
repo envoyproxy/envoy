@@ -5,7 +5,7 @@
 #include <cerrno>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 namespace Envoy {
 namespace Api {
@@ -148,6 +148,20 @@ bool OsSysCallsImpl::supportsIpTransparent() const {
     return result;
   }();
   return is_supported;
+#endif
+}
+
+bool OsSysCallsImpl::supportsMptcp() const {
+#if !defined(__linux__)
+  return false;
+#else
+  int fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_MPTCP);
+  if (fd < 0) {
+    return false;
+  }
+
+  ::close(fd);
+  return true;
 #endif
 }
 

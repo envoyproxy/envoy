@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/original_dst/original_dst.h"
+#include "source/extensions/filters/listener/original_dst/original_dst.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -20,7 +20,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   auto filter =
       std::make_unique<OriginalDstFilter>(envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input);
+  fuzzer.fuzz(std::move(filter), input);
 }
 
 } // namespace OriginalDst

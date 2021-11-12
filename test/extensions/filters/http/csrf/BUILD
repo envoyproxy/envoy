@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "csrf_filter_test",
     srcs = ["csrf_filter_test.cc"],
-    extension_name = "envoy.filters.http.csrf",
+    extension_names = ["envoy.filters.http.csrf"],
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/csrf:config",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "csrf_filter_integration_test",
     srcs = ["csrf_filter_integration_test.cc"],
-    extension_name = "envoy.filters.http.csrf",
+    extension_names = ["envoy.filters.http.csrf"],
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

@@ -22,6 +22,10 @@ alias(
 
 envoy_cc_binary(
     name = "envoy-static",
+    features = select({
+        "//bazel:windows_opt_build": ["generate_pdb_file"],
+        "//conditions:default": [],
+    }),
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
@@ -111,6 +115,7 @@ envoy_cc_library(
         ":envoy_common_with_core_extensions_lib",
         ":platform_impl_lib",
         ":process_wide_lib",
+        "//envoy/server:platform_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:compiler_requirements_lib",
         "//source/common/common:perf_annotation_lib",
@@ -150,8 +155,7 @@ envoy_cc_library(
     name = "platform_header_lib",
     hdrs = ["platform_impl.h"],
     deps = [
-        "//include/envoy/filesystem:filesystem_interface",
-        "//include/envoy/thread:thread_interface",
+        "//envoy/server:platform_interface",
     ],
 )
 
@@ -203,6 +207,7 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
+    include_prefix = "source/exe",
     strip_include_prefix = select({
         "//bazel:windows_x86_64": "win32",
         "//conditions:default": "",
@@ -212,6 +217,7 @@ envoy_cc_library(
             ":main_common_lib",
             "//source/common/buffer:buffer_lib",
             "//source/common/common:assert_lib",
+            "//source/common/common:win32_event_logger_impl_lib",
             "//source/common/common:thread_lib",
             "//source/common/event:signal_lib",
         ],

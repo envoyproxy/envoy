@@ -1,10 +1,9 @@
-#include "extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/common/expr/context.h"
 
-#include "common/grpc/common.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/common/expr/cel_state.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/common/expr/cel_state.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
@@ -182,12 +181,13 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
   }
   auto value = key.StringOrDie().value();
   if (value == MTLS) {
-    return CelValue::CreateBool(info_.downstreamSslConnection() != nullptr &&
-                                info_.downstreamSslConnection()->peerCertificatePresented());
+    return CelValue::CreateBool(
+        info_.downstreamAddressProvider().sslConnection() != nullptr &&
+        info_.downstreamAddressProvider().sslConnection()->peerCertificatePresented());
   } else if (value == RequestedServerName) {
-    return CelValue::CreateString(&info_.requestedServerName());
+    return CelValue::CreateStringView(info_.downstreamAddressProvider().requestedServerName());
   } else if (value == ID) {
-    auto id = info_.connectionID();
+    auto id = info_.downstreamAddressProvider().connectionID();
     if (id.has_value()) {
       return CelValue::CreateUint64(id.value());
     }
@@ -199,7 +199,7 @@ absl::optional<CelValue> ConnectionWrapper::operator[](CelValue key) const {
     return {};
   }
 
-  auto ssl_info = info_.downstreamSslConnection();
+  auto ssl_info = info_.downstreamAddressProvider().sslConnection();
   if (ssl_info != nullptr) {
     return extractSslInfo(*ssl_info, value);
   }

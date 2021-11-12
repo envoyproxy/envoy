@@ -1,8 +1,7 @@
 #include <memory>
 
-#include "common/thread_local/thread_local_impl.h"
-
-#include "extensions/filters/common/lua/lua.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"

@@ -1,6 +1,6 @@
-#include "common/http/http2/metadata_encoder.h"
+#include "source/common/http/http2/metadata_encoder.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/container/fixed_array.h"
 #include "nghttp2/nghttp2.h"

@@ -1,4 +1,4 @@
-#include "common/router/config_utility.h"
+#include "source/common/router/config_utility.h"
 
 #include <string>
 #include <vector>
@@ -7,14 +7,14 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<Matchers::StringMatcherImpl>
+absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>
 maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
@@ -27,19 +27,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
   }
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
       QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
-    if (config.hidden_envoy_deprecated_value().empty()) {
-      // Present match.
-      return absl::nullopt;
-    }
-
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
-                                                   : false) {
-      matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
-    } else {
-      matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    }
-    return Matchers::StringMatcherImpl(matcher_config);
+    return absl::nullopt;
   }
   }
 

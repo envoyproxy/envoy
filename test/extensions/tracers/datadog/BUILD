@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     srcs = [
         "datadog_tracer_impl_test.cc",
     ],
-    extension_name = "envoy.tracers.datadog",
+    extension_names = ["envoy.tracers.datadog"],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
@@ -42,7 +42,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.tracers.datadog",
+    extension_names = ["envoy.tracers.datadog"],
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [

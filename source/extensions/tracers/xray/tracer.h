@@ -7,14 +7,15 @@
 #include "envoy/common/time.h"
 #include "envoy/tracing/http_tracer.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/hex.h"
-#include "common/common/random_generator.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/daemon_broker.h"
-#include "extensions/tracers/xray/sampling_strategy.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/random_generator.h"
+#include "source/common/http/codes.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/tracing/common_values.h"
+#include "source/extensions/tracers/xray/daemon_broker.h"
+#include "source/extensions/tracers/xray/sampling_strategy.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
@@ -37,7 +38,8 @@ public:
    */
   Span(TimeSource& time_source, Random::RandomGenerator& random, DaemonBroker& broker)
       : time_source_(time_source), random_(random), broker_(broker),
-        id_(Hex::uint64ToHex(random_.random())), sampled_(true) {}
+        id_(Hex::uint64ToHex(random_.random())), server_error_(false), response_status_code_(0),
+        sampled_(true) {}
 
   /**
    * Sets the Span's trace ID.
@@ -61,6 +63,12 @@ public:
   void setOperation(absl::string_view operation) override {
     operation_name_ = std::string(operation);
   }
+
+  /**
+   * Sets the current direction on the Span.
+   * This information will be included in the X-Ray span's annotation.
+   */
+  void setDirection(absl::string_view direction) { direction_ = std::string(direction); }
 
   /**
    * Sets the name of the Span.
@@ -101,14 +109,6 @@ public:
   }
 
   /**
-   * Gets the AWS metadata
-   * field of the Span.
-   */
-  const absl::flat_hash_map<std::string, ProtobufWkt::Value>& awsMetadata() {
-    return aws_metadata_;
-  }
-
-  /**
    * Sets the recording start time of the traced operation/request.
    */
   void setStartTime(Envoy::SystemTime start_time) { start_time_ = start_time; }
@@ -122,9 +122,19 @@ public:
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
   /**
+   * Sets the server error as true for the traced operation/request.
+   */
+  void setServerError() { server_error_ = true; };
+
+  /**
+   * Sets the http response status code for the traced operation/request.
+   */
+  void setResponseStatusCode(uint64_t status_code) { response_status_code_ = status_code; };
+
+  /**
    * Adds X-Ray trace header to the set of outgoing headers.
    */
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context) override;
 
   /**
    * Gets the start time of this Span.
@@ -136,7 +146,15 @@ public:
    */
   const std::string& id() const { return id_; }
 
+  /**
+   * Gets this Span's parent ID.
+   */
   const std::string& parentId() const { return parent_segment_id_; }
+
+  /**
+   * Gets this Span's direction.
+   */
+  const std::string& direction() const { return direction_; }
 
   /**
    * Gets this Span's name.
@@ -147,6 +165,23 @@ public:
    * Determines whether this span is sampled.
    */
   bool sampled() const { return sampled_; }
+
+  /**
+   * Determines if a server error occurred (response status code was 5XX Server Error).
+   */
+  bool serverError() const { return server_error_; }
+
+  /**
+   * Determines if a client error occurred (response status code was 4XX Client Error).
+   */
+  bool clientError() const { return Http::CodeUtility::is4xx(response_status_code_); }
+
+  /**
+   * Determines if a request was throttled (response status code was 429 Too Many Requests).
+   */
+  bool isThrottled() const {
+    return Http::Code::TooManyRequests == static_cast<Http::Code>(response_status_code_);
+  }
 
   /**
    * Not used by X-Ray because the Spans are "logged" (serialized) to the X-Ray daemon.
@@ -175,6 +210,7 @@ private:
   DaemonBroker& broker_;
   Envoy::SystemTime start_time_;
   std::string operation_name_;
+  std::string direction_;
   std::string id_;
   std::string trace_id_;
   std::string parent_segment_id_;
@@ -184,6 +220,8 @@ private:
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
+  bool server_error_;
+  uint64_t response_status_code_;
   bool sampled_;
 };
 
@@ -199,7 +237,8 @@ public:
   /**
    * Starts a tracing span for X-Ray
    */
-  Tracing::SpanPtr startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, const std::string& operation_name,
+                             Envoy::SystemTime start_time,
                              const absl::optional<XRayHeader>& xray_header);
   /**
    * Creates a Span that is marked as not-sampled.

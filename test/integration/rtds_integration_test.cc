@@ -1,6 +1,7 @@
 #include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -83,8 +84,15 @@ class RtdsIntegrationTest : public Grpc::DeltaSotwIntegrationParamTest, public H
 public:
   RtdsIntegrationTest()
       : HttpIntegrationTest(
-            Http::CodecClient::Type::HTTP2, ipVersion(),
-            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+            Http::CodecType::HTTP2, ipVersion(),
+            tdsBootstrapConfig(sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                       sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                   ? "GRPC"
+                                   : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     use_lds_ = false;
     create_xds_upstream_ = true;
     sotw_or_delta_ = sotwOrDelta();
@@ -96,7 +104,7 @@ public:
     // The tests infra expects the xDS server to be the second fake upstream, so
     // we need a dummy data plane cluster.
     setUpstreamCount(1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
     HttpIntegrationTest::initialize();
     // Register admin port.
     registerTestServerPorts({});

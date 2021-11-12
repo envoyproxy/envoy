@@ -96,11 +96,12 @@ Terminal 1
   mysql.egress_mysql.decoder_errors: 0
   mysql.egress_mysql.login_attempts: 1
   mysql.egress_mysql.login_failures: 0
-  mysql.egress_mysql.protocol_errors: 21
+  mysql.egress_mysql.protocol_errors: 0
   mysql.egress_mysql.queries_parse_error: 2
   mysql.egress_mysql.queries_parsed: 7
-  mysql.egress_mysql.sessions: 1
+  mysql.egress_mysql.sessions: 6
   mysql.egress_mysql.upgraded_to_ssl: 0
+
 
 
 Step 4: Check TCP stats

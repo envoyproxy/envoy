@@ -13,24 +13,23 @@ static_resources:
         address: 0.0.0.0
         port_value: 10000
     listener_filters:
-      - name: envoy.filters.listener.tls_inspector
+    - name: envoy.filters.listener.tls_inspector
     filter_chains:
-      - filters:
-          - name: envoy.filters.network.sni_dynamic_forward_proxy
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3alpha.FilterConfig
-              port_value: 443
-              dns_cache_config:
-                name: dynamic_forward_proxy_cache_config
-                dns_lookup_family: V4_ONLY
-          - name: envoy.tcp_proxy
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
-              stat_prefix: tcp
-              cluster: dynamic_forward_proxy_cluster
+    - filters:
+      - name: envoy.filters.network.sni_dynamic_forward_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+          port_value: 443
+          dns_cache_config:
+            name: dynamic_forward_proxy_cache_config
+            dns_lookup_family: V4_ONLY
+      - name: envoy.tcp_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+          stat_prefix: tcp
+          cluster: dynamic_forward_proxy_cluster
   clusters:
   - name: dynamic_forward_proxy_cluster
-    connect_timeout: 1s
     lb_policy: CLUSTER_PROVIDED
     cluster_type:
       name: envoy.clusters.dynamic_forward_proxy

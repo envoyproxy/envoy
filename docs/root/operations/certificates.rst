@@ -5,7 +5,7 @@ Certificate Management
 
 Envoy provides several mechanisms for cert management. At a high level they can be broken into
 
-1. Static :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>` referenced certificates.
+1. Static :ref:`CommonTlsContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.commontlscontext>` referenced certificates.
    These will *not* reload automatically, and requires either a restart of the proxy or
    reloading the clusters/listeners that reference them.
    :ref:`Hot restarting <arch_overview_hot_restart>` can be used here to pick up the new

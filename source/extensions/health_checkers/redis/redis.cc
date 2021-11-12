@@ -1,4 +1,4 @@
-#include "extensions/health_checkers/redis/redis.h"
+#include "source/extensions/health_checkers/redis/redis.h"
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "gtest/gtest.h"
 
@@ -130,11 +130,17 @@ MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, clusterHeader()).WillByDefault(ReturnRef(cluster_header_));
+  ON_CALL(*this, requestMirrorPolicies()).WillByDefault(ReturnRef(policies_));
 }
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockRoute::MockRoute() { ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_)); }
 MockRoute::~MockRoute() = default;
+
+MockShadowWriter::MockShadowWriter() {
+  ON_CALL(*this, submit(_, _, _, _)).WillByDefault(Return(router_handle_));
+}
+MockShadowWriter::~MockShadowWriter() = default;
 
 } // namespace Router
 } // namespace ThriftProxy

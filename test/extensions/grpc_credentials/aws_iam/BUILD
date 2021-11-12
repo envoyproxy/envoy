@@ -14,7 +14,6 @@ envoy_cc_test(
     srcs = envoy_select_google_grpc(["aws_iam_grpc_credentials_test.cc"]),
     data = ["//test/config/integration/certs"],
     deps = [
-        "//source/extensions/grpc_credentials:well_known_names",
         "//source/extensions/grpc_credentials/aws_iam:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",
         "//test/integration:integration_lib",

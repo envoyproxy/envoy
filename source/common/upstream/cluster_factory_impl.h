@@ -30,21 +30,20 @@
 #include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/common/logger.h"
-#include "common/config/metadata.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/network/utility.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/isolated_store_impl.h"
-#include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/outlier_detection_impl.h"
-#include "common/upstream/resource_manager_impl.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/clusters/well_known_names.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/load_balancer_impl.h"
+#include "source/common/upstream/outlier_detection_impl.h"
+#include "source/common/upstream/resource_manager_impl.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -71,13 +70,13 @@ public:
 
   ClusterManager& clusterManager() override { return cluster_manager_; }
   Stats::Store& stats() override { return stats_; }
-  ThreadLocal::SlotAllocator& tls() override { return tls_; }
+  ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
   Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Runtime::Loader& runtime() override { return runtime_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   AccessLog::AccessLogManager& logManager() override { return log_manager_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   const Server::Options& options() override { return options_; }
   Server::Admin& admin() override { return admin_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
@@ -177,9 +176,9 @@ private:
       Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(
-        cluster.cluster_type().typed_config(), ProtobufWkt::Struct::default_instance(),
-        socket_factory_context.messageValidationVisitor(), *config);
+    Config::Utility::translateOpaqueConfig(cluster.cluster_type().typed_config(),
+                                           socket_factory_context.messageValidationVisitor(),
+                                           *config);
     return createClusterWithConfig(cluster,
                                    MessageUtil::downcastAndValidate<const ConfigProto&>(
                                        *config, context.messageValidationVisitor()),

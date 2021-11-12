@@ -1,11 +1,10 @@
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 
-#include "common/config/utility.h"
-#include "common/config/version_converter.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/test_common/utility.h"
 

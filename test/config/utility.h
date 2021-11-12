@@ -17,10 +17,10 @@
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/http/codes.h"
 
-#include "common/config/api_version.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/config/api_version.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/integration/server_stats.h"
 
@@ -116,7 +116,7 @@ public:
   static std::string baseConfig();
 
   // A basic configuration (admin port, cluster_0, one udp listener) with no network filters.
-  static std::string baseUdpListenerConfig();
+  static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
   static std::string tlsInspectorFilter();
@@ -127,53 +127,57 @@ public:
   static std::string httpProxyConfig(bool downstream_use_quic = false);
   // A basic configuration for L7 proxying with QUIC transport.
   static std::string quicHttpProxyConfig();
-  // A string for a basic buffer filter, which can be used with addFilter()
+  // A string for a basic buffer filter, which can be used with prependFilter()
   static std::string defaultBufferFilter();
-  // A string for a small buffer filter, which can be used with addFilter()
+  // A string for a small buffer filter, which can be used with prependFilter()
   static std::string smallBufferFilter();
-  // A string for a health check filter which can be used with addFilter()
+  // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with addFilter()
+  // A string for a squash filter which can be used with prependFilter()
   static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
+  // A cluster that uses the startTls transport socket.
+  static envoy::config::cluster::v3::Cluster buildStartTlsCluster(const std::string& address,
+                                                                  int port);
 
   // Configuration for L7 proxying, with clusters cluster_1 and cluster_2 meant to be added via CDS.
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
-  static std::string adsBootstrap(const std::string& api_type,
-                                  envoy::config::core::v3::ApiVersion resource_api_version,
-                                  envoy::config::core::v3::ApiVersion transport_api_version =
-                                      envoy::config::core::v3::ApiVersion::AUTO);
+  static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
-  static envoy::config::cluster::v3::Cluster buildStaticCluster(const std::string& name, int port,
-                                                                const std::string& address);
+  static envoy::config::cluster::v3::Cluster
+  buildStaticCluster(const std::string& name, int port, const std::string& address,
+                     const std::string& lb_policy = "ROUND_ROBIN");
 
   // ADS configurations
-  static envoy::config::cluster::v3::Cluster buildCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
 
-  static envoy::config::cluster::v3::Cluster buildTlsCluster(
-      const std::string& name, const std::string& lb_policy = "ROUND_ROBIN",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::cluster::v3::Cluster
+  buildTlsCluster(const std::string& name, const std::string& lb_policy = "ROUND_ROBIN");
 
-  static envoy::config::endpoint::v3::ClusterLoadAssignment buildClusterLoadAssignment(
-      const std::string& name, const std::string& ip_version, uint32_t port,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, const std::string& ip_version, uint32_t port);
 
-  static envoy::config::listener::v3::Listener buildBaseListener(
-      const std::string& name, const std::string& address, const std::string& filter_chains = "",
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                     const std::string& leds_collection_name);
 
-  static envoy::config::listener::v3::Listener buildListener(
-      const std::string& name, const std::string& route_config, const std::string& address,
-      const std::string& stat_prefix,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::endpoint::v3::LbEndpoint buildLbEndpoint(const std::string& address,
+                                                                 uint32_t port);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(
-      const std::string& name, const std::string& cluster,
-      envoy::config::core::v3::ApiVersion api_version = envoy::config::core::v3::ApiVersion::V3);
+  static envoy::config::listener::v3::Listener
+  buildBaseListener(const std::string& name, const std::string& address,
+                    const std::string& filter_chains = "");
+
+  static envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                             const std::string& route_config,
+                                                             const std::string& address,
+                                                             const std::string& stat_prefix);
+
+  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                                       const std::string& cluster);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -208,12 +212,19 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
+  // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
+  void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
+
   envoy::config::route::v3::VirtualHost createVirtualHost(const char* host, const char* route = "/",
                                                           const char* cluster = "cluster_0");
 
   void addVirtualHost(const envoy::config::route::v3::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
+  void prependFilter(const std::string& filter_yaml);
+
+  // Add an HTTP filter prior to existing filters.
+  // TODO(rgs1): remove once envoy-filter-example has been updated.
   void addFilter(const std::string& filter_yaml);
 
   // Add a network filter prior to existing filters.
@@ -229,12 +240,18 @@ public:
   void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
                           HttpConnectionManager::CodecType type);
 
+  // Add TLS configuration for either SSL or QUIC transport socket according to listener config.
+  void configDownstreamTransportSocketWithTls(
+      envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::CommonTlsContext&)>
+          configure_tls_context);
+
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
   void addSslConfig() { addSslConfig({}); }
 
   // Add the default SSL configuration for QUIC downstream.
-  void addQuicDownstreamTransportSocketConfig(bool resuse_port);
+  void addQuicDownstreamTransportSocketConfig();
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // the platform's null device.
@@ -285,7 +302,9 @@ public:
   void applyConfigModifiers();
 
   // Configure Envoy to do TLS to upstream.
-  void configureUpstreamTls(bool use_alpn = false, bool http3 = false);
+  void configureUpstreamTls(bool use_alpn = false, bool http3 = false,
+                            absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+                                alternate_protocol_cache_config = {});
 
   // Skip validation that ensures that all upstream ports are referenced by the
   // configuration generated in ConfigHelper::finalize.
@@ -294,8 +313,8 @@ public:
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
 
-  // Enable deprecated v2 API resources via the runtime.
-  void enableDeprecatedV2Api();
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,
@@ -303,26 +322,29 @@ public:
 
   // Given an HCM with the default config, set the matcher to be a connect matcher and enable
   // CONNECT requests.
-  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post);
+  static void setConnectConfig(HttpConnectionManager& hcm, bool terminate_connect, bool allow_post,
+                               bool http3 = false);
 
   void setLocalReply(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config);
+
+  // Adjust the upstream route with larger timeout if running tsan. This is the duration between
+  // whole request being processed and whole response received.
+  static void adjustUpstreamTimeoutForTsan(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm);
 
   using HttpProtocolOptions = envoy::extensions::upstreams::http::v3::HttpProtocolOptions;
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
 
+  // Populate and return a Http3ProtocolOptions instance based on http2_options.
+  static envoy::config::core::v3::Http3ProtocolOptions
+  http2ToHttp3ProtocolOptions(const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
+                              size_t http3_max_stream_receive_window);
+
 private:
-  static bool shouldBoost(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2;
-  }
-
-  static std::string apiVersionStr(envoy::config::core::v3::ApiVersion api_version) {
-    return api_version == envoy::config::core::v3::ApiVersion::V2 ? "V2" : "V3";
-  }
-
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(HttpConnectionManager& hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
@@ -351,11 +373,6 @@ private:
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
   envoy::config::listener::v3::Filter* getFilterFromListener(const std::string& name);
-
-  // Configure a tap transport socket for a cluster/filter chain.
-  void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::config::core::v3::TransportSocket& transport_socket,
-                             const Protobuf::Message* tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;

@@ -8,9 +8,9 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/singleton/instance.h"
 
-#include "common/common/assert.h"
-#include "common/common/non_copyable.h"
-#include "common/common/thread_synchronizer.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/thread_synchronizer.h"
 
 #include "absl/container/flat_hash_map.h"
 

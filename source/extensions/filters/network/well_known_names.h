@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/config/well_known_names.h"
+#include "source/common/config/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,6 +14,8 @@ class NetworkFilterNameValues {
 public:
   // Client ssl auth filter
   const std::string ClientSslAuth = "envoy.filters.network.client_ssl_auth";
+  // Connection limit filter
+  const std::string ConnectionLimit = "envoy.filters.network.connection_limit";
   // Echo filter
   const std::string Echo = "envoy.filters.network.echo";
   // Direct response filter
@@ -22,6 +24,9 @@ public:
   const std::string RocketmqProxy = "envoy.filters.network.rocketmq_proxy";
   // Dubbo proxy filter
   const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
+  // Envoy mobile http connection manager.
+  const std::string EnvoyMobileHttpConnectionManager =
+      "envoy.filters.network.envoy_mobile_http_connection_manager";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.filters.network.http_connection_manager";
   // Local rate limit filter

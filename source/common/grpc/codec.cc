@@ -1,11 +1,11 @@
-#include "common/grpc/codec.h"
+#include "source/common/grpc/codec.h"
 
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -23,9 +23,13 @@ void Encoder::newFrame(uint8_t flags, uint64_t length, std::array<uint8_t, 5>& o
 }
 
 void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer) {
+  prependFrameHeader(flags, buffer, buffer.length());
+}
+
+void Encoder::prependFrameHeader(uint8_t flags, Buffer::Instance& buffer, uint32_t message_length) {
   // Compute the size of the payload and construct the length prefix.
   std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-  Grpc::Encoder().newFrame(flags, buffer.length(), frame);
+  Grpc::Encoder().newFrame(flags, message_length, frame);
   Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
   buffer.prepend(frame_buffer);
 }

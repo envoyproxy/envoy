@@ -1,3 +1,0 @@
-clang==11.0 \
-    --hash=sha256:de1b1e7defe3b499e82cc9851cdc968790575c510f62c2a000c724e1943ca8bb \
-    --hash=sha256:f838e6475b1fe5c91efb97e80ae19420c39483fd5aa7ef10f03ffb51edc6f8c5

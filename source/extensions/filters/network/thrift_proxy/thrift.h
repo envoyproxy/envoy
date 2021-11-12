@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/common/assert.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/assert.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -116,6 +116,14 @@ enum class MessageType {
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE
   LastMessageType = Oneway,
+};
+
+/**
+ * A Reply message is either a success or an error (IDL exception)
+ */
+enum class ReplyType {
+  Success,
+  Error,
 };
 
 /**

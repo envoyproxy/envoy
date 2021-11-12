@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/alts/tsi_handshaker.h"
+#include "source/extensions/transport_sockets/alts/tsi_handshaker.h"
 
 #include "test/mocks/event/mocks.h"
 

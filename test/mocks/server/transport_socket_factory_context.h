@@ -2,9 +2,12 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/secret/secret_manager_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/server/options.h"
+#include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
 #include "config_tracker.h"
@@ -25,7 +28,7 @@ public:
   MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
   MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
   MOCK_METHOD(Stats::Store&, stats, ());
@@ -38,6 +41,9 @@ public:
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Api::MockApi> api_;
   testing::NiceMock<MockConfigTracker> config_tracker_;
+  testing::NiceMock<Ssl::MockContextManager> context_manager_;
+  testing::NiceMock<Stats::MockStore> store_;
+  testing::NiceMock<Server::MockOptions> options_;
   std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 } // namespace Configuration

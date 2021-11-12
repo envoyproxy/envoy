@@ -2,17 +2,17 @@
 #include <string>
 #include <vector>
 
-#include "common/quic/envoy_quic_proof_source.h"
-#include "common/quic/envoy_quic_proof_verifier.h"
-#include "common/quic/envoy_quic_utils.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/common/quic/envoy_quic_proof_source.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
+#include "source/common/quic/envoy_quic_utils.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
 
 using testing::Invoke;
@@ -23,13 +23,9 @@ namespace Envoy {
 
 namespace Quic {
 
-class TestGetProofCallback : public quic::ProofSource::Callback {
+class SignatureVerifier {
 public:
-  TestGetProofCallback(bool& called, bool should_succeed, const std::string& server_config,
-                       quic::QuicTransportVersion& version, absl::string_view chlo_hash,
-                       Network::FilterChain& filter_chain)
-      : called_(called), should_succeed_(should_succeed), server_config_(server_config),
-        version_(version), chlo_hash_(chlo_hash), expected_filter_chain_(filter_chain) {
+  SignatureVerifier() {
     ON_CALL(client_context_config_, cipherSuites)
         .WillByDefault(ReturnRef(
             Extensions::TransportSockets::Tls::ClientContextConfigImpl::DEFAULT_CIPHER_SUITES));
@@ -62,8 +58,6 @@ public:
     ON_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillByDefault(ReturnRef(path_string));
     const std::vector<std::string> empty_string_list;
-    ON_CALL(cert_validation_ctx_config_, verifySubjectAltNameList())
-        .WillByDefault(ReturnRef(empty_string_list));
     const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers;
     ON_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillByDefault(ReturnRef(san_matchers));
@@ -73,38 +67,35 @@ public:
         .WillByDefault(ReturnRef(empty_string_list));
     const absl::optional<envoy::config::core::v3::TypedExtensionConfig> nullopt = absl::nullopt;
     ON_CALL(cert_validation_ctx_config_, customValidatorConfig()).WillByDefault(ReturnRef(nullopt));
-    verifier_ =
-        std::make_unique<EnvoyQuicProofVerifier>(store_, client_context_config_, time_system_);
+    auto context = std::make_shared<Extensions::TransportSockets::Tls::ClientContextImpl>(
+        store_, client_context_config_, time_system_);
+    verifier_ = std::make_unique<EnvoyQuicProofVerifier>(std::move(context));
   }
 
-  // quic::ProofSource::Callback
-  void Run(bool ok, const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
-           const quic::QuicCryptoProof& proof,
-           std::unique_ptr<quic::ProofSource::Details> details) override {
-    called_ = true;
-    if (!should_succeed_) {
-      EXPECT_FALSE(ok);
-      return;
-    };
-    EXPECT_TRUE(ok);
-    EXPECT_EQ(2, chain->certs.size());
+  void
+  verifyCertsAndSignature(const quic::QuicReferenceCountedPointer<quic::ProofSource::Chain>& chain,
+                          const std::string& payload, const std::string& signature) {
+    const std::string& leaf = chain->certs[0];
+    std::unique_ptr<quic::CertificateView> cert_view =
+        quic::CertificateView::ParseSingleCertificate(leaf);
+    ASSERT_NE(cert_view, nullptr);
+    std::string error_details;
+    int sign_alg = deduceSignatureAlgorithmFromPublicKey(cert_view->public_key(), &error_details);
+    EXPECT_NE(sign_alg, 0);
+    EXPECT_TRUE(cert_view->VerifySignature(payload, signature, sign_alg));
+
     std::string error;
+    std::unique_ptr<quic::ProofVerifyDetails> verify_details;
     EXPECT_EQ(quic::QUIC_SUCCESS,
-              verifier_->VerifyProof("www.example.org", 54321, server_config_, version_, chlo_hash_,
-                                     chain->certs, proof.leaf_cert_scts, proof.signature, nullptr,
-                                     &error, nullptr, nullptr))
+              verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
+                                         /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
+                                         /*context=*/nullptr, &error, &verify_details,
+                                         /*out_alert=*/nullptr,
+                                         /*callback=*/nullptr))
         << error;
-    EXPECT_EQ(&expected_filter_chain_,
-              &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
   }
 
 private:
-  bool& called_;
-  bool should_succeed_;
-  const std::string& server_config_;
-  const quic::QuicTransportVersion& version_;
-  absl::string_view chlo_hash_;
-  Network::FilterChain& expected_filter_chain_;
   NiceMock<Stats::MockStore> store_;
   Event::GlobalTimeSystem time_system_;
   NiceMock<Ssl::MockClientContextConfig> client_context_config_;
@@ -114,18 +105,29 @@ private:
 
 class TestSignatureCallback : public quic::ProofSource::SignatureCallback {
 public:
-  TestSignatureCallback(bool expect_success) : expect_success_(expect_success) {}
-  ~TestSignatureCallback() override { EXPECT_TRUE(run_called_); }
+  TestSignatureCallback(bool expect_success, Network::FilterChain& filter_chain,
+                        std::string& signature)
+      : expect_success_(expect_success), signature_(signature),
+        expected_filter_chain_(filter_chain) {}
+  ~TestSignatureCallback() override { EXPECT_TRUE(called_); }
 
   // quic::ProofSource::SignatureCallback
-  void Run(bool ok, std::string, std::unique_ptr<quic::ProofSource::Details>) override {
+  void Run(bool ok, std::string signature,
+           std::unique_ptr<quic::ProofSource::Details> details) override {
+    called_ = true;
     EXPECT_EQ(expect_success_, ok);
-    run_called_ = true;
+    if (ok) {
+      signature_ = signature;
+      EXPECT_EQ(&expected_filter_chain_,
+                &static_cast<EnvoyQuicProofSourceDetails*>(details.get())->filterChain());
+    }
   }
 
 private:
   bool expect_success_;
-  bool run_called_{false};
+  bool called_;
+  std::string& signature_;
+  Network::FilterChain& expected_filter_chain_;
 };
 
 class EnvoyQuicProofSourceTest : public ::testing::Test {
@@ -133,47 +135,42 @@ public:
   EnvoyQuicProofSourceTest()
       : server_address_(quic::QuicIpAddress::Loopback4(), 12345),
         client_address_(quic::QuicIpAddress::Loopback4(), 54321),
-        transport_socket_factory_(std::make_unique<Ssl::MockServerContextConfig>()),
+        mock_context_config_(new Ssl::MockServerContextConfig()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
-        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {}
+        proof_source_(listen_socket_, filter_chain_manager_, listener_stats_) {
+    EXPECT_CALL(*mock_context_config_, setSecretUpdateCallback(_)).Times(testing::AtLeast(1u));
+    transport_socket_factory_ = std::make_unique<QuicServerTransportSocketFactory>(
+        listener_config_.listenerScope(),
+        std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
+    transport_socket_factory_->initialize();
+    EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
+  }
 
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {
     EXPECT_CALL(listen_socket_, ioHandle()).Times(expect_private_key ? 2u : 1u);
     EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
         .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                    *connection_socket.addressProvider().localAddress());
+                    *connection_socket.connectionInfoProvider().localAddress());
           EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                    *connection_socket.addressProvider().remoteAddress());
-          EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                    connection_socket.detectedTransportProtocol());
-          EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+                    *connection_socket.connectionInfoProvider().remoteAddress());
+          EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+          EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
           return &filter_chain_;
         }));
     EXPECT_CALL(filter_chain_, transportSocketFactory())
-        .WillRepeatedly(ReturnRef(transport_socket_factory_));
+        .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
+    EXPECT_CALL(*mock_context_config_, isReady()).WillRepeatedly(Return(true));
     std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
         std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config_)};
-    EXPECT_CALL(dynamic_cast<const Ssl::MockServerContextConfig&>(
-                    transport_socket_factory_.serverContextConfig()),
-                tlsCertificates())
-        .WillRepeatedly(Return(tls_cert_configs));
+    EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
     EXPECT_CALL(tls_cert_config_, certificateChain()).WillOnce(ReturnRef(cert));
     if (expect_private_key) {
       EXPECT_CALL(tls_cert_config_, privateKey()).WillOnce(ReturnRef(pkey_));
     }
-  }
-
-  void testGetProof(bool expect_success) {
-    bool called = false;
-    auto callback = std::make_unique<TestGetProofCallback>(called, expect_success, server_config_,
-                                                           version_, chlo_hash_, filter_chain_);
-    proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
-                           chlo_hash_, std::move(callback));
-    EXPECT_TRUE(called);
   }
 
 protected:
@@ -189,67 +186,83 @@ protected:
   Network::MockFilterChainManager filter_chain_manager_;
   Network::MockListenSocket listen_socket_;
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
-  QuicServerTransportSocketFactory transport_socket_factory_;
+  Ssl::MockServerContextConfig* mock_context_config_;
+  std::unique_ptr<QuicServerTransportSocketFactory> transport_socket_factory_;
   Ssl::MockTlsCertificateConfig tls_cert_config_;
   Server::ListenerStats listener_stats_;
   EnvoyQuicProofSource proof_source_;
 };
 
-TEST_F(EnvoyQuicProofSourceTest, TestGetProof) {
+TEST_F(EnvoyQuicProofSourceTest, TestGetCerChainAndSignatureAndVerify) {
   expectCertChainAndPrivateKey(expected_certs_, true);
-  testGetProof(true);
+  bool cert_matched_sni;
+  quic::QuicReferenceCountedPointer<quic::ProofSource::Chain> chain =
+      proof_source_.GetCertChain(server_address_, client_address_, hostname_, &cert_matched_sni);
+  EXPECT_EQ(2, chain->certs.size());
+
+  std::string error_details;
+  bssl::UniquePtr<X509> cert = parseDERCertificate(chain->certs[0], &error_details);
+  EXPECT_NE(cert, nullptr);
+  bssl::UniquePtr<EVP_PKEY> pub_key(X509_get_pubkey(cert.get()));
+  int sign_alg = deduceSignatureAlgorithmFromPublicKey(pub_key.get(), &error_details);
+  EXPECT_EQ(sign_alg, SSL_SIGN_RSA_PSS_RSAE_SHA256);
+  std::string signature;
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(true, filter_chain_, signature));
+  SignatureVerifier verifier;
+  verifier.verifyCertsAndSignature(chain, "payload", signature);
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoFilterChain) {
-  bool called = false;
-  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
-                                                         chlo_hash_, filter_chain_);
-  EXPECT_CALL(listen_socket_, ioHandle());
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailBadConfig) {
+  // No filter chain.
+  EXPECT_CALL(listen_socket_, ioHandle()).Times(3);
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
-      .WillRepeatedly(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
-  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
-                         chlo_hash_, std::move(callback));
-  EXPECT_TRUE(called);
-}
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailNoCertConfig) {
-  bool called = false;
-  auto callback = std::make_unique<TestGetProofCallback>(called, false, server_config_, version_,
-                                                         chlo_hash_, filter_chain_);
-  EXPECT_CALL(listen_socket_, ioHandle()).Times(1u);
+  // Cert not ready.
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
+  EXPECT_CALL(filter_chain_, transportSocketFactory())
+      .WillOnce(ReturnRef(*transport_socket_factory_));
+  EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(false));
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
+
+  // No certs in config.
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillRepeatedly(Invoke([&](const Network::ConnectionSocket& connection_socket) {
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(server_address_),
-                  *connection_socket.addressProvider().localAddress());
+                  *connection_socket.connectionInfoProvider().localAddress());
         EXPECT_EQ(*quicAddressToEnvoyAddressInstance(client_address_),
-                  *connection_socket.addressProvider().remoteAddress());
-        EXPECT_EQ(Extensions::TransportSockets::TransportProtocolNames::get().Quic,
-                  connection_socket.detectedTransportProtocol());
-        EXPECT_EQ("h2", connection_socket.requestedApplicationProtocols()[0]);
+                  *connection_socket.connectionInfoProvider().remoteAddress());
+        EXPECT_EQ("quic", connection_socket.detectedTransportProtocol());
+        EXPECT_EQ("h3", connection_socket.requestedApplicationProtocols()[0]);
         return &filter_chain_;
       }));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillRepeatedly(ReturnRef(transport_socket_factory_));
-
-  EXPECT_CALL(dynamic_cast<const Ssl::MockServerContextConfig&>(
-                  transport_socket_factory_.serverContextConfig()),
-              tlsCertificates())
-      .WillRepeatedly(
-          Return(std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>{}));
-  proof_source_.GetProof(server_address_, client_address_, hostname_, server_config_, version_,
-                         chlo_hash_, std::move(callback));
-  EXPECT_TRUE(called);
+      .WillOnce(ReturnRef(*transport_socket_factory_));
+  EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
+  std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{};
+  EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillOnce(Return(tls_cert_configs));
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidCert) {
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidCert) {
   std::string invalid_cert{R"(-----BEGIN CERTIFICATE-----
     invalid certificate
     -----END CERTIFICATE-----)"};
   expectCertChainAndPrivateKey(invalid_cert, false);
-  testGetProof(false);
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
 }
 
-TEST_F(EnvoyQuicProofSourceTest, GetProofFailInvalidPublicKeyInCert) {
+TEST_F(EnvoyQuicProofSourceTest, GetCertChainFailInvalidPublicKeyInCert) {
   // This is a valid cert with RSA public key. But we don't support RSA key with
   // length < 1024.
   std::string cert_with_rsa_1024{R"(-----BEGIN CERTIFICATE-----
@@ -271,24 +284,34 @@ x96rVeUbRJ/qU4//nNM/XQa9vIAIcTZ0jFhmb0c3R4rmoqqC3vkSDwtaE5yuS5T4
 GUy+n0vQNB0cXGzgcGI=
 -----END CERTIFICATE-----)"};
   expectCertChainAndPrivateKey(cert_with_rsa_1024, false);
-  testGetProof(false);
+  bool cert_matched_sni;
+  EXPECT_EQ(nullptr, proof_source_.GetCertChain(server_address_, client_address_, hostname_,
+                                                &cert_matched_sni));
+}
+
+TEST_F(EnvoyQuicProofSourceTest, ComputeSignatureFailNoFilterChain) {
+  EXPECT_CALL(listen_socket_, ioHandle());
+  EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
+      .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return nullptr; }));
+
+  std::string signature;
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, UnexpectedPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
-  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
-  auto server_context_config_ptr = server_context_config.get();
-  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillRepeatedly(ReturnRef(transport_socket_factory));
+      .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
   Ssl::MockTlsCertificateConfig tls_cert_config;
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
       std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
-  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
-      .WillRepeatedly(Return(tls_cert_configs));
+  EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
+  EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
   std::string rsa_pkey_1024_len(R"(-----BEGIN RSA PRIVATE KEY-----
 MIICWwIBAAKBgQC79hDq/OwN3ke3EF6Ntdi9R+VSrl9MStk992l1us8lZhq+e0zU
 OlvxbUeZ8wyVkzs1gqI1it1IwF+EpdGhHhjggZjg040GD3HWSuyCzpHh+nLwJxtQ
@@ -305,31 +328,30 @@ HO6j1yxTIGU6w8++AQJACdFPnRidOaj5oJmcZq0s6WGTYfegjTOKgi5KQzO0FTwG
 qGm130brdD+1U1EJnEFmleLZ/W6mEi3MxcKpWOpTqQ==
 -----END RSA PRIVATE KEY-----)");
   EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(rsa_pkey_1024_len));
-  proof_source_.ComputeTlsSignature(server_address_, client_address_, hostname_,
-                                    SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
-                                    std::make_unique<TestSignatureCallback>(false));
+  std::string signature;
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
 TEST_F(EnvoyQuicProofSourceTest, InvalidPrivateKey) {
   EXPECT_CALL(listen_socket_, ioHandle());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_))
       .WillOnce(Invoke([&](const Network::ConnectionSocket&) { return &filter_chain_; }));
-  auto server_context_config = std::make_unique<Ssl::MockServerContextConfig>();
-  auto server_context_config_ptr = server_context_config.get();
-  QuicServerTransportSocketFactory transport_socket_factory(std::move(server_context_config));
   EXPECT_CALL(filter_chain_, transportSocketFactory())
-      .WillRepeatedly(ReturnRef(transport_socket_factory));
+      .WillRepeatedly(ReturnRef(*transport_socket_factory_));
 
   Ssl::MockTlsCertificateConfig tls_cert_config;
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>> tls_cert_configs{
       std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>(tls_cert_config)};
-  EXPECT_CALL(*server_context_config_ptr, tlsCertificates())
-      .WillRepeatedly(Return(tls_cert_configs));
+  EXPECT_CALL(*mock_context_config_, tlsCertificates()).WillRepeatedly(Return(tls_cert_configs));
+  EXPECT_CALL(*mock_context_config_, isReady()).WillOnce(Return(true));
   std::string invalid_pkey("abcdefg");
   EXPECT_CALL(tls_cert_config, privateKey()).WillOnce(ReturnRef(invalid_pkey));
-  proof_source_.ComputeTlsSignature(server_address_, client_address_, hostname_,
-                                    SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
-                                    std::make_unique<TestSignatureCallback>(false));
+  std::string signature;
+  proof_source_.ComputeTlsSignature(
+      server_address_, client_address_, hostname_, SSL_SIGN_RSA_PSS_RSAE_SHA256, "payload",
+      std::make_unique<TestSignatureCallback>(false, filter_chain_, signature));
 }
 
 } // namespace Quic

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "common/upstream/health_checker_impl.h"
+#include "source/common/upstream/health_checker_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/common.h"
@@ -37,7 +37,7 @@ public:
   // HttpHealthCheckerImpl
   MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
-  Http::CodecClient::Type codecClientType() { return codec_client_type_; }
+  Http::CodecType codecClientType() { return codec_client_type_; }
 };
 
 class HttpHealthCheckerImplTestBase : public HealthCheckerTestBase {

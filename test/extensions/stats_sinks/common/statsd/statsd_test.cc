@@ -2,10 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -137,6 +136,20 @@ TEST_F(TcpStatsdSinkTest, SiSuffix) {
 
   EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.duration:4|ms\n"), _));
   sink_->onHistogramComplete(duration_milli, 4);
+
+  EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
+  tls_.shutdownThread();
+}
+
+TEST_F(TcpStatsdSinkTest, ScaledPercent) {
+  expectCreateConnection();
+
+  NiceMock<Stats::MockHistogram> items;
+  items.name_ = "items";
+  items.unit_ = Stats::Histogram::Unit::Percent;
+
+  EXPECT_CALL(*connection_, write(BufferStringEqual("envoy.items:0.5|h\n"), _));
+  sink_->onHistogramComplete(items, Stats::Histogram::PercentScale / 2);
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   tls_.shutdownThread();

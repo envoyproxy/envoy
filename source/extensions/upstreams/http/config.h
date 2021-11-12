@@ -8,14 +8,15 @@
 #include <string>
 
 #include "envoy/config/core/v3/extension.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/logger.h"
-#include "common/protobuf/message_validator_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/message_validator_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,6 +53,8 @@ public:
   bool use_http2_{};
   bool use_http3_{};
   bool use_alpn_{};
+  absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+      alternate_protocol_cache_options_;
 };
 
 class ProtocolOptionsConfigFactory : public Server::Configuration::ProtocolOptionsFactory {

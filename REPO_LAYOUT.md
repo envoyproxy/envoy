@@ -13,12 +13,13 @@ are:
 * [docs/](docs/): End user facing Envoy proxy and data plane API documentation as well as scripts
   for publishing final docs during releases.
 * [examples/](examples/): Larger Envoy examples using Docker and Docker Compose.
-* [include/](include/): "Public" interface headers for "core" Envoy. In general,
+* [envoy/](envoy/): "Public" interface headers for "core" Envoy. In general,
   these are almost entirely 100% abstract classes. There are a few cases of not-abstract classes in
   the "public" headers, typically for performance reasons. Note that "core" includes some
   "extensions" such as the HTTP connection manager filter and associated functionality which are
   so fundamental to Envoy that they will likely never be optional from a compilation perspective.
 * [restarter/](restarter/): Envoy's hot restart wrapper Python script.
+* [security/](security/): Some templates for reporting security issues of Envoy. Historical security issues can also be found here.
 * [source/](source/): Source code for core Envoy as well as extensions. The layout of this directory
   is discussed in further detail below.
 * [support/](support/): Development support scripts (pre-commit Git hooks, etc.)
@@ -65,7 +66,6 @@ Not every directory within test is described below, but a few highlights:
 We maintain a very specific code and namespace layout for extensions. This aids in discovering
 code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNERS).
 
-
 * All extensions are either registered in [all_extensions.bzl](source/extensions/all_extensions.bzl)
   or [extensions_build_config.bzl](source/extensions/extensions_build_config.bzl). The former is
   for extensions that cannot be removed from the primary Envoy build. The latter is for extensions
@@ -75,13 +75,13 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
 * These are the top level extension directories and associated namespaces:
   * [access_loggers/](/source/extensions/access_loggers): Access log implementations which use
     the `Envoy::Extensions::AccessLoggers` namespace.
-  * [bootstrap](/source/extensions/bootstrap): Bootstrap extensions which use
+  * [bootstrap/](/source/extensions/bootstrap): Bootstrap extensions which use
     the `Envoy::Extensions::Bootstrap` namespace.
-  * [clusters](/source/extensions/clusters): Cluster extensions which use the
+  * [clusters/](/source/extensions/clusters): Cluster extensions which use the
     `Envoy::Extensions::Clusters` namespace.
-  * [compression](/source/extensions/compression): Compression extensions
+  * [compression/](/source/extensions/compression): Compression extensions
     which use `Envoy::Extensions::Compression` namespace.
-  * [fatal_actions](/source/extensions/fatal_actions): Fatal Action extensions
+  * [fatal_actions/](/source/extensions/fatal_actions): Fatal Action extensions
     which use the `Envoy::Extensions::FatalActions` namespace.
   * [filters/http/](/source/extensions/filters/http): HTTP L7 filters which use the
     `Envoy::Extensions::HttpFilters` namespace.
@@ -89,19 +89,19 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     `Envoy::Extensions::ListenerFilters` namespace.
   * [filters/network/](/source/extensions/filters/network): L4 network filters which use the
     `Envoy::Extensions::NetworkFilters` namespace.
-  * [formatters](/source/extensions/formatters): Access log formatters which use the
+  * [formatters/](/source/extensions/formatters): Access log formatters which use the
     `Envoy::Extensions::Formatters` namespace.
   * [grpc_credentials/](/source/extensions/grpc_credentials): Custom gRPC credentials which use the
     `Envoy::Extensions::GrpcCredentials` namespace.
   * [health_checker/](/source/extensions/health_checker): Custom health checkers which use the
     `Envoy::Extensions::HealthCheckers` namespace.
-  * [internal_redirect](/source/extensions/internal_redirect): Internal Redirect
+  * [internal_redirect/](/source/extensions/internal_redirect): Internal Redirect
     extensions which use the `Envoy::Extensions::InternalRedirect` namespace.
-  * [quic_listeners](/source/extensions/quic_listeners): QUIC extensions which
+  * [quic_listeners/](/source/extensions/quic_listeners): QUIC extensions which
     use the `Envoy::Quic` namespace.
-  * [resource_monitors](/source/extensions/resource_monitors): Resource monitor
+  * [resource_monitors/](/source/extensions/resource_monitors): Resource monitor
     extensions which use the `Envoy::Extensions::ResourceMonitors` namespace.
-  * [retry](/source/extensions/retry): Retry extensions which use the
+  * [retry/](/source/extensions/retry): Retry extensions which use the
     `Envoy::Extensions::Retry` namespace.
   * [stat_sinks/](/source/extensions/stat_sinks): Stat sink implementations which use the
     `Envoy::Extensions::StatSinks` namespace.
@@ -109,11 +109,11 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
     `Envoy::Extensions::Tracers` namespace.
   * [transport_sockets/](/source/extensions/transport_sockets): Transport socket implementations
     which use the `Envoy::Extensions::TransportSockets` namespace.
-  * [upstreams](/source/extensions/upstreams): Upstream extensions use the
+  * [upstreams/](/source/extensions/upstreams): Upstream extensions use the
     `Envoy::Extensions::Upstreams` namespace.
-  * [watchdog](/source/extensions/watchdog): Watchdog extensions use the
+  * [watchdog/](/source/extensions/watchdog): Watchdog extensions use the
     `Envoy::Extensions::Watchdog` namespace.
-  * [descriptors](/source/extensions/rate_limit_descriptors): Rate limit
+  * [rate_limit_descriptors/](/source/extensions/rate_limit_descriptors): Rate limit
     descriptor extensions use the `Envoy::Extensions::RateLimitDescriptors`
     namespace.
 * Each extension is contained wholly in its own namespace. E.g.,
@@ -123,3 +123,14 @@ code/extensions, and allows us specify extension owners in [CODEOWNERS](CODEOWNE
   code that is used by both HTTP and network filters. Common code used only by two HTTP filters
   would be found in `filters/http/common/`. Common code should be placed in a common namespace.
   E.g., `Envoy::Extensions::Filters::Common`.
+
+## [contrib](contrib/) layout
+
+This directory contains contrib extensions. See [EXTENSION_POLICY.md](EXTENSION_POLICY.md) for
+more information.
+
+* [contrib/exe/](contrib/exe/): The default executable for contrib. This is similar to the
+  `envoy-static` target but also includes all contrib extensions, and is used to produce the
+  contrib image targets.
+* [contrib/...](contrib/): The rest of this directory mirrors the [source/extensions](source/extensions/)
+  layout. Contrib extensions are placed here.

@@ -2,9 +2,11 @@
 
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/buffer/watermark_buffer.h"
-#include "common/network/io_socket_error_impl.h"
+#include "envoy/buffer/buffer.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -74,16 +76,20 @@ public:
   MockBufferFactory();
   ~MockBufferFactory() override;
 
-  Buffer::InstancePtr create(std::function<void()> below_low, std::function<void()> above_high,
-                             std::function<void()> above_overflow) override {
-    auto buffer = Buffer::InstancePtr{create_(below_low, above_high, above_overflow)};
+  Buffer::InstancePtr createBuffer(std::function<void()> below_low,
+                                   std::function<void()> above_high,
+                                   std::function<void()> above_overflow) override {
+    auto buffer = Buffer::InstancePtr{createBuffer_(below_low, above_high, above_overflow)};
     ASSERT(buffer != nullptr);
     return buffer;
   }
 
-  MOCK_METHOD(Buffer::Instance*, create_,
+  MOCK_METHOD(Buffer::Instance*, createBuffer_,
               (std::function<void()> below_low, std::function<void()> above_high,
                std::function<void()> above_overflow));
+
+  MOCK_METHOD(Buffer::BufferMemoryAccountSharedPtr, createAccount, (Http::StreamResetHandler&));
+  MOCK_METHOD(uint64_t, resetAccountsGivenPressure, (float));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

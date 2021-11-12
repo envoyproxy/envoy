@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "test/integration/integration.h"
 

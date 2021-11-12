@@ -1,7 +1,6 @@
-#include "common/common/thread_impl.h"
-#include "common/filesystem/filesystem_impl.h"
-
-#include "exe/platform_impl.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/exe/platform_impl.h"
 
 namespace Envoy {
 

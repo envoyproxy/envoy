@@ -5,7 +5,7 @@
 
 #include "envoy/api/os_sys_calls.h"
 
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -46,5 +46,7 @@ private:
   friend class FileSystemImplTest;
 };
 
+using FileImpl = FileImplPosix;
+using InstanceImpl = InstanceImplPosix;
 } // namespace Filesystem
 } // namespace Envoy

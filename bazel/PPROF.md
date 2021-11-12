@@ -95,7 +95,7 @@ Example:
 
 ```c++
     // includes
-    #include "common/profiler/profiler.h"
+    #include "source/common/profiler/profiler.h"
     ...
     Function(...) {
         if (!Profiler::Cpu::startProfiler(profile_path)) {

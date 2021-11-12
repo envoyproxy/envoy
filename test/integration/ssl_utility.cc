@@ -1,12 +1,13 @@
 #include "test/integration/ssl_utility.h"
 
-#include "common/http/utility.h"
-#include "common/json/json_loader.h"
-#include "common/network/utility.h"
+#include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
-#include "extensions/transport_sockets/tls/ssl_socket.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/transport_sockets/tls/context_config_impl.h"
+#include "source/extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/integration/server.h"
@@ -96,7 +97,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 }
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
-                                                            Api::Api& api) {
+                                                            Api::Api& api, bool use_http3) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
@@ -106,8 +107,18 @@ Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& cont
       tls_context, mock_factory_ctx);
 
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
-      std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+  if (!use_http3) {
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
+        std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
+  }
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
+  quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);
+
+  std::vector<std::string> server_names;
+  auto& config_factory = Config::Utility::getAndCheckFactoryByName<
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(
+      "envoy.transport_sockets.quic");
+  return config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
 Network::TransportSocketFactoryPtr createFakeUpstreamSslContext(

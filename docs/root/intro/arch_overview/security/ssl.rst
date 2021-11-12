@@ -77,7 +77,7 @@ Example configuration
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
 :ref:`trusted_ca <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>` along with
 :ref:`match_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`
-makes Envoy verify the server identity of *127.0.0.2:1234* as "foo" in the same way as e.g. cURL
+makes Envoy verify the server identity of *127.0.0.1:1234* as "foo" in the same way as e.g. cURL
 does on standard Debian installations. Common paths for system CA bundles on Linux and BSD are:
 
 * /etc/ssl/certs/ca-certificates.crt (Debian/Ubuntu/Gentoo etc.)
@@ -103,7 +103,7 @@ Custom Certificate Validator
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The configuration explained above is used by the "default" certificate validator.
-Envoy also supports custom validators in `envoy.tls.cert_validator` extension category which can be
+Envoy also supports custom validators in ``envoy.tls.cert_validator`` extension category which can be
 configured on :ref:`CertificateValidationContext <envoy_v3_api_msg_extensions.transport_sockets.tls.v3.CertificateValidationContext>`.
 
 For example, Envoy can be configured to verify peer certificates following the `SPIFFE <https://github.com/spiffe/spiffe>`_ specification

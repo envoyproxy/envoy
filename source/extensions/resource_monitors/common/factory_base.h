@@ -2,7 +2,7 @@
 
 #include "envoy/server/resource_monitor_config.h"
 
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {

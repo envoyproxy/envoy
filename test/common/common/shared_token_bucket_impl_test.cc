@@ -1,6 +1,6 @@
 #include <chrono>
 
-#include "common/common/shared_token_bucket_impl.h"
+#include "source/common/common/shared_token_bucket_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 

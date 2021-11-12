@@ -15,7 +15,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.listener.original_dst",
+    extension_names = ["envoy.filters.listener.original_dst"],
     deps = [
         "//source/extensions/filters/listener/original_dst:config",
         "//test/test_common:utility_lib",

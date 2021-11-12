@@ -7,9 +7,9 @@
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-#include "common/network/resolver_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"

@@ -1,12 +1,12 @@
-#include "common/version/version.h"
+#include "source/common/version/version.h"
 
 #include <map>
 #include <regex>
 #include <string>
 
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
@@ -37,11 +37,11 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
 }
 
 bool VersionInfo::sslFipsCompliant() {
-  bool fipsCompliant = false;
-#ifdef BORINGSSL_FIPS
-  fipsCompliant = true;
+#ifdef ENVOY_SSL_FIPS
+  return true;
+#else
+  return false;
 #endif
-  return fipsCompliant;
 }
 
 const std::string& VersionInfo::buildType() {

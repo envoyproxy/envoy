@@ -1,6 +1,6 @@
 #include "envoy/common/exception.h"
 
-#include "common/stream_info/filter_state_impl.h"
+#include "source/common/stream_info/filter_state_impl.h"
 
 #include "test/test_common/utility.h"
 

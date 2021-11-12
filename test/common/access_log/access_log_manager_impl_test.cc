@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "common/access_log/access_log_manager_impl.h"
-#include "common/filesystem/file_shared_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
+#include "source/common/filesystem/file_shared_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/access_log/mocks.h"

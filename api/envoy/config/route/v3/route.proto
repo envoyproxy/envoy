@@ -4,6 +4,7 @@ package envoy.config.route.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -21,14 +22,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>` in
-  // :ref:`envoy_api_msg_extensions.filters.network.http_connection_manager.v3.Rds`.
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.Rds.route_config_name>` in
+  // :ref:`envoy_v3_api_msg_extensions.filters.network.http_connection_manager.v3.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
@@ -52,8 +53,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each response that
   // the connection manager encodes. Headers specified at this level are applied
-  // after headers from any enclosed :ref:`envoy_api_msg_config.route.v3.VirtualHost` or
-  // :ref:`envoy_api_msg_config.route.v3.RouteAction`. For more information, including details on
+  // after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v3.HeaderValueOption response_headers_to_add = 4
@@ -67,8 +68,8 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
-  // applied after headers from any enclosed :ref:`envoy_api_msg_config.route.v3.VirtualHost` or
-  // :ref:`envoy_api_msg_config.route.v3.RouteAction`. For more information, including details on
+  // applied after headers from any enclosed :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost` or
+  // :ref:`envoy_v3_api_msg_config.route.v3.RouteAction`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.v3.HeaderValueOption request_headers_to_add = 6
@@ -99,26 +100,38 @@ message RouteConfiguration {
   // route table will load and the router filter will return a 404 if the route
   // is selected at runtime. This setting defaults to true if the route table
   // is statically defined via the :ref:`route_config
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.route_config>`
   // option. This setting default to false if the route table is loaded dynamically via the
   // :ref:`rds
-  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.rds>`
   // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;
 
   // The maximum bytes of the response :ref:`direct response body
-  // <envoy_api_field_config.route.v3.DirectResponseAction.body>` size. If not specified the default
+  // <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` size. If not specified the default
   // is 4096.
   //
   // .. warning::
   //
   //   Envoy currently holds the content of :ref:`direct response body
-  //   <envoy_api_field_config.route.v3.DirectResponseAction.body>` in memory. Be careful setting
+  //   <envoy_v3_api_field_config.route.v3.DirectResponseAction.body>` in memory. Be careful setting
   //   this to be larger than the default 4KB, since the allocated memory for direct response body
   //   is not subject to data plane buffering controls.
   //
   google.protobuf.UInt32Value max_direct_response_body_size_bytes = 11;
+
+  // [#not-implemented-hide:]
+  // A list of plugins and their configurations which may be used by a
+  // :ref:`envoy_v3_api_field_config.route.v3.RouteAction.cluster_specifier_plugin`
+  // within the route. All *extension.name* fields in this list must be unique.
+  repeated ClusterSpecifierPlugin cluster_specifier_plugins = 12;
+}
+
+// Configuration for a cluster specifier plugin.
+message ClusterSpecifierPlugin {
+  // The name of the plugin and its opaque configuration.
+  core.v3.TypedExtensionConfig extension = 1;
 }
 
 message Vhds {

@@ -1,45 +1,50 @@
-#include "extensions/filters/http/ext_proc/client_impl.h"
+#include "source/extensions/filters/http/ext_proc/client_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-static constexpr char kExternalMethod[] =
-    "envoy.service.ext_proc.v3alpha.ExternalProcessor.Process";
+static constexpr char kExternalMethod[] = "envoy.service.ext_proc.v3.ExternalProcessor.Process";
 
 ExternalProcessorClientImpl::ExternalProcessorClientImpl(
     Grpc::AsyncClientManager& client_manager,
-    const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope) {
-  factory_ = client_manager.factoryForGrpcService(grpc_service, scope, true);
-}
+    const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope)
+    : client_manager_(client_manager), grpc_service_(grpc_service), scope_(scope) {}
 
 ExternalProcessorStreamPtr
-ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks) {
-  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(factory_->create());
-  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks);
+ExternalProcessorClientImpl::start(ExternalProcessorCallbacks& callbacks,
+                                   const StreamInfo::StreamInfo& stream_info) {
+  Grpc::AsyncClient<ProcessingRequest, ProcessingResponse> grpcClient(
+      client_manager_.getOrCreateRawAsyncClient(grpc_service_, scope_, true,
+                                                Grpc::CacheOption::AlwaysCache));
+  return std::make_unique<ExternalProcessorStreamImpl>(std::move(grpcClient), callbacks,
+                                                       stream_info);
 }
 
 ExternalProcessorStreamImpl::ExternalProcessorStreamImpl(
     Grpc::AsyncClient<ProcessingRequest, ProcessingResponse>&& client,
-    ExternalProcessorCallbacks& callbacks)
+    ExternalProcessorCallbacks& callbacks, const StreamInfo::StreamInfo& stream_info)
     : callbacks_(callbacks) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(kExternalMethod);
+  grpc_context_.stream_info = &stream_info;
   Http::AsyncClient::StreamOptions options;
+  options.setParentContext(grpc_context_);
   stream_ = client_.start(*descriptor, *this, options);
 }
 
-void ExternalProcessorStreamImpl::send(
-    envoy::service::ext_proc::v3alpha::ProcessingRequest&& request, bool end_stream) {
+void ExternalProcessorStreamImpl::send(envoy::service::ext_proc::v3::ProcessingRequest&& request,
+                                       bool end_stream) {
   stream_.sendMessage(std::move(request), end_stream);
 }
 
 bool ExternalProcessorStreamImpl::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
-    stream_->closeStream();
+    stream_.closeStream();
     stream_closed_ = true;
+    stream_.resetStream();
     return true;
   }
   return false;

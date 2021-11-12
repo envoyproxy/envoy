@@ -21,8 +21,9 @@ public:
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Host&));
   MOCK_METHOD(uint32_t, hostSelectionRetryCount, (), (const));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, upstreamSocketOptions, (), (const));
-  MOCK_METHOD(Network::TransportSocketOptionsSharedPtr, upstreamTransportSocketOptions, (),
+  MOCK_METHOD(Network::TransportSocketOptionsConstSharedPtr, upstreamTransportSocketOptions, (),
               (const));
+  MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
 
 private:
   HealthyAndDegradedLoad priority_load_;

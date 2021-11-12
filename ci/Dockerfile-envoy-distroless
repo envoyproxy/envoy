@@ -1,0 +1,11 @@
+FROM gcr.io/distroless/base-debian11:nonroot
+
+ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
+
+ARG ENVOY_BINARY_SUFFIX=_stripped
+ADD linux/amd64/build_envoy_release${ENVOY_BINARY_SUFFIX}/* /usr/local/bin/
+
+EXPOSE 10000
+
+ENTRYPOINT ["envoy"]
+CMD ["-c", "/etc/envoy/envoy.yaml"]

@@ -3,11 +3,9 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/crypto/utility.h"
-
-#include "extensions/common/crypto/crypto_impl.h"
-#include "extensions/filters/common/lua/lua.h"
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/filters/common/lua/lua.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include "openssl/evp.h"
 
@@ -48,6 +46,8 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"add", static_luaAdd},
             {"get", static_luaGet},
+            {"getAtIndex", static_luaGetAtIndex},
+            {"getNumValues", static_luaGetNumValues},
             {"remove", static_luaRemove},
             {"replace", static_luaReplace},
             {"__pairs", static_luaPairs}};
@@ -68,6 +68,21 @@ private:
    * @return string value if found or nil.
    */
   DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGet);
+
+  /**
+   * Get a header value from the map.
+   * @param 1 (string): header name.
+   * @param 2 (int): index of the value for the given header which needs to be retrieved.
+   * @return string value if found or nil.
+   */
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetAtIndex);
+
+  /**
+   * Get the header value size from the map.
+   * @param 1 (string): header name.
+   * @return int value size if found or 0.
+   */
+  DECLARE_LUA_FUNCTION(HeaderMapWrapper, luaGetNumValues);
 
   /**
    * Implementation of the __pairs metamethod so a headers wrapper can be iterated over using

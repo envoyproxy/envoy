@@ -19,7 +19,9 @@ Below is a list of additional documentation to aid the development process:
 
 - [Guide to Envoy Bazel rules (managing `BUILD` files)](https://github.com/envoyproxy/envoy/blob/main/bazel/DEVELOPER.md)
 
-- [Using Docker for building and testing](https://github.com/envoyproxy/envoy/tree/main/ci)
+- [Guide to setup development environment with Visual Studio Code](https://github.com/envoyproxy/envoy/blob/main/tools/vscode/README.md)
+
+- [Using Docker for building and testing](https://github.com/envoyproxy/envoy/tree/main/ci#readme)
 
 - [Guide to contributing to Envoy](https://github.com/envoyproxy/envoy/blob/main/CONTRIBUTING.md)
 
@@ -27,7 +29,7 @@ Below is a list of additional documentation to aid the development process:
 
 - [Overview of how to write integration tests for new code](https://github.com/envoyproxy/envoy/blob/main/test/integration/README.md)
 
-- [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example)
+- [Envoy filter example project (how to consume and extend Envoy as a submodule)](https://github.com/envoyproxy/envoy-filter-example#readme)
 
 - [Performance testing Envoy with `tcmalloc`/`pprof`](https://github.com/envoyproxy/envoy/blob/main/bazel/PPROF.md)
 

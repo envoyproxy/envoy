@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 
-from exports import (
+from tools.dependency.exports import (
     api_repository_locations, envoy_repository_locations, repository_locations_utils)
 
 
@@ -39,11 +39,11 @@ def get_github_release_from_urls(urls):
         if components[5] == 'archive':
             # Only support .tar.gz, .zip today. Figure out the release tag from this
             # filename.
-            if components[6].endswith('.tar.gz'):
-                github_version = components[6][:-len('.tar.gz')]
+            if components[-1].endswith('.tar.gz'):
+                github_version = components[-1][:-len('.tar.gz')]
             else:
-                assert (components[6].endswith('.zip'))
-                github_version = components[6][:-len('.zip')]
+                assert (components[-1].endswith('.zip'))
+                github_version = components[-1][:-len('.zip')]
         else:
             # Release tag is a path component.
             assert (components[5] == 'releases')

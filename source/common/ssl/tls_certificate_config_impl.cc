@@ -1,12 +1,12 @@
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/config/datasource.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/datasource.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -28,7 +28,7 @@ static const std::string INLINE_STRING = "<inline>";
 
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext* factory_context, Api::Api& api)
+    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api)
     : certificate_chain_(Config::DataSource::read(config.certificate_chain(), true, api)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
@@ -42,19 +42,30 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       ocsp_staple_(readOcspStaple(config.ocsp_staple(), api)),
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      private_key_method_(
-          factory_context != nullptr && config.has_private_key_provider()
-              ? factory_context->sslContextManager()
-                    .privateKeyMethodManager()
-                    .createPrivateKeyMethodProvider(config.private_key_provider(), *factory_context)
-              : nullptr) {
+      private_key_method_(nullptr) {
   if (config.has_private_key_provider() && config.has_private_key()) {
     throw EnvoyException(fmt::format(
         "Certificate configuration can't have both private_key and private_key_provider"));
   }
-  if (certificate_chain_.empty() || (private_key_.empty() && private_key_method_ == nullptr)) {
-    throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",
-                                     certificate_chain_path_, private_key_path_));
+  if (config.has_private_key_provider()) {
+    private_key_method_ =
+        factory_context.sslContextManager()
+            .privateKeyMethodManager()
+            .createPrivateKeyMethodProvider(config.private_key_provider(), factory_context);
+  }
+  if (certificate_chain_.empty()) {
+    throw EnvoyException(
+        fmt::format("Failed to load incomplete certificate from {}: certificate chain not set",
+                    certificate_chain_path_));
+  }
+  if (private_key_.empty() && private_key_method_ == nullptr) {
+    if (config.has_private_key_provider()) {
+      throw EnvoyException(fmt::format("Failed to load private key provider: {}",
+                                       config.private_key_provider().provider_name()));
+    } else {
+      throw EnvoyException(
+          fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
+    }
   }
 }
 

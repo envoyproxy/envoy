@@ -5,8 +5,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/thread.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/stats/symbol_table_impl.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
@@ -62,22 +62,6 @@ std::string sanitizeStatsName(absl::string_view name);
  * @return The value of the tag, if found.
  */
 absl::optional<StatName> findTag(const Metric& metric, StatName find_tag_name);
-
-/**
- * Creates a nested scope from a vector of tokens which are used to create the
- * name. The tokens can be specified as DynamicName or StatName. For
- * tokens specified as DynamicName, a dynamic StatName will be created. See
- * https://github.com/envoyproxy/envoy/blob/main/source/docs/stats.md#dynamic-stat-tokens
- * for more detail on why symbolic StatNames are preferred when possible.
- *
- * See also scopeFromStatNames, which is slightly faster but does not allow
- * passing DynamicName(string)s as names.
- *
- * @param scope The scope in which to create the counter.
- * @param elements The vector of mixed DynamicName and StatName
- * @return A scope named using the joined elements.
- */
-ScopePtr scopeFromElements(Scope& scope, const ElementVec& elements);
 
 /**
  * Creates a nested scope from a vector of StatNames which are used to create the

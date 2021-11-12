@@ -36,7 +36,7 @@ message LocalRateLimit {
   //
   // .. note::
   //   In the current implementation the token bucket's :ref:`fill_interval
-  //   <envoy_api_field_type.v3.TokenBucket.fill_interval>` must be >= 50ms to avoid too aggressive
+  //   <envoy_v3_api_field_type.v3.TokenBucket.fill_interval>` must be >= 50ms to avoid too aggressive
   //   refills.
   type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
 

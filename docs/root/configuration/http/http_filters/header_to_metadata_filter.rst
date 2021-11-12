@@ -85,7 +85,7 @@ A corresponding upstream cluster configuration could be:
           - keys:
               - version
 
-This would then allow requests with the `x-version` header set to be matched against
+This would then allow requests with the ``x-version`` header set to be matched against
 endpoints with the corresponding version. Whereas requests with that header missing
 would be matched with the default endpoints.
 

@@ -38,13 +38,13 @@ envoy_cc_library(
         "abseil_optional",
     ],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/common:time_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/network:address_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/tracing:http_tracer_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
@@ -67,12 +67,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    category = "envoy.tracers",
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/server:__subpackages__",
-    ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zipkin_lib",
         "//source/extensions/tracers/common:factory_base_lib",

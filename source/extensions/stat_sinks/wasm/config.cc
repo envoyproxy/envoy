@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/wasm/config.h"
+#include "source/extensions/stat_sinks/wasm/config.h"
 
 #include <memory>
 
@@ -6,9 +6,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,18 +36,20 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
       }
       return;
     }
-    wasm_sink->setSingleton(
-        Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
+    wasm_sink->setSingleton(Common::Wasm::getOrCreateThreadLocalPlugin(
+        base_wasm, plugin, context.mainThreadDispatcher()));
   };
 
   if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
-                                context.initManager(), context.dispatcher(), context.api(),
-                                context.lifecycleNotifier(), remote_data_provider_,
+                                context.initManager(), context.mainThreadDispatcher(),
+                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm Stat Sink {}", plugin->name_));
   }
 
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
   return wasm_sink;
 }
 
@@ -56,7 +57,7 @@ ProtobufTypes::MessagePtr WasmSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::stat_sinks::wasm::v3::Wasm>();
 }
 
-std::string WasmSinkFactory::name() const { return StatsSinkNames::get().Wasm; }
+std::string WasmSinkFactory::name() const { return WasmName; }
 
 /**
  * Static registration for the wasm access log. @see RegisterFactory.

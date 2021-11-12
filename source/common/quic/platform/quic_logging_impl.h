@@ -12,9 +12,9 @@
 #include <sstream>
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/common/stl_helpers.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/stl_helpers.h"
 
 #include "absl/base/optimization.h"
 #include "absl/synchronization/mutex.h"
@@ -128,6 +128,7 @@
 #endif
 
 #define QUICHE_PREDICT_FALSE_IMPL(x) ABSL_PREDICT_FALSE(x)
+#define QUICHE_PREDICT_TRUE_IMPL(x) ABSL_PREDICT_TRUE(x)
 
 namespace quic {
 

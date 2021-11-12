@@ -4,7 +4,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/upstream/conn_pool_map.h"
+#include "source/common/upstream/conn_pool_map.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -15,7 +15,7 @@ template <typename KEY_TYPE, typename POOL_TYPE> class PriorityConnPoolMap {
 public:
   using ConnPoolMapType = ConnPoolMap<KEY_TYPE, POOL_TYPE>;
   using PoolFactory = typename ConnPoolMapType::PoolFactory;
-  using DrainedCb = typename ConnPoolMapType::DrainedCb;
+  using IdleCb = typename ConnPoolMapType::IdleCb;
   using PoolOptRef = typename ConnPoolMapType::PoolOptRef;
 
   PriorityConnPoolMap(Event::Dispatcher& dispatcher, const HostConstSharedPtr& host);
@@ -26,12 +26,22 @@ public:
    * is reached.
    * @return The pool corresponding to `key`, or `absl::nullopt`.
    */
-  PoolOptRef getPool(ResourcePriority priority, KEY_TYPE key, const PoolFactory& factory);
+  PoolOptRef getPool(ResourcePriority priority, const KEY_TYPE& key, const PoolFactory& factory);
+
+  /**
+   * Erase a pool for the given priority and `key` if it exists and is idle.
+   */
+  bool erasePool(ResourcePriority priority, const KEY_TYPE& key);
 
   /**
    * @return the number of pools across all priorities.
    */
   size_t size() const;
+
+  /**
+   * @return true if the pools across all priorities are empty.
+   */
+  bool empty() const;
 
   /**
    * Destroys all mapped pools.
@@ -44,14 +54,16 @@ public:
    * the state of `this`, there is a good chance it will cause corruption due to the callback firing
    * immediately.
    */
-  void addDrainedCallback(const DrainedCb& cb);
+  void addIdleCallback(const IdleCb& cb);
 
   /**
-   * Instructs each connection pool to drain its connections.
+   * See `Envoy::ConnectionPool::Instance::drainConnections()`.
    */
-  void drainConnections();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior);
 
 private:
+  size_t getPriorityIndex(ResourcePriority priority) const;
+
   std::array<std::unique_ptr<ConnPoolMapType>, NumResourcePriorities> conn_pool_maps_;
 };
 

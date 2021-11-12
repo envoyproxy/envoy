@@ -1,8 +1,7 @@
 #include <memory>
 
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/on_demand/on_demand_update.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/on_demand/on_demand_update.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

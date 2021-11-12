@@ -1,4 +1,4 @@
-#include "extensions/tracers/xray/util.h"
+#include "source/extensions/tracers/xray/util.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

@@ -1,21 +1,23 @@
 #include "test/common/router/router_test_base.h"
 
-#include "common/router/debug_config.h"
+#include "source/common/router/debug_config.h"
 
 namespace Envoy {
 namespace Router {
 
 using ::testing::AnyNumber;
+using ::testing::Eq;
 using ::testing::ReturnRef;
 
 RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_headers,
+                               bool suppress_grpc_request_failure_code_stats,
                                Protobuf::RepeatedPtrField<std::string> strict_headers_to_check)
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(pool_.add("test"), local_info_, stats_store_, cm_, runtime_, random_,
               ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers,
-              false, std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
-              router_context_),
+              false, suppress_grpc_request_failure_code_stats, std::move(strict_headers_to_check),
+              test_time_.timeSystem(), http_context_, router_context_),
       router_(config_) {
   router_.setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
@@ -24,10 +26,10 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
       .WillByDefault(Return(host_address_));
   ON_CALL(*cm_.thread_local_cluster_.conn_pool_.host_, locality())
       .WillByDefault(ReturnRef(upstream_locality_));
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       host_address_);
-  router_.downstream_connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
-      Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
+  router_.downstream_connection_.stream_info_.downstream_connection_info_provider_
+      ->setRemoteAddress(Network::Utility::parseInternetAddressAndPort("1.2.3.4:80"));
 
   // Make the "system time" non-zero, because 0 is considered invalid by DateUtil.
   test_time_.setMonotonicTime(std::chrono::milliseconds(50));
@@ -49,9 +51,14 @@ void RouterTestBase::expectPerTryTimerCreate() {
   EXPECT_CALL(*per_try_timeout_, disableTimer());
 }
 
-void RouterTestBase::expectMaxStreamDurationTimerCreate() {
+void RouterTestBase::expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout) {
+  per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
+  EXPECT_CALL(*per_try_idle_timeout_, enableTimer(timeout, _));
+}
+
+void RouterTestBase::expectMaxStreamDurationTimerCreate(std::chrono::milliseconds duration_msec) {
   max_stream_duration_timer_ = new Event::MockTimer(&callbacks_.dispatcher_);
-  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(_, _));
+  EXPECT_CALL(*max_stream_duration_timer_, enableTimer(Eq(duration_msec), _));
   EXPECT_CALL(*max_stream_duration_timer_, disableTimer());
 }
 
@@ -98,31 +105,30 @@ void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                     Upstream::LoadBalancerContext* context) -> Http::ConnectionPool::Instance* {
-            auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-            EXPECT_EQ(match.size(), 2);
-            auto it = match.begin();
+      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
+                           Upstream::LoadBalancerContext* context) {
+        auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+        EXPECT_EQ(match.size(), 2);
+        auto it = match.begin();
 
-            // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
-            // below matters.
+        // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+        // below matters.
 
-            // `stage` was only set by the request, not by the route entry.
-            EXPECT_EQ((*it)->name(), "stage");
-            EXPECT_EQ((*it)->value().value().string_value(), "devel");
-            it++;
+        // `stage` was only set by the request, not by the route entry.
+        EXPECT_EQ((*it)->name(), "stage");
+        EXPECT_EQ((*it)->value().value().string_value(), "devel");
+        it++;
 
-            // `version` should be what came from the request, overriding the route entry.
-            EXPECT_EQ((*it)->name(), "version");
-            EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+        // `version` should be what came from the request, overriding the route entry.
+        EXPECT_EQ((*it)->name(), "version");
+        EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
 
-            // When metadataMatchCriteria() is computed from dynamic metadata, the result should
-            // be cached.
-            EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
+        // When metadataMatchCriteria() is computed from dynamic metadata, the result should
+        // be cached.
+        EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
 
-            return &cm_.thread_local_cluster_.conn_pool_;
-          }));
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
       .WillOnce(Return(&cancellable_));
   expectResponseTimerCreate();
@@ -153,6 +159,7 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   router_.decodeHeaders(headers, true);
 
   EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
+  EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 
   // When the router filter gets reset we should cancel the pool request.
   EXPECT_CALL(cancellable_, cancel(_));
@@ -219,7 +226,7 @@ void RouterTestBase::sendRequest(bool end_stream) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  HttpTestUtility::addDefaultHeaders(default_request_headers_);
+  HttpTestUtility::addDefaultHeaders(default_request_headers_, false);
   router_.decodeHeaders(default_request_headers_, end_stream);
 }
 

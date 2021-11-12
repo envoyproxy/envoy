@@ -8,5 +8,5 @@ MAIN_BRANCH="refs/heads/main"
 . "$(dirname "$0")"/setup_cache.sh
 
 if [[ "${AZP_BRANCH}" == "${MAIN_BRANCH}" ]]; then
-  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS}" tools/api/generate_go_protobuf.py
+  BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS}" tools/api/generate_go_protobuf.py --sync
 fi

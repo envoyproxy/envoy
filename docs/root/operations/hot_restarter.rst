@@ -13,7 +13,7 @@ The restarter is invoked like so:
 
   hot-restarter.py start_envoy.sh
 
-`start_envoy.sh` might be defined like so (using salt/jinja like syntax):
+``start_envoy.sh`` might be defined like so (using salt/jinja like syntax):
 
 .. code-block:: jinja
 
@@ -24,7 +24,7 @@ The restarter is invoked like so:
 
   exec /usr/sbin/envoy -c /etc/envoy/envoy.cfg --restart-epoch $RESTART_EPOCH --service-cluster {{ grains['cluster_name'] }} --service-node {{ grains['service_node'] }} --service-zone {{ grains.get('ec2_availability-zone', 'unknown') }}
 
-Note on `inotify.max_user_watches`: If Envoy is being configured to watch many files for configuration in a directory
+Note on ``inotify.max_user_watches``: If Envoy is being configured to watch many files for configuration in a directory
 on a Linux machine, increase this value as Linux enforces limits on the maximum number of files that can be watched.
 
 The *RESTART_EPOCH* environment variable is set by the restarter on each restart and must be passed

@@ -7,11 +7,8 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
 
-#include "common/network/socket_impl.h"
-
-#include "server/filter_chain_manager_impl.h"
-
-#include "extensions/transport_sockets/well_known_names.h"
+#include "source/common/network/socket_impl.h"
+#include "source/server/filter_chain_manager_impl.h"
 
 #include "test/benchmark/main.h"
 #include "test/mocks/network/mocks.h"
@@ -42,7 +39,8 @@ class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 class MockConnectionSocket : public Network::ConnectionSocket {
 public:
   MockConnectionSocket()
-      : address_provider_(std::make_shared<Network::SocketAddressSetterImpl>(nullptr, nullptr)) {}
+      : connection_info_provider_(
+            std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)) {}
 
   static std::unique_ptr<MockConnectionSocket>
   createMockConnectionSocket(uint16_t destination_port, const std::string& destination_address,
@@ -52,17 +50,19 @@ public:
     auto res = std::make_unique<MockConnectionSocket>();
 
     if (absl::StartsWith(destination_address, "/")) {
-      res->address_provider_->setLocalAddress(
+      res->connection_info_provider_->setLocalAddress(
           std::make_shared<Network::Address::PipeInstance>(destination_address));
     } else {
-      res->address_provider_->setLocalAddress(
+      res->connection_info_provider_->setLocalAddress(
           Network::Utility::parseInternetAddress(destination_address, destination_port));
     }
     if (absl::StartsWith(source_address, "/")) {
-      res->address_provider_->setRemoteAddress(
+      res->connection_info_provider_->setRemoteAddress(
           std::make_shared<Network::Address::PipeInstance>(source_address));
     } else {
-      res->address_provider_->setRemoteAddress(
+      res->connection_info_provider_->setRemoteAddress(
+          Network::Utility::parseInternetAddress(source_address, source_port));
+      res->connection_info_provider_->setDirectRemoteAddressForTest(
           Network::Utility::parseInternetAddress(source_address, source_port));
     }
     res->server_name_ = server_name;
@@ -76,12 +76,14 @@ public:
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
-  Network::SocketAddressSetter& addressProvider() override { return *address_provider_; }
-  const Network::SocketAddressSetter& addressProvider() const override {
-    return *address_provider_;
+  Network::ConnectionInfoSetter& connectionInfoProvider() override {
+    return *connection_info_provider_;
   }
-  Network::SocketAddressProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
 
   // Wont call
@@ -93,7 +95,7 @@ public:
   bool isOpen() const override { return false; }
   Network::Socket::Type socketType() const override { return Network::Socket::Type::Stream; }
   Network::Address::Type addressType() const override {
-    return address_provider_->localAddress()->type();
+    return connection_info_provider_->localAddress()->type();
   }
   absl::optional<Network::Address::IpVersion> ipVersion() const override {
     return Network::Address::IpVersion::v4;
@@ -127,7 +129,7 @@ public:
 private:
   Network::IoHandlePtr io_handle_;
   OptionsSharedPtr options_;
-  Network::SocketAddressSetterSharedPtr address_provider_;
+  std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
   std::string server_name_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
@@ -137,7 +139,6 @@ const char YamlHeader[] = R"EOF(
       socket_address: { address: 127.0.0.1, port_value: 1234 }
     listener_filters:
     - name: "envoy.filters.listener.tls_inspector"
-      typed_config: {}
     filter_chains:
     - filter_chain_match:
         # empty

@@ -19,8 +19,8 @@ configure and code each application independently. Envoy supports various types 
   allocated. This has the implication that the :ref:`upstream_cx_active
   <config_cluster_manager_cluster_stats>` count for a cluster may be higher than the cluster maximum
   connection circuit breaker, with an upper bound of
-  `cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
-  cluster)`. This bound applies to the sum of connections across all workers threads. See
+  ``cluster maximum connections + (number of endpoints in a cluster) * (connection pools for the
+  cluster)``. This bound applies to the sum of connections across all workers threads. See
   :ref:`connection pooling <arch_overview_conn_pool_how_many>` for details on how many connection
   pools a cluster may have.
 * **Cluster maximum pending requests**: The maximum number of requests that will be queued while
@@ -31,7 +31,7 @@ configure and code each application independently. Envoy supports various types 
   configured, all requests will be multiplexed over the same connection so this circuit breaker
   will only be hit when no connection is already established. If this circuit breaker overflows the
   :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>` counter for the cluster will
-  increment.
+  increment. For HTTP/3 the equivalent to HTTP/2's :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>` is :ref:`max concurrent streams <envoy_v3_api_field_config.core.v3.QuicProtocolOptions.max_concurrent_streams>`
 * **Cluster maximum requests**: The maximum number of requests that can be outstanding to all hosts
   in a cluster at any given time. If this circuit breaker overflows the :ref:`upstream_rq_pending_overflow <config_cluster_manager_cluster_stats>`
   counter for the cluster will increment.

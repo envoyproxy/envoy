@@ -1,8 +1,8 @@
-#include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
+#include "source/extensions/filters/udp/udp_proxy/udp_proxy_filter.h"
 
 #include "envoy/network/listener.h"
 
-#include "common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,17 +40,19 @@ void UdpProxyFilter::onClusterRemoval(const std::string& cluster) {
   cluster_info_.reset();
 }
 
-void UdpProxyFilter::onData(Network::UdpRecvData& data) {
+Network::FilterStatus UdpProxyFilter::onData(Network::UdpRecvData& data) {
   if (!cluster_info_.has_value()) {
     config_->stats().downstream_sess_no_route_.inc();
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
-  cluster_info_.value().onData(data);
+  return cluster_info_.value().onData(data);
 }
 
-void UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
+Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) {
   config_->stats().downstream_sess_rx_errors_.inc();
+
+  return Network::FilterStatus::StopIteration;
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
@@ -83,7 +85,7 @@ UdpProxyFilter::ClusterInfo::~ClusterInfo() {
   ASSERT(host_to_sessions_.empty());
 }
 
-void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
+Network::FilterStatus UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
   const auto active_session_it = sessions_.find(data.addresses_);
   ActiveSession* active_session;
   if (active_session_it == sessions_.end()) {
@@ -92,7 +94,7 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
              .connections()
              .canCreate()) {
       cluster_.info()->stats().upstream_cx_overflow_.inc();
-      return;
+      return Network::FilterStatus::StopIteration;
     }
 
     UdpLoadBalancerContext context(filter_.config_->hashPolicy(), data.addresses_.peer_);
@@ -100,7 +102,7 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
     if (host == nullptr) {
       ENVOY_LOG(debug, "cannot find any valid host. failed to create a session.");
       cluster_.info()->stats().upstream_cx_none_healthy_.inc();
-      return;
+      return Network::FilterStatus::StopIteration;
     }
 
     active_session = createSession(std::move(data.addresses_), host);
@@ -126,6 +128,8 @@ void UdpProxyFilter::ClusterInfo::onData(Network::UdpRecvData& data) {
   }
 
   active_session->write(*data.buffer_);
+
+  return Network::FilterStatus::StopIteration;
 }
 
 UdpProxyFilter::ActiveSession*
@@ -222,7 +226,10 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   const Api::IoErrorPtr result = Network::Utility::readPacketsFromSocket(
       socket_->ioHandle(), *addresses_.local_, *this, cluster_.filter_.config_->timeSource(),
       cluster_.filter_.config_->upstreamSocketConfig().prefer_gro_, packets_dropped);
-  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+  if (result == nullptr) {
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    return;
+  }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     cluster_.cluster_stats_.sess_rx_errors_.inc();
   }

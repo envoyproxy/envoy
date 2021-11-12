@@ -1,4 +1,4 @@
-#include "extensions/transport_sockets/tls/stats.h"
+#include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"

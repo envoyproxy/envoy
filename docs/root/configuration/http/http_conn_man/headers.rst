@@ -9,6 +9,27 @@ is being received) as well as during encoding (when the response is being sent).
 .. contents::
   :local:
 
+.. _config_http_conn_man_headers_scheme:
+
+:scheme
+-------
+
+Envoy will always set the *:scheme* header while processing a request. It should always be available to filters, and should be forwarded upstream for HTTP/2 and HTTP/3, where :ref:`config_http_conn_man_headers_x-forwarded-proto` will be sent for HTTP/1.1.
+
+For HTTP/2, and HTTP/3, incoming *:scheme* headers are trusted and propogated through upstream.
+For HTTP/1, the *:scheme* header will be set
+1) From the absolute URL if present and valid. An invalid (not "http" or "https") scheme, or an https scheme over an unencrypted connection will result in Envoy rejecting the request. This is the only scheme validation Envoy performs as it avoids a HTTP/1.1-specific privledge escalation attack for edge Envoys [1]_ which doesn't have a comparable vector for HTTP/2 and above [2]_.
+2) From the value of the :ref:`config_http_conn_man_headers_x-forwarded-proto` header after sanitization (to valid *x-forwarded-proto* from trusted downstreams, otherwise based on downstream encryption level).
+
+This default behavior can be overridden via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option.
+
+The *:scheme* header will be used by Envoy over *x-forwarded-proto* where the URI scheme is wanted, for example serving content from cache based on the *:scheme* header rather than X-Forwarded-Proto, or setting the scheme of redirects based on the scheme of the original URI. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
+.. [1] Edge Envoys often have plaintext HTTP/1.1 listeners. If Envoy trusts absolute URL scheme from fully qualfied URLs, a MiTM can adjust relative URLs to https absolute URLs, and inadvertantly cause the Envoy's upstream to send PII or other sensitive data over what it then believes is a secure connection.
+.. [2] Unlike HTTP/1.1, HTTP/2 is in practice always served over TLS via ALPN for edge Envoys. In mesh networks using insecure HTTP/2, if the downstream is not trusted to set scheme, the :ref:`scheme_header_transformation <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>` should be used.
+
 .. _config_http_conn_man_headers_user-agent:
 
 user-agent
@@ -26,6 +47,13 @@ server
 
 The *server* header will be set during encoding to the value in the :ref:`server_name
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.server_name>` option.
+
+.. _config_http_conn_man_headers_referer:
+
+referer
+-------
+
+The *referer* header will be sanitized during decoding. Multiple URLs or invalid URLs will be removed.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
@@ -191,6 +219,14 @@ accurate. The source IP address of the immediate downstream node's connection to
 trusted. XFF *sometimes* can be trusted. Malicious clients can forge XFF, but the last
 address in XFF can be trusted if it was put there by a trusted proxy.
 
+Alternatively, Envoy supports
+:ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+for determining the *trusted client address* or original IP address.
+
+.. note::
+
+ The use of such extensions cannot be mixed with *use_remote_address* nor *xff_num_trusted_hops*.
+
 Envoy's default rules for determining the trusted client address (*before* appending anything
 to XFF) are:
 
@@ -336,6 +372,16 @@ It is a common case where a service wants to know what the originating protocol 
 of the connection terminated by front/edge Envoy. *x-forwarded-proto* contains this information. It
 will be set to either *http* or *https*.
 
+Downstream *x-forwarded-proto* headers will only be trusted if *xff_num_trusted_hops* is non-zero.
+If *xff_num_trusted_hops* is zero, downstream *x-forwarded-proto* headers and *:scheme* headers
+will be set to http or https based on if the downstream connection is TLS or not.
+
+If the scheme is changed via the :ref:`scheme_header_transformation
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.scheme_header_transformation>`
+configuration option, *x-forwarded-proto* will be updated as well.
+
+The *x-forwarded-proto* header will be used by Envoy over *:scheme* where the underlying encryption is wanted, for example clearing default ports based on *x-forwarded-proto*. See :ref:`why_is_envoy_using_xfp_or_scheme` for more details.
+
 .. _config_http_conn_man_headers_x-request-id:
 
 x-request-id
@@ -472,6 +518,15 @@ The *sw8* HTTP header is used by the SkyWalking tracer in Envoy. It contains the
 tracing context for the SkyWalking tracer and is used to establish the relationship between
 the tracing spans of downstream and Envoy. See more on SkyWalking tracing
 `here <https://github.com/apache/skywalking/blob/v8.1.0/docs/en/protocols/Skywalking-Cross-Process-Propagation-Headers-Protocol-v3.md>`__.
+
+.. _config_http_conn_man_headers_x-amzn-trace-id:
+
+x-amzn-trace-id
+---------------
+
+The *x-amzn-trace-id* HTTP header is used by the AWS X-Ray tracer in Envoy. The trace ID,
+parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
+`here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
 
 .. _config_http_conn_man_headers_custom_request_headers:
 

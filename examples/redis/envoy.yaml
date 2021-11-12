@@ -18,8 +18,7 @@ static_resources:
               cluster: redis_cluster
   clusters:
   - name: redis_cluster
-    connect_timeout: 1s
-    type: STRICT_DNS # static
+    type: STRICT_DNS  # static
     lb_policy: MAGLEV
     load_assignment:
       cluster_name: redis_cluster

@@ -1,7 +1,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

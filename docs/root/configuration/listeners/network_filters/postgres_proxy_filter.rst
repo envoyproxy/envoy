@@ -1,7 +1,7 @@
 .. _config_network_filters_postgres_proxy:
 
 Postgres proxy
-================
+==============
 
 The Postgres proxy filter decodes the wire protocol between a Postgres client (downstream) and a Postgres server
 (upstream). The decoded information is used to produce Postgres level statistics like sessions,
@@ -15,13 +15,13 @@ place. More information:
 
 .. attention::
 
-   The `postgres_proxy` filter is experimental and is currently under active development.
+   The ``postgres_proxy`` filter is experimental and is currently under active development.
    Capabilities will be expanded over time and the configuration structures are likely to change.
 
 
 .. warning::
 
-   The `postgreql_proxy` filter was tested only with
+   The ``postgreql_proxy`` filter was tested only with
    `Postgres frontend/backend protocol version 3.0`_, which was introduced in
    Postgres 7.4. Earlier versions are thus not supported. Testing is limited
    anyway to not EOL-ed versions.

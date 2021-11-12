@@ -1,6 +1,7 @@
 #pragma once
 
-#include "common/matcher/matcher.h"
+#include "source/common/common/matchers.h"
+#include "source/common/matcher/matcher.h"
 
 #include "gmock/gmock.h"
 
@@ -14,8 +15,15 @@ public:
   // won't work.
 
   MOCK_METHOD(absl::Status, performDataInputValidation,
-              (const Matcher::DataInput<DataType>&, absl::string_view));
+              (const Matcher::DataInputFactory<DataType>&, absl::string_view));
 };
 
 } // namespace Matcher
+
+namespace Matchers {
+class MockStringMatcher : public StringMatcher {
+public:
+  MOCK_METHOD(bool, match, (absl::string_view), (const, override));
+};
+} // namespace Matchers
 } // namespace Envoy

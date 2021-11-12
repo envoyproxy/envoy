@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "extensions/filters/network/thrift_proxy/buffer_helper.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -41,19 +42,23 @@ public:
                     method_name: "execute"
                     headers:
                     - name: "x-header-1"
-                      exact_match: "x-value-1"
+                      string_match:
+                        exact: "x-value-1"
                     - name: "x-header-2"
-                      safe_regex_match:
-                        google_re2: {}
-                        regex: "0.[5-9]"
+                      string_match:
+                        safe_regex:
+                          google_re2: {}
+                          regex: "0.[5-9]"
                     - name: "x-header-3"
                       range_match:
                         start: 100
                         end: 200
                     - name: "x-header-4"
-                      prefix_match: "user_id:"
+                      string_match:
+                        prefix: "user_id:"
                     - name: "x-header-5"
-                      suffix_match: "asdf"
+                      string_match:
+                        suffix: "asdf"
                   route:
                     cluster: "cluster_1"
                 - match:
@@ -144,6 +149,11 @@ protected:
   // while oneway's are handled by the "poke" method. All other requests
   // are handled by "execute".
   FakeUpstream* getExpectedUpstream(bool oneway) {
+    int upstreamIdx = getExpectedUpstreamIdx(oneway);
+    return fake_upstreams_[upstreamIdx].get();
+  }
+
+  int getExpectedUpstreamIdx(bool oneway) {
     int upstreamIdx = 2;
     if (multiplexed_) {
       upstreamIdx = 0;
@@ -153,7 +163,7 @@ protected:
       upstreamIdx = 1;
     }
 
-    return fake_upstreams_[upstreamIdx].get();
+    return upstreamIdx;
   }
 
   TransportType transport_;
@@ -221,7 +231,28 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
+  int upstream_idx = getExpectedUpstreamIdx(false);
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_rq_call", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
+  if (payload_passthrough_ &&
+      (transport_ == TransportType::Framed || transport_ == TransportType::Header) &&
+      protocol_ != ProtocolType::Twitter) {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(1U, counter->value());
+  } else {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(0U, counter->value());
+  }
+  counter = test_server_->counter("thrift.thrift_stats.response_reply");
+  EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_success");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_reply", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_success", upstream_idx));
   EXPECT_EQ(1U, counter->value());
 }
 
@@ -248,13 +279,28 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
-  counter = test_server_->counter("thrift.thrift_stats.response_error");
-  if (payload_passthrough_ && transport_ == TransportType::Framed &&
+  int upstream_idx = getExpectedUpstreamIdx(false);
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_rq_call", upstream_idx));
+  if (payload_passthrough_ &&
+      (transport_ == TransportType::Framed || transport_ == TransportType::Header) &&
       protocol_ != ProtocolType::Twitter) {
-    EXPECT_EQ(0U, counter->value());
-  } else {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
     EXPECT_EQ(1U, counter->value());
+  } else {
+    counter = test_server_->counter("thrift.thrift_stats.response_passthrough");
+    EXPECT_EQ(0U, counter->value());
   }
+  counter = test_server_->counter("thrift.thrift_stats.response_reply");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("thrift.thrift_stats.response_error");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_reply", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_error", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {
@@ -280,7 +326,14 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(1U, counter->value());
+  int upstream_idx = getExpectedUpstreamIdx(false);
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_rq_call", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_exception");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_exception", upstream_idx));
   EXPECT_EQ(1U, counter->value());
 }
 
@@ -356,6 +409,10 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
   EXPECT_THAT(tcp_client->data(), HasSubstr("connection failure"));
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  EXPECT_EQ(1U, counter->value());
+  int upstream_idx = getExpectedUpstreamIdx(false);
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_rq_call", upstream_idx));
   EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_exception");
   EXPECT_EQ(1U, counter->value());
@@ -488,10 +545,18 @@ TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
   EXPECT_TRUE(TestUtility::buffersEqual(
       Buffer::OwnedImpl(tcp_client->data().substr(upgrade_response_size)), response_bytes_));
 
+  // 2 requests on downstream but the first is an upgrade, so only one on upstream side
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
   EXPECT_EQ(2U, counter->value());
+  int upstream_idx = getExpectedUpstreamIdx(false);
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_rq_call", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
   counter = test_server_->counter("thrift.thrift_stats.response_success");
   EXPECT_EQ(2U, counter->value());
+  counter = test_server_->counter(
+      fmt::format("cluster.cluster_{}.thrift.upstream_resp_success", upstream_idx));
+  EXPECT_EQ(1U, counter->value());
 #endif
 }
 

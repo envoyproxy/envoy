@@ -4,9 +4,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/compression/gzip/common/base.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/compression/gzip/common/base.h"
 
 #include "zlib.h"
 

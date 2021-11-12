@@ -32,11 +32,9 @@ static_resources:
                 timeout: 0.250s
               transport_api_version: V3
           - name: envoy.filters.http.router
-            typed_config: {}
 
   clusters:
   - name: upstream-service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -50,7 +48,6 @@ static_resources:
                 port_value: 8080
 
   - name: ext_authz-opa-service
-    connect_timeout: 0.250s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:

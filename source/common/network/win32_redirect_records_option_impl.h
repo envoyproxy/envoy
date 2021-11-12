@@ -5,8 +5,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Network {
@@ -20,15 +20,13 @@ public:
   // Socket::Option
   bool setOption(Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
-
-  // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override;
 
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
                    envoy::config::core::v3::SocketOption::SocketState) const override;
+  bool isSupported() const override;
 
-  bool isSupported() const;
   static const Network::SocketOptionName& optionName();
 
 private:

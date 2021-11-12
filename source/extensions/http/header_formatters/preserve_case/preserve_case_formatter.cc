@@ -1,4 +1,4 @@
-#include "extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
+#include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.h"
 #include "envoy/extensions/http/header_formatters/preserve_case/v3/preserve_case.pb.validate.h"

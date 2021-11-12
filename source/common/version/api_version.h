@@ -1,10 +1,10 @@
 #pragma once
 
-#include "common/version/api_version_struct.h"
+#include "source/common/version/api_version_struct.h"
 
 // Defines the ApiVersion current version (Envoy::api_version), and oldest
 // version (Envoy::oldest_api_version).
-#include "common/version/api_version_number.h"
+#include "source/common/version/api_version_number.h"
 
 namespace Envoy {
 

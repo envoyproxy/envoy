@@ -1,10 +1,10 @@
-#include "common/grpc/context_impl.h"
+#include "source/common/grpc/context_impl.h"
 
 #include <cstdint>
 #include <string>
 
-#include "common/grpc/common.h"
-#include "common/stats/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Grpc {

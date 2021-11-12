@@ -1,10 +1,10 @@
-#include "extensions/grpc_credentials/example/config.h"
+#include "source/extensions/grpc_credentials/example/config.h"
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
-#include "common/grpc/google_grpc_creds_impl.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
 
 namespace Envoy {
 namespace Extensions {

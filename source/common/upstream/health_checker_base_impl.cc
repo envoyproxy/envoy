@@ -1,12 +1,12 @@
-#include "common/upstream/health_checker_base_impl.h"
+#include "source/common/upstream/health_checker_base_impl.h"
 
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/network/utility.h"
-#include "common/router/router.h"
+#include "source/common/network/utility.h"
+#include "source/common/router/router.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -72,6 +72,10 @@ MetadataConstSharedPtr HealthCheckerImplBase::initTransportSocketMatchMetadata(
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
+  // First clear callbacks that otherwise will be run from
+  // ActiveHealthCheckSession::onDeferredDeleteBase(). This prevents invoking a callback on a
+  // deleted parent object (e.g. Cluster).
+  callbacks_.clear();
   // ASSERTs inside the session destructor check to make sure we have been previously deferred
   // deleted. Unify that logic here before actual destruction happens.
   for (auto& session : active_sessions_) {
@@ -215,7 +219,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host,
       return;
     }
 
-    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE);
+    session->second->setUnhealthy(envoy::data::core::v3::PASSIVE, /*retriable=*/false);
   });
 }
 
@@ -258,6 +262,11 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onDeferredDeleteBase() {
     parent_.decDegraded();
   }
   onDeferredDelete();
+
+  // Run callbacks in case something is waiting for health checks to run which will now never run.
+  if (first_check_) {
+    parent_.runCallbacks(host_, HealthTransition::Unchanged);
+  }
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess(bool degraded) {
@@ -329,13 +338,14 @@ bool networkHealthCheckFailureType(envoy::data::core::v3::HealthCheckFailureType
 } // namespace
 
 HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
-    envoy::data::core::v3::HealthCheckFailureType type) {
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (!networkHealthCheckFailureType(type) || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
+    if ((!networkHealthCheckFailureType(type) && !retriable) ||
+        ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
@@ -376,8 +386,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
 }
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
-    envoy::data::core::v3::HealthCheckFailureType type) {
-  HealthTransition changed_state = setUnhealthy(type);
+    envoy::data::core::v3::HealthCheckFailureType type, bool retriable) {
+  HealthTransition changed_state = setUnhealthy(type, retriable);
   // It's possible that the previous call caused this session to be deferred deleted.
   if (timeout_timer_ != nullptr) {
     timeout_timer_->disableTimer();
@@ -392,7 +402,7 @@ HealthTransition
 HealthCheckerImplBase::ActiveHealthCheckSession::clearPendingFlag(HealthTransition changed_state) {
   if (host_->healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
     host_->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
-    // Even though the health value of the host might have not changed, we set this to Changed to
+    // Even though the health value of the host might have not changed, we set this to Changed so
     // that the cluster can update its list of excluded hosts.
     return HealthTransition::Changed;
   }

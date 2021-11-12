@@ -3,11 +3,11 @@
 #include <stdexcept>
 #include <string>
 
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/config/protobuf_link_hacks.h"
-#include "common/event/libevent.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/config/protobuf_link_hacks.h"
+#include "source/common/event/libevent.h"
 
 #include "test/config_test/config_test.h"
 

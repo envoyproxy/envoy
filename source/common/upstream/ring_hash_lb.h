@@ -7,8 +7,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/logger.h"
-#include "common/upstream/thread_aware_lb_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/thread_aware_lb_impl.h"
 
 namespace Envoy {
 namespace Upstream {

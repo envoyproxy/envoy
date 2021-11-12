@@ -1,23 +1,21 @@
-#include "extensions/filters/http/oauth2/config.h"
+#include "source/extensions/filters/http/oauth2/config.h"
 
 #include <chrono>
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/auth/secret.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/oauth2/v3alpha/oauth.pb.validate.h"
+#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/assert.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/oauth2/filter.h"
-#include "extensions/filters/http/oauth2/oauth.h"
+#include "source/common/common/assert.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/oauth2/filter.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,7 +37,7 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 } // namespace
 
 Http::FilterFactoryCb OAuth2Config::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::oauth2::v3alpha::OAuth2& proto,
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2& proto,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   if (!proto.has_config()) {
     throw EnvoyException("config must be present for global config");

@@ -1,4 +1,4 @@
-#include "extensions/filters/network/rbac/config.h"
+#include "source/extensions/filters/network/rbac/config.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
@@ -6,8 +6,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/network/rbac/rbac_filter.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/rbac/rbac_filter.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -79,7 +79,8 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
   validateRbacRules(proto_config.rules());
   validateRbacRules(proto_config.shadow_rules());
   RoleBasedAccessControlFilterConfigSharedPtr config(
-      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope()));
+      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),
+                                                           context.messageValidationVisitor()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
   };

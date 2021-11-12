@@ -16,6 +16,7 @@ envoy_cc_library(
         ":context_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
         "@com_google_cel_cpp//eval/public:cel_expression",
@@ -50,7 +51,7 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/stream_info:filter_state_interface",
+        "//envoy/stream_info:filter_state_interface",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@com_github_google_flatbuffers//:flatbuffers",

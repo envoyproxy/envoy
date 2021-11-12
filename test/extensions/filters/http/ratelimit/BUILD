@@ -14,7 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "ratelimit_test",
     srcs = ["ratelimit_test.cc"],
-    extension_name = "envoy.filters.http.ratelimit",
+    extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.ratelimit",
+    extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:factory_context_mocks",
@@ -50,7 +50,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ratelimit_integration_test",
     srcs = ["ratelimit_integration_test.cc"],
-    extension_name = "envoy.filters.http.ratelimit",
+    extension_names = ["envoy.filters.http.ratelimit"],
     deps = [
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
@@ -70,7 +70,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "ratelimit_headers_test",
     srcs = ["ratelimit_headers_test.cc"],
-    extension_name = "envoy.filters.http.cache",
+    extension_names = ["envoy.filters.http.cache"],
     deps = [
         "//source/extensions/filters/http/ratelimit:ratelimit_headers_lib",
         "//test/extensions/filters/common/ratelimit:ratelimit_utils",

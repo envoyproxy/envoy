@@ -5,7 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace LocalReply {

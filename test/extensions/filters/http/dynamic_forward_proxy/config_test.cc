@@ -1,8 +1,8 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.validate.h"
 
-#include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
-#include "extensions/filters/http/dynamic_forward_proxy/config.h"
+#include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
+#include "source/extensions/filters/http/dynamic_forward_proxy/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"

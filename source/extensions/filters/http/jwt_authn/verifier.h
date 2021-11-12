@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/authenticator.h"
+#include "source/extensions/filters/http/jwt_authn/authenticator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +32,7 @@ public:
      * This function is called before onComplete() function.
      * It will not be called if no payload to write.
      */
-    virtual void setPayload(const ProtobufWkt::Struct& payload) PURE;
+    virtual void setExtractedData(const ProtobufWkt::Struct& payload) PURE;
 
     /**
      * Called on completion of request.

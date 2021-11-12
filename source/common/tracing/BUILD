@@ -9,6 +9,27 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "null_span_lib",
+    hdrs = [
+        "null_span_impl.h",
+    ],
+    deps = [
+        "//envoy/tracing:trace_driver_interface",
+        "//source/common/common:empty_string",
+    ],
+)
+
+envoy_cc_library(
+    name = "common_values_lib",
+    hdrs = [
+        "common_values.h",
+    ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
     name = "http_tracer_lib",
     srcs = [
         "http_tracer_impl.cc",
@@ -17,12 +38,14 @@ envoy_cc_library(
         "http_tracer_impl.h",
     ],
     deps = [
-        "//include/envoy/http:request_id_extension_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        ":common_values_lib",
+        ":null_span_lib",
+        "//envoy/http:request_id_extension_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/tracing:http_tracer_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:macros",
@@ -45,12 +68,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "http_tracer_config_lib",
+    name = "tracer_config_lib",
     hdrs = [
-        "http_tracer_config_impl.h",
+        "tracer_config_impl.h",
     ],
     deps = [
-        "//include/envoy/server:tracer_config_interface",
+        "//envoy/server:tracer_config_interface",
     ],
 )
 
@@ -63,9 +86,9 @@ envoy_cc_library(
         "http_tracer_manager_impl.h",
     ],
     deps = [
-        "//include/envoy/server:tracer_config_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/tracing:http_tracer_manager_interface",
+        "//envoy/server:tracer_config_interface",
+        "//envoy/singleton:instance_interface",
+        "//envoy/tracing:http_tracer_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",

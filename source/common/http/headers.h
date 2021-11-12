@@ -4,8 +4,8 @@
 
 #include "envoy/http/header_map.h"
 
-#include "common/singleton/const_singleton.h"
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Http {
@@ -51,7 +51,6 @@ private:
 class CustomHeaderValues {
 public:
   const LowerCaseString Accept{"accept"};
-  const LowerCaseString Age{"age"};
   const LowerCaseString AcceptEncoding{"accept-encoding"};
   const LowerCaseString AccessControlRequestMethod{"access-control-request-method"};
   const LowerCaseString AccessControlAllowOrigin{"access-control-allow-origin"};
@@ -60,6 +59,8 @@ public:
   const LowerCaseString AccessControlExposeHeaders{"access-control-expose-headers"};
   const LowerCaseString AccessControlMaxAge{"access-control-max-age"};
   const LowerCaseString AccessControlAllowCredentials{"access-control-allow-credentials"};
+  const LowerCaseString Age{"age"};
+  const LowerCaseString AltSvc{"alt-svc"};
   const LowerCaseString Authentication{"authentication"};
   const LowerCaseString Authorization{"authorization"};
   const LowerCaseString CacheControl{"cache-control"};
@@ -182,6 +183,8 @@ public:
   const LowerCaseString EnvoyUpstreamServiceTime{absl::StrCat(prefix(), "-upstream-service-time")};
   const LowerCaseString EnvoyUpstreamHealthCheckedCluster{
       absl::StrCat(prefix(), "-upstream-healthchecked-cluster")};
+  const LowerCaseString EnvoyUpstreamStreamDurationMs{
+      absl::StrCat(prefix(), "-upstream-stream-duration-ms")};
   const LowerCaseString EnvoyDecoratorOperation{absl::StrCat(prefix(), "-decorator-operation")};
   const LowerCaseString Expect{"expect"};
   const LowerCaseString ForwardedClientCert{"x-forwarded-client-cert"};
@@ -215,6 +218,7 @@ public:
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
   const LowerCaseString XSquashDebug{"x-squash-debug"};
+  const LowerCaseString EarlyData{"early-data"};
 
   struct {
     const std::string Close{"close"};

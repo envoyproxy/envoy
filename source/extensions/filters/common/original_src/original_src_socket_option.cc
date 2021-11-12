@@ -1,8 +1,8 @@
-#include "extensions/filters/common/original_src/original_src_socket_option.h"
+#include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +21,7 @@ bool OriginalSrcSocketOption::setOption(
     Network::Socket& socket, envoy::config::core::v3::SocketOption::SocketState state) const {
 
   if (state == envoy::config::core::v3::SocketOption::STATE_PREBIND) {
-    socket.addressProvider().setLocalAddress(src_address_);
+    socket.connectionInfoProvider().setLocalAddress(src_address_);
   }
 
   return true;

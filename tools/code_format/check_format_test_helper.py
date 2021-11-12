@@ -121,7 +121,7 @@ def check_tool_not_found_error():
     # Temporarily change PATH to test the error about lack of external tools.
     oldPath = os.environ["PATH"]
     os.environ["PATH"] = "/sbin:/usr/sbin"
-    clang_format = os.getenv("CLANG_FORMAT", "clang-format-9")
+    clang_format = os.getenv("CLANG_FORMAT", "clang-format-11")
     # If CLANG_FORMAT points directly to the binary, skip this test.
     if os.path.isfile(clang_format) and os.access(clang_format, os.X_OK):
         os.environ["PATH"] = oldPath
@@ -163,7 +163,7 @@ def run_checks():
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     errors += check_unfixable_error("shared_mutex.cc", "shared_mutex")
     real_time_inject_error = (
-        "Don't reference real-world time sources from production code; use injection")
+        "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)")
     errors += check_unfixable_error("real_time_source.cc", real_time_inject_error)
     errors += check_unfixable_error("real_time_system.cc", real_time_inject_error)
     errors += check_unfixable_error(
@@ -194,17 +194,6 @@ def run_checks():
     errors += check_unfixable_error(
         "serialize_as_string.cc",
         "Don't use MessageLite::SerializeAsString for generating deterministic serialization")
-    errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history not in alphabetical order (zzzzz vs aaaaa): please check placement of line"
-    )
-    errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history not in alphabetical order (this vs aaaa): please check placement of line")
-    errors += check_unfixable_error(
-        "version_history/current.rst",
-        "Version history line malformed. Does not match VERSION_HISTORY_NEW_LINE_REGEX in "
-        "check_format.py")
     errors += check_unfixable_error(
         "counter_from_string.cc",
         "Don't lookup stats by name at runtime; use StatName saved during construction")
@@ -265,7 +254,8 @@ def run_checks():
     errors += check_unfixable_error(
         "std_optional.cc", "Don't use std::optional; use absl::optional instead")
     errors += check_unfixable_error(
-        "std_string_view.cc", "Don't use std::string_view; use absl::string_view instead")
+        "std_string_view.cc",
+        "Don't use std::string_view or toStdStringView; use absl::string_view instead")
     errors += check_unfixable_error(
         "std_variant.cc", "Don't use std::variant; use absl::variant instead")
     errors += check_unfixable_error("std_visit.cc", "Don't use std::visit; use absl::visit instead")

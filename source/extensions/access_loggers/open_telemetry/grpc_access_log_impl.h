@@ -8,9 +8,8 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/protobuf/protobuf.h"
-
-#include "extensions/access_loggers/common/grpc_access_logger.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -36,11 +35,11 @@ class GrpcAccessLoggerImpl
           ProtobufWkt::Empty, opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest,
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse> {
 public:
-  GrpcAccessLoggerImpl(Grpc::RawAsyncClientPtr&& client, std::string log_name,
-                       std::chrono::milliseconds buffer_flush_interval_msec,
-                       uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
-                       const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-                       envoy::config::core::v3::ApiVersion transport_api_version);
+  GrpcAccessLoggerImpl(
+      const Grpc::RawAsyncClientSharedPtr& client,
+      const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+      std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
+      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope);
 
 private:
   void initMessageRoot(const std::string& log_name, const LocalInfo::LocalInfo& local_info);
@@ -68,10 +67,9 @@ private:
   // Common::GrpcAccessLoggerCache
   GrpcAccessLoggerImpl::SharedPtr
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               envoy::config::core::v3::ApiVersion transport_version,
-               Grpc::RawAsyncClientPtr&& client,
+               const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
+               Event::Dispatcher& dispatcher) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

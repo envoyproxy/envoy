@@ -6,15 +6,17 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/router/router.h"
 
-#include "common/network/utility.h"
-#include "common/upstream/ring_hash_lb.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/ring_hash_lb.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
+#include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
 
@@ -94,7 +96,60 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::test
 TEST_P(RingHashLoadBalancerTest, NoHost) {
   init();
   EXPECT_EQ(nullptr, lb_->factory()->create()->chooseHost(nullptr));
+
+  EXPECT_EQ(nullptr, lb_->factory()->create()->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->factory()->create()->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->factory()
+                   ->create()
+                   ->selectExistingConnection(nullptr, *mock_host, hash_key)
+                   .has_value());
+}
+
+TEST_P(RingHashLoadBalancerTest, BaseMethods) {
+  init();
+  EXPECT_EQ(nullptr, lb_->peekAnotherHost(nullptr));
+  EXPECT_FALSE(lb_->lifetimeCallbacks().has_value());
+  std::vector<uint8_t> hash_key;
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_FALSE(lb_->selectExistingConnection(nullptr, *mock_host, hash_key).has_value());
 };
+
+TEST_P(RingHashLoadBalancerTest, SelectOverrideHost) {
+  init();
+
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  auto mock_host = std::make_shared<NiceMock<MockHost>>();
+  EXPECT_CALL(*mock_host, health()).WillOnce(Return(Host::Health::Degraded));
+
+  LoadBalancerContext::OverrideHost expected_host{
+      "1.2.3.4", 1u << static_cast<size_t>(Host::Health::Healthy) |
+                     1u << static_cast<size_t>(Host::Health::Degraded)};
+  EXPECT_CALL(context, overrideHostToSelect()).WillOnce(Return(absl::make_optional(expected_host)));
+
+  // Mock membership update and update host map shared pointer in the lb.
+  auto host_map = std::make_shared<HostMap>();
+  host_map->insert({"1.2.3.4", mock_host});
+  priority_set_.cross_priority_host_map_ = host_map;
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(mock_host, lb_->factory()->create()->chooseHost(&context));
+}
+
+// Test for thread aware load balancer destructed before load balancer factory. After CDS removes a
+// cluster, the operation does not immediately reach the worker thread. There may be cases where the
+// thread aware load balancer is destructed, but the load balancer factory is still used in the
+// worker thread.
+TEST_P(RingHashLoadBalancerTest, LbDestructedBeforeFactory) {
+  init();
+
+  auto factory = lb_->factory();
+  lb_.reset();
+
+  EXPECT_NE(nullptr, factory->create());
+}
 
 // Given minimum_ring_size > maximum_ring_size, expect an exception.
 TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
@@ -287,12 +342,9 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
   config_.value().mutable_minimum_ring_size()->set_value(12);
 
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
-  chc.set_use_hostname_for_hashing(true);
-  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
+  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
 
   init();
-  common_config_.release_consistent_hashing_lb_config();
 
   EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
   EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
@@ -362,12 +414,9 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
   config_.value().mutable_minimum_ring_size()->set_value(12);
 
   common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  auto chc = envoy::config::cluster::v3::Cluster::CommonLbConfig::ConsistentHashingLbConfig();
-  chc.set_use_hostname_for_hashing(true);
-  common_config_.set_allocated_consistent_hashing_lb_config(&chc);
+  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
 
   init();
-  common_config_.release_consistent_hashing_lb_config();
 
   EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
   EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());

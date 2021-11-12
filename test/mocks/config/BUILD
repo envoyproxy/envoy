@@ -13,9 +13,9 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/config:config_provider_manager_interface",
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
+        "//envoy/config:config_provider_manager_interface",
+        "//envoy/config:grpc_mux_interface",
+        "//envoy/config:subscription_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/config:config_provider_lib",
         "//source/common/protobuf:utility_lib",

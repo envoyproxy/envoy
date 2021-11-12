@@ -1,6 +1,8 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
-#include "extensions/request_id/uuid/config.h"
+#include "source/extensions/request_id/uuid/config.h"
+
+#include "test/common/http/xff_extension.h"
 
 using testing::AtLeast;
 using testing::InSequence;
@@ -33,6 +35,8 @@ HttpConnectionManagerImplTest::HttpConnectionManagerImplTest()
   // response_encoder_ is not a NiceMock on purpose. This prevents complaining about this
   // method only.
   EXPECT_CALL(response_encoder_, getStream()).Times(AtLeast(0));
+
+  ip_detection_extensions_.push_back(getXFFExtension(0));
 }
 
 HttpConnectionManagerImplTest::~HttpConnectionManagerImplTest() {
@@ -60,12 +64,16 @@ void HttpConnectionManagerImplTest::setup(bool ssl, const std::string& server_na
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
-  filter_callbacks_.connection_.stream_info_.downstream_address_provider_
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
       ->setDirectRemoteAddressForTest(std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+      ->setRequestedServerName(server_name_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setSslConnection(
+      ssl_connection_);
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       *this, drain_close_, random_, http_context_, runtime_, local_info_, cluster_manager_,
       overload_manager_, test_time_.timeSystem());
@@ -259,6 +267,31 @@ void HttpConnectionManagerImplTest::doRemoteClose(bool deferred) {
   EXPECT_CALL(stream_, removeCallbacks(_));
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+void HttpConnectionManagerImplTest::testPathNormalization(
+    const RequestHeaderMap& request_headers, const ResponseHeaderMap& expected_response) {
+  InSequence s;
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{std::make_unique<TestRequestHeaderMapImpl>(request_headers)};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        TestResponseHeaderMapImpl copy{headers};
+        copy.remove(Envoy::Http::LowerCaseString{"date"});
+        copy.remove(Envoy::Http::LowerCaseString{"server"});
+        EXPECT_THAT(&copy, HeaderMapEqualIgnoreOrder(&expected_response));
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
 }
 
 } // namespace Http

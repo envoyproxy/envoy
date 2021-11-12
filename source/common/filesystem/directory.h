@@ -4,7 +4,7 @@
 
 #include "envoy/filesystem/filesystem.h"
 
-#include "common/filesystem/directory_iterator_impl.h"
+#include "source/common/filesystem/directory_iterator_impl.h"
 
 namespace Envoy {
 namespace Filesystem {

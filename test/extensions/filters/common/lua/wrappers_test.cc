@@ -1,8 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/network/mocks.h"

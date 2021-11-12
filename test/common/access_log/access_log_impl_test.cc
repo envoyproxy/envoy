@@ -8,10 +8,11 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/access_log/access_log_impl.h"
-#include "common/config/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/runtime/runtime_impl.h"
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/config/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/runtime/runtime_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/common/upstream/utility.h"
@@ -38,10 +39,9 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::string& yaml,
-                                                                 bool avoid_boosting = true) {
+envoy::config::accesslog::v3::AccessLog parseAccessLogFromV3Yaml(const std::string& yaml) {
   envoy::config::accesslog::v3::AccessLog access_log;
-  TestUtility::loadFromYamlAndValidate(yaml, access_log, false, avoid_boosting);
+  TestUtility::loadFromYamlAndValidate(yaml, access_log);
   return access_log;
 }
 
@@ -120,7 +120,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -135,10 +135,10 @@ typed_config:
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  EXPECT_EQ(
-      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
-      "\"user-agent-set\" \"id\"  \"host\"\n",
-      output_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 0 0 3 - "
+            "\"x.x.x.x\" "
+            "\"user-agent-set\" \"id\"  \"host\"\n",
+            output_);
 }
 
 TEST_F(AccessLogImplTest, HeadersBytes) {
@@ -782,7 +782,8 @@ filter:
   header_filter:
     header:
       name: test-header
-      exact_match: exact-match-value
+      string_match:
+        exact: exact-match-value
 
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
@@ -811,9 +812,10 @@ filter:
   header_filter:
     header:
       name: test-header
-      safe_regex_match:
-        google_re2: {}
-        regex: "\\d{3}"
+      string_match:
+        safe_regex:
+          google_re2: {}
+          regex: "\\d{3}"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -988,45 +990,18 @@ filter:
       - DT
       - UPE
       - NC
+      - OM
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x1000000,
-                "A flag has been added. Fix this code.");
-
-  const std::vector<StreamInfo::ResponseFlag> all_response_flags = {
-      StreamInfo::ResponseFlag::FailedLocalHealthCheck,
-      StreamInfo::ResponseFlag::NoHealthyUpstream,
-      StreamInfo::ResponseFlag::UpstreamRequestTimeout,
-      StreamInfo::ResponseFlag::LocalReset,
-      StreamInfo::ResponseFlag::UpstreamRemoteReset,
-      StreamInfo::ResponseFlag::UpstreamConnectionFailure,
-      StreamInfo::ResponseFlag::UpstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamOverflow,
-      StreamInfo::ResponseFlag::NoRouteFound,
-      StreamInfo::ResponseFlag::DelayInjected,
-      StreamInfo::ResponseFlag::FaultInjected,
-      StreamInfo::ResponseFlag::RateLimited,
-      StreamInfo::ResponseFlag::UnauthorizedExternalService,
-      StreamInfo::ResponseFlag::RateLimitServiceError,
-      StreamInfo::ResponseFlag::DownstreamConnectionTermination,
-      StreamInfo::ResponseFlag::UpstreamRetryLimitExceeded,
-      StreamInfo::ResponseFlag::StreamIdleTimeout,
-      StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders,
-      StreamInfo::ResponseFlag::DownstreamProtocolError,
-      StreamInfo::ResponseFlag::UpstreamMaxStreamDurationReached,
-      StreamInfo::ResponseFlag::ResponseFromCacheFilter,
-      StreamInfo::ResponseFlag::NoFilterConfigFound,
-      StreamInfo::ResponseFlag::DurationTimeout,
-      StreamInfo::ResponseFlag::UpstreamProtocolError,
-      StreamInfo::ResponseFlag::NoClusterFound,
-  };
-
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
-  for (const auto response_flag : all_response_flags) {
+  for (const auto& [flag_string, response_flag] :
+       StreamInfo::ResponseFlagUtils::ALL_RESPONSE_STRING_FLAGS) {
+    UNREFERENCED_PARAMETER(flag_string);
+
     TestStreamInfo stream_info;
     stream_info.setResponseFlag(response_flag);
     EXPECT_CALL(*file_, write(_));
@@ -1231,11 +1206,11 @@ typed_config:
       {"PERMISSION_DENIED", 403}, {"UNAVAILABLE", 429}, {"UNIMPLEMENTED", 404},
       {"UNAVAILABLE", 502},       {"UNAVAILABLE", 503}, {"UNAVAILABLE", 504}};
 
-  for (const auto& pair : statusMapping) {
-    stream_info_.response_code_ = pair.second;
+  for (const auto& [response_string, response_code] : statusMapping) {
+    stream_info_.response_code_ = response_code;
 
     const InstanceSharedPtr log = AccessLogFactory::fromProto(
-        parseAccessLogFromV3Yaml(fmt::format(yaml_template, pair.first)), context_);
+        parseAccessLogFromV3Yaml(fmt::format(yaml_template, response_string)), context_);
 
     EXPECT_CALL(*file_, write(_));
     log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
@@ -1617,42 +1592,37 @@ typed_config:
   }
 }
 
-// Test that the deprecated extension names still function.
+// Test that the deprecated extension names are disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.access_loggers.file");
-
-    EXPECT_NO_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
-  }
-
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.file_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.http_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.tcp_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 }
 

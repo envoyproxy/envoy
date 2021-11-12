@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/router/v3/router.pb.validate.h"
 
-#include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
-#include "extensions/filters/network/dubbo_proxy/filters/well_known_names.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,7 +15,7 @@ class RouterFilterConfig
     : public DubboFilters::FactoryBase<
           envoy::extensions::filters::network::dubbo_proxy::router::v3::Router> {
 public:
-  RouterFilterConfig() : FactoryBase(DubboFilters::DubboFilterNames::get().ROUTER) {}
+  RouterFilterConfig() : FactoryBase("envoy.filters.dubbo.router") {}
 
 private:
   DubboFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(

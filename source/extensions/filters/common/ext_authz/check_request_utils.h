@@ -19,8 +19,8 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/async_client_impl.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/http/async_client_impl.h"
+#include "source/common/singleton/const_singleton.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -55,7 +55,8 @@ public:
                               envoy::config::core::v3::Metadata&& metadata_context,
                               envoy::service::auth::v3::CheckRequest& request,
                               uint64_t max_request_bytes, bool pack_as_bytes,
-                              bool include_peer_certificate);
+                              bool include_peer_certificate,
+                              const Protobuf::Map<std::string, std::string>& destination_labels);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -66,7 +67,8 @@ public:
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
                              envoy::service::auth::v3::CheckRequest& request,
-                             bool include_peer_certificate);
+                             bool include_peer_certificate,
+                             const Protobuf::Map<std::string, std::string>& destination_labels);
 
 private:
   static void setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,

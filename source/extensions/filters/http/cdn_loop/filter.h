@@ -5,7 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {

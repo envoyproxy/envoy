@@ -22,7 +22,8 @@ sources of latency. Envoy supports three features related to system wide tracing
 
   - External tracers which are part of the Envoy code base, like `LightStep <https://lightstep.com/>`_,
     `Zipkin <https://zipkin.io/>`_  or any Zipkin compatible backends (e.g. `Jaeger <https://github.com/jaegertracing/>`_),
-    `Datadog <https://datadoghq.com>`_ and `SkyWalking <http://skywalking.apache.org/>`_.
+    `Datadog <https://datadoghq.com>`_, `SkyWalking <http://skywalking.apache.org/>`_ and
+    `AWS X-Ray <https://docs.aws.amazon.com/xray/latest/devguide/xray-gettingstarted.html>`_.
   - External tracers which come as a third party plugin, like `Instana <https://www.instana.com/blog/monitoring-envoy-proxy-microservices/>`_.
 
 How to initiate a trace
@@ -68,6 +69,16 @@ to be correlated.
   field can be used to disable this behavior at the expense of also disabling stable trace reason
   propagation and associated features within a deployment.
 
+.. attention::
+
+  The sampling policy for Envoy is determined by the value of :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` by default.
+  However, such a sampling policy is only valid for a fleet of Envoys. If a service proxy
+  that is not Envoy is present in the fleet, sampling is performed without considering the policy of that proxy.
+  For meshes consisting of multiple service proxies such as this, it is more effective to
+  bypass Envoy's sampling policy and sample based on the trace provider's sampling policy. This can be achieved by setting
+  :ref:`use_request_id_for_trace_sampling <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.use_request_id_for_trace_sampling>`
+  to false.
+
 The tracing providers also require additional context, to enable the parent/child relationships
 between the spans (logical units of work) to be understood. This can be achieved by using the
 LightStep (via OpenTracing API) or Zipkin tracer directly within the service itself, to extract the
@@ -101,6 +112,10 @@ Alternatively the trace context can be manually propagated by the service:
 * When using the SkyWalking tracer, Envoy relies on the service to propagate the
   SkyWalking-specific HTTP headers (
   :ref:`config_http_conn_man_headers_sw8`).
+
+* When using the AWS X-Ray tracer, Envoy relies on the service to propagate the
+  X-Ray-specific HTTP headers (
+  :ref:`config_http_conn_man_headers_x-amzn-trace-id`).
 
 What data each trace contains
 -----------------------------

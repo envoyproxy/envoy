@@ -3,8 +3,8 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
-#include "common/upstream/cluster_factory_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -41,6 +41,13 @@ private:
     const uint32_t port_;
     const Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+
+    // Host map for current resolve target. When we have multiple resolve targets, multiple targets
+    // may contain two different hosts with the same address. This has two effects:
+    // 1) This host map cannot be replaced by the cross-priority global host map in the priority
+    // set.
+    // 2) Cross-priority global host map may not be able to search for the expected host based on
+    // the address.
     HostMap all_hosts_;
   };
 
@@ -70,8 +77,7 @@ private:
  */
 class StrictDnsClusterFactory : public ClusterFactoryImplBase {
 public:
-  StrictDnsClusterFactory()
-      : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().StrictDns) {}
+  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(

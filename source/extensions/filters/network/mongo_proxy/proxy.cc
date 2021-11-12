@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
 
 #include <chrono>
 #include <cstdint>
@@ -10,12 +10,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_split.h"
 

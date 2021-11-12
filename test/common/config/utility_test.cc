@@ -6,11 +6,11 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
 
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/grpc/mocks.h"
@@ -25,8 +25,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
-using testing::_;
 using testing::Ref;
 using testing::Return;
 
@@ -72,12 +72,10 @@ TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
 
 TEST(UtilityTest, TranslateApiConfigSource) {
   envoy::config::core::v3::ApiConfigSource api_config_source_rest_legacy;
-  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,
-                                    ApiType::get().UnsupportedRestLegacy,
+  Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000, ApiType::get().Rest,
                                     api_config_source_rest_legacy);
-  EXPECT_EQ(
-      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY,
-      api_config_source_rest_legacy.api_type());
+  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST,
+            api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000,
             DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));
   EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
@@ -100,12 +98,22 @@ TEST(UtilityTest, TranslateApiConfigSource) {
 
 TEST(UtilityTest, createTagProducer) {
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  auto producer = Utility::createTagProducer(bootstrap);
-  ASSERT(producer != nullptr);
-  std::vector<Stats::Tag> tags;
+  auto producer = Utility::createTagProducer(bootstrap, {});
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
   auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
   ASSERT_EQ(extracted_name, "http.rq_total");
   ASSERT_EQ(tags.size(), 1);
+}
+
+TEST(UtilityTest, createTagProducerWithDefaultTgs) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  auto producer = Utility::createTagProducer(bootstrap, {{"foo", "bar"}});
+  ASSERT_TRUE(producer != nullptr);
+  Stats::TagVector tags;
+  auto extracted_name = producer->produceTags("http.config_test.rq_total", tags);
+  EXPECT_EQ(extracted_name, "http.rq_total");
+  EXPECT_EQ(tags.size(), 2);
 }
 
 TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
@@ -113,7 +121,7 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
 
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkFilesystemSubscriptionBackingPath("foo", *api), EnvoyException,
-      "envoy::api::v2::Path must refer to an existing path in the system: 'foo' does not exist");
+      "paths must refer to an existing path in the system: 'foo' does not exist");
   std::string test_path = TestEnvironment::temporaryDirectory();
   Utility::checkFilesystemSubscriptionBackingPath(test_path, *api);
 }
@@ -290,8 +298,8 @@ TEST(UtilityTest, AnyWrongType) {
   typed_config.PackFrom(source_duration);
   ProtobufWkt::Timestamp out;
   EXPECT_THROW_WITH_REGEX(
-      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                     ProtobufMessage::getStrictValidationVisitor(), out),
+      Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
+                                     out),
       EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
@@ -331,128 +339,104 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
   EXPECT_THAT(*config, ProtoEq(source_duration));
 }
 
-void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
-  udpa::type::v1::TypedStruct typed_struct;
-  (*typed_struct.mutable_type_url()) =
-      absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
-  MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
-  typed_config.PackFrom(typed_struct);
-}
+template <typename T> class UtilityTypedStructTest : public ::testing::Test {
+public:
+  static void packTypedStructIntoAny(ProtobufWkt::Any& typed_config,
+                                     const Protobuf::Message& inner) {
+    T typed_struct;
+    (*typed_struct.mutable_type_url()) =
+        absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
+    MessageUtil::jsonConvert(inner, *typed_struct.mutable_value());
+    typed_config.PackFrom(typed_struct);
+  }
+};
 
-// Verify that udpa.type.v1.TypedStruct can be translated into google.protobuf.Struct
-TEST(UtilityTest, TypedStructToStruct) {
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+TYPED_TEST_SUITE(UtilityTypedStructTest, TypedStructTypes);
+
+// Verify that TypedStruct can be translated into google.protobuf.Struct
+TYPED_TEST(UtilityTypedStructTest, TypedStructToStruct) {
   ProtobufWkt::Any typed_config;
   ProtobufWkt::Struct untyped_struct;
   (*untyped_struct.mutable_fields())["foo"].set_string_value("bar");
-  packTypedStructIntoAny(typed_config, untyped_struct);
+  this->packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
 }
 
-// Verify that regular Struct can be translated into an arbitrary message of correct type
+// Verify that TypedStruct can be translated into an arbitrary message of correct type
 // (v2 API, no upgrading).
-TEST(UtilityTest, StructToClusterV2) {
-  ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::api::v2::Cluster) cluster;
-  ProtobufWkt::Struct cluster_struct;
-  const std::string cluster_config_yaml = R"EOF(
-    drain_connections_on_host_removal: true
-  )EOF";
-  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
-
-  {
-    API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
-                                   out);
-    EXPECT_THAT(out, ProtoEq(cluster));
-  }
-  {
-    API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig({}, cluster_struct,
-                                   ProtobufMessage::getStrictValidationVisitor(), out);
-    EXPECT_THAT(out, ProtoEq(cluster));
-  }
-}
-
-// Verify that regular Struct can be translated into an arbitrary message of correct type
-// (v3 API, upgrading).
-TEST(UtilityTest, StructToClusterV3) {
-  ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
-  ProtobufWkt::Struct cluster_struct;
-  const std::string cluster_config_yaml = R"EOF(
-    ignore_health_on_host_removal: true
-  )EOF";
-  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
-
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
-                                   out);
-    EXPECT_THAT(out, ProtoEq(cluster));
-  }
-  {
-    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig({}, cluster_struct,
-                                   ProtobufMessage::getStrictValidationVisitor(), out);
-    EXPECT_THAT(out, ProtoEq(cluster));
-  }
-}
-
-// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
-// (v2 API, no upgrading).
-TEST(UtilityTest, TypedStructToClusterV2) {
+TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV2) {
   ProtobufWkt::Any typed_config;
   API_NO_BOOST(envoy::api::v2::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     drain_connections_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  packTypedStructIntoAny(typed_config, cluster);
+  this->packTypedStructIntoAny(typed_config, cluster);
 
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                   ProtobufMessage::getNullValidationVisitor(), out);
+    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getNullValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::api::v2::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
+                                   out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
 }
 
-// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
+// Verify that TypedStruct can be translated into an arbitrary message of correct type
 // (v3 API, upgrading).
-TEST(UtilityTest, TypedStructToClusterV3) {
+TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV3) {
   ProtobufWkt::Any typed_config;
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
-  packTypedStructIntoAny(typed_config, cluster);
+  this->packTypedStructIntoAny(typed_config, cluster);
 
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                   ProtobufMessage::getNullValidationVisitor(), out);
+    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getNullValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
     API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
+                                   out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
+}
+
+// Verify that translation from TypedStruct into message of incorrect type fails
+TYPED_TEST(UtilityTypedStructTest, TypedStructToInvalidType) {
+  ProtobufWkt::Any typed_config;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
+  const std::string bootstrap_config_yaml = R"EOF(
+    admin:
+      access_log:
+      - name: envoy.access_loggers.file
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+          path: /dev/null
+      address:
+        pipe:
+          path: "/"
+  )EOF";
+  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
+  this->packTypedStructIntoAny(typed_config, bootstrap);
+
+  ProtobufWkt::Any out;
+  EXPECT_THROW_WITH_REGEX(Utility::translateOpaqueConfig(
+                              typed_config, ProtobufMessage::getStrictValidationVisitor(), out),
+                          EnvoyException, "Unable to parse JSON as proto");
 }
 
 // Verify that Any can be translated into an arbitrary message of correct type
@@ -467,8 +451,7 @@ TEST(UtilityTest, AnyToClusterV2) {
   typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::api::v2::Cluster) out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
@@ -484,34 +467,8 @@ TEST(UtilityTest, AnyToClusterV3) {
   typed_config.PackFrom(cluster);
 
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(cluster));
-}
-
-// Verify that translation from udpa.type.v1.TypedStruct into message of incorrect type fails
-TEST(UtilityTest, TypedStructToInvalidType) {
-  ProtobufWkt::Any typed_config;
-  envoy::config::bootstrap::v3::Bootstrap bootstrap;
-  const std::string bootstrap_config_yaml = R"EOF(
-    admin:
-      access_log:
-      - name: envoy.access_loggers.file
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-          path: /dev/null
-      address:
-        pipe:
-          path: "/"
-  )EOF";
-  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
-  packTypedStructIntoAny(typed_config, bootstrap);
-
-  ProtobufWkt::Any out;
-  EXPECT_THROW_WITH_REGEX(
-      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                     ProtobufMessage::getStrictValidationVisitor(), out),
-      EnvoyException, "Unable to parse JSON as proto");
 }
 
 // Verify that ProtobufWkt::Empty can load into a typed factory with an empty config proto
@@ -521,8 +478,7 @@ TEST(UtilityTest, EmptyToEmptyConfig) {
   typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
-                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3::Cors()));
 }
 

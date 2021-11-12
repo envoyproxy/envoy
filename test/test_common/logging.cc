@@ -1,6 +1,6 @@
 #include "test/test_common/logging.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/synchronization/mutex.h"
 
@@ -41,8 +41,8 @@ LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
 
 LogRecordingSink::~LogRecordingSink() { restoreDelegate(); }
 
-void LogRecordingSink::log(absl::string_view msg) {
-  previousDelegate()->log(msg);
+void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg& log_msg) {
+  previousDelegate()->log(msg, log_msg);
 
   absl::MutexLock ml(&mtx_);
   messages_.push_back(std::string(msg));

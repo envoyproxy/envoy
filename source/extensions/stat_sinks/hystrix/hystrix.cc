@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/hystrix/hystrix.h"
+#include "source/extensions/stat_sinks/hystrix/hystrix.h"
 
 #include <chrono>
 #include <ctime>
@@ -7,11 +7,11 @@
 
 #include "envoy/stats/scope.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/http/headers.h"
-#include "common/stats/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
@@ -320,7 +320,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   auto on_destroy_callback = [this, &stream_decoder_filter_callbacks]() {
     ENVOY_LOG(debug, "stopped sending data to hystrix dashboard on port {}",
               stream_decoder_filter_callbacks.connection()
-                  ->addressProvider()
+                  ->connectionInfoProvider()
                   .remoteAddress()
                   ->asString());
 
@@ -331,9 +331,11 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   // Add the callback to the admin_filter list of callbacks
   admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
 
-  ENVOY_LOG(
-      debug, "started sending data to hystrix dashboard on port {}",
-      stream_decoder_filter_callbacks.connection()->addressProvider().remoteAddress()->asString());
+  ENVOY_LOG(debug, "started sending data to hystrix dashboard on port {}",
+            stream_decoder_filter_callbacks.connection()
+                ->connectionInfoProvider()
+                .remoteAddress()
+                ->asString());
   return Http::Code::OK;
 }
 

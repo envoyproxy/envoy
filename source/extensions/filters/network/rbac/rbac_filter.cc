@@ -1,10 +1,10 @@
-#include "extensions/filters/network/rbac/rbac_filter.h"
+#include "source/extensions/filters/network/rbac/rbac_filter.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_join.h"
 
@@ -14,12 +14,13 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
-    const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope)
+    const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config, Stats::Scope& scope,
+    ProtobufMessage::ValidationVisitor& validation_visitor)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(),
                                                   proto_config.shadow_rules_stat_prefix(), scope)),
       shadow_rules_stat_prefix_(proto_config.shadow_rules_stat_prefix()),
-      engine_(Filters::Common::RBAC::createEngine(proto_config)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
+      engine_(Filters::Common::RBAC::createEngine(proto_config, validation_visitor)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config, validation_visitor)),
       enforcement_type_(proto_config.enforcement_type()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
@@ -28,7 +29,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
       "checking connection: requestedServerName: {}, sourceIP: {}, directRemoteIP: {},"
       "remoteIP: {}, localAddress: {}, ssl: {}, dynamicMetadata: {}",
       callbacks_->connection().requestedServerName(),
-      callbacks_->connection().addressProvider().remoteAddress()->asString(),
+      callbacks_->connection().connectionInfoProvider().remoteAddress()->asString(),
       callbacks_->connection()
           .streamInfo()
           .downstreamAddressProvider()

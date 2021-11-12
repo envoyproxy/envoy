@@ -79,14 +79,17 @@ std::string base64Encode(const uint8_t* start, const uint8_t* end) {
 }
 
 bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* output) {
-  if (input.length() % 4)
+  if (input.length() % 4) {
     return false;
+  }
   size_t padding = 0;
   if (input.length()) {
-    if (input[input.length() - 1] == padCharacter)
+    if (input[input.length() - 1] == padCharacter) {
       padding++;
-    if (input[input.length() - 2] == padCharacter)
+    }
+    if (input[input.length() - 2] == padCharacter) {
       padding++;
+    }
   }
   // Setup a vector to hold the result
   std::vector<unsigned char> decodedBytes;
@@ -96,17 +99,17 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
   while (cursor < input.end()) {
     for (size_t quantumPosition = 0; quantumPosition < 4; quantumPosition++) {
       temp <<= 6;
-      if (*cursor >= 0x41 && *cursor <= 0x5A) // This area will need tweaking if
-        temp |= *cursor - 0x41;               // you are using an alternate alphabet
-      else if (*cursor >= 0x61 && *cursor <= 0x7A)
+      if (*cursor >= 0x41 && *cursor <= 0x5A) { // This area will need tweaking if
+        temp |= *cursor - 0x41;                 // you are using an alternate alphabet
+      } else if (*cursor >= 0x61 && *cursor <= 0x7A) {
         temp |= *cursor - 0x47;
-      else if (*cursor >= 0x30 && *cursor <= 0x39)
+      } else if (*cursor >= 0x30 && *cursor <= 0x39) {
         temp |= *cursor + 0x04;
-      else if (*cursor == 0x2B)
+      } else if (*cursor == 0x2B) {
         temp |= 0x3E; // change to 0x2D for URL alphabet
-      else if (*cursor == 0x2F)
+      }  else if (*cursor == 0x2F) {
         temp |= 0x3F;                     // change to 0x5F for URL alphabet
-      else if (*cursor == padCharacter) { // pad
+      } else if (*cursor == padCharacter) { // pad
         switch (input.end() - cursor) {
         case 1: // One pad character
           decodedBytes.push_back((temp >> 16) & 0x000000FF);
@@ -118,8 +121,9 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
         default:
           return false;
         }
-      } else
+      } else {
         return false;
+      }
       cursor++;
     }
     decodedBytes.push_back((temp >> 16) & 0x000000FF);

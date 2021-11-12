@@ -1,4 +1,4 @@
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -9,18 +9,16 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/hex.h"
-#include "common/common/utility.h"
-#include "common/config/api_type_oracle.h"
-#include "common/config/version_converter.h"
-#include "common/config/well_known_names.h"
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
-#include "common/stats/tag_producer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -44,12 +42,8 @@ void Utility::translateApiConfigSource(
     envoy::config::core::v3::GrpcService* grpc_service = api_config_source.add_grpc_services();
     grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
   } else {
-    if (api_type == ApiType::get().UnsupportedRestLegacy) {
-      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::
-                                         hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY);
-    } else if (api_type == ApiType::get().Rest) {
-      api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
-    }
+    ASSERT(api_type == ApiType::get().Rest);
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names(cluster);
   }
 
@@ -97,8 +91,7 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Ap
   // watch addition.
   if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
-        "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
-        path));
+        "paths must refer to an existing path in the system: '{}' does not exist", path));
   }
 }
 
@@ -222,13 +215,15 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 }
 
 Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
+Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           const Stats::TagVector& cli_tags) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
 Stats::StatsMatcherPtr
-Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
+Utility::createStatsMatcher(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                            Stats::SymbolTable& symbol_table) {
+  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config(), symbol_table);
 }
 
 Stats::HistogramSettingsConstPtr
@@ -254,29 +249,14 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
 }
 
-envoy::config::endpoint::v3::ClusterLoadAssignment Utility::translateClusterHosts(
-    const Protobuf::RepeatedPtrField<envoy::config::core::v3::Address>& hosts) {
-  envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
-  envoy::config::endpoint::v3::LocalityLbEndpoints* locality_lb_endpoints =
-      load_assignment.add_endpoints();
-  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
-  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
-  for (const envoy::config::core::v3::Address& host : hosts) {
-    envoy::config::endpoint::v3::LbEndpoint* lb_endpoint =
-        locality_lb_endpoints->add_lb_endpoints();
-    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
-    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
-  }
-  return load_assignment;
-}
-
 void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
   static const std::string typed_struct_type =
+      xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+  static const std::string legacy_typed_struct_type =
       udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
@@ -285,6 +265,17 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
+      xds::type::v3::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // if out_proto is expecting Struct, return directly
+      if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        out_proto.CopyFrom(typed_struct.value());
+      } else {
+        // The typed struct might match out_proto, or some earlier version, let
+        // MessageUtil::jsonConvert sort this out.
+        MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+      }
+    } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
@@ -303,10 +294,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
-  }
-
-  if (!config.fields().empty()) {
-    MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
 }
 

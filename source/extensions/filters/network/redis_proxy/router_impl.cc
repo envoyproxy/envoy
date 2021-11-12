@@ -1,4 +1,4 @@
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/type/v3/percent.pb.h"

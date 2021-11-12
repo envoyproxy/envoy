@@ -1,4 +1,4 @@
-#include "common/common/hash.h"
+#include "source/common/common/hash.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

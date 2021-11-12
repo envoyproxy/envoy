@@ -1,18 +1,61 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/network/filter.h"
+#include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 
 namespace Envoy {
 namespace {
+class UdpReverseFilter : public Network::UdpListenerReadFilter {
+public:
+  UdpReverseFilter(Network::UdpReadFilterCallbacks& callbacks) : UdpListenerReadFilter(callbacks) {}
+
+  // Network::UdpListenerReadFilter
+  Network::FilterStatus onData(Network::UdpRecvData& data) override {
+    std::string content = data.buffer_->toString();
+    std::reverse(content.begin(), content.end());
+
+    data.buffer_->drain(data.buffer_->length());
+    data.buffer_->add(content);
+
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class UdpReverseFilterConfigFactory
+    : public Server::Configuration::NamedUdpListenerFilterConfigFactory {
+public:
+  // NamedUdpListenerFilterConfigFactory
+  Network::UdpListenerFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::ListenerFactoryContext&) override {
+    return [](Network::UdpListenerFilterManager& filter_manager,
+              Network::UdpReadFilterCallbacks& callbacks) -> void {
+      filter_manager.addReadFilter(std::make_unique<UdpReverseFilter>(callbacks));
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return "test.udp_listener.reverse"; }
+};
 
 class UdpProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                 public BaseIntegrationTest {
 public:
   UdpProxyIntegrationTest()
-      : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()) {}
+      : BaseIntegrationTest(GetParam(), ConfigHelper::baseUdpListenerConfig()),
+        registration_(factory_) {}
 
   void setup(uint32_t upstream_count,
              absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt) {
@@ -20,7 +63,7 @@ public:
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
     if (upstream_count > 1) {
-      setDeterministic();
+      setDeterministicValue();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -73,9 +116,30 @@ typed_config:
     BaseIntegrationTest::initialize();
   }
 
+  void setupMultiple() {
+    FakeUpstreamConfig::UdpConfig config;
+    config.max_rx_datagram_size_ = absl::nullopt;
+    setUdpFakeUpstream(config);
+
+    config_helper_.addListenerFilter(R"EOF(
+name: udp_proxy
+typed_config:
+  '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
+  stat_prefix: foo
+  cluster: cluster_0
+)EOF");
+    // Add a reverse filter for reversing payload prior to UDP proxy
+    config_helper_.addListenerFilter(R"EOF(
+name: test.udp_listener.reverse
+)EOF");
+
+    BaseIntegrationTest::initialize();
+  }
+
   void requestResponseWithListenerAddress(
       const Network::Address::Instance& listener_address, std::string request = "hello",
-      std::string response = "world1",
+      std::string expected_request = "hello", std::string response = "world1",
+      std::string expected_response = "world1",
       uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE) {
     // Send datagram to be proxied.
     Network::Test::UdpSyncPeer client(version_, max_rx_datagram_size);
@@ -84,42 +148,52 @@ typed_config:
     // Wait for the upstream datagram.
     Network::UdpRecvData request_datagram;
     ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-    EXPECT_EQ(request, request_datagram.buffer_->toString());
+    EXPECT_EQ(expected_request, request_datagram.buffer_->toString());
 
     // Respond from the upstream.
     fake_upstreams_[0]->sendUdpDatagram(response, request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ(response, response_datagram.buffer_->toString());
+    EXPECT_EQ(expected_response, response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
 
-    EXPECT_EQ(request.size(), test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(expected_request.size(),
+              test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
-    EXPECT_EQ(request.size(),
+    EXPECT_EQ(expected_request.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_tx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_tx_datagrams")->value());
 
-    EXPECT_EQ(response.size(),
+    EXPECT_EQ(expected_response.size(),
               test_server_->counter("cluster.cluster_0.upstream_cx_rx_bytes_total")->value());
     EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.udp.sess_rx_datagrams")->value());
     // The stat is incremented after the send so there is a race condition and we must wait for
     // the counter to be incremented.
-    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", response.size());
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", expected_response.size());
     test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
 
     EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
     EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
   }
+
+  UdpReverseFilterConfigFactory factory_;
+  Registry::InjectFactory<Server::Configuration::NamedUdpListenerFilterConfigFactory> registration_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UdpProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// Make sure that we gracefully fail if the user does not configure reuse port and concurrency is
+// Make sure that we gracefully fail if the user does not configure reuse_port and concurrency is
 // > 1.
 TEST_P(UdpProxyIntegrationTest, NoReusePort) {
   concurrency_ = 2;
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_enable_reuse_port()
+        ->set_value(false);
+  });
   // Do not wait for listeners to start as the listener will fail.
   defer_listener_finalization_ = true;
   setup(1);
@@ -143,7 +217,7 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   Network::Test::UdpSyncPeer client(version_);
   const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   client.write(std::string(large_datagram_size, 'a'), *listener_address);
   if (GetParam() == Network::Address::IpVersion::v4) {
     test_server_->waitForCounterEq("listener.0.0.0.0_0.udp.downstream_rx_datagram_dropped", 1);
@@ -166,7 +240,7 @@ TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
   EXPECT_EQ("hello", request_datagram.buffer_->toString());
 
   const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   fake_upstreams_[0]->sendUdpDatagram(std::string(large_datagram_size, 'a'),
                                       request_datagram.addresses_.peer_);
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_dropped", 1);
@@ -176,14 +250,16 @@ TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
 TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
   // The following tests large packets end to end. We use a size larger than
   // the default GRO receive buffer size of
-  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_GRO_RECEIVE.
+  // DEFAULT_UDP_MAX_DATAGRAM_SIZE x NUM_DATAGRAMS_PER_RECEIVE.
   const uint64_t max_rx_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_GRO_RECEIVE) + 1024;
+      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
   setup(1, max_rx_datagram_size);
   const uint32_t port = lookupPort("listener_0");
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address, std::string(max_rx_datagram_size, 'a'),
+                                     std::string(max_rx_datagram_size, 'a'),
+                                     std::string(max_rx_datagram_size, 'b'),
                                      std::string(max_rx_datagram_size, 'b'), max_rx_datagram_size);
 }
 
@@ -280,6 +356,15 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   EXPECT_EQ("world1", response_datagram.buffer_->toString());
   client.recv(response_datagram);
   EXPECT_EQ("world2", response_datagram.buffer_->toString());
+}
+
+// Make sure the UDP proxy filter on the chain will work.
+TEST_P(UdpProxyIntegrationTest, MultipleFilters) {
+  setupMultiple();
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+  requestResponseWithListenerAddress(*listener_address, "hello", "olleh");
 }
 
 } // namespace

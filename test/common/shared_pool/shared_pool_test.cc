@@ -1,7 +1,7 @@
 #include <thread>
 
-#include "common/event/timer_impl.h"
-#include "common/shared_pool/shared_pool.h"
+#include "source/common/event/timer_impl.h"
+#include "source/common/shared_pool/shared_pool.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/thread_factory_for_test.h"

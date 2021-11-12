@@ -1,8 +1,6 @@
-#include "extensions/common/wasm/plugin.h"
+#include "source/extensions/common/wasm/plugin.h"
 
 #include "envoy/common/exception.h"
-
-#include "extensions/common/wasm/well_known_names.h"
 
 #include "include/proxy-wasm/wasm.h"
 
@@ -24,8 +22,7 @@ WasmConfig::WasmConfig(const envoy::extensions::wasm::v3::PluginConfig& config) 
     // since it directly accesses Envoy's env vars and we should not modify Envoy's env vars here.
     // TODO(mathetake): Once proxy_get_map_values(type::EnvironmentVariables, ..) call is supported,
     // then remove this restriction.
-    if (config.vm_config().runtime() == WasmRuntimeNames::get().Null &&
-        !envs.key_values().empty()) {
+    if (config.vm_config().runtime() == "envoy.wasm.runtime.null" && !envs.key_values().empty()) {
       throw EnvoyException("envoy.extensions.wasm.v3.VmConfig.EnvironmentVariables.key_values must "
                            "not be set for NullVm.");
     }

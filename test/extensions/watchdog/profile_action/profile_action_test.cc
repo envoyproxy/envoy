@@ -3,17 +3,16 @@
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/watchdog/profile_action/v3alpha/profile_action.pb.h"
+#include "envoy/extensions/watchdog/profile_action/v3/profile_action.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/guarddog_config.h"
 #include "envoy/thread/thread.h"
 
-#include "common/common/assert.h"
-#include "common/filesystem/directory.h"
-#include "common/profiler/profiler.h"
-
-#include "extensions/watchdog/profile_action/config.h"
-#include "extensions/watchdog/profile_action/profile_action.h"
+#include "source/common/common/assert.h"
+#include "source/common/filesystem/directory.h"
+#include "source/common/profiler/profiler.h"
+#include "source/extensions/watchdog/profile_action/config.h"
+#include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -93,7 +92,7 @@ protected:
 
 TEST_F(ProfileActionTest, CanDoSingleProfile) {
   // Create configuration.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
 
@@ -133,7 +132,7 @@ TEST_F(ProfileActionTest, CanDoSingleProfile) {
 
 TEST_F(ProfileActionTest, CanDoMultipleProfiles) {
   // Create configuration.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
   // Create the ProfileAction before we start running the dispatcher
@@ -189,7 +188,7 @@ TEST_F(ProfileActionTest, CanDoMultipleProfiles) {
 
 TEST_F(ProfileActionTest, CannotTriggerConcurrentProfiles) {
   // Create configuration.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", test_path_),
                             config);
   // Create the ProfileAction before we start running the dispatcher
@@ -230,7 +229,7 @@ TEST_F(ProfileActionTest, CannotTriggerConcurrentProfiles) {
 
 TEST_F(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
   // Create configuration.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   const std::string nonexistant_path = test_path_ + "/nonexistant_dir/";
   TestUtility::loadFromJson(
       absl::Substitute(R"EOF({ "profile_path": "$0", })EOF", nonexistant_path), config);
@@ -265,7 +264,7 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfDirectoryDoesNotExist) {
 
 TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
   // Create configuration.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   TestUtility::loadFromJson(absl::Substitute(R"EOF({ "profile_path": "$0"})EOF", test_path_),
                             config);
   // Create the ProfileAction before we start running the dispatcher
@@ -297,7 +296,7 @@ TEST_F(ProfileActionTest, ShouldNotProfileIfNoTids) {
 
 TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
   // Create configuration that we'll run until it saturates.
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
   config.set_max_profiles(1);
@@ -359,7 +358,7 @@ TEST_F(ProfileActionTest, ShouldSaturatedMaxProfiles) {
 // interfere with an existing profile the action is running.
 // The successfully captured profile should be updated only if we captured the profile.
 TEST_F(ProfileActionTest, ShouldUpdateCountersCorrectly) {
-  envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig config;
+  envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig config;
   config.set_profile_path(test_path_);
   config.mutable_profile_duration()->set_seconds(1);
 

@@ -1,4 +1,4 @@
-#include "common/local_info/local_info_impl.h"
+#include "source/common/local_info/local_info_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 

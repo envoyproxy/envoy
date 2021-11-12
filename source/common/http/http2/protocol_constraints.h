@@ -6,8 +6,8 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/http2/codec_stats.h"
-#include "common/http/status.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/status.h"
 
 #include "nghttp2/nghttp2.h"
 

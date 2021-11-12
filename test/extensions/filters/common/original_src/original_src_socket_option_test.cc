@@ -1,9 +1,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/original_src/original_src_socket_option.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/original_src/original_src_socket_option.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
@@ -37,14 +36,14 @@ TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddress) {
   const auto address = Network::Utility::parseInternetAddress("127.0.0.2");
   auto option = makeOptionByAddress(address);
   EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND), true);
-  EXPECT_EQ(*socket_.address_provider_->localAddress(), *address);
+  EXPECT_EQ(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddressSecond) {
   const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND), true);
-  EXPECT_EQ(*socket_.address_provider_->localAddress(), *address);
+  EXPECT_EQ(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionNotPrebindDoesNotSetAddress) {
@@ -52,7 +51,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestSetOptionNotPrebindDoesNotSetAddress) {
   auto option = makeOptionByAddress(address);
   EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING),
             true);
-  EXPECT_NE(*socket_.address_provider_->localAddress(), *address);
+  EXPECT_NE(*socket_.connection_info_provider_->localAddress(), *address);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKey) {

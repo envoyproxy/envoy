@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Config {
 
+enum class LegacyOrUnified { Legacy, Unified };
 const uint64_t TEST_TIME_MILLIS = 42000;
 
 /**

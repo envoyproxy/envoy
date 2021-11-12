@@ -3,7 +3,7 @@
 #include "envoy/config/trace/v3/lightstep.pb.h"
 #include "envoy/config/trace/v3/lightstep.pb.validate.h"
 
-#include "extensions/tracers/common/factory_base.h"
+#include "source/extensions/tracers/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,9 +20,9 @@ public:
 
 private:
   // FactoryBase
-  Tracing::HttpTracerSharedPtr
-  createHttpTracerTyped(const envoy::config::trace::v3::LightstepConfig& proto_config,
-                        Server::Configuration::TracerFactoryContext& context) override;
+  Tracing::DriverSharedPtr
+  createTracerDriverTyped(const envoy::config::trace::v3::LightstepConfig& proto_config,
+                          Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace Lightstep

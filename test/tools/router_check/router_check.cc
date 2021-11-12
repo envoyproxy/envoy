@@ -2,7 +2,8 @@
 #include <iostream>
 #include <string>
 
-#include "exe/platform_impl.h"
+#include "source/common/common/thread.h"
+#include "source/exe/platform_impl.h"
 
 #include "test/test_common/test_runtime.h"
 #include "test/tools/router_check/router.h"

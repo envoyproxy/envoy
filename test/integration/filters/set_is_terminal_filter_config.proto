@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+import "validate/validate.proto";
+
+message SetIsTerminalFilterConfig {
+  bool is_terminal_filter = 1;
+}

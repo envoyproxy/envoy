@@ -1,8 +1,8 @@
 #include <string>
 
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
-#include "extensions/tracers/xray/xray_tracer_impl.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
+#include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
 #include "test/mocks/server/tracer_factory_context.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -61,7 +61,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8");
+  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};

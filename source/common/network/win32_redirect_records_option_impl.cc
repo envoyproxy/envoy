@@ -1,13 +1,13 @@
-#include "common/network/win32_redirect_records_option_impl.h"
+#include "source/common/network/win32_redirect_records_option_impl.h"
 
 #include "envoy/common/exception.h"
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/scalar_to_byte_vector.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/scalar_to_byte_vector.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -44,7 +44,7 @@ bool Win32RedirectRecordsOptionImpl::setOption(
         socket.ioctl(ENVOY_SIO_SET_WFP_CONNECTION_REDIRECT_RECORDS,
                      const_cast<void*>(reinterpret_cast<const void*>(redirect_records_.buf_)),
                      redirect_records_.buf_size_, nullptr, 0, &size);
-    if (result.rc_ != 0) {
+    if (result.return_value_ != 0) {
       ENVOY_LOG(warn, "Setting WFP records on socket failed: {}", errorDetails(result.errno_));
       return false;
     }

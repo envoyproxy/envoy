@@ -67,14 +67,3 @@ index 6a1a6fe8e..777ee122f 100644
 +  endforeach()
  endif()
  
-@@ -619,5 +627,9 @@ endif()
- 
- # Check for idn
--check_library_exists_concat("idn2" idn2_lookup_ul HAVE_LIBIDN2)
-+option(USE_LIBIDN2 "Use libidn2 for IDN support" ON)
-+set(HAVE_LIBIDN2 OFF)
-+if(USE_LIBIDN2)
-+  check_library_exists_concat("idn2" idn2_lookup_ul HAVE_LIBIDN2)
-+endif()
- 
- # Check for symbol dlopen (same as HAVE_LIBDL)

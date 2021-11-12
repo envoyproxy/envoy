@@ -1,6 +1,6 @@
-#include "common/network/upstream_server_name.h"
+#include "source/common/network/upstream_server_name.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Network {

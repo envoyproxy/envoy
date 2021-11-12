@@ -1,10 +1,10 @@
-#include "common/thread/terminate_thread.h"
+#include "source/common/thread/terminate_thread.h"
 
 #include <sys/types.h>
 
 #include <csignal>
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Thread {

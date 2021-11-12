@@ -1,4 +1,4 @@
-#include "common/secret/secret_manager_impl.h"
+#include "source/common/secret/secret_manager_impl.h"
 
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
@@ -6,21 +6,22 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/utility.h"
-#include "common/secret/sds_api.h"
-#include "common/secret/secret_provider_impl.h"
-#include "common/ssl/certificate_validation_context_config_impl.h"
-#include "common/ssl/tls_certificate_config_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/secret/sds_api.h"
+#include "source/common/secret/secret_provider_impl.h"
+#include "source/common/ssl/certificate_validation_context_config_impl.h"
+#include "source/common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {
 
 SecretManagerImpl::SecretManagerImpl(Server::ConfigTracker& config_tracker)
-    : config_tracker_entry_(config_tracker.add("secrets", [this] { return dumpSecretConfigs(); })) {
-}
+    : config_tracker_entry_(
+          config_tracker.add("secrets", [this](const Matchers::StringMatcher& name_matcher) {
+            return dumpSecretConfigs(name_matcher);
+          })) {}
 void SecretManagerImpl::addStaticSecret(
     const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
   switch (secret.type_case()) {
@@ -151,62 +152,70 @@ GenericSecretConfigProviderSharedPtr SecretManagerImpl::findOrCreateGenericSecre
                                                 secret_provider_context);
 }
 
-ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
-  // TODO(htuch): unlike other config providers, we're recreating the original
-  // Secrets below. This makes it hard to support API_RECOVER_ORIGINAL()-style
-  // recovery of the original config message. As a result, for now we're
-  // providing v3 config dumps. For Secrets, the main deprecation of interest
-  // are the use of v2 Struct config() and verify_subject_alt_name.
+ProtobufTypes::MessagePtr
+SecretManagerImpl::dumpSecretConfigs(const Matchers::StringMatcher& name_matcher) {
   auto config_dump = std::make_unique<envoy::admin::v3::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {
     const auto& tls_cert = cert_iter.second;
-    auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(cert_iter.first);
     ASSERT(tls_cert != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(cert_iter.first);
     dump_secret.mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
+    if (!name_matcher.match(dump_secret.name())) {
+      continue;
+    }
     MessageUtil::redact(dump_secret);
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(cert_iter.first);
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static certificate validation context providers.
   for (const auto& context_iter : static_certificate_validation_context_providers_) {
     const auto& validation_context = context_iter.second;
-    auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(context_iter.first);
     ASSERT(validation_context != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(context_iter.first);
     dump_secret.mutable_validation_context()->MergeFrom(*validation_context->secret());
+    if (!name_matcher.match(dump_secret.name())) {
+      continue;
+    }
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(context_iter.first);
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static session keys providers.
   for (const auto& context_iter : static_session_ticket_keys_providers_) {
     const auto& session_ticket_keys = context_iter.second;
-    auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(context_iter.first);
     ASSERT(session_ticket_keys != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(context_iter.first);
     for (const auto& key : session_ticket_keys->secret()->keys()) {
       dump_secret.mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
     }
+    if (!name_matcher.match(dump_secret.name())) {
+      continue;
+    }
     MessageUtil::redact(dump_secret);
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(context_iter.first);
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static generic secret providers.
   for (const auto& secret_iter : static_generic_secret_providers_) {
     const auto& generic_secret = secret_iter.second;
-    auto static_secret = config_dump->mutable_static_secrets()->Add();
-    static_secret->set_name(secret_iter.first);
     ASSERT(generic_secret != nullptr);
     envoy::extensions::transport_sockets::tls::v3::Secret dump_secret;
     dump_secret.set_name(secret_iter.first);
     dump_secret.mutable_generic_secret()->MergeFrom(*generic_secret->secret());
+    if (!name_matcher.match(dump_secret.name())) {
+      continue;
+    }
+    auto static_secret = config_dump->mutable_static_secrets()->Add();
+    static_secret->set_name(secret_iter.first);
     MessageUtil::redact(dump_secret);
     static_secret->mutable_secret()->PackFrom(dump_secret);
   }
@@ -216,25 +225,28 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
     const auto& tls_cert = cert_secrets->secret();
-    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = tls_cert != nullptr;
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(secret_data.resource_name_);
+    ProtobufWkt::Timestamp last_updated_ts;
+    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
+    secret.set_name(secret_data.resource_name_);
+    if (secret_ready) {
+      secret.mutable_tls_certificate()->MergeFrom(*tls_cert);
+    }
+    if (!name_matcher.match(secret.name())) {
+      continue;
+    }
+    MessageUtil::redact(secret);
+    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(secret_data.resource_name_);
-    ProtobufWkt::Timestamp last_updated_ts;
-    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    secret.set_name(secret_data.resource_name_);
-    if (secret_ready) {
-      secret.mutable_tls_certificate()->MergeFrom(*tls_cert);
-    }
-    MessageUtil::redact(secret);
     dump_secret->mutable_secret()->PackFrom(secret);
   }
 
@@ -243,23 +255,28 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& validation_context_secret : context_secret_provider) {
     const auto& secret_data = validation_context_secret->secretData();
     const auto& validation_context = validation_context_secret->secret();
-    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = validation_context != nullptr;
+
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+
+    if (secret_ready) {
+      secret.mutable_validation_context()->MergeFrom(*validation_context);
+    }
+    secret.set_name(secret_data.resource_name_);
+    if (!name_matcher.match(secret.name())) {
+      continue;
+    }
+    ProtobufWkt::Timestamp last_updated_ts;
+    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
+    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
-    dump_secret->set_name(secret_data.resource_name_);
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(secret_data.resource_name_);
-    ProtobufWkt::Timestamp last_updated_ts;
-    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    if (secret_ready) {
-      secret.mutable_validation_context()->MergeFrom(*validation_context);
-    }
+    dump_secret->set_name(secret_data.resource_name_);
     dump_secret->mutable_secret()->PackFrom(secret);
   }
 
@@ -268,23 +285,26 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& stek_secrets : stek_providers) {
     const auto& secret_data = stek_secrets->secretData();
     const auto& tls_stek = stek_secrets->secret();
-    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = tls_stek != nullptr;
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(secret_data.resource_name_);
+    if (secret_ready) {
+      secret.mutable_session_ticket_keys()->MergeFrom(*tls_stek);
+    }
+    if (!name_matcher.match(secret.name())) {
+      continue;
+    }
+    ProtobufWkt::Timestamp last_updated_ts;
+    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
+    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(secret_data.resource_name_);
-    ProtobufWkt::Timestamp last_updated_ts;
-    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    if (secret_ready) {
-      secret.mutable_session_ticket_keys()->MergeFrom(*tls_stek);
-    }
     MessageUtil::redact(secret);
     dump_secret->mutable_secret()->PackFrom(secret);
   }
@@ -294,23 +314,26 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& provider : generic_secret_providers) {
     const auto& secret_data = provider->secretData();
     const auto& generic_secret = provider->secret();
-    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = generic_secret != nullptr;
+    envoy::extensions::transport_sockets::tls::v3::Secret secret;
+    secret.set_name(secret_data.resource_name_);
+    if (secret_ready) {
+      secret.mutable_generic_secret()->MergeFrom(*generic_secret);
+    }
+    if (!name_matcher.match(secret.name())) {
+      continue;
+    }
+    ProtobufWkt::Timestamp last_updated_ts;
+    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
+    envoy::admin::v3::SecretsConfigDump::DynamicSecret* dump_secret;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
     } else {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    envoy::extensions::transport_sockets::tls::v3::Secret secret;
-    secret.set_name(secret_data.resource_name_);
-    ProtobufWkt::Timestamp last_updated_ts;
-    TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    if (secret_ready) {
-      secret.mutable_generic_secret()->MergeFrom(*generic_secret);
-    }
     MessageUtil::redact(secret);
     dump_secret->mutable_secret()->PackFrom(secret);
   }
