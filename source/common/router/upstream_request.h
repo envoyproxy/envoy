@@ -54,7 +54,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // UpstreamToDownstream (Http::ResponseDecoder)
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override;
@@ -119,7 +119,7 @@ public:
   bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
-  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
 
 private:
   bool shouldSendEndStream() {

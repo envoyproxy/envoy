@@ -85,11 +85,12 @@ public:
     EXPECT_TRUE(cert_view->VerifySignature(payload, signature, sign_alg));
 
     std::string error;
+    std::unique_ptr<quic::ProofVerifyDetails> verify_details;
     EXPECT_EQ(quic::QUIC_SUCCESS,
               verifier_->VerifyCertChain("www.example.org", 54321, chain->certs,
                                          /*ocsp_response=*/"", /*cert_sct=*/"Fake SCT",
-                                         /*context=*/nullptr, &error,
-                                         /*details=*/nullptr, /*out_alert=*/nullptr,
+                                         /*context=*/nullptr, &error, &verify_details,
+                                         /*out_alert=*/nullptr,
                                          /*callback=*/nullptr))
         << error;
   }
@@ -144,6 +145,7 @@ public:
         listener_config_.listenerScope(),
         std::unique_ptr<Ssl::MockServerContextConfig>(mock_context_config_));
     transport_socket_factory_->initialize();
+    EXPECT_CALL(filter_chain_, name()).WillRepeatedly(Return(""));
   }
 
   void expectCertChainAndPrivateKey(const std::string& cert, bool expect_private_key) {

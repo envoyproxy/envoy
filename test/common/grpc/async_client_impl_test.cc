@@ -175,11 +175,12 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
 
   Tracing::MockSpan active_span;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+  EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("test_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("14")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(*child_span, finishSpan());
@@ -242,11 +243,12 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
 
   Tracing::MockSpan active_span;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
-  EXPECT_CALL(active_span, spawnChild_(_, "async test_cluster egress", _))
+  EXPECT_CALL(active_span, spawnChild_(_, "async helloworld.Greeter.SayHello egress", _))
       .WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("test_cluster")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("test_cluster")));
   EXPECT_CALL(*child_span, injectContext(_));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));

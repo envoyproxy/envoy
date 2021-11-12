@@ -6,7 +6,7 @@ Kafka Mesh filter
 The Apache Kafka mesh filter provides a facade for `Apache Kafka <https://kafka.apache.org/>`_
 producers. Produce requests sent to this filter insance can be forwarded to one of multiple
 clusters, depending on configured forwarding rules. Corresponding message versions from
-Kafka 2.4.0 are supported.
+Kafka 2.8.1 are supported.
 
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh>`
 * This filter should be configured with the name *envoy.filters.network.kafka_mesh*.
@@ -78,7 +78,6 @@ Notes
 Given that this filter does its own processing of received requests, there are some changes
 in behaviour compared to explicit connection to a Kafka cluster:
 
-#. Record headers are not sent upstream.
 #. Only ProduceRequests with version 2 are supported (what means very old producers like 0.8 are
    not going to be supported).
 #. Python producers need to set API version of at least 1.0.0, so that the produce requests they

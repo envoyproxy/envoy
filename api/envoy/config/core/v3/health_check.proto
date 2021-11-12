@@ -73,7 +73,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
@@ -117,6 +117,18 @@ message HealthCheck {
     // semantics of :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each
     // range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.v3.Int64Range expected_statuses = 9;
+
+    // Specifies a list of HTTP response statuses considered retriable. If provided, responses in this range
+    // will count towards the configured :ref:`unhealthy_threshold <envoy_v3_api_field_config.core.v3.HealthCheck.unhealthy_threshold>`,
+    // but will not result in the host being considered immediately unhealthy. Ranges follow half-open semantics of
+    // :ref:`Int64Range <envoy_v3_api_msg_type.v3.Int64Range>`. The start and end of each range are required.
+    // Only statuses in the range [100, 600) are allowed. The :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+    // field takes precedence for any range overlaps with this field i.e. if status code 200 is both retriable and expected, a 200 response will
+    // be considered a successful health check. By default all responses not in
+    // :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>` will result in
+    // the host being considered immediately unhealthy i.e. if status code 200 is expected and there are no configured retriable statuses, any
+    // non-200 response will result in the host being marked unhealthy.
+    repeated type.v3.Int64Range retriable_statuses = 12;
 
     // Use specified application protocol for health checks.
     type.v3.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
@@ -243,8 +255,10 @@ message HealthCheck {
   uint32 interval_jitter_percent = 18;
 
   // The number of unhealthy health checks required before a host is marked
-  // unhealthy. Note that for *http* health checking if a host responds with 503
-  // this threshold is ignored and the host is considered unhealthy immediately.
+  // unhealthy. Note that for *http* health checking if a host responds with a code not in
+  // :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`
+  // or :ref:`retriable_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`,
+  // this threshold is ignored and the host is considered immediately unhealthy.
   google.protobuf.UInt32Value unhealthy_threshold = 4 [(validate.rules).message = {required: true}];
 
   // The number of healthy health checks required before a host is marked

@@ -816,8 +816,9 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
       unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
       cumulative_histogram_(hist_alloc()),
-      interval_statistics_(interval_histogram_, supported_buckets),
-      cumulative_statistics_(cumulative_histogram_, supported_buckets), merged_(false), id_(id) {}
+      interval_statistics_(interval_histogram_, unit, supported_buckets),
+      cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), merged_(false),
+      id_(id) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   thread_local_store_.releaseHistogramCrossThread(id_);

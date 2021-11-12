@@ -57,20 +57,25 @@ TEST_F(BufferedAsyncClientTest, BasicSendFlow) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  auto id = buffered_client.publishId(request);
-  buffered_client.bufferMessage(id, request);
-  EXPECT_EQ(1, buffered_client.sendBufferedMessages().size());
+  EXPECT_EQ(0, buffered_client.bufferMessage(request).value());
+  const auto inflight_message_ids = buffered_client.sendBufferedMessages();
+  EXPECT_TRUE(buffered_client.hasActiveStream());
+  EXPECT_EQ(1, inflight_message_ids.size());
+
+  // Pending messages should not be re-sent.
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
+  const auto inflight_message_ids2 = buffered_client.sendBufferedMessages();
+  EXPECT_EQ(0, inflight_message_ids2.size());
 
   // Re-buffer, and transport.
-  buffered_client.onError(id);
+  buffered_client.onError(*inflight_message_ids.begin());
 
   EXPECT_CALL(http_stream, sendData(_, _)).Times(2);
   EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
 
   helloworld::HelloRequest request2;
   request2.set_name("Bob");
-  auto id2 = buffered_client.publishId(request2);
-  buffered_client.bufferMessage(id2, request2);
+  EXPECT_EQ(1, buffered_client.bufferMessage(request2).value());
   auto ids2 = buffered_client.sendBufferedMessages();
   EXPECT_EQ(2, ids2.size());
 
@@ -102,10 +107,33 @@ TEST_F(BufferedAsyncClientTest, BufferLimitExceeded) {
 
   helloworld::HelloRequest request;
   request.set_name("Alice");
-  auto id = buffered_client.publishId(request);
-  buffered_client.bufferMessage(id, request);
+  EXPECT_EQ(absl::nullopt, buffered_client.bufferMessage(request));
 
   EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+  EXPECT_TRUE(buffered_client.hasActiveStream());
+}
+
+TEST_F(BufferedAsyncClientTest, BufferHighWatermarkTest) {
+  Http::MockAsyncClientStream http_stream;
+  EXPECT_CALL(http_client_, start(_, _)).WillOnce(Return(&http_stream));
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+  EXPECT_CALL(http_stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(true));
+  EXPECT_CALL(http_stream, reset());
+
+  DangerousDeprecatedTestTime test_time_;
+  auto raw_client = std::make_shared<AsyncClientImpl>(cm_, config_, test_time_.timeSystem());
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> client(raw_client);
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> callback;
+  BufferedAsyncClient<helloworld::HelloRequest, helloworld::HelloReply> buffered_client(
+      100000, *method_descriptor_, callback, client);
+
+  helloworld::HelloRequest request;
+  request.set_name("Alice");
+  EXPECT_EQ(0, buffered_client.bufferMessage(request).value());
+
+  EXPECT_EQ(0, buffered_client.sendBufferedMessages().size());
+  EXPECT_TRUE(buffered_client.hasActiveStream());
 }
 
 } // namespace

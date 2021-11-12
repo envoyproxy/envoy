@@ -29,7 +29,7 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
                                      const HttpGrpcAccessLogConfig config,
                                      GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache,
                                      Server::Configuration::CommonFactoryContext& context)
-    : Common::ImplBase(std::move(filter)), scope_(context.scope()),
+    : Common::ImplBase(std::move(filter)), /* scope_(context.scope()), */
       config_(std::make_shared<const HttpGrpcAccessLogConfig>(std::move(config))),
       tls_slot_(context.threadLocal().allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)) {
@@ -45,13 +45,12 @@ HttpGrpcAccessLog::HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
     response_trailers_to_log_.emplace_back(header);
   }
   Envoy::Config::Utility::checkTransportVersion(config_->common_config());
-  // Note that &scope might have died by the time when this callback is called on each thread.
-  // This is supposed to be fixed by https://github.com/envoyproxy/envoy/issues/18066.
-  tls_slot_->set([config = config_, access_logger_cache = access_logger_cache_,
-                  &scope = scope_](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
-        config->common_config(), Common::GrpcAccessLoggerType::HTTP, scope));
-  });
+
+  tls_slot_->set(
+      [config = config_, access_logger_cache = access_logger_cache_](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLogger>(access_logger_cache->getOrCreateLogger(
+            config->common_config(), Common::GrpcAccessLoggerType::HTTP));
+      });
 
   if (config_->has_common_config() && config_->common_config().has_critical_buffer_log_filter()) {
     critical_log_filter_ = AccessLog::FilterFactory::fromProto(

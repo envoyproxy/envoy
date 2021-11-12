@@ -195,8 +195,8 @@ void ConnectionImpl::StreamImpl::buildHeaders(std::vector<nghttp2_nv>& final_hea
   });
 }
 
-void ConnectionImpl::ServerStreamImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+  ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
@@ -276,8 +276,7 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
     // waiting on window updates. We need to save the trailers so that we can emit them later.
     // However, for empty trailers, we don't need to to save the trailers.
     ASSERT(!pending_trailers_to_encode_);
-    const bool skip_encoding_empty_trailers =
-        trailers.empty() && parent_.skip_encoding_empty_trailers_;
+    const bool skip_encoding_empty_trailers = trailers.empty();
     if (!skip_encoding_empty_trailers) {
       pending_trailers_to_encode_ = cloneTrailers(trailers);
       onLocalEndStream();
@@ -355,7 +354,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
 
   if (status == enumToInt(Http::Code::Continue)) {
     ASSERT(!remote_end_stream_);
-    response_decoder_.decode100ContinueHeaders(std::move(headers));
+    response_decoder_.decode1xxHeaders(std::move(headers));
   } else {
     response_decoder_.decodeHeaders(std::move(headers), remote_end_stream_);
   }
@@ -401,8 +400,7 @@ void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& 
 
 void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   ASSERT(local_end_stream_);
-  const bool skip_encoding_empty_trailers =
-      trailers.empty() && parent_.skip_encoding_empty_trailers_;
+  const bool skip_encoding_empty_trailers = trailers.empty();
   if (skip_encoding_empty_trailers) {
     ENVOY_CONN_LOG(debug, "skipping submitting trailers", parent_.connection_);
 
@@ -451,12 +449,11 @@ void ConnectionImpl::StreamImpl::onDataSourceSend(const uint8_t* framehd, size_t
   // In this callback we are writing out a raw DATA frame without copying. nghttp2 assumes that we
   // "just know" that the frame header is 9 bytes.
   // https://nghttp2.org/documentation/types.html#c.nghttp2_send_data_callback
-  static const uint64_t FRAME_HEADER_SIZE = 9;
 
   parent_.protocol_constraints_.incrementOutboundDataFrameCount();
 
   Buffer::OwnedImpl output;
-  parent_.addOutboundFrameFragment(output, framehd, FRAME_HEADER_SIZE);
+  parent_.addOutboundFrameFragment(output, framehd, H2_FRAME_HEADER_SIZE);
   if (!parent_.protocol_constraints_.checkOutboundFrameLimits().ok()) {
     ENVOY_CONN_LOG(debug, "error sending data frame: Too many frames in the outbound queue",
                    parent_.connection_);
@@ -617,8 +614,6 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options),
-      skip_encoding_empty_trailers_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.http2_skip_encoding_empty_trailers")),
       skip_dispatching_frames_for_closed_connection_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection")),
       dispatching_(false), raised_goaway_(false), random_(random_generator),
@@ -816,7 +811,6 @@ Status ConnectionImpl::onBeforeFrameReceived(const nghttp2_frame_hd* hd) {
          connection_.state() == Network::Connection::State::Open);
 
   current_stream_id_ = hd->stream_id;
-
   // Track all the frames without padding here, since this is the only callback we receive
   // for some of them (e.g. CONTINUATION frame, frames sent on closed streams, etc.).
   // HEADERS frame is tracked in onBeginHeaders(), DATA frame is tracked in onFrameReceived().
@@ -881,6 +875,14 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
   StreamImpl* stream = getStream(frame->hd.stream_id);
   if (!stream) {
     return okStatus();
+  }
+
+  // Track bytes sent and received.
+  if (frame->hd.type != METADATA_FRAME_TYPE) {
+    stream->bytes_meter_->addWireBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
+  }
+  if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+    stream->bytes_meter_->addHeaderBytesReceived(frame->hd.length + H2_FRAME_HEADER_SIZE);
   }
 
   switch (frame->hd.type) {
@@ -948,7 +950,17 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   // data from our peer. Sometimes it raises the invalid frame callback, and sometimes it does not.
   // In all cases however it will attempt to send a GOAWAY frame with an error status. If we see
   // an outgoing frame of this type, we will return an error code so that we can abort execution.
-  ENVOY_CONN_LOG(trace, "sent frame type={}", connection_, static_cast<uint64_t>(frame->hd.type));
+  ENVOY_CONN_LOG(trace, "sent frame type={}, stream_id={}, length={}", connection_,
+                 static_cast<uint64_t>(frame->hd.type), frame->hd.stream_id, frame->hd.length);
+  StreamImpl* stream = getStream(frame->hd.stream_id);
+  if (stream != nullptr) {
+    if (frame->hd.type != METADATA_FRAME_TYPE) {
+      stream->bytes_meter_->addWireBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+    if (frame->hd.type == NGHTTP2_HEADERS || frame->hd.type == NGHTTP2_CONTINUATION) {
+      stream->bytes_meter_->addHeaderBytesSent(frame->hd.length + H2_FRAME_HEADER_SIZE);
+    }
+  }
   switch (frame->hd.type) {
   case NGHTTP2_GOAWAY: {
     ENVOY_CONN_LOG(debug, "sent goaway code={}", connection_, frame->goaway.error_code);
@@ -1516,8 +1528,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
   os << spaces << "Http2::ConnectionImpl " << this << DUMP_MEMBER(max_headers_kb_)
      << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
      << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
-     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_)
-     << DUMP_MEMBER(skip_encoding_empty_trailers_) << DUMP_MEMBER(dispatching_)
+     << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_) << DUMP_MEMBER(dispatching_)
      << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
 
   // Dump the protocol constraints
@@ -1728,14 +1739,9 @@ ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_contr
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
-  StreamResetReason reason = StreamResetReason::LocalReset;
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-    reason = StreamResetReason::ProtocolError;
-    connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
-  }
+  connection_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
 
-  return reason;
+  return StreamResetReason::ProtocolError;
 }
 
 ServerConnectionImpl::ServerConnectionImpl(

@@ -200,11 +200,7 @@ void TestEnvironment::initializeTestMain(char* program_name) {
   RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
 #endif
 
-#ifdef __APPLE__
-  UNREFERENCED_PARAMETER(program_name);
-#else
   absl::InitializeSymbolizer(program_name);
-#endif
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"

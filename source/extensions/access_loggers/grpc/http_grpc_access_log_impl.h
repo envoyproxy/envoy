@@ -49,7 +49,6 @@ private:
                const Http::ResponseTrailerMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  Stats::Scope& scope_;
   const HttpGrpcAccessLogConfigConstSharedPtr config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;

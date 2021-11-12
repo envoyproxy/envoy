@@ -28,8 +28,11 @@ py_binary(
         "cve_scan.py",
         "utils.py",
     ],
+    args = ["$(location :cve.yaml)"],
     data = [
+        ":cve.yaml",
         ":exports",
+        requirement("envoy.base.utils"),
     ],
 )
 

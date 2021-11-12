@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.grpc.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
@@ -55,7 +56,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.CommonGrpcAccessLogConfig";
@@ -88,19 +89,28 @@ message CommonGrpcAccessLogConfig {
   // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
 
+  // Sets the retry policy when the establishment of a gRPC stream fails.
+  // If the stream succeeds once in establishing If the stream succeeds
+  // at least once in establishing itself, no retry will be performed
+  // no matter what gRPC status is received. Note that only
+  // :ref:`num_retries <envoy_v3_api_field_config.core.v3.RetryPolicy.num_retries>`
+  // will be used in this configuration. This feature is used only when you are using
+  // :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`.
+  config.core.v3.RetryPolicy grpc_stream_retry_policy = 7;
+
   // Define the log condition for critical access logs.
   // Logs that match the filter are not sent to `StreamAccessLogs`,
   // but are sent to `CriticalAccessLogs`.
-  config.accesslog.v3.AccessLogFilter critical_buffer_log_filter = 7;
+  config.accesslog.v3.AccessLogFilter critical_buffer_log_filter = 8;
 
   // The time to wait for an ACK message. If no ACK message is returned after this time,
   // the message is considered undeliverable and the failed transmission is buffered again.
   // The re-buffered message will be sent again at the next time a log matching *critical_buffer_log_filter* is queued.
-  google.protobuf.Duration message_ack_timeout = 8
+  google.protobuf.Duration message_ack_timeout = 9
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Size limit (in bytes) of the buffer used to store messages during processing in a
   // critical logger. A critical logger buffers messages until it receives an ACK from upstream.
   // The default is 16384.
-  google.protobuf.UInt32Value max_pending_buffer_size_bytes = 9;
+  google.protobuf.UInt32Value max_pending_buffer_size_bytes = 10;
 }

@@ -190,9 +190,7 @@ private:
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
-    const StreamInfo::StreamInfo& streamInfo() const override {
-      return filter_manager_.streamInfo();
-    }
+    StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                         const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -216,7 +214,7 @@ private:
 
     // FilterManagerCallbacks
     void encodeHeaders(ResponseHeaderMap& response_headers, bool end_stream) override;
-    void encode100ContinueHeaders(ResponseHeaderMap& response_headers) override;
+    void encode1xxHeaders(ResponseHeaderMap& response_headers) override;
     void encodeData(Buffer::Instance& data, bool end_stream) override;
     void encodeTrailers(ResponseTrailerMap& trailers) override;
     void encodeMetadata(MetadataMapVector& metadata) override;

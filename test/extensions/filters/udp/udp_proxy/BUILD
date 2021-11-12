@@ -47,8 +47,11 @@ envoy_extension_cc_test(
     srcs = ["udp_proxy_integration_test.cc"],
     extension_names = ["envoy.filters.udp_listener.udp_proxy"],
     deps = [
+        "//envoy/network:filter_interface",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/udp/udp_proxy:config",
         "//test/integration:integration_lib",
+        "//test/test_common:registry_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "contrib/kafka/filters/network/source/external/requests.h"
-#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_outbound_record.h"
+#include "contrib/kafka/filters/network/source/mesh/outbound_record.h"
 
 namespace Envoy {
 namespace Extensions {

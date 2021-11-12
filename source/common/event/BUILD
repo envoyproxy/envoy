@@ -34,8 +34,8 @@ envoy_cc_library(
         ":dispatcher_includes",
         ":libevent_scheduler_lib",
         ":real_time_system_lib",
-        ":signal_lib",
         ":scaled_range_timer_manager_lib",
+        ":signal_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
@@ -44,14 +44,10 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
         "//source/common/filesystem:watcher_lib",
-        "//source/common/network:dns_lib",
         "//source/common/network:connection_lib",
         "//source/common/network:listener_lib",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
-    ] + select({
-        "//bazel:apple": ["//source/common/network:apple_dns_lib"],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 envoy_cc_library(

@@ -6,11 +6,9 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
-#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -406,9 +404,12 @@ admin:
 }
 
 // TODO(samflattery): bundle this up with buildCluster
-envoy::config::cluster::v3::Cluster
-ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::string& address) {
-  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(fmt::format(R"EOF(
+envoy::config::cluster::v3::Cluster ConfigHelper::buildStaticCluster(const std::string& name,
+                                                                     int port,
+                                                                     const std::string& address,
+                                                                     const std::string& lb_policy) {
+  return TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+      fmt::format(R"EOF(
       name: {}
       connect_timeout: 5s
       type: STATIC
@@ -421,15 +422,14 @@ ConfigHelper::buildStaticCluster(const std::string& name, int port, const std::s
                 socket_address:
                   address: {}
                   port_value: {}
-      lb_policy: ROUND_ROBIN
+      lb_policy: {}
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             http2_protocol_options: {{}}
     )EOF",
-                                                                                 name, name,
-                                                                                 address, port));
+                  name, name, address, port, lb_policy));
 }
 
 envoy::config::cluster::v3::Cluster ConfigHelper::buildCluster(const std::string& name,
@@ -506,6 +506,39 @@ ConfigHelper::buildClusterLoadAssignment(const std::string& name, const std::str
                                         name, address, port),
                             cluster_load_assignment);
   return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::ClusterLoadAssignment
+ConfigHelper::buildClusterLoadAssignmentWithLeds(const std::string& name,
+                                                 const std::string& leds_collection_name) {
+  API_NO_BOOST(envoy::config::endpoint::v3::ClusterLoadAssignment) cluster_load_assignment;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      cluster_name: {}
+      endpoints:
+        leds_cluster_locality_config:
+          leds_config:
+            resource_api_version: V3
+            ads: {{}}
+          leds_collection_name: {}
+    )EOF",
+                                        name, leds_collection_name),
+                            cluster_load_assignment);
+  return cluster_load_assignment;
+}
+
+envoy::config::endpoint::v3::LbEndpoint ConfigHelper::buildLbEndpoint(const std::string& address,
+                                                                      uint32_t port) {
+  API_NO_BOOST(envoy::config::endpoint::v3::LbEndpoint) lb_endpoint;
+  TestUtility::loadFromYaml(fmt::format(R"EOF(
+      endpoint:
+        address:
+          socket_address:
+            address: {}
+            port_value: {}
+    )EOF",
+                                        address, port),
+                            lb_endpoint);
+  return lb_endpoint;
 }
 
 envoy::config::listener::v3::Listener
@@ -620,6 +653,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   }
 }
 
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  ASSERT_TRUE(static_resources->listeners_size() > 0);
+  auto* listener = static_resources->mutable_listeners(0);
+  auto* map = listener->mutable_metadata()->mutable_typed_filter_metadata();
+  (*map)[std::string(key)] = packed_value;
+};
+
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
   RELEASE_ASSERT(!finalized_, "");
@@ -683,9 +725,11 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
-                                        bool use_alternate_protocols_cache) {
-  addConfigModifier([use_alpn, http3, use_alternate_protocols_cache](
+void ConfigHelper::configureUpstreamTls(
+    bool use_alpn, bool http3,
+    absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
+        alternate_protocol_cache_config) {
+  addConfigModifier([use_alpn, http3, alternate_protocol_cache_config](
                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -716,10 +760,13 @@ void ConfigHelper::configureUpstreamTls(bool use_alpn, bool http3,
         new_protocol_options.mutable_auto_config()->mutable_http3_protocol_options()->MergeFrom(
             old_protocol_options.explicit_http_config().http3_protocol_options());
       }
-      if (use_alternate_protocols_cache) {
+      if (alternate_protocol_cache_config.has_value()) {
         new_protocol_options.mutable_auto_config()
             ->mutable_alternate_protocols_cache_options()
             ->set_name("default_alternate_protocols_cache");
+        new_protocol_options.mutable_auto_config()
+            ->mutable_alternate_protocols_cache_options()
+            ->CopyFrom(alternate_protocol_cache_config.value());
       }
       (*cluster->mutable_typed_extension_protocol_options())
           ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
@@ -748,11 +795,6 @@ void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string&
   auto* static_layer =
       bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
   (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
-}
-
-void ConfigHelper::enableDeprecatedV2Api() {
-  addRuntimeOverride("envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true");
-  addRuntimeOverride("envoy.features.enable_all_deprecated_features", "true");
 }
 
 void ConfigHelper::setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
@@ -786,22 +828,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   bool custom_cluster = false;
   bool original_dst_cluster = false;
   auto* static_resources = bootstrap_.mutable_static_resources();
-  const auto tap_path = TestEnvironment::getOptionalEnvVar("TAP_PATH");
-  if (tap_path) {
-    ENVOY_LOG_MISC(debug, "Test tap path set to {}", tap_path.value());
-  } else {
-    ENVOY_LOG_MISC(debug, "No tap path set for tests");
-  }
-  for (int i = 0; i < bootstrap_.mutable_static_resources()->listeners_size(); ++i) {
-    auto* listener = static_resources->mutable_listeners(i);
-    for (int j = 0; j < listener->filter_chains_size(); ++j) {
-      if (tap_path) {
-        auto* filter_chain = listener->mutable_filter_chains(j);
-        setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
-                              *filter_chain->mutable_transport_socket());
-      }
-    }
-  }
   for (int i = 0; i < bootstrap_.mutable_static_resources()->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
     if (cluster->type() == envoy::config::cluster::v3::Cluster::EDS) {
@@ -831,11 +857,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         }
       }
     }
-
-    if (tap_path) {
-      setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
-                            *cluster->mutable_transport_socket());
-    }
   }
   ASSERT(skip_port_usage_validation_ || port_idx == ports.size() || eds_hosts ||
          original_dst_cluster || custom_cluster || bootstrap_.dynamic_resources().has_cds_config());
@@ -852,39 +873,6 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   }
 
   finalized_ = true;
-}
-
-void ConfigHelper::setTapTransportSocket(
-    const std::string& tap_path, const std::string& type,
-    envoy::config::core::v3::TransportSocket& transport_socket) {
-  // Determine inner transport socket.
-  envoy::config::core::v3::TransportSocket inner_transport_socket;
-  if (!transport_socket.name().empty()) {
-    inner_transport_socket.MergeFrom(transport_socket);
-  } else {
-    inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
-  }
-  // Configure outer tap transport socket.
-  transport_socket.set_name("envoy.transport_sockets.tap");
-  envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
-  tap_config.mutable_common_config()
-      ->mutable_static_config()
-      ->mutable_match_config()
-      ->set_any_match(true);
-  auto* output_sink = tap_config.mutable_common_config()
-                          ->mutable_static_config()
-                          ->mutable_output_config()
-                          ->mutable_sinks()
-                          ->Add();
-  output_sink->set_format(envoy::config::tap::v3::OutputSink::PROTO_TEXT);
-  const ::testing::TestInfo* const test_info =
-      ::testing::UnitTest::GetInstance()->current_test_info();
-  const std::string test_id =
-      std::string(test_info->name()) + "_" + std::string(test_info->test_case_name()) + "_" + type;
-  output_sink->mutable_file_per_tap()->set_path_prefix(tap_path + "_" +
-                                                       absl::StrReplaceAll(test_id, {{"/", "_"}}));
-  tap_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  transport_socket.mutable_typed_config()->PackFrom(tap_config);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {

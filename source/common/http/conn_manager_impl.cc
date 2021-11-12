@@ -300,6 +300,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
+  new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
@@ -704,10 +705,6 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     filter_manager_.streamInfo().setResponseFlag(
         StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
-  // TODO(danzh) bring HTTP/3 to parity here.
-  if (connection_manager_.codec_->protocol() != Protocol::Http3) {
-    ASSERT(filter_manager_.streamInfo().responseCodeDetails().has_value());
-  }
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
   if (filter_manager_.streamInfo().healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
@@ -888,7 +885,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Note in the case Envoy is handling 100-Continue complexity, it skips the filter chain
     // and sends the 100-Continue directly to the encoder.
     chargeStats(continueHeader());
-    response_encoder_->encode100ContinueHeaders(continueHeader());
+    response_encoder_->encode1xxHeaders(continueHeader());
     // Remove the Expect header so it won't be handled again upstream.
     request_headers_->removeExpect();
   }
@@ -1335,8 +1332,7 @@ void ConnectionManagerImpl::ActiveStream::onLocalReply(Code code) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
-    ResponseHeaderMap& response_headers) {
+void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& response_headers) {
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
@@ -1349,7 +1345,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
   ENVOY_STREAM_LOG(debug, "encoding 100 continue headers via codec:\n{}", *this, response_headers);
 
   // Now actually encode via the codec.
-  response_encoder_->encode100ContinueHeaders(response_headers);
+  response_encoder_->encode1xxHeaders(response_headers);
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& headers,

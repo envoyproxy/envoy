@@ -102,7 +102,7 @@ StreamEncoderFilterCallbacks::addEncodedMetadata(MetadataMapPtr&&
 metadata\_map\_ptr). By calling the interface, users can directly pass in the
 metadata to be added. This function can be called in the
 StreamEncoderFilter::encode*() methods except for encodeMetadata():
-StreamEncoderFilter::encode100ContinueHeaders(HeaderMap& headers),
+StreamEncoderFilter::encode1xxHeaders(HeaderMap& headers),
 StreamEncoderFilter::encodeHeaders(HeaderMap& headers, bool end\_stream),
 StreamEncoderFilter::encodeData(Buffer::Instance& data, bool end\_stream),
 StreamEncoderFilter::encodeTrailers(HeaderMap& trailers), and

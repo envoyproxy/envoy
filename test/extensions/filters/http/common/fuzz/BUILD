@@ -54,6 +54,7 @@ envoy_cc_test_library(
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:bookstore_proto_cc_proto",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",

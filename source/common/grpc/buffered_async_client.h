@@ -1,13 +1,21 @@
 #pragma once
 
+#include <cstdint>
+
 #include "source/common/grpc/typed_async_client.h"
 #include "source/common/protobuf/utility.h"
+
+#include "absl/container/btree_map.h"
 
 namespace Envoy {
 namespace Grpc {
 
 enum class BufferState { Buffered, PendingFlush };
 
+// This class wraps bidirectional gRPC and provides message arrival guarantee.
+// It stores messages to be sent or in the process of being sent in a buffer,
+// and can track the status of the message based on the ID assigned to each message.
+// If a message fails to be sent, it can be re-buffered to guarantee its arrival.
 template <class RequestType, class ResponseType> class BufferedAsyncClient {
 public:
   BufferedAsyncClient(uint32_t max_buffer_bytes, const Protobuf::MethodDescriptor& service_method,
@@ -16,21 +24,27 @@ public:
       : max_buffer_bytes_(max_buffer_bytes), service_method_(service_method), callbacks_(callbacks),
         client_(client) {}
 
-  virtual ~BufferedAsyncClient() { cleanup(); }
-
-  uint32_t publishId(RequestType& message) { return MessageUtil::hash(message); }
-
-  void bufferMessage(uint32_t id, RequestType& message) {
-    const auto buffer_size = message.ByteSizeLong();
-    if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
-      return;
+  ~BufferedAsyncClient() {
+    if (active_stream_ != nullptr) {
+      active_stream_ = nullptr;
     }
-
-    message_buffer_[id] = std::make_pair(BufferState::Buffered, message);
-    current_buffer_bytes_ += buffer_size;
   }
 
-  absl::flat_hash_set<uint32_t> sendBufferedMessages() {
+  // It push message into internal message buffer.
+  // If the buffer is full, it will return absl::nullopt.
+  absl::optional<uint64_t> bufferMessage(RequestType& message) {
+    const auto buffer_size = message.ByteSizeLong();
+    if (current_buffer_bytes_ + buffer_size > max_buffer_bytes_) {
+      return absl::nullopt;
+    }
+
+    auto id = publishId();
+    message_buffer_[id] = std::make_pair(BufferState::Buffered, message);
+    current_buffer_bytes_ += buffer_size;
+    return id;
+  }
+
+  absl::flat_hash_set<uint64_t> sendBufferedMessages() {
     if (active_stream_ == nullptr) {
       active_stream_ =
           client_.start(service_method_, callbacks_, Http::AsyncClient::StreamOptions());
@@ -40,7 +54,7 @@ public:
       return {};
     }
 
-    absl::flat_hash_set<uint32_t> inflight_message_ids;
+    absl::flat_hash_set<uint64_t> inflight_message_ids;
 
     for (auto&& it : message_buffer_) {
       const auto id = it.first;
@@ -59,29 +73,26 @@ public:
     return inflight_message_ids;
   }
 
-  void onSuccess(uint32_t message_id) { erasePendingMessage(message_id); }
+  void onSuccess(uint64_t message_id) { erasePendingMessage(message_id); }
 
-  void onError(uint32_t message_id) {
+  void onError(uint64_t message_id) {
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
-    message_buffer_.at(message_id).first = BufferState::Buffered;
-  }
 
-  void cleanup() {
-    if (active_stream_ != nullptr) {
-      active_stream_ = nullptr;
-    }
+    message_buffer_.at(message_id).first = BufferState::Buffered;
   }
 
   bool hasActiveStream() { return active_stream_ != nullptr; }
 
-  const absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>>& messageBuffer() {
+  const absl::btree_map<uint64_t, std::pair<BufferState, RequestType>>& messageBuffer() {
     return message_buffer_;
   }
 
 private:
-  void erasePendingMessage(uint32_t message_id) {
+  void erasePendingMessage(uint64_t message_id) {
+    // This case will be considered if `onSuccess` had called with unknown message id that is not
+    // received by envoy as response.
     if (message_buffer_.find(message_id) == message_buffer_.end()) {
       return;
     }
@@ -98,13 +109,16 @@ private:
     }
   }
 
-  uint32_t max_buffer_bytes_ = 0;
+  uint64_t publishId() { return next_message_id_++; }
+
+  const uint32_t max_buffer_bytes_ = 0;
   const Protobuf::MethodDescriptor& service_method_;
   Grpc::AsyncStreamCallbacks<ResponseType>& callbacks_;
   Grpc::AsyncClient<RequestType, ResponseType> client_;
   Grpc::AsyncStream<RequestType> active_stream_;
-  absl::flat_hash_map<uint32_t, std::pair<BufferState, RequestType>> message_buffer_;
+  absl::btree_map<uint64_t, std::pair<BufferState, RequestType>> message_buffer_;
   uint32_t current_buffer_bytes_ = 0;
+  uint64_t next_message_id_ = 0;
 };
 
 template <class RequestType, class ResponseType>

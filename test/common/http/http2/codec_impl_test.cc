@@ -55,18 +55,6 @@ public:
   static bool slowContainsStreamId(int id, ConnectionImpl& connection) {
     return connection.slowContainsStreamId(id);
   }
-  // The Http::Connection::dispatch method does not throw (any more). However unit tests in this
-  // file use codecs for sending test data through mock network connections to the codec under test.
-  // It is infeasible to plumb error codes returned by the dispatch() method of the codecs under
-  // test, through mock connections and sending codec. As a result error returned by the dispatch
-  // method of the codec under test invoked by the ConnectionWrapper is thrown as an exception. Note
-  // that exception goes only through the mock network connection and sending codec, i.e. it is
-  // thrown only through the test harness code. Specific exception types are to distinguish error
-  // codes returned when processing requests or responses.
-  // TODO(yanavlasov): modify the code to verify test expectations at the point of calling codec
-  //                   under test through the ON_CALL expectations in the
-  //                   setupDefaultConnectionMocks() method. This will make the exceptions below
-  //                   unnecessary.
   struct ClientCodecError : public std::runtime_error {
     ClientCodecError(Http::Status&& status)
         : std::runtime_error(std::string(status.message())), status_(std::move(status)) {}
@@ -84,19 +72,19 @@ public:
   struct ConnectionWrapper {
     Http::Status dispatch(const Buffer::Instance& data, ConnectionImpl& connection) {
       connection_ = &connection;
-      Http::Status status = Http::okStatus();
       buffer_.add(data);
       return dispatchBufferedData();
     }
 
     Http::Status dispatchBufferedData() {
       Http::Status status = Http::okStatus();
-      if (!dispatching_) {
+      if (!dispatching_ && status_.ok()) {
         while (buffer_.length() > 0) {
           dispatching_ = true;
           status = connection_->dispatch(buffer_);
           if (!status.ok()) {
-            // Exit early if we hit an error status.
+            // Exit early if we hit an error status and record it for verification in the test.
+            status_.Update(status);
             return status;
           }
           dispatching_ = false;
@@ -108,6 +96,7 @@ public:
     bool dispatching_{};
     Buffer::OwnedImpl buffer_;
     ConnectionImpl* connection_{};
+    Http::Status status_;
   };
 
   enum SettingsTupleIndex {
@@ -168,17 +157,11 @@ public:
           if (corrupt_metadata_frame_) {
             corruptMetadataFramePayload(data);
           }
-          auto status = server_wrapper_.dispatch(data, *server_);
-          if (!status.ok()) {
-            throw ServerCodecError(std::move(status));
-          }
+          server_wrapper_.dispatch(data, *server_).IgnoreError();
         }));
     ON_CALL(server_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          auto status = client_wrapper_.dispatch(data, *client_);
-          if (!status.ok()) {
-            throw ClientCodecError(std::move(status));
-          }
+          client_wrapper_.dispatch(data, *client_).IgnoreError();
         }));
   }
 
@@ -383,7 +366,7 @@ TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   EXPECT_EQ(StatusCode::CodecProtocolError, getStatusCode(raw_server->protocolErrorForTest()));
 }
 
-// 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
+// 100 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
 TEST_P(Http2CodecImplTest, ContinueHeaders) {
   initialize();
 
@@ -393,8 +376,8 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -413,15 +396,17 @@ TEST_P(Http2CodecImplTest, TrailerStatus) {
   EXPECT_FALSE(Http2CodecImplTestFixture::slowContainsStreamId(100, *client_));
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(response_headers, false);
 
   // nghttp2 doesn't allow :status in trailers
-  EXPECT_THROW(response_encoder_->encode100ContinueHeaders(continue_headers), ClientCodecError);
+  response_encoder_->encode1xxHeaders(continue_headers);
+  EXPECT_FALSE(client_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 };
 
@@ -435,10 +420,10 @@ TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
@@ -471,7 +456,9 @@ TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
 
   TestResponseHeaderMapImpl upgrade_headers{{":status", "101"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, _)).Times(0);
-  EXPECT_THROW(response_encoder_->encodeHeaders(upgrade_headers, false), ClientCodecError);
+  response_encoder_->encodeHeaders(upgrade_headers, false);
+  EXPECT_FALSE(client_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 }
 
@@ -484,7 +471,9 @@ TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), ClientCodecError);
+  response_encoder_->encodeHeaders(continue_headers, true);
+  EXPECT_FALSE(client_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 }
 
@@ -550,10 +539,12 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
-  EXPECT_THROW(response_encoder_->encodeHeaders(continue_headers, true), ClientCodecError);
+  response_encoder_->encodeHeaders(continue_headers, true);
+  EXPECT_FALSE(client_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 };
 
@@ -570,8 +561,8 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  EXPECT_CALL(response_decoder_, decode100ContinueHeaders_(_));
-  response_encoder_->encode100ContinueHeaders(continue_headers);
+  EXPECT_CALL(response_decoder_, decode1xxHeaders_(_));
+  response_encoder_->encode1xxHeaders(continue_headers);
 
   // Buffer client data to avoid mock recursion causing lifetime issues.
   ON_CALL(server_connection_, write(_, _))
@@ -611,7 +602,9 @@ TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
       "debug",
       "Invalid HTTP header field was received: frame type: 1, stream: 1, name: [content-length], "
       "value: [3]",
-      EXPECT_THROW(response_encoder_->encodeHeaders(response_headers, false), ClientCodecError));
+      response_encoder_->encodeHeaders(response_headers, false));
+  EXPECT_FALSE(client_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(client_wrapper_.status_));
   EXPECT_EQ(1, client_stats_store_.counter("http2.rx_messaging_error").value());
 };
 
@@ -705,8 +698,6 @@ TEST_P(Http2CodecImplTest, TrailingHeaders) {
 // When having empty trailers, codec submits empty buffer and end_stream instead.
 TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "true"}});
 
   initialize();
 
@@ -729,35 +720,6 @@ TEST_P(Http2CodecImplTest, IgnoreTrailingEmptyHeaders) {
   Buffer::OwnedImpl world("world");
   response_encoder_->encodeData(world, false);
   EXPECT_CALL(response_decoder_, decodeData(BufferEqual(&empty_buffer), true));
-  response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
-}
-
-// When having empty trailers and "envoy.reloadable_features.http2_skip_encoding_empty_trailers" is
-// turned off, codec submits empty trailers.
-TEST_P(Http2CodecImplTest, SubmitTrailingEmptyHeaders) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.http2_skip_encoding_empty_trailers", "false"}});
-
-  initialize();
-
-  TestRequestHeaderMapImpl request_headers;
-  HttpTestUtility::addDefaultHeaders(request_headers);
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
-  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
-  EXPECT_CALL(request_decoder_, decodeData(_, false));
-  Buffer::OwnedImpl hello("hello");
-  request_encoder_->encodeData(hello, false);
-  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
-  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{});
-
-  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
-  response_encoder_->encodeHeaders(response_headers, false);
-  EXPECT_CALL(response_decoder_, decodeData(_, false));
-  Buffer::OwnedImpl world("world");
-  response_encoder_->encodeData(world, false);
-  EXPECT_CALL(response_decoder_, decodeTrailers_(_));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{});
 }
 
@@ -872,8 +834,11 @@ TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   metadata_map_vector.push_back(std::move(metadata_map_ptr));
 
   corrupt_metadata_frame_ = true;
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeMetadata(metadata_map_vector), ServerCodecError,
-                            "The user callback function failed");
+  request_encoder_->encodeMetadata(metadata_map_vector);
+  // The error is detected by the server codec.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "The user callback function failed");
 }
 
 // Encode response metadata while dispatching request data from the client, so
@@ -1040,7 +1005,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "max_headers_kb_: 60, max_headers_count_: 100, "
           "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
-          "0, skip_encoding_empty_trailers_: 1, dispatching_: 0, raised_goaway_: 0, "
+          "0, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));
@@ -1930,6 +1895,8 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
   EXPECT_EQ(1, TestUtility::findGauge(client_stats_store_, "http2.streams_active")->value());
   EXPECT_EQ(1, TestUtility::findGauge(server_stats_store_, "http2.streams_active")->value());
+  // The server codec should not fail since the error is "consumed".
+  EXPECT_TRUE(server_wrapper_.status_.ok());
 }
 
 TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreError) {
@@ -1968,14 +1935,17 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreErro
 
   request_encoder_ = &client_->newStream(response_decoder_);
   setupDefaultConnectionMocks();
-  EXPECT_THROW_WITH_MESSAGE(request_encoder_->encodeHeaders(request_headers, true).IgnoreError(),
-                            ServerCodecError, "The user callback function failed");
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  // The server codec should fail since there are no available streams.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isCodecProtocolError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "The user callback function failed");
 
   EXPECT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
   EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
 
   // Not verifying the http2.streams_active server/client gauges here as the
-  // EXPECT_THROW_WITH_MESSAGE above doesn't let us fully capture the behavior of the real system.
+  // test dispatch function doesn't let us fully capture the behavior of the real system.
   // In the real world, the status returned from dispatch would trigger a connection close which
   // would result in the active stream gauges to go down to 0.
 }
@@ -2468,8 +2438,11 @@ TEST_P(Http2CodecImplTest, PingFlood) {
         buffer.move(frame);
       }));
 
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many control frames in the outbound queue.");
+  client_->sendPendingFrames().IgnoreError();
+  // The PING flood is detected by the server codec.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isBufferFloodError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "Too many control frames in the outbound queue.");
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_control_flood").value());
 }
 
@@ -2538,8 +2511,11 @@ TEST_P(Http2CodecImplTest, PingFloodCounterReset) {
 
   // 1 more ping frame should overflow the outbound frame limit.
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many control frames in the outbound queue.");
+  client_->sendPendingFrames().IgnoreError();
+  // The server codec should fail when it gets 1 PING too many.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isBufferFloodError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "Too many control frames in the outbound queue.");
 }
 
 // Verify that codec detects flood of outbound HEADER frames
@@ -2709,8 +2685,11 @@ TEST_P(Http2CodecImplTest, PingStacksWithDataFlood) {
   }
   // Send one PING frame above the outbound queue size limit
   EXPECT_EQ(0, nghttp2_submit_ping(client_->session(), NGHTTP2_FLAG_NONE, nullptr));
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many frames in the outbound queue.");
+  client_->sendPendingFrames().IgnoreError();
+  // The server codec should fail when it gets 1 frame too many.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isBufferFloodError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "Too many frames in the outbound queue.");
 
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
@@ -2805,8 +2784,11 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
   priorityFlood();
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many PRIORITY frames");
+  client_->sendPendingFrames().IgnoreError();
+  // The PRIORITY flood is detected by the server codec.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isBufferFloodError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "Too many PRIORITY frames");
 }
 
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
@@ -2818,8 +2800,11 @@ TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
   windowUpdateFlood();
-  EXPECT_THROW_WITH_MESSAGE(client_->sendPendingFrames().IgnoreError(), ServerCodecError,
-                            "Too many WINDOW_UPDATE frames");
+  client_->sendPendingFrames().IgnoreError();
+  // The server codec should fail when it gets 1 WINDOW_UPDATE frame too many.
+  EXPECT_FALSE(server_wrapper_.status_.ok());
+  EXPECT_TRUE(isBufferFloodError(server_wrapper_.status_));
+  EXPECT_EQ(server_wrapper_.status_.message(), "Too many WINDOW_UPDATE frames");
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {

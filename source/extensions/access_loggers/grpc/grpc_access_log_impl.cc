@@ -20,12 +20,11 @@ GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     uint64_t max_buffer_size_bytes, Event::Dispatcher& dispatcher,
     const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
-    : GrpcAccessLogger(std::move(client), max_buffer_size_bytes, scope,
-                       GRPC_LOG_STATS_PREFIX.data(),
+    : GrpcAccessLogger(client, max_buffer_size_bytes, scope, GRPC_LOG_STATS_PREFIX.data(),
                        *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                           "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs")),
-      max_critical_message_size_bytes_(max_buffer_size_bytes), log_name_(config.log_name()),
-      local_info_(local_info) {
+                           "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs"),
+                       config.grpc_stream_retry_policy()),
+      log_name_(config.log_name()), local_info_(local_info) {
   critical_log_client_ = std::make_unique<GrpcCriticalAccessLogClient>(
       client,
       *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -104,9 +103,12 @@ void GrpcCriticalAccessLogClient::flush(GrpcCriticalAccessLogClient::RequestType
     setLogIdentifier(message);
   }
 
-  const uint32_t message_id = client_->publishId(message);
-  message.set_id(message_id);
-  client_->bufferMessage(message_id, message);
+  const auto message_id = client_->bufferMessage(message);
+  if (!message_id.has_value()) {
+    return;
+  }
+
+  message.set_id(message_id.value());
   stats_.pending_critical_logs_.inc();
   inflight_message_ttl_->setDeadline(client_->sendBufferedMessages());
 }
@@ -127,9 +129,9 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
     const Grpc::RawAsyncClientSharedPtr& client,
     std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, Stats::Scope& scope) {
+    Event::Dispatcher& dispatcher) {
   auto logger = std::make_shared<GrpcAccessLoggerImpl>(client, config, max_buffer_size_bytes,
-                                                       dispatcher, local_info_, scope);
+                                                       dispatcher, local_info_, scope_);
   logger->startIntervalFlushTimer(dispatcher, buffer_flush_interval_msec);
   return logger;
 }

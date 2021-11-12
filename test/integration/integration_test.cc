@@ -4,7 +4,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/http/header_map_impl.h"
@@ -305,15 +304,12 @@ TEST_P(IntegrationTest, RouterDirectResponseEmptyBody) {
 }
 
 TEST_P(IntegrationTest, ConnectionClose) {
-  config_helper_.prependFilter(ConfigHelper::defaultHealthCheckFilter());
+  autonomous_upstream_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  auto response =
-      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                                                          {":path", "/healthcheck"},
-                                                                          {":authority", "host"},
-                                                                          {"connection", "close"}});
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"}, {":path", "/"}, {":authority", "host"}, {"connection", "close"}});
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
@@ -411,16 +407,16 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingEarly100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingEarly1xxWithEncoderFilter) {
   testEnvoyProxying1xx(true, true);
 }
 
-TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
+TEST_P(IntegrationTest, EnvoyProxyingLate1xxWithEncoderFilter) {
   testEnvoyProxying1xx(false, true);
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/10923.
-TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
+TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
   config_helper_.prependFilter(R"EOF(
   name: stop-iteration-and-continue-filter
   typed_config:
@@ -433,7 +429,6 @@ TEST_P(IntegrationTest, EnvoyProxying100ContinueWithDecodeDataPause) {
 // filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstruction) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -500,7 +495,6 @@ typed_config:
 // that we are able to skip filter invocation through the match tree.
 TEST_P(IntegrationTest, MatchingHttpFilterConstructionNewProto) {
   concurrency_ = 2;
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.experimental_matching_api", "true");
 
   config_helper_.prependFilter(R"EOF(
 name: matcher
@@ -563,6 +557,53 @@ typed_config:
   second_codec->close();
 }
 
+// Verifies routing via the match tree API.
+TEST_P(IntegrationTest, MatchTreeRouting) {
+  const std::string vhost_yaml = R"EOF(
+    name: vhost
+    domains: ["matcher.com"]
+    matcher:
+      matcher_tree:
+        input:
+          name: request-headers
+          typed_config:
+            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+            header_name: match-header
+        exact_match_map:
+          map:
+            "route":
+              action:
+                name: route
+                typed_config:
+                  "@type": type.googleapis.com/envoy.config.route.v3.Route
+                  match:
+                    prefix: /
+                  route:
+                    cluster: cluster_0
+  )EOF";
+
+  envoy::config::route::v3::VirtualHost virtual_host;
+  TestUtility::loadFromYaml(vhost_yaml, virtual_host);
+
+  config_helper_.addVirtualHost(virtual_host);
+  autonomous_upstream_ = true;
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/whatever"},
+                                         {":scheme", "http"},
+                                         {"match-header", "route"},
+                                         {":authority", "matcher.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+
+  codec_client_->close();
+}
+
 // This is a regression for https://github.com/envoyproxy/envoy/issues/2715 and validates that a
 // pending request is not sent on a connection that has been half-closed.
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
@@ -622,38 +663,6 @@ TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 2);
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
-}
-
-// Test hitting the bridge filter with too many response bytes to buffer. Given
-// the headers are not proxied, the connection manager will send a local error reply.
-TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
-  config_helper_.prependFilter(
-      "{ name: grpc_http1_bridge, typed_config: { \"@type\": "
-      "type.googleapis.com/envoy.extensions.filters.http.grpc_http1_bridge.v3.Config } }");
-  config_helper_.setBufferLimits(1024, 1024);
-  initialize();
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/test/long/url"},
-                                     {":scheme", "http"},
-                                     {":authority", "host"},
-                                     {"content-type", "application/grpc"},
-                                     {"x-envoy-retry-grpc-on", "cancelled"}});
-  waitForNextUpstreamRequest();
-
-  // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are exceeded, this will be translated into an unknown gRPC error.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(1024 * 65, false);
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(),
-              HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, TestSmuggling) {
@@ -1311,17 +1320,8 @@ TEST_P(IntegrationTest, Connect) {
   EXPECT_EQ(normalizeDate(response1), normalizeDate(response2));
 }
 
-// Test that Envoy by default returns HTTP code 502 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorDefault) {
-  testRouterUpstreamProtocolError("502", "UPE");
-}
-
-// Test runtime overwrite to return 503 on upstream protocol error.
-TEST_P(IntegrationTest, UpstreamProtocolErrorRuntimeOverwrite) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.return_502_for_upstream_protocol_errors", "false");
-  testRouterUpstreamProtocolError("503", "UC");
-}
+// Test that Envoy returns HTTP code 502 on upstream protocol error.
+TEST_P(IntegrationTest, UpstreamProtocolError) { testRouterUpstreamProtocolError("502", "UPE"); }
 
 TEST_P(IntegrationTest, TestHead) {
   initialize();
@@ -1468,9 +1468,9 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
 
 // Validate that 100-continue works as expected with via header addition on both request and
 // response path.
-TEST_P(IntegrationTest, ViaAppendWith100Continue) {
+TEST_P(IntegrationTest, ViaAppendWith1xx) {
   config_helper_.addConfigModifier(setVia("foo"));
-  testEnvoyHandling100Continue(false, "foo");
+  testEnvoyHandling1xx(false, "foo");
 }
 
 // Test delayed close semantics for downstream HTTP/1.1 connections. When an early response is

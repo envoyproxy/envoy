@@ -129,12 +129,12 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersSize(headers->byteSize());
-  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
@@ -143,8 +143,8 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
-  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
-  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
+  // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
   //
   // We could in principle handle other headers here, but this might result in the double invocation
   // of decodeHeaders() (once for informational, again for non-informational), which is likely an
@@ -303,7 +303,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-
   clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
@@ -394,12 +393,7 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     reset_reason = Http::StreamResetReason::ConnectionFailure;
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure")) {
-      reset_reason = Http::StreamResetReason::ConnectionFailure;
-    } else {
-      reset_reason = Http::StreamResetReason::LocalReset;
-    }
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
@@ -415,7 +409,6 @@ void UpstreamRequest::onPoolReady(
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
-
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 
@@ -451,6 +444,10 @@ void UpstreamRequest::onPoolReady(
     parent_.callbacks()->streamInfo().setUpstreamConnectionId(
         info.downstreamAddressProvider().connectionID().value());
   }
+
+  stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
+  StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
+                                                              stream_info_);
 
   if (parent_.downstreamEndStream()) {
     setupPerTryTimeout();

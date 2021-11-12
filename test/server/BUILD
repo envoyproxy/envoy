@@ -114,6 +114,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "active_udp_listener_test",
+    srcs = ["active_udp_listener_test.cc"],
+    deps = [
+        "//source/common/network:listen_socket_lib",
+        "//source/common/network:socket_option_factory_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
+        "//source/server:active_udp_listener",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:network_utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "drain_manager_impl_test",
     srcs = ["drain_manager_impl_test.cc"],
     deps = [

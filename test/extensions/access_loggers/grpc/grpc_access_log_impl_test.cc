@@ -68,7 +68,6 @@ public:
           envoy::service::accesslog::v3::CriticalAccessLogsMessage message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-          EXPECT_GT(message.id(), 0);
           message.set_id(0);
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
         }));
@@ -89,7 +88,7 @@ public:
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    config_.set_log_name("test_log_name");
+    *config_.mutable_log_name() = "test_log_name";
     logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
                                                      config_, BUFFER_SIZE_BYTES, dispatcher_,
                                                      local_info_, stats_store_);
@@ -212,7 +211,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, scope_);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
   // Note that the local info node() method is mocked, so the node is not really configurable.
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   identifier:

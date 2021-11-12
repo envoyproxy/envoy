@@ -412,43 +412,6 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
             "upstream_reset_before_response_started{connection failure,connect_timeout}");
 }
 
-TEST_F(RouterTest, PoolFailureDueToConnectTimeoutLegacy) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.treat_upstream_connect_timeout_as_connect_failure", "false"}});
-  ON_CALL(callbacks_.route_->route_entry_, priority())
-      .WillByDefault(Return(Upstream::ResourcePriority::High));
-  EXPECT_CALL(cm_.thread_local_cluster_,
-              httpConnPool(Upstream::ResourcePriority::High, _, &router_));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder&, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Timeout, "connect_timeout",
-                                cm_.thread_local_cluster_.conn_pool_.host_);
-        return nullptr;
-      }));
-
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "503"}, {"content-length", "127"}, {"content-type", "text/plain"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
-  EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::LocalReset));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, true);
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-  // Pool failure, so upstream request was not initiated.
-  EXPECT_EQ(0U,
-            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{local reset,connect_timeout}");
-}
-
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, absl::optional<Http::Protocol>(), _));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -3786,7 +3749,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
 }
 
 // The router filter is responsible for not propagating 100-continue headers after the initial 100.
-TEST_F(RouterTest, Coalesce100ContinueHeaders) {
+TEST_F(RouterTest, Coalesce1xxHeaders) {
   // Setup.
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3808,23 +3771,25 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 
   // Initial 100-continue, this is processed normally.
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+    response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());
 
-  // No encode100ContinueHeaders() invocation for the second 100-continue (but we continue to track
+  // No encode1xxHeaders() invocation for the second 100-continue (but we continue to track
   // stats from upstream).
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_)).Times(0);
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_)).Times(0);
   {
     Http::ResponseHeaderMapPtr continue_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+    response_decoder->decode1xxHeaders(std::move(continue_headers));
   }
   EXPECT_EQ(
       2U,
@@ -3838,7 +3803,7 @@ TEST_F(RouterTest, Coalesce100ContinueHeaders) {
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
-TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
+TEST_F(RouterTest, RetryUpstreamReset1xxResponseStarted) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
@@ -3862,10 +3827,11 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   // is reset we won't even check shouldRetryReset() (or shouldRetryHeaders()).
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).Times(0);
-  EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
+  EXPECT_CALL(callbacks_, encode1xxHeaders_(_));
   Http::ResponseHeaderMapPtr continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  response_decoder->decode100ContinueHeaders(std::move(continue_headers));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decode1xxHeaders(std::move(continue_headers));
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_100").value());

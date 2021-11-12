@@ -44,6 +44,7 @@ class Http2CodecImplTestFixture;
 // This is not the full client magic, but it's the smallest size that should be able to
 // differentiate between HTTP/1 and HTTP/2.
 const std::string CLIENT_MAGIC_PREFIX = "PRI * HTTP/2";
+constexpr uint64_t H2_FRAME_HEADER_SIZE = 9;
 
 class ReceivedSettingsImpl : public ReceivedSettings {
 public:
@@ -282,10 +283,12 @@ protected:
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
 
+    const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};
+    StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
 
     Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
@@ -408,7 +411,7 @@ protected:
     void resetStream(StreamResetReason reason) override;
 
     // ResponseEncoder
-    void encode100ContinueHeaders(const ResponseHeaderMap& headers) override;
+    void encode1xxHeaders(const ResponseHeaderMap& headers) override;
     void encodeHeaders(const ResponseHeaderMap& headers, bool end_stream) override;
     void encodeTrailers(const ResponseTrailerMap& trailers) override {
       encodeTrailersBase(trailers);
@@ -522,12 +525,6 @@ protected:
   // nghttp2 library will keep calling this callback to write the rest of the frame.
   ssize_t onSend(const uint8_t* data, size_t length);
 
-  // Some browsers (e.g. WebKit-based browsers: https://bugs.webkit.org/show_bug.cgi?id=210108) have
-  // a problem with processing empty trailers (END_STREAM | END_HEADERS with zero length HEADERS) of
-  // an HTTP/2 response as reported here: https://github.com/envoyproxy/envoy/issues/10514. This is
-  // controlled by "envoy.reloadable_features.http2_skip_encoding_empty_trailers" runtime feature
-  // flag.
-  const bool skip_encoding_empty_trailers_;
   const bool skip_dispatching_frames_for_closed_connection_;
 
   // dumpState helper method.

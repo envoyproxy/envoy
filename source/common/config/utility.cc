@@ -215,8 +215,9 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
 }
 
 Stats::TagProducerPtr
-Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
+Utility::createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                           const Stats::TagVector& cli_tags) {
+  return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config(), cli_tags);
 }
 
 Stats::StatsMatcherPtr
@@ -254,6 +255,8 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
   static const std::string typed_struct_type =
+      xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
+  static const std::string legacy_typed_struct_type =
       udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
@@ -262,6 +265,17 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
+      xds::type::v3::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // if out_proto is expecting Struct, return directly
+      if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        out_proto.CopyFrom(typed_struct.value());
+      } else {
+        // The typed struct might match out_proto, or some earlier version, let
+        // MessageUtil::jsonConvert sort this out.
+        MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+      }
+    } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly

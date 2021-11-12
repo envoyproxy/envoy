@@ -17,7 +17,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
-#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
@@ -94,7 +93,6 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnectionWithOption
 }
 
 void BaseIntegrationTest::initialize() {
-  Thread::MainThread::initTestThread();
   RELEASE_ASSERT(!initialized_, "");
   RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
@@ -488,13 +486,14 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+      sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
                                        expect_node, expected_error_code, expected_error_substring);
   } else {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
                                         expected_resource_names_removed, expected_error_code,
-                                        expected_error_substring);
+                                        expected_error_substring, expect_node);
   }
 }
 
@@ -574,16 +573,33 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
   return AssertionFailure() << "Timeout waiting for port availability";
 }
 
+envoy::service::discovery::v3::DeltaDiscoveryResponse
+BaseIntegrationTest::createExplicitResourcesDeltaDiscoveryResponse(
+    const std::string& type_url,
+    const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+    const std::vector<std::string>& removed) {
+  envoy::service::discovery::v3::DeltaDiscoveryResponse response;
+  response.set_system_version_info("system_version_info_this_is_a_test");
+  response.set_type_url(type_url);
+  *response.mutable_resources() = {added_or_updated.begin(), added_or_updated.end()};
+  *response.mutable_removed_resources() = {removed.begin(), removed.end()};
+  static int next_nonce_counter = 0;
+  response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
+  return response;
+}
+
 AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::string& expected_type_url,
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
-    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
+    const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
+    bool expect_node) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.
-  if (!request.has_node() || request.node().id().empty() || request.node().cluster().empty()) {
+  if (expect_node &&
+      (!request.has_node() || request.node().id().empty() || request.node().cluster().empty())) {
     return AssertionFailure() << "Weird node field";
   }
   last_node_.CopyFrom(request.node());

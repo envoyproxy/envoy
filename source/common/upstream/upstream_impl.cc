@@ -676,8 +676,9 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
-        local_info_(c.localInfo()), dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
+      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+        cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
+        dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
         options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
@@ -687,6 +688,7 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
+  Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
@@ -719,6 +721,7 @@ public:
 
 private:
   Server::Admin& admin_;
+  Stats::Scope& server_scope_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -833,72 +836,42 @@ ClusterInfoImpl::ClusterInfoImpl(
                          "HttpProtocolOptions can be specified");
   }
 
-  switch (config.lb_policy()) {
-  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
-    lb_type_ = LoadBalancerType::RoundRobin;
-    break;
-  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
-    lb_type_ = LoadBalancerType::LeastRequest;
-    break;
-  case envoy::config::cluster::v3::Cluster::RANDOM:
-    lb_type_ = LoadBalancerType::Random;
-    break;
-  case envoy::config::cluster::v3::Cluster::RING_HASH:
-    lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::config::cluster::v3::Cluster::MAGLEV:
-    lb_type_ = LoadBalancerType::Maglev;
-    break;
-  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    lb_type_ = LoadBalancerType::ClusterProvided;
-    break;
-  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    if (config.has_common_lb_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    if (!config.has_load_balancing_policy()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    for (const auto& policy : config.load_balancing_policy().policies()) {
-      TypedLoadBalancerFactory* factory =
-          Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
-              policy.typed_extension_config(), /*is_optional=*/true);
-      if (factory != nullptr) {
-        load_balancing_policy_ = policy;
-        load_balancer_factory_ = factory;
-        break;
+  // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
+  if (config.has_load_balancing_policy()) {
+    configureLbPolicies(config);
+  } else {
+    switch (config.lb_policy()) {
+    case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
+      lb_type_ = LoadBalancerType::RoundRobin;
+      break;
+    case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
+      lb_type_ = LoadBalancerType::LeastRequest;
+      break;
+    case envoy::config::cluster::v3::Cluster::RANDOM:
+      lb_type_ = LoadBalancerType::Random;
+      break;
+    case envoy::config::cluster::v3::Cluster::RING_HASH:
+      lb_type_ = LoadBalancerType::RingHash;
+      break;
+    case envoy::config::cluster::v3::Cluster::MAGLEV:
+      lb_type_ = LoadBalancerType::Maglev;
+      break;
+    case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
+      if (config.has_lb_subset_config()) {
+        throw EnvoyException(
+            fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                        envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
       }
-    }
 
-    if (load_balancer_factory_ == nullptr) {
-      throw EnvoyException(fmt::format(
-          "Didn't find a registered load balancer factory implementation for cluster: '{}'",
-          name_));
+      lb_type_ = LoadBalancerType::ClusterProvided;
+      break;
+    case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+      configureLbPolicies(config);
+      break;
     }
-
-    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
-    break;
-  }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -916,6 +889,16 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
   } else {
     idle_timeout_ = std::chrono::hours(1);
+  }
+
+  if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
+    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.max_connection_duration()));
+    if (max_connection_duration_.value().count() == 0) {
+      max_connection_duration_ = absl::nullopt;
+    }
+  } else {
+    max_connection_duration_ = absl::nullopt;
   }
 
   if (config.has_eds_cluster_config()) {
@@ -945,6 +928,45 @@ ClusterInfoImpl::ClusterInfoImpl(
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
   }
+}
+
+// Configures the load balancer based on config.load_balancing_policy
+void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_lb_subset_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (config.has_common_lb_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (!config.has_load_balancing_policy()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  for (const auto& policy : config.load_balancing_policy().policies()) {
+    TypedLoadBalancerFactory* factory =
+        Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+            policy.typed_extension_config(), /*is_optional=*/true);
+    if (factory != nullptr) {
+      load_balancing_policy_ = policy;
+      load_balancer_factory_ = factory;
+      break;
+    }
+  }
+
+  if (load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Didn't find a registered load balancer factory implementation for cluster: '{}'", name_));
+  }
+
+  lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -1084,9 +1106,7 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 }
 
 } // namespace
@@ -1604,14 +1624,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
       if (existing_host->second->weight() != host->weight()) {
         existing_host->second->weight(host->weight());
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
-          // We do full host set rebuilds so that load balancers can do pre-computation of data
-          // structures based on host weight. This may become a performance problem in certain
-          // deployments so it is runtime feature guarded and may also need to be configurable
-          // and/or dynamic in the future.
-          hosts_changed = true;
-        }
+        // We do full host set rebuilds so that load balancers can do pre-computation of data
+        // structures based on host weight. This may become a performance problem in certain
+        // deployments so it is runtime feature guarded and may also need to be configurable
+        // and/or dynamic in the future.
+        hosts_changed = true;
       }
 
       hosts_changed |=
@@ -1769,6 +1786,8 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::Auto;
   case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
     return Network::DnsLookupFamily::V4Preferred;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

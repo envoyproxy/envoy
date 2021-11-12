@@ -64,7 +64,7 @@ public:
     }
     void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
     void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {
-      parent_.client_->cleanup();
+      // TODO(shikugawa): should it be cleanuped?
     }
 
     GrpcCriticalAccessLogClient& parent_;
@@ -81,7 +81,7 @@ public:
 
     ~InflightMessageTtlManager() { timer_->disableTimer(); }
 
-    void setDeadline(absl::flat_hash_set<uint32_t>&& ids) {
+    void setDeadline(absl::flat_hash_set<uint64_t>&& ids) {
       const auto expires_at = dispatcher_.timeSource().monotonicTime() + message_ack_timeout_;
       deadline_.emplace(expires_at, std::move(ids));
 
@@ -129,7 +129,7 @@ public:
     GrpcCriticalAccessLogClientGrpcClientStats& stats_;
     Grpc::BufferedAsyncClient<RequestType, ResponseType>& client_;
     Event::TimerPtr timer_;
-    std::map<MonotonicTime, absl::flat_hash_set<uint32_t>, std::greater<>> deadline_;
+    std::map<MonotonicTime, absl::flat_hash_set<uint64_t>, std::greater<>> deadline_;
   };
 
   GrpcCriticalAccessLogClient(const Grpc::RawAsyncClientSharedPtr& client,
@@ -236,7 +236,7 @@ private:
   createLogger(const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
                const Grpc::RawAsyncClientSharedPtr& client,
                std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-               Event::Dispatcher& dispatcher, Stats::Scope& scope) override;
+               Event::Dispatcher& dispatcher) override;
 
   const LocalInfo::LocalInfo& local_info_;
 };

@@ -272,7 +272,7 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "//source/common/watchdog:abort_action_config",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )
 
@@ -388,6 +388,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
+        "//source/common/stats:tag_utility_lib",
         "//source/common/version:version_lib",
     ],
 )
@@ -455,7 +456,9 @@ envoy_cc_library(
         ":lds_api_lib",
         ":transport_socket_config_lib",
         "//envoy/access_log:access_log_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/network:connection_interface",
+        "//envoy/network:listener_interface",
         "//envoy/server:api_listener_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/server:listener_manager_interface",
@@ -465,6 +468,7 @@ envoy_cc_library(
         "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
+        "//source/common/config:metadata_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
         "//source/common/init:target_lib",
@@ -500,6 +504,7 @@ envoy_cc_library(
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
         ":filter_chain_factory_context_callback",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/server:instance_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/server:transport_socket_config_interface",
@@ -588,6 +593,7 @@ envoy_cc_library(
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
+        "//source/common/config/xds_mux:grpc_mux_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",

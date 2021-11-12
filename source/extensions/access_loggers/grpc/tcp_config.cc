@@ -32,8 +32,7 @@ AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
     context.clusterManager().checkActiveStaticCluster(service_config.envoy_grpc().cluster_name());
   }
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
-                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context),
-                                            context.scope());
+                                            GrpcCommon::getGrpcAccessLoggerCacheSingleton(context));
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
