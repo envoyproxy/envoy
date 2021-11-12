@@ -7,13 +7,22 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
 
 namespace Envoy {
 namespace Network {
 
+IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(int socket_fd, bool socket_v6only,
+                                                            absl::optional<int> domain) {
+  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
+    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
+  }
+  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+}
+
 IoHandlePtr SocketInterfaceImpl::makeSocket(int socket_fd, bool socket_v6only,
                                             absl::optional<int> domain) const {
-  return std::make_unique<IoSocketHandleImpl>(socket_fd, socket_v6only, domain);
+  return makePlatformSpecificSocket(socket_fd, socket_v6only, domain);
 }
 
 IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type addr_type,

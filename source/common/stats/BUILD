@@ -90,6 +90,7 @@ envoy_cc_library(
         ":symbol_table_lib",
         "//envoy/stats:stats_interface",
         "//envoy/stats:symbol_table_interface",
+        "//source/common/config:well_known_names",
     ],
 )
 

@@ -39,7 +39,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&&) override {}
 
   // Http::ResponseDecoder
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override {

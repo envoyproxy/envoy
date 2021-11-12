@@ -83,15 +83,12 @@ message QuicProtocolOptions {
   google.protobuf.UInt32Value initial_connection_window_size = 3
       [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
 
-  // [#not-implemented-hide:] Hiding until timeout config is supported.
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
-  // This defaults to 1. If sets to 0, port migration will not occur.
+  // This defaults to 1. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
-  // Currently the value can only be 0 or 1.
-  // TODO(renjietang): Plumb through quiche to make this config able to adjust the amount of timeouts needed to trigger port migration.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
-      [(validate.rules).uint32 = {lte: 1 gte: 0}];
+      [(validate.rules).uint32 = {lte: 5 gte: 0}];
 
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.

@@ -253,7 +253,7 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -292,6 +292,9 @@ message CertificateValidationContext {
   // that if a CRL is provided for any certificate authority in a trust chain, a CRL must be
   // provided for all certificate authorities in that chain. Failure to do so will result in
   // verification failure for both revoked and unrevoked certificates from that chain.
+  // The behavior of requiring all certificates to contain CRLs if any do can be altered by
+  // setting :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>`
+  // true. If set to true, only the final certificate in the chain undergoes CRL verification.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
@@ -417,7 +420,9 @@ message CertificateValidationContext {
   // for any certificate authority in a trust chain, a CRL must be provided
   // for all certificate authorities in that chain. Failure to do so will
   // result in verification failure for both revoked and unrevoked certificates
-  // from that chain.
+  // from that chain. This default behavior can be altered by setting
+  // :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>` to
+  // true.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.
@@ -433,4 +438,8 @@ message CertificateValidationContext {
   // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
+
+  // If this option is set to true, only the certificate at the end of the
+  // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
+  bool only_verify_leaf_cert_crl = 14;
 }
