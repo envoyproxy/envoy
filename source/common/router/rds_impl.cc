@@ -122,9 +122,6 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
-  if (route_config_provider_opt_.has_value()) {
-    route_config_provider_opt_.value()->validateConfig(route_config);
-  }
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
@@ -290,12 +287,6 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
       it++;
     }
   }
-}
-
-void RdsRouteConfigProviderImpl::validateConfig(
-    const envoy::config::route::v3::RouteConfiguration& config) const {
-  // TODO(lizan): consider cache the config here until onConfigUpdate.
-  ConfigImpl validation_config(config, optional_http_filters_, factory_context_, validator_, false);
 }
 
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS

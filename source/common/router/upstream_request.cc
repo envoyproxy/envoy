@@ -129,12 +129,12 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersSize(headers->byteSize());
-  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
@@ -143,8 +143,8 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
-  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
-  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
+  // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
   //
   // We could in principle handle other headers here, but this might result in the double invocation
   // of decodeHeaders() (once for informational, again for non-informational), which is likely an

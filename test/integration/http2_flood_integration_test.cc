@@ -418,7 +418,7 @@ TEST_P(Http2FloodMitigationTest, Headers) {
 }
 
 // Verify that the server can detect overflow by 100 continue response sent by Envoy itself
-TEST_P(Http2FloodMitigationTest, Envoy100ContinueHeaders) {
+TEST_P(Http2FloodMitigationTest, Envoy1xxHeaders) {
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 

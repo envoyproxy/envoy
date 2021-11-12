@@ -59,7 +59,7 @@ public:
   ~MockFilterManagerCallbacks() override;
 
   MOCK_METHOD(void, encodeHeaders, (ResponseHeaderMap&, bool));
-  MOCK_METHOD(void, encode100ContinueHeaders, (ResponseHeaderMap&));
+  MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
   MOCK_METHOD(void, encodeMetadata, (MetadataMapVector&));
@@ -232,9 +232,7 @@ public:
                        const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                        absl::string_view details);
 
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
-    encode100ContinueHeaders_(*headers);
-  }
+  void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override { encode1xxHeaders_(*headers); }
   MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, (), (const));
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override {
@@ -261,7 +259,7 @@ public:
   MOCK_METHOD(MetadataMapVector&, addDecodedMetadata, ());
   MOCK_METHOD(const Buffer::Instance*, decodingBuffer, ());
   MOCK_METHOD(void, modifyDecodingBuffer, (std::function<void(Buffer::Instance&)>));
-  MOCK_METHOD(void, encode100ContinueHeaders_, (HeaderMap & headers));
+  MOCK_METHOD(void, encode1xxHeaders_, (HeaderMap & headers));
   MOCK_METHOD(void, encodeHeaders_, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, encodeTrailers_, (ResponseTrailerMap & trailers));
@@ -372,7 +370,7 @@ public:
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::MockStreamEncoderFilter
-  MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(FilterHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (ResponseTrailerMap & trailers));
@@ -403,7 +401,7 @@ public:
   MOCK_METHOD(void, decodeComplete, ());
 
   // Http::MockStreamEncoderFilter
-  MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (ResponseHeaderMap & headers));
+  MOCK_METHOD(FilterHeadersStatus, encode1xxHeaders, (ResponseHeaderMap & headers));
   MOCK_METHOD(ResponseHeaderMapOptRef, continueHeaders, (), (const));
   MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (ResponseHeaderMap & headers, bool end_stream));
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, (), (const));

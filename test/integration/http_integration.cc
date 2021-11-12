@@ -955,9 +955,8 @@ void HttpIntegrationTest::testGrpcRetry() {
   }
 }
 
-void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
-                                                       const std::string& via,
-                                                       bool disconnect_after_100) {
+void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_upstream,
+                                               const std::string& via, bool disconnect_after_100) {
   useAccessLog("%RESPONSE_CODE%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -991,8 +990,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   if (additional_continue_from_upstream) {
     // Make sure if upstream sends an 100-Continue Envoy doesn't send its own and proxy the one
     // from upstream!
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   }
 
   if (disconnect_after_100) {
@@ -1048,16 +1046,13 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
 
   if (continue_before_upstream_complete) {
     if (with_multiple_1xx_headers) {
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
     // This case tests sending on 100-Continue headers before the client has sent all the
     // request data.
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     response->waitForContinueHeaders();
   }
   // Send all of the request data and wait for it to be received upstream.
@@ -1066,15 +1061,12 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
 
   if (!continue_before_upstream_complete) {
     if (with_multiple_1xx_headers) {
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
     // This case tests forwarding 100-Continue after the client has sent all data.
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     response->waitForContinueHeaders();
   }
   // Now send the rest of the response.
