@@ -55,8 +55,7 @@ private:
   void parse(const std::string& format_string);
 
   using SpecifierOffsets = std::vector<int32_t>;
-  std::string fromTimeAndPrepareSpecifierOffsets(time_t time,
-		  				 SpecifierOffsets& specifier_offsets,
+  std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                  const absl::string_view seconds_str) const;
 
   // A container to hold a specifiers (%f, %Nf, %s) found in a format string.

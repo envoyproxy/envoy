@@ -192,9 +192,9 @@ void DateFormatter::parse(const std::string& format_string) {
   }
 }
 
-std::string DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time,
-                                                              SpecifierOffsets& specifier_offsets,
-                                                              const absl::string_view seconds_str) const {
+std::string
+DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
+                                                  const absl::string_view seconds_str) const {
   std::string formatted_time;
 
   int32_t previous = 0;
