@@ -55,8 +55,9 @@ private:
   void parse(const std::string& format_string);
 
   using SpecifierOffsets = std::vector<int32_t>;
-  std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
-                                                 absl::string_view seconds_str) const;
+  std::string fromTimeAndPrepareSpecifierOffsets(time_t time,
+		  				 SpecifierOffsets& specifier_offsets,
+                                                 const absl::string_view seconds_str) const;
 
   // A container to hold a specifiers (%f, %Nf, %s) found in a format string.
   struct Specifier {
@@ -404,7 +405,7 @@ public:
    * @param source supplies the string to escape.
    * @return escaped string.
    */
-  static std::string escape(absl::string_view source);
+  static std::string escape(const absl::string_view source);
 
   /**
    * Outputs the string to the provided ostream, while escaping \n, \r, \t, and "
