@@ -716,7 +716,9 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringCreation) {
 
   const bool supports_getifaddrs = Api::OsSysCallsSingleton::get().supportsGetifaddrs();
   Api::InterfaceAddressVector interfaces{};
-  ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
+  if (supports_getifaddrs) {
+    ASSERT_EQ(0, Api::OsSysCallsSingleton::get().getifaddrs(interfaces).return_value_);
+  }
 
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
