@@ -1467,9 +1467,11 @@ TEST_F(Http2ConnPoolImplTest, DisconnectWithNegativeCapacity) {
   CHECK_STATE(3 /*active*/, 0 /*pending*/, -2 /*capacity*/);
   EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 0);
 
+  // If one stream closes, concurrency capacity goes to -1, still no ready client available.
   completeRequest(r1);
   EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 0);
 
+  // Close all streams, concurrency capacity goes to -1, there should be one ready client.
   completeRequest(r2);
   completeRequest(r3);
   EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 1);
