@@ -150,7 +150,7 @@ std::string generateNumericOutput(const StatType& metric,
 
 std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
                                       const std::string& prefixed_tag_extracted_name) {
-  auto tags = std::vector(text_readout.tags());
+  auto tags = text_readout.tags();
   tags.push_back(Stats::Tag{"text_value", text_readout.value()});
   const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
   return fmt::format("{0}{{{1}}} 1\n", prefixed_tag_extracted_name, formattedTags);
