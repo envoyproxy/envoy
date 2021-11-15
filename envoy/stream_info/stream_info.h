@@ -425,6 +425,8 @@ public:
 
   /**
    * Returns the upstream timing information for this stream.
+   * It is not expected that the fields in upstreamTiming() will be set until
+   * the upstream request is complete.
    */
   virtual UpstreamTiming& upstreamTiming() PURE;
   virtual const UpstreamTiming& upstreamTiming() const PURE;
