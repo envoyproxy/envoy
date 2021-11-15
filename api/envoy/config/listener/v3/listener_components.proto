@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
+import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -93,7 +94,7 @@ message Filter {
 // listed at the end, because that's how we want to list them in the docs.
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
-// [#next-free-field: 15]
+// [#next-free-field: 14]
 message FilterChainMatch {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.FilterChainMatch";
@@ -110,126 +111,160 @@ message FilterChainMatch {
   }
 
   // Matches filter chains by the destination port.
-  message DestinationPort {
-    // Optional destination port to consider when use_original_dst is set on the
-    // listener in determining a filter chain match.
-    google.protobuf.UInt32Value destination_port = 1
-        [(validate.rules).uint32 = {lte: 65535 gte: 1}];
-
-    // Match destination port by ranges.
-    repeated type.v3.Int32Range destination_port_ranges = 2;
+  message DestinationPortInput {
   }
 
   // Matches filter chains by the destination IP address.
-  message DestinationIP {
-    // If non-empty, an IP address and prefix length to match addresses when the
-    // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
-    // Empty list matches all.
-    repeated core.v3.CidrRange prefix_ranges = 1;
+  message DestinationIPInput {
+  }
+
+  // Matches filter chains by the source IP address.
+  message SourceIPInput {
   }
 
   // Matches filter chains by the directly connected source IP address (this
   // will only be different from the source IP address when using a listener
   // filter that overrides the source address, such as the :ref:`Proxy Protocol
   // listener filter <config_listener_filters_proxy_protocol>`).
-  message DirectSourceIP {
-    // The criteria is satisfied if the directly connected source IP address of the downstream
-    // connection is contained in at least one of the specified subnets. If the list is empty,
-    // the directly connected source IP address is ignored.
-    repeated core.v3.CidrRange direct_source_prefix_ranges = 1;
-  }
-
-  // Matches filter chains by the connection source IP type.
-  message SourceType {
-    // Specifies the connection source IP match type. Can be any, local or external network.
-    ConnectionSourceType source_type = 1 [(validate.rules).enum = {defined_only: true}];
-  }
-
-  // Matches filter chains by the source IP address.
-  message SourceIP {
-    // The criteria is satisfied if the source IP address of the downstream
-    // connection is contained in at least one of the specified subnets. If the list is empty, the source IP address is
-    // ignored.
-    repeated core.v3.CidrRange source_prefix_ranges = 1;
+  message DirectSourceIPInput {
   }
 
   // Matches filter chains by the source port.
-  message SourcePort {
-    // The criteria is satisfied if the source port of the downstream connection
-    // is contained in at least one of the specified port ranges. If the parameter is
-    // not specified, the source port is ignored.
-    repeated type.v3.Int32Range source_port_ranges = 1;
+  message SourcePortInput {
   }
 
-  // Matches filter chains by the server name indication.
-  message SNI {
-    // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
-    // a filter chain match. Those values will be compared against the server names of a new
-    // connection, when detected by one of the listener filters.
-    //
+  // Matches filter chains by the connection source IP type.
+  // Specifies the connection source IP match type. The values include:
+  //
+  // * ``any`` - any connection source,
+  // * ``local`` - matches a connection originating from the same host,
+  // * ``external`` - matches a connection originating from a different host
+  message SourceTypeInput {
+  }
+
+  // Matches filter chains by the server names of a new connection, when detected by one of the listener filters.
+  message SNIInput {
+  }
+
+  // Matches filter chains by the transport protocol.
+  // This value will be compared against the transport protocol of a new connection, when
+  // it's detected by one of the listener filters.
+  //
+  // Suggested values include:
+  //
+  // * ``raw_buffer`` - default, used when no transport protocol is detected,
+  // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  //   when TLS protocol is detected.
+  message TransportProtocolInput {
+  }
+
+  // Matches filter chains by the application protocol (e.g. ALPN for TLS protocol).
+  // This values will be compared against the application
+  // protocols of a new connection, when detected by one of the listener filters.
+  //
+  // Suggested values include:
+  //
+  // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
+  //   <config_listener_filters_tls_inspector>`,
+  // * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+  //
+  // .. attention::
+  //
+  //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+  //   application protocol detection based on the requested
+  //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
+  //
+  //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
+  //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
+  //   unless all connecting clients are known to use ALPN.
+  message ApplicationProtocolInput {
+  }
+
+  // Matches a specific port against a set of possibly overlapping port ranges.
+  message PortMatcher {
+    // Specifies an optional list of port ranges and a match action.
+    message PortRangeMatcher {
+      // Optional set of port ranges. An empty set matches any port.
+      repeated type.v3.Int32Range ranges = 1;
+
+      // Match action to apply when the port is within one of the port ranges.
+      common.matcher.v3.Matcher.OnMatch on_match = 2;
+
+      // Indicates whether this match option should be considered if there is a
+      // matcher for the specific port value. For example, consider a matcher
+      // for the port range [1, 1000] applied to a specific port 80. If there
+      // is another matcher for the specific port 80 that fully matches, then
+      // the specific port matcher is selected. However, if the specific port
+      // matcher does not fully match, then the behavior depends on whether the
+      // range matcher [1, 1000] is exclusive. Exclusive port matchers do not
+      // apply when there is a more specific port match. Non-exclusive port
+      // matchers may apply when the nested match conditions are satisfied for
+      // the range matcher but not for the specific port value nested matcher.
+      //
+      // The order of range matchers is important since it dictates the order
+      // of matching in case of overlapping port ranges.
+      bool exclusive = 3;
+    }
+
+    // Match port by value. Takes precedence over matching by the port ranges.
+    map<int32, common.matcher.v3.Matcher.OnMatch> port_map = 1;
+
+    // Match port by port ranges.
+    repeated PortRangeMatcher range_matchers = 2;
+  }
+
+  // Matches a specific IP address against a set of possibly overlapping subnets.
+  message IPMatcher {
+    // Specifies an optional list of IP address ranges and a match action.
+    message IPRangeMatcher {
+      // Optional set of CIDR ranges. An empty set matches any IP address.
+      repeated core.v3.CidrRange ranges = 1;
+
+      // Match action to apply when the IP address is within one of the CIDR ranges.
+      common.matcher.v3.Matcher.OnMatch on_match = 2;
+
+      // Indicates whether this match option should be considered if there is a
+      // more specific matcher. Exclusive matchers are not selected whenever a
+      // more specific matcher exists (e.g. matcher with a longer prefix) even
+      // when the more specific matcher fails its nested match condition.
+      // Non-exclusive matchers are considered if the more specific matcher
+      // exists but its nested match condition does not entirely match.
+      // Non-exclusive matchers are selected in the order of their specificity
+      // first (longest prefix first), then the order of declaration next.
+      bool exclusive = 3;
+    }
+
+    // Match IP address by CIDR ranges.
+    repeated IPRangeMatcher range_matchers = 1;
+  }
+
+  // Matches a specific server name against of a set of possibly overlapping wildcard domains.
+  message ServerNameMatcher {
+    // Specifies an optional list of wildcard domains and a match action.
     // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
     // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
     //
     // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
-    //
-    // .. attention::
-    //
-    //   See the :ref:`FAQ entry <faq_how_to_setup_sni>` on how to configure SNI for more
-    //   information.
-    repeated string server_names = 1;
-  }
+    message DomainMatcher {
+      // Optional set of wildcard domains. An empty set matches any server name.
+      repeated string server_names = 1;
 
-  // Matches filter chains by the transport protocol.
-  message TransportProtocol {
-    // If non-empty, a transport protocol to consider when determining a filter chain match.
-    // This value will be compared against the transport protocol of a new connection, when
-    // it's detected by one of the listener filters.
-    //
-    // Suggested values include:
-    //
-    // * ``raw_buffer`` - default, used when no transport protocol is detected,
-    // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
-    //   when TLS protocol is detected.
-    string transport_protocol = 1;
-  }
+      // Match action to apply when the server name matches.
+      common.matcher.v3.Matcher.OnMatch on_match = 2;
 
-  // Matches filter chains by the application protocol (e.g. ALPN for TLS protocol).
-  message ApplicationProtocol {
-    // If non-empty, a list of application protocols (e.g. ALPN for TLS protocol) to consider when
-    // determining a filter chain match. Those values will be compared against the application
-    // protocols of a new connection, when detected by one of the listener filters.
-    //
-    // Suggested values include:
-    //
-    // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
-    //   <config_listener_filters_tls_inspector>`,
-    // * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
-    //
-    // .. attention::
-    //
-    //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
-    //   application protocol detection based on the requested
-    //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
-    //
-    //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
-    //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
-    //   unless all connecting clients are known to use ALPN.
-    repeated string application_protocols = 1;
-  }
+      // Indicates whether this match option should be considered if there is a
+      // more specific matcher. Exclusive matches are not selected whenever a
+      // more specific matcher exists even when the more specific matcher fails
+      // to match its nested match condition. For example, an exclusive matcher
+      // for ```*.com``` does not match ``www.example.com``` if there is a
+      // matcher for ```*.example.com```. Matchers are selected in the order of
+      // their specificity first (longest suffix first), then
+      // the order of declaration next.
+      bool exclusive = 3;
+    }
 
-  // Individual filter chain match predicate.
-  message FilterChainMatchPredicate {
-    // The typed config for the match predicate extension. The type URL will be
-    // used to identify the extension. In the case that the type URL is
-    // *xds.type.v3.TypedStruct* (or, for historical reasons,
-    // *udpa.type.v1.TypedStruct*), the inner type URL of *TypedStruct* will be
-    // utilized. See the :ref:`extension configuration overview
-    // <config_overview_extension_configuration>` for further details.
-    google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
-
-    // Flag to continue matching if this match is a wildcard match and there is a
-    // more specific match.
-    bool fallthrough = 2;
+    // Match server name by wildcard domains.
+    repeated DomainMatcher domain_matchers = 1;
   }
 
   reserved 1;
@@ -316,54 +351,6 @@ message FilterChainMatch {
   //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
-
-  // A list of filter chain matching predicate extensions specifying the order
-  // of selection for the most specific filter chain. The filter chains in a
-  // single listener must have the identical order of predicate extension type
-  // URLs. For backwards compatibility, if the existing fields in the filter
-  // chain match are specified, the fields are converted to their corresponding
-  // filter chain matching predicates in the following default matching order:
-  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationPort>`.
-  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationIP>`.
-  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SNI>`.
-  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.TransportProtocol>`.
-  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.ApplicationProtocol>`.
-  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DirectSourceIP>`.
-  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceType>`.
-  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceIP>`.
-  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourcePort>`.
-  //
-  // At each step, the predicate is evaluated for each filter chain. If the
-  // predicate returns false, the filter chain is eliminated from subsequent
-  // consideration. If the predicate returns true, then the decision is based
-  // on the ``fallthrough`` flag. If there is another more specific match for
-  // the same predicate and the flag is not set, then the less specific match
-  // is eliminated. If the flag is set, then it remains as a candidate for the
-  // next step. In general, the order of specificity is domain specific to the
-  // predicate extension. The flag should be set when matching on multiple
-  // properties in order for a default chain to apply without explicit specific
-  // matching of the first properties in the list.
-  //
-  // As an example, consider a filter chain ``FC1`` matching plaintext HTTP
-  // traffic on destination port 80, and another pass-through filter chain
-  // ``FC2`` for the rest of the traffic. The first chain match condition can
-  // be expressed with the transport protocol match on ``raw_buffer``, the
-  // application protocol match on ``http/1.1`` and ``h2``, and the destination
-  // port match on 80, in this order. If the second filter chain match does not
-  // specify ``fallthrough`` for any of its empty predicates, then for the
-  // plaintext non-HTTP traffic, ``FC2`` is not selected because it is
-  // eliminated at the first step as being less specific than ``FC1`` on the
-  // transport protocol match ``raw_buffer``. Therefore, ``FC2`` should specify
-  // ``fallthrough`` flag for both the transport protocol and the application
-  // protocol match predicates, in order to match plaintext non-HTTP traffic as
-  // well as plaintext HTTP traffic on ports other than 80.
-  //
-  // In case, there is more than one filter chain candidates remaining after
-  // the process completes, the first of the filter chains in the order of
-  // their declaration is selected.
-  //
-  // [#not-implemented-hide:]
-  repeated FilterChainMatchPredicate predicates = 14;
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
