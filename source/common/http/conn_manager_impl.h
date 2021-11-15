@@ -255,7 +255,8 @@ private:
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
-      filter_manager_.streamInfo().onLastDownstreamTxByteSent();
+      filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+          connection_manager_.time_source_);
       request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
