@@ -70,7 +70,6 @@ public:
   const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override {
     return rc;
   }
-  const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const override { return rc; }
   const std::string& resourceName(const Protobuf::Message& rc) const override {
     return cast(rc).name();
   }

@@ -45,12 +45,6 @@ public:
   virtual const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const PURE;
 
   /**
-   * Check if a valid config object can be made based on the provided route configuration proto.
-   * Throw an exception if not.
-   */
-  virtual const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const PURE;
-
-  /**
    * Gives back the name from the route configuration proto.
    * The object behind the returned reference has to have the same lifetime like the proto.
    */
@@ -58,6 +52,7 @@ public:
 
   /**
    * Create a config object based on a route configuration.
+   * @throw EnvoyException if the new config can't be applied.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const PURE;
 

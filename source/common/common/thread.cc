@@ -20,15 +20,11 @@ namespace {
 // call-sites for isMainThread(), which might be a bit of work, but will make
 // tests more hermetic.
 struct ThreadIds {
-  // Determines whether we are currently running on the main-thread or
-  // test-thread. We need to allow for either one because we don't establish
-  // the full threading model in all unit tests.
-  bool inMainOrTestThread() const {
+  bool inMainThread() const {
     // We don't take the lock when testing the thread IDs, as they are atomic,
     // and are cleared when being released. All possible thread orderings
     // result in the correct result even without a lock.
-    std::thread::id id = std::this_thread::get_id();
-    return main_thread_id_ == id || test_thread_id_ == id;
+    return std::this_thread::get_id() == main_thread_id_;
   }
 
   bool isMainThreadActive() const {
@@ -53,20 +49,6 @@ struct ThreadIds {
     }
   }
 
-  // Call this when the TestThread exits. Nested semantics are supported, so
-  // that if multiple TestThread instances are declared, we unwind them
-  // properly.
-  void releaseTestThread() {
-    absl::MutexLock lock(&mutex_);
-    ASSERT(test_thread_use_count_ > 0);
-    ASSERT(std::this_thread::get_id() == test_thread_id_);
-    if (--test_thread_use_count_ == 0) {
-      // Clearing the thread ID when its use-count goes to zero allows us
-      // to read the atomic without taking a lock.
-      test_thread_id_ = std::thread::id{};
-    }
-  }
-
   // Declares current thread as the main one, or verifies that the current
   // thread matches any previous declarations.
   void registerMainThread() {
@@ -78,16 +60,10 @@ struct ThreadIds {
     }
   }
 
-  // Declares current thread as the test thread, or verifies that the current
-  // thread matches any previous declarations.
-  void registerTestThread() {
-    absl::MutexLock lock(&mutex_);
-    if (++test_thread_use_count_ > 1) {
-      ASSERT(std::this_thread::get_id() == test_thread_id_);
-    } else {
-      test_thread_id_ = std::this_thread::get_id();
-    }
-  }
+  // Methods to track how many SkipAssert objects are instantiated.
+  void incSkipAsserts() { ++skip_asserts_; }
+  void decSkipAsserts() { --skip_asserts_; }
+  bool skipAsserts() const { return skip_asserts_ > 0; }
 
 private:
   // The atomic thread IDs can be read without a mutex, but they are written
@@ -95,26 +71,41 @@ private:
   // avoids the possibility of two threads racing to claim being the main/test
   // thread.
   std::atomic<std::thread::id> main_thread_id_;
-  std::atomic<std::thread::id> test_thread_id_;
 
   int32_t main_thread_use_count_ GUARDED_BY(mutex_) = 0;
-  int32_t test_thread_use_count_ GUARDED_BY(mutex_) = 0;
   mutable absl::Mutex mutex_;
+
+  std::atomic<uint32_t> skip_asserts_{};
 };
 
 } // namespace
 
-bool MainThread::isMainOrTestThread() { return ThreadIds::get().inMainOrTestThread(); }
+bool MainThread::isMainThread() { return ThreadIds::get().inMainThread(); }
 
 bool MainThread::isMainThreadActive() { return ThreadIds::get().isMainThreadActive(); }
-
-TestThread::TestThread() { ThreadIds::get().registerTestThread(); }
-
-TestThread::~TestThread() { ThreadIds::get().releaseTestThread(); }
 
 MainThread::MainThread() { ThreadIds::get().registerMainThread(); }
 
 MainThread::~MainThread() { ThreadIds::get().releaseMainThread(); }
+
+#if TEST_THREAD_SUPPORTED
+bool TestThread::isTestThread() {
+  // Keep this implementation consistent with TEST_THREAD_SUPPORTED, defined in thread.h.
+  // https://stackoverflow.com/questions/4867839/how-can-i-tell-if-pthread-self-is-the-main-first-thread-in-the-process
+#ifdef __linux__
+  return getpid() == syscall(SYS_gettid);
+#elif defined(__APPLE__)
+  return pthread_main_np() != 0;
+#endif
+  // Note: final #else fallback omitted intentionally.
+}
+#endif
+
+SkipAsserts::SkipAsserts() { ThreadIds::get().incSkipAsserts(); }
+
+SkipAsserts::~SkipAsserts() { ThreadIds::get().decSkipAsserts(); }
+
+bool SkipAsserts::skip() { return ThreadIds::get().skipAsserts(); }
 
 } // namespace Thread
 } // namespace Envoy

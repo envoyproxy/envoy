@@ -64,7 +64,6 @@ void RdsRouteConfigSubscription::onConfigUpdate(
         fmt::format("Unexpected RDS configuration (expecting {}): {}", route_config_name_,
                     config_update_info_->configTraits().resourceName(route_config)));
   }
-  config_update_info_->configTraits().validateConfig(route_config);
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
     stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));

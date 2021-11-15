@@ -528,13 +528,41 @@ http_filters:
   rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info());
 }
 
-// Validate behavior when the config is delivered but it fails PGV validation.
+// Validates behavior when the config is delivered but it fails PGV validation.
+// The invalid config won't affect existing valid config.
 TEST_F(RdsImplTest, FailureInvalidConfig) {
   InSequence s;
 
   setup();
+  EXPECT_CALL(init_watcher_, ready());
 
-  const std::string response1_json = R"EOF(
+  const std::string valid_json = R"EOF(
+{
+  "version_info": "1",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "foo_route_config",
+      "virtual_hosts": null
+    }
+  ]
+}
+)EOF";
+
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(valid_json);
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
+  EXPECT_NO_THROW(
+      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()));
+  // Sadly the RdsRouteConfigSubscription privately inherited from
+  // SubscriptionCallbacks, so we has to use reinterpret_cast here.
+  RdsRouteConfigSubscription* rds_subscription =
+      reinterpret_cast<RdsRouteConfigSubscription*>(rds_callbacks_);
+  auto config_impl_pointer = rds_subscription->routeConfigProvider().value()->config();
+  // Now send an invalid config update.
+  const std::string invalid_json =
+      R"EOF(
 {
   "version_info": "1",
   "resources": [
@@ -546,16 +574,20 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   ]
 }
 )EOF";
-  auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
-  const auto decoded_resources =
-      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response1);
 
-  EXPECT_CALL(init_watcher_, ready());
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(invalid_json);
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources<envoy::config::route::v3::RouteConfiguration>(response2);
+
   EXPECT_THROW_WITH_MESSAGE(
-      rds_callbacks_->onConfigUpdate(decoded_resources.refvec_, response1.version_info()),
+      rds_callbacks_->onConfigUpdate(decoded_resources_2.refvec_, response2.version_info()),
       EnvoyException,
-      "Unexpected RDS configuration (expecting foo_route_config): INVALID_NAME_FOR_route_config");
+      "Unexpected RDS configuration (expecting foo_route_config): "
+      "INVALID_NAME_FOR_route_config");
+
+  // Verify that the config is still the old value.
+  ASSERT_EQ(config_impl_pointer, rds_subscription->routeConfigProvider().value()->config());
 }
 
 // rds and vhds configurations change together

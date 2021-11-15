@@ -32,7 +32,6 @@ public:
   ProtobufTypes::MessagePtr createProto() const override;
 
   const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override;
-  const Protobuf::Message& validateConfig(const Protobuf::Message& rc) const override;
 
   const std::string& resourceName(const Protobuf::Message& rc) const override;
 
@@ -58,15 +57,10 @@ public:
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
         vhds_configuration_changed_(true) {}
 
-  void initializeRdsVhosts(const envoy::config::route::v3::RouteConfiguration& route_configuration);
   bool removeVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   bool updateVhosts(std::map<std::string, envoy::config::route::v3::VirtualHost>& vhosts,
                     const VirtualHostRefVector& added_vhosts);
-  void rebuildRouteConfig(
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-      const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
-      envoy::config::route::v3::RouteConfiguration& route_config);
   bool onDemandFetchFailed(const envoy::service::discovery::v3::Resource& resource) const;
 
   // Router::RouteConfigUpdateReceiver

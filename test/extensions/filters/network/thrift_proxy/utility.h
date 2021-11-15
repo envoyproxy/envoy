@@ -149,6 +149,7 @@ MATCHER_P(HasFrameSize, n, "") {
 
 MATCHER_P(HasProtocol, p, "") { return arg.hasProtocol() && arg.protocol() == p; }
 MATCHER_P(HasSequenceId, id, "") { return arg.hasSequenceId() && arg.sequenceId() == id; }
+MATCHER_P(HasHeaderFlags, flags, "") { return arg.hasHeaderFlags() && arg.headerFlags() == flags; }
 MATCHER(HasNoHeaders, "") { return arg.headers().size() == 0; }
 
 MATCHER_P2(HasAppException, t, m, "") {

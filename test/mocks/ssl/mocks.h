@@ -62,6 +62,7 @@ public:
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
+  MOCK_METHOD(const std::string&, alpn, (), (const));
 };
 
 class MockClientContext : public ClientContext {
@@ -167,6 +168,7 @@ public:
   MOCK_METHOD(envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
                   TrustChainVerification,
               trustChainVerification, (), (const));
+  MOCK_METHOD(bool, onlyVerifyLeafCertificateCrl, (), (const));
 };
 
 class MockPrivateKeyMethodManager : public PrivateKeyMethodManager {

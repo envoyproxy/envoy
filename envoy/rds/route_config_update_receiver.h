@@ -24,6 +24,7 @@ public:
    * @param rc supplies the RouteConfiguration.
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
+   * @throw EnvoyException if the new config can't be applied.
    */
   virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
 

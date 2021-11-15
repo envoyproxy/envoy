@@ -9,18 +9,11 @@ RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
       route_config_proto_(config_traits_.createProto()), last_config_hash_(0ull),
       config_(config_traits_.createConfig()) {}
 
-bool RouteConfigUpdateReceiverImpl::updateHash(const Protobuf::Message& rc) {
-  const uint64_t new_hash = MessageUtil::hash(rc);
-  if (new_hash == last_config_hash_) {
-    return false;
-  }
-  last_config_hash_ = new_hash;
-  return true;
-}
-
 void RouteConfigUpdateReceiverImpl::updateConfig(
     std::unique_ptr<Protobuf::Message>&& route_config_proto) {
   config_ = config_traits_.createConfig(*route_config_proto);
+  // If the above create config doesn't raise exception, update the
+  // other cached config entries.
   route_config_proto_ = std::move(route_config_proto);
 }
 
@@ -34,10 +27,12 @@ void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_in
 // Rds::RouteConfigUpdateReceiver
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
                                                 const std::string& version_info) {
-  if (!updateHash(rc)) {
+  uint64_t new_hash = getHash(rc);
+  if (!checkHash(new_hash)) {
     return false;
   }
   updateConfig(config_traits_.cloneProto(rc));
+  updateHash(new_hash);
   onUpdateCommon(version_info);
   return true;
 }

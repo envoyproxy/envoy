@@ -205,6 +205,7 @@ MD
 MERCHANTABILITY
 Merkle
 MGET
+MPTCP
 MQ
 MSDN
 MSET
@@ -1310,3 +1311,4 @@ ep
 suri
 transid
 routable
+vhosts

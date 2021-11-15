@@ -13,7 +13,9 @@ public:
   RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context);
 
-  bool updateHash(const Protobuf::Message& rc);
+  uint64_t getHash(const Protobuf::Message& rc) { return MessageUtil::hash(rc); }
+  bool checkHash(uint64_t new_hash) { return (new_hash != last_config_hash_); }
+  void updateHash(uint64_t hash) { last_config_hash_ = hash; }
   void updateConfig(std::unique_ptr<Protobuf::Message>&& route_config_proto);
   void onUpdateCommon(const std::string& version_info);
 

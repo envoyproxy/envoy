@@ -45,6 +45,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   }));
   ON_CALL(*this, socketPath()).WillByDefault(ReturnRef(socket_path_));
   ON_CALL(*this, socketMode()).WillByDefault(ReturnPointee(&socket_mode_));
+  ON_CALL(*this, statsTags()).WillByDefault(ReturnRef(stats_tags_));
 }
 
 MockOptions::~MockOptions() = default;
