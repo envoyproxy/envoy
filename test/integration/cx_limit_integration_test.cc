@@ -110,9 +110,6 @@ public:
     ASSERT_TRUE(tcp_clients.back()->connected());
 
     const bool isV4 = (version_ == Network::Address::IpVersion::v4);
-    auto local_address = isV4 ? Network::Utility::getCanonicalIpv4LoopbackAddress()
-                              : Network::Utility::getIpv6LoopbackAddress();
-
     const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
     test_server_->waitForCounterEq(counter_prefix + check_stat, 1);
@@ -224,9 +221,6 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
   ASSERT_TRUE(tcp_clients.back()->connected());
 
   const bool isV4 = (version_ == Network::Address::IpVersion::v4);
-  auto local_address = isV4 ? Network::Utility::getCanonicalIpv4LoopbackAddress()
-                            : Network::Utility::getIpv6LoopbackAddress();
-
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
   // listener_0 does not hit any connection limits
@@ -279,9 +273,6 @@ TEST_P(ConnectionLimitIntegrationTest, TestListenerLimitWithGlobalOptOut) {
   tcp_clients.pop_back();
 
   const bool isV4 = (version_ == Network::Address::IpVersion::v4);
-  auto local_address = isV4 ? Network::Utility::getCanonicalIpv4LoopbackAddress()
-                            : Network::Utility::getIpv6LoopbackAddress();
-
   const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
   // listener_0 does hits the listener connection limit

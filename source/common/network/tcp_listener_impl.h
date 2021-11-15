@@ -43,7 +43,7 @@ private:
   Random::RandomGenerator& random_;
   bool bind_to_port_;
   UnitFloat reject_fraction_;
-  bool ignore_global_conn_limit_;
+  const bool ignore_global_conn_limit_;
 };
 
 } // namespace Network

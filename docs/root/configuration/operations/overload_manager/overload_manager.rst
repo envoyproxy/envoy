@@ -162,7 +162,8 @@ Listeners can opt out of this global connection limit by setting
 to true. Similarly, you can opt out the admin listener by setting
 :ref:`Admin.ignore_global_conn_limit <envoy_v3_api_field_config.bootstrap.v3.Admin.ignore_global_conn_limit>`.
 You may want to opt out a listener to be able to probe Envoy or collect stats while it is otherwise at its
-connection limit.
+connection limit. Note that connections to listeners that opt out are still tracked and count towards the
+global limit.
 
 If it is desired to only limit the number of downstream connections for a particular listener,
 per-listener limits can be set via the :ref:`listener configuration <config_listeners>`.
