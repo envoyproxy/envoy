@@ -33,8 +33,7 @@ public:
 
   // Templated since MockStreamFilter and MockStreamEncoder filter doesn't share a mock base class.
   template <class T> void expectDelegatedEncoding(T& filter_mock) {
-    EXPECT_CALL(filter_mock,
-                encode100ContinueHeaders(HeaderMapEqualRef(&default_response_headers_)));
+    EXPECT_CALL(filter_mock, encode1xxHeaders(HeaderMapEqualRef(&default_response_headers_)));
     EXPECT_CALL(filter_mock, encodeHeaders(HeaderMapEqualRef(&default_response_headers_), false));
     EXPECT_CALL(filter_mock, encodeMetadata(_));
     EXPECT_CALL(filter_mock, encodeData(_, false));
@@ -57,7 +56,7 @@ public:
   }
 
   void doAllEncodingCallbacks() {
-    filter_.encode100ContinueHeaders(default_response_headers_);
+    filter_.encode1xxHeaders(default_response_headers_);
 
     filter_.encodeHeaders(default_response_headers_, false);
 

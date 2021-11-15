@@ -80,7 +80,7 @@ public:
   // allows execution of non-interrupted sequences of operations on the fake stream which may run
   // into trouble if client-side events are interleaved.
   void postToConnectionThread(std::function<void()> cb);
-  void encode100ContinueHeaders(const Http::ResponseHeaderMap& headers);
+  void encode1xxHeaders(const Http::ResponseHeaderMap& headers);
   void encodeHeaders(const Http::HeaderMap& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
@@ -461,6 +461,10 @@ public:
 
   // Should only be called for HTTP2 or above, sends a GOAWAY frame with ENHANCE_YOUR_CALM.
   void encodeProtocolError();
+
+  // Update the maximum number of concurrent streams. This is currently only
+  // supported for HTTP/3
+  void updateConcurrentStreams(uint64_t max_streams);
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {

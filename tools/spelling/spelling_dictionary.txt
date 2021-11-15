@@ -771,6 +771,7 @@ keyder
 kqueue
 kubernetes
 kv
+kvlist
 kvs
 lala
 latencies
@@ -1311,3 +1312,4 @@ ep
 suri
 transid
 routable
+vhosts
