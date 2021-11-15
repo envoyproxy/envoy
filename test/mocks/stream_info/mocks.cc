@@ -56,6 +56,7 @@ MockStreamInfo::MockStreamInfo()
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
   }));
+  ON_CALL(*this, downstreamTiming()).WillByDefault(ReturnRef(downstream_timing_));
   ON_CALL(*this, setUpstreamLocalAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {

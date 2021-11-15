@@ -92,7 +92,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), bytes_meter_(bytes_meter) {
+      is_response_to_connect_request_(false), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }

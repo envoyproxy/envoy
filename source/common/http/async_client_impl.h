@@ -378,7 +378,7 @@ private:
   }
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}
-  ResponseHeaderMapOptRef continueHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ResponseHeaderMapOptRef informationalHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
   ResponseHeaderMapOptRef responseHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

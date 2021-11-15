@@ -1,5 +1,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <regex>
