@@ -60,9 +60,11 @@ envoy_cc_test(
     tags = ["nofips"],
     deps = [
         "//source/common/quic:quic_filter_manager_connection_lib",
+        "//test/common/quic:quic_test_utils_for_envoy_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ],
 )
 
