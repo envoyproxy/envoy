@@ -100,6 +100,11 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 
 void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
                                                                    ares_addrinfo* addrinfo) {
+  if (status != ARES_SUCCESS) {
+    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+  }
+
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);

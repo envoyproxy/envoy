@@ -21,7 +21,7 @@ Api::IoCallUint64Result TestIoSocketHandle::writev(const Buffer::RawSlice* slice
       return std::move(result).value();
     }
   }
-  return IoSocketHandleImpl::writev(slices, num_slice);
+  return Test::IoSocketHandlePlatformImpl::writev(slices, num_slice);
 }
 
 IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen) {

@@ -1967,6 +1967,84 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   testUtilV2(test_options);
 }
 
+TEST_P(SslSocketTest, Pkcs12CertificatesWithPassword) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+
+  server_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12"));
+  server_cert->mutable_password()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"));
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
+      server_validation_ctx =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(TEST_PASSWORD_PROTECTED_CERT_256_HASH);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12"));
+  client_cert->mutable_password()->set_inline_string(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir "
+          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt")));
+
+  TestUtilOptionsV2 test_options(listener, client, true, GetParam());
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+                 .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_256_HASH));
+
+  // Works even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(test_options);
+}
+
+TEST_P(SslSocketTest, Pkcs12CertificatesWithoutPassword) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+
+  server_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"));
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
+      server_validation_ctx =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(TEST_SAN_DNS3_CERT_256_HASH);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"));
+
+  TestUtilOptionsV2 test_options(listener, client, true, GetParam());
+  testUtilV2(test_options.setExpectedServerCertDigest(TEST_SAN_DNS3_CERT_256_HASH));
+
+  // Works even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(test_options);
+}
+
 TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
   envoy::config::listener::v3::Listener listener;
   envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
@@ -4608,6 +4686,85 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, GetParam());
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
+  // The test checks that revoked certificate will makes the validation success even if we set
+  // only_verify_leaf_cert_crl to true.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits (But this test will succeed):
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+      only_verify_leaf_cert_crl: true
+)EOF";
+
+  // This should succeed, since the certificate has not been revoked.
+  const std::string unrevoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_key.pem"
+)EOF";
+
+  TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                  incomplete_server_ctx_yaml, true, GetParam());
+  testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
+  // The test checks that revoked certificate will makes the validation fails even if we set
+  // only_verify_leaf_cert_crl to true.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits (But this test will succeed):
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+      only_verify_leaf_cert_crl: true
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, incomplete_server_ctx_yaml,
+                                                false, GetParam());
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {

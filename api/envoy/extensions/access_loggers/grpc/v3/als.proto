@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.grpc.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
@@ -54,7 +55,7 @@ message TcpGrpcAccessLogConfig {
 }
 
 // Common configuration for gRPC access logs.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message CommonGrpcAccessLogConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.CommonGrpcAccessLogConfig";
@@ -86,4 +87,13 @@ message CommonGrpcAccessLogConfig {
   // <envoy_v3_api_field_data.accesslog.v3.AccessLogCommon.filter_state_objects>`.
   // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
   repeated string filter_state_objects_to_log = 5;
+
+  // Sets the retry policy when the establishment of a gRPC stream fails.
+  // If the stream succeeds once in establishing If the stream succeeds
+  // at least once in establishing itself, no retry will be performed
+  // no matter what gRPC status is received. Note that only
+  // :ref:`num_retries <envoy_v3_api_field_config.core.v3.RetryPolicy.num_retries>`
+  // will be used in this configuration. This feature is used only when you are using
+  // :ref:`Envoy gRPC client <envoy_v3_api_field_config.core.v3.GrpcService.envoy_grpc>`.
+  config.core.v3.RetryPolicy grpc_stream_retry_policy = 7;
 }

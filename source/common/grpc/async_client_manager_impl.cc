@@ -53,8 +53,9 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
                                                Api::Api& api, const StatNames& stat_names)
     : cm_(cm), tls_(tls), time_source_(time_source), api_(api), stat_names_(stat_names),
       raw_async_client_cache_(tls_) {
-  raw_async_client_cache_.set(
-      [](Event::Dispatcher&) { return std::make_shared<RawAsyncClientCache>(); });
+  raw_async_client_cache_.set([](Event::Dispatcher& dispatcher) {
+    return std::make_shared<RawAsyncClientCache>(dispatcher);
+  });
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
@@ -148,18 +149,58 @@ RawAsyncClientSharedPtr AsyncClientManagerImpl::getOrCreateRawAsyncClient(
   return client;
 }
 
-RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
-    const envoy::config::core::v3::GrpcService& config) const {
-  auto it = cache_.find(config);
-  if (it == cache_.end()) {
-    return nullptr;
-  }
-  return it->second;
+AsyncClientManagerImpl::RawAsyncClientCache::RawAsyncClientCache(Event::Dispatcher& dispatcher)
+    : dispatcher_(dispatcher) {
+  cache_eviction_timer_ = dispatcher.createTimer([this] { evictEntriesAndResetEvictionTimer(); });
 }
 
 void AsyncClientManagerImpl::RawAsyncClientCache::setCache(
     const envoy::config::core::v3::GrpcService& config, const RawAsyncClientSharedPtr& client) {
-  cache_[config] = client;
+  ASSERT(lru_map_.find(config) == lru_map_.end());
+  // Create a new cache entry at the beginning of the list.
+  lru_list_.emplace_front(config, client, dispatcher_.timeSource().monotonicTime());
+  lru_map_[config] = lru_list_.begin();
+  // If inserting to an empty cache, enable eviction timer.
+  if (lru_list_.size() == 1) {
+    evictEntriesAndResetEvictionTimer();
+  }
+}
+
+RawAsyncClientSharedPtr AsyncClientManagerImpl::RawAsyncClientCache::getCache(
+    const envoy::config::core::v3::GrpcService& config) {
+  auto it = lru_map_.find(config);
+  if (it == lru_map_.end()) {
+    return nullptr;
+  }
+  const auto cache_entry = it->second;
+  // Reset the eviction timer if the next entry to expire is accessed.
+  const bool should_reset_timer = (cache_entry == --lru_list_.end());
+  cache_entry->accessed_time_ = dispatcher_.timeSource().monotonicTime();
+  // Move the cache entry to the beginning of the list upon access.
+  lru_list_.splice(lru_list_.begin(), lru_list_, cache_entry);
+  // Get the cached async client before any cache eviction.
+  RawAsyncClientSharedPtr client = cache_entry->client_;
+  if (should_reset_timer) {
+    evictEntriesAndResetEvictionTimer();
+  }
+  return client;
+}
+
+void AsyncClientManagerImpl::RawAsyncClientCache::evictEntriesAndResetEvictionTimer() {
+  MonotonicTime now = dispatcher_.timeSource().monotonicTime();
+  // Evict all the entries that have expired.
+  while (!lru_list_.empty()) {
+    MonotonicTime next_expire = lru_list_.back().accessed_time_ + EntryTimeoutInterval;
+    if (now >= next_expire) {
+      // Erase the expired entry.
+      lru_map_.erase(lru_list_.back().config_);
+      lru_list_.pop_back();
+    } else {
+      cache_eviction_timer_->enableTimer(
+          std::chrono::duration_cast<std::chrono::seconds>(next_expire - now));
+      return;
+    }
+  }
 }
 
 } // namespace Grpc

@@ -76,9 +76,9 @@ public:
   }
   ~FilterConfigDiscoveryImplTest() override { factory_context_.thread_local_.shutdownThread(); }
 
-  DynamicFilterConfigProviderPtr createProvider(std::string name, bool warm,
-                                                bool default_configuration,
-                                                bool last_filter_config = true) {
+  DynamicFilterConfigProviderPtr<Http::FilterFactoryCb>
+  createProvider(std::string name, bool warm, bool default_configuration,
+                 bool last_filter_config = true) {
 
     EXPECT_CALL(init_manager_, add(_));
     envoy::config::core::v3::ExtensionConfigSource config_source;
@@ -121,8 +121,9 @@ type_urls:
     init_manager_.initialize(init_watcher_);
   }
 
-  std::unique_ptr<FilterConfigProviderManager> filter_config_provider_manager_;
-  DynamicFilterConfigProviderPtr provider_;
+  std::unique_ptr<FilterConfigProviderManager<Http::FilterFactoryCb>>
+      filter_config_provider_manager_;
+  DynamicFilterConfigProviderPtr<Http::FilterFactoryCb> provider_;
   Config::SubscriptionCallbacks* callbacks_{};
 };
 
