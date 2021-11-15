@@ -250,8 +250,37 @@ public:
     return ret->second;
   }
 
+  absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
+    return last_downstream_rx_byte_received_;
+  }
+  absl::optional<MonotonicTime> firstDownstreamTxByteSent() const {
+    return first_downstream_tx_byte_sent_;
+  }
+  absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
+    return last_downstream_tx_byte_sent_;
+  }
+
+  void onLastDownstreamRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_rx_byte_received_);
+    last_downstream_rx_byte_received_ = time_source.monotonicTime();
+  }
+  void onFirstDownstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!first_downstream_tx_byte_sent_);
+    first_downstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+  void onLastDownstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!last_downstream_tx_byte_sent_);
+    last_downstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+
 private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
+  // The time when the last byte of the request was received.
+  absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
+  // The time when the first byte of the response was sent downstream.
+  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  // The time when the last byte of the response was sent downstream.
+  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
 };
 
 // Measure the number of bytes sent and received for a stream.
@@ -380,11 +409,6 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
 
   /**
-   * Sets the time when the last byte of the request was received.
-   */
-  virtual void onLastDownstreamRxByteReceived() PURE;
-
-  /**
    * Sets the upstream timing information for this stream. This is useful for
    * when multiple upstream requests are issued and we want to save timing
    * information for the one that "wins".
@@ -422,23 +446,11 @@ public:
    */
   virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
 
-  // TODO(alyssawilk) move the downstream timing calls into DownstreamTiming in
-  // a follow-up.
-  /**
-   * Sets the time when the first byte of the response is sent downstream.
-   */
-  virtual void onFirstDownstreamTxByteSent() PURE;
-
   /**
    * @return the duration between the last byte of the response is sent downstream and the start of
    * the request.
    */
   virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
-
-  /**
-   * Sets the time when the last byte of the response is sent downstream.
-   */
-  virtual void onLastDownstreamTxByteSent() PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)

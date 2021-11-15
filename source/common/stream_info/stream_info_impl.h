@@ -76,12 +76,10 @@ struct StreamInfoImpl : public StreamInfo {
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
-    return duration(last_downstream_rx_byte_received);
-  }
-
-  void onLastDownstreamRxByteReceived() override {
-    ASSERT(!last_downstream_rx_byte_received);
-    last_downstream_rx_byte_received = time_source_.monotonicTime();
+    if (!downstream_timing_.has_value()) {
+      return absl::nullopt;
+    }
+    return duration(downstream_timing_.value().lastDownstreamRxByteReceived());
   }
 
   void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
@@ -105,21 +103,17 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    return duration(first_downstream_tx_byte_sent_);
-  }
-
-  void onFirstDownstreamTxByteSent() override {
-    ASSERT(!first_downstream_tx_byte_sent_);
-    first_downstream_tx_byte_sent_ = time_source_.monotonicTime();
+    if (!downstream_timing_.has_value()) {
+      return absl::nullopt;
+    }
+    return duration(downstream_timing_.value().firstDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    return duration(last_downstream_tx_byte_sent_);
-  }
-
-  void onLastDownstreamTxByteSent() override {
-    ASSERT(!last_downstream_tx_byte_sent_);
-    last_downstream_tx_byte_sent_ = time_source_.monotonicTime();
+    if (!downstream_timing_.has_value()) {
+      return absl::nullopt;
+    }
+    return duration(downstream_timing_.value().lastDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -319,10 +313,6 @@ struct StreamInfoImpl : public StreamInfo {
   TimeSource& time_source_;
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
-
-  absl::optional<MonotonicTime> last_downstream_rx_byte_received;
-  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> final_time_;
 
   absl::optional<Http::Protocol> protocol_;

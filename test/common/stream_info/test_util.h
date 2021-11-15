@@ -107,10 +107,6 @@ public:
     return duration(last_rx_byte_received_);
   }
 
-  void onLastDownstreamRxByteReceived() override {
-    last_rx_byte_received_ = timeSystem().monotonicTime();
-  }
-
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
@@ -127,19 +123,11 @@ public:
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    return duration(first_downstream_tx_byte_sent_);
-  }
-
-  void onFirstDownstreamTxByteSent() override {
-    first_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.firstDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    return duration(last_downstream_tx_byte_sent_);
-  }
-
-  void onLastDownstreamTxByteSent() override {
-    last_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.lastDownstreamTxByteSent());
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
@@ -245,12 +233,6 @@ public:
 
   Envoy::StreamInfo::DownstreamTiming downstream_timing_;
   absl::optional<MonotonicTime> last_rx_byte_received_;
-  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> end_time_;
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
