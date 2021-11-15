@@ -260,7 +260,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
   void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
-  ResponseHeaderMapOptRef continueHeaders() const override;
+  ResponseHeaderMapOptRef informationalHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
   ResponseHeaderMapOptRef responseHeaders() const override;
@@ -407,10 +407,10 @@ public:
   virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
 
   /**
-   * Passes ownership of received continue headers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received informational headers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
-  virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void setInformationalHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
    * Passes ownership of received response headers to the parent. This may be called multiple times
@@ -443,9 +443,9 @@ public:
   virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
-   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
+   * Retrieves a pointer to the continue headers set via the call to setInformationalHeaders.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() PURE;
 
   /**
    * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.

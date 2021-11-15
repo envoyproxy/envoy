@@ -116,6 +116,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
+    // TODO(birenroy): flip to true in a future PR to enable by default
+    "envoy.reloadable_features.http2_new_codec_wrapper",
 };
 
 RuntimeFeatures::RuntimeFeatures() {
