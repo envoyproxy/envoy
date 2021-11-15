@@ -29,6 +29,7 @@ class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::I
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                  const bool use_resolvers_as_fallback,
                   const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
   ~DnsResolverImpl() override;
 
@@ -108,6 +109,7 @@ private:
 
   static absl::optional<std::string>
   maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+  static std::vector<in_addr> maybeBuildResolversVector(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);
@@ -128,6 +130,8 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
+  const bool use_resolvers_as_fallback_;
+  std::vector<in_addr> resolvers_vector_;
   const absl::optional<std::string> resolvers_csv_;
 };
 

@@ -23,6 +23,8 @@ message CaresDnsResolverConfig {
   // (e.g., /etc/resolv.conf) will be used.
   repeated config.core.v3.Address resolvers = 1 [(validate.rules).repeated = {min_items: 1}];
 
+  bool use_resolvers_as_fallback = 3;
+
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
   config.core.v3.DnsResolverOptions dns_resolver_options = 2;
 }
