@@ -298,10 +298,14 @@ private:
     UdpProxyUpstreamStats cluster_stats_;
 
   protected:
-    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                 const Upstream::HostConstSharedPtr& host);
-    virtual ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-                                      const Upstream::HostConstSharedPtr& host) const PURE;
+    using HostConstSharedPtrOptConstRef =
+        absl::optional<std::reference_wrapper<const Upstream::HostConstSharedPtr>>;
+
+    ActiveSession*
+    createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                  const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt);
+    Upstream::HostConstSharedPtr
+    chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
 
   private:
     static UdpProxyUpstreamStats generateStats(Stats::Scope& scope) {
@@ -309,9 +313,14 @@ private:
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
     void removeHostSessions(const Upstream::HostConstSharedPtr& host);
+    ActiveSession* createSessionWithHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                         const Upstream::HostConstSharedPtr& host);
 
     virtual void storeSession(ActiveSessionPtr session) PURE;
     virtual void removeSessionFromStorage(const ActiveSession* session) PURE;
+    virtual ActiveSession*
+    getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+               const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const PURE;
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
@@ -329,8 +338,6 @@ private:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
     ~StickySessionClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
-    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-                              const Upstream::HostConstSharedPtr& host) const override;
 
   private:
     absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
@@ -339,6 +346,9 @@ private:
 
     void storeSession(ActiveSessionPtr session) override;
     void removeSessionFromStorage(const ActiveSession* session) override;
+    ActiveSession*
+    getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+               const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const override;
   };
 
   /**
@@ -351,8 +361,6 @@ private:
                                       Upstream::ThreadLocalCluster& cluster);
     ~PerPacketLoadBalancingClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
-    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-                              const Upstream::HostConstSharedPtr& host) const override;
 
   private:
     absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHashWithUpstreamHost,
@@ -361,6 +369,8 @@ private:
 
     void storeSession(ActiveSessionPtr session) override;
     void removeSessionFromStorage(const ActiveSession* session) override;
+    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
+                              const HostConstSharedPtrOptConstRef& optional_host) const override;
   };
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
