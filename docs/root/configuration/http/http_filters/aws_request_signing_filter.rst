@@ -43,9 +43,9 @@ Example filter configuration:
     region: us-west-2
     use_unsigned_payload: true
     match_excluded_headers:
-        - prefix: x-envoy
-        - prefix: x-forwarded
-        - exact: x-amzn-trace-id
+    - prefix: x-envoy
+    - prefix: x-forwarded
+    - exact: x-amzn-trace-id
 
 
 Statistics
