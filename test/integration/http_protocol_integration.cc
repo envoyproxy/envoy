@@ -12,13 +12,25 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
     for (auto downstream_protocol : downstream_protocols) {
       for (auto upstream_protocol : upstream_protocols) {
 #ifdef ENVOY_ENABLE_QUIC
-        ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
+        ret.push_back(
+            HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, false});
+        if (downstream_protocol == Http::CodecType::HTTP2 ||
+            upstream_protocol == Http::CodecType::HTTP2) {
+          ret.push_back(
+              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, true});
+        }
 #else
         if (downstream_protocol == Http::CodecType::HTTP3 ||
             upstream_protocol == Http::CodecType::HTTP3) {
           ENVOY_LOG_MISC(warn, "Skipping HTTP/3 as support is compiled out");
         } else {
-          ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol});
+          ret.push_back(
+              HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, false});
+          if (downstream_protocol == Http::CodecType::HTTP2 ||
+              upstream_protocol == Http::CodecType::HTTP2) {
+            ret.push_back(
+                HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol, true});
+          }
         }
 #endif
       }
@@ -55,7 +67,8 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
     const ::testing::TestParamInfo<HttpProtocolTestParams>& params) {
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
-                      upstreamToString(params.param.upstream_protocol));
+                      upstreamToString(params.param.upstream_protocol),
+                      params.param.http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2");
 }
 
 void HttpProtocolIntegrationTest::expectUpstreamBytesSentAndReceived(

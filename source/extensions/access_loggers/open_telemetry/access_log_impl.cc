@@ -9,22 +9,45 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
-#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/utility.h"
+#include "source/extensions/access_loggers/open_telemetry/substitution_formatter.h"
 
 #include "opentelemetry/proto/collector/logs/v1/logs_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
 #include "opentelemetry/proto/logs/v1/logs.pb.h"
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
+// Used to pack/unpack the body AnyValue to a KeyValueList.
+const char BODY_KEY[] = "body";
+
 namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace OpenTelemetry {
+
+namespace {
+
+// Packing the body "AnyValue" to a "KeyValueList" with a single key and the body as value.
+::opentelemetry::proto::common::v1::KeyValueList
+packBody(const ::opentelemetry::proto::common::v1::AnyValue& body) {
+  ::opentelemetry::proto::common::v1::KeyValueList output;
+  auto* kv = output.add_values();
+  kv->set_key(BODY_KEY);
+  *kv->mutable_value() = body;
+  return output;
+}
+
+::opentelemetry::proto::common::v1::AnyValue
+unpackBody(const ::opentelemetry::proto::common::v1::KeyValueList& value) {
+  ASSERT(value.values().size() == 1 && value.values(0).key() == BODY_KEY);
+  return value.values(0).value();
+}
+
+} // namespace
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     referer_handle(Http::CustomHeaders::get().Referer);
@@ -45,13 +68,12 @@ AccessLog::AccessLog(
         config.common_config(), Common::GrpcAccessLoggerType::HTTP));
   });
 
-  ProtobufWkt::Struct body_format;
-  MessageUtil::jsonConvert(config.body(), body_format);
-  body_formatter_ = std::make_unique<Formatter::StructFormatter>(body_format, false, false);
-  ProtobufWkt::Struct attributes_format;
-  MessageUtil::jsonConvert(config.attributes(), attributes_format);
-  attributes_formatter_ =
-      std::make_unique<Formatter::StructFormatter>(attributes_format, false, false);
+  // Packing the body "AnyValue" to a "KeyValueList" only if it's not empty, otherwise the
+  // formatter would fail to parse it.
+  if (config.body().value_case() != ::opentelemetry::proto::common::v1::AnyValue::VALUE_NOT_SET) {
+    body_formatter_ = std::make_unique<OpenTelemetryFormatter>(packBody(config.body()));
+  }
+  attributes_formatter_ = std::make_unique<OpenTelemetryFormatter>(config.attributes());
 }
 
 void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
@@ -62,16 +84,16 @@ void AccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
   log_entry.set_time_unix_nano(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                    stream_info.startTime().time_since_epoch())
                                    .count());
-  const auto formatted_body = body_formatter_->format(
-      request_headers, response_headers, response_trailers, stream_info, absl::string_view());
-  MessageUtil::jsonConvert(formatted_body, ProtobufMessage::getNullValidationVisitor(),
-                           *log_entry.mutable_body());
+
+  // Unpacking the body "KeyValueList" to "AnyValue".
+  if (body_formatter_) {
+    const auto formatted_body = unpackBody(body_formatter_->format(
+        request_headers, response_headers, response_trailers, stream_info, absl::string_view()));
+    *log_entry.mutable_body() = formatted_body;
+  }
   const auto formatted_attributes = attributes_formatter_->format(
       request_headers, response_headers, response_trailers, stream_info, absl::string_view());
-  opentelemetry::proto::common::v1::KeyValueList attributes;
-  MessageUtil::jsonConvert(formatted_attributes, ProtobufMessage::getNullValidationVisitor(),
-                           attributes);
-  *log_entry.mutable_attributes() = attributes.values();
+  *log_entry.mutable_attributes() = formatted_attributes.values();
 
   tls_slot_->getTyped<ThreadLocalLogger>().logger_->log(std::move(log_entry));
 }
