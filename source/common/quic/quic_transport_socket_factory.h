@@ -108,7 +108,7 @@ public:
     return fallback_factory_->createTransportSocket(options);
   }
 
-  Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
+  virtual Envoy::Ssl::ClientContextSharedPtr sslCtx() { return fallback_factory_->sslCtx(); }
 
   const Ssl::ClientContextConfig& clientContextConfig() const {
     return fallback_factory_->config();

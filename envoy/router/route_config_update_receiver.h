@@ -27,6 +27,7 @@ public:
    * @param rc supplies the RouteConfiguration.
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
+   * @throw EnvoyException if the new config can't be applied.
    */
   virtual bool onRdsUpdate(const envoy::config::route::v3::RouteConfiguration& rc,
                            const std::string& version_info) PURE;

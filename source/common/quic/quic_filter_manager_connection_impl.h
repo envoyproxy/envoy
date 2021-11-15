@@ -31,7 +31,8 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;

@@ -28,7 +28,7 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    # TODO(#9953) move echo integration test to extensions.
+    # The echo filter is used in integration tests which don't need an upstream.
     extra_visibility = [
         "//test/integration:__subpackages__",
     ],
