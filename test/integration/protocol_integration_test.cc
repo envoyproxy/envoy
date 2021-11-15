@@ -3274,6 +3274,65 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
                                        BytesCountExpectation(177, 173, 68, 64));
 }
 
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseDownstream) {
+  // We only care about the downstream protocol.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const int request_size = 100;
+  const int response_size = 100;
+
+  // Send first request on the connection
+  auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_one.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(177, 137, 68, 28), 0);
+
+  // Reuse connection, send the second request on the connection.
+  auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_two.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(148, 137, 15, 27), 1);
+}
+
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
+  // We only care about the upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto second_client = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const int request_size = 100;
+  const int response_size = 100;
+
+  // Send to the same upstream from the two clients.
+  auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
+                                     BytesCountExpectation(223, 122, 114, 13), 0);
+
+  // Swap clients so the other connection is used to send the request.
+  std::swap(codec_client_, second_client);
+  auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
+                                     BytesCountExpectation(167, 119, 58, 10), 1);
+  second_client->close();
+}
+
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
   // we only care about upstream protocol.
   if (downstreamProtocol() != Http::CodecType::HTTP2) {
