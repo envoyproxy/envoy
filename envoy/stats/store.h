@@ -133,7 +133,7 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Set the predicates to filter stats for sink.
+   * Set predicates for filtering stats to be flushed to sinks.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 };

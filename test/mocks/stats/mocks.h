@@ -271,7 +271,6 @@ public:
   MOCK_METHOD(bool, includeCounter, (const Counter&));
   MOCK_METHOD(bool, includeGauge, (const Gauge&));
   MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
-  MOCK_METHOD(bool, includeHistogram, (const Histogram& histogram));
 };
 
 class MockStore : public TestUtil::TestStore {

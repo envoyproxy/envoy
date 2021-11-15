@@ -1567,21 +1567,6 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class SinkPredicatesImpl : public SinkPredicates {
-public:
-  ~SinkPredicatesImpl() override = default;
-  absl::flat_hash_set<std::string>& sinkedStatNames() { return sinked_stat_names_; }
-  bool includeCounter(const Counter&) override { return false; }
-  bool includeGauge(const Gauge&) override { return false; }
-  bool includeTextReadout(const TextReadout&) override { return false; }
-  bool includeHistogram(const Histogram& histogram) override {
-    return sinked_stat_names_.find(histogram.tagExtractedName()) != sinked_stat_names_.end();
-  }
-
-private:
-  absl::flat_hash_set<std::string> sinked_stat_names_;
-};
-
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
                                        public ThreadLocalStoreNoMocksTestBase {
 protected:
