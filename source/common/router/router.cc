@@ -454,7 +454,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
   if (request_vcluster_) {
-    std::string vc_name = config_.scope_.symbolTable().toString(request_vcluster_->statName());
+    const std::string& vc_name =
+        config_.scope_.symbolTable().toString(request_vcluster_->statName());
     callbacks_->streamInfo().setVirtualClusterName(vc_name);
   }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,

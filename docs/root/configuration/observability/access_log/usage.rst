@@ -385,7 +385,11 @@ The following command operators are supported:
   Name of the route.
 
 %VIRTUAL_CLUSTER_NAME%
-  Name of the matched Virtual Cluster (if any).
+  HTTP
+    Name of the matched Virtual Cluster (if any).
+
+  TCP
+    Not implemented ("-")
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).

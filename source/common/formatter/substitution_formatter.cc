@@ -957,7 +957,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          std::string virtual_cluster_name = stream_info.getVirtualClusterName();
+          const std::string& virtual_cluster_name = stream_info.getVirtualClusterName();
           if (!virtual_cluster_name.empty()) {
             result = virtual_cluster_name;
           }
