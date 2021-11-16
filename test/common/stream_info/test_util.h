@@ -137,6 +137,7 @@ public:
   void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
   }
+  Envoy::StreamInfo::UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
@@ -232,6 +233,9 @@ public:
   }
   virtual std::shared_ptr<Envoy::StreamInfo::UpstreamInfo> upstreamInfo() override {
     return upstream_info_;
+  }
+  virtual OptRef<const Envoy::StreamInfo::UpstreamInfo> upstreamInfo() const override {
+    return *upstream_info_;
   }
 
   Random::RandomGeneratorImpl random_;

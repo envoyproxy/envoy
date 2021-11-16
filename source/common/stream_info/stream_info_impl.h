@@ -34,15 +34,10 @@ const ReplacementMap& emptySpaceReplacement() {
 
 } // namespace
 
-
 struct UpstreamInfoImpl : public UpstreamInfo {
-  void setUpstreamConnectionId(uint64_t id) override {
-    upstream_connection_id_ = id;
-  }
+  void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
 
-  absl::optional<uint64_t> upstreamConnectionId() const override {
-    return upstream_connection_id_;
-  }
+  absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
   void
   setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
@@ -55,9 +50,8 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
   }
-  const UpstreamTiming& upstreamTiming() override {
-    return upstream_timing_;
-  }
+  UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
+  const UpstreamTiming& upstreamTiming() const override { return upstream_timing_; }
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     return upstream_local_address_;
   }
@@ -82,6 +76,13 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   }
 
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override { return upstream_host_; }
+
+  void dumpState(std::ostream& os, int indent_level = 0) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    // TODO(alyssawilk) dump upstream info.
+    os << spaces << "UpstreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
+       << "\n";
+  }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
@@ -159,13 +160,18 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_info_->setUpstreamTiming(upstream_timing);
   }
 
-  virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override {
-    upstream_info_ = info;
+  void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override { upstream_info_ = info; }
+  std::shared_ptr<UpstreamInfo> upstreamInfo() override { return upstream_info_; }
+  OptRef<const UpstreamInfo> upstreamInfo() const override {
+    if (!upstream_info_) {
+      return {};
+    }
+    return *upstream_info_;
   }
-  virtual std::shared_ptr<UpstreamInfo> upstreamInfo() override {
-    return upstream_info_;
+  UpstreamTiming& upstreamTiming() override {
+    maybeCreateUpstreamInfo();
+    return upstream_info_->upstreamTiming();
   }
-
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     if (!upstream_info_) {
@@ -372,10 +378,10 @@ struct StreamInfoImpl : public StreamInfo {
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     // TODO(alyssawilk) dump upstream info.
-    os << spaces << "StreamInfoImpl " << this
-       << DUMP_OPTIONAL_MEMBER(protocol_) << DUMP_OPTIONAL_MEMBER(response_code_)
-       << DUMP_OPTIONAL_MEMBER(response_code_details_) << DUMP_OPTIONAL_MEMBER(attempt_count_)
-       << DUMP_MEMBER(health_check_request_) << DUMP_MEMBER(route_name_) << "\n";
+    os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
+       << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
+       << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
+       << DUMP_MEMBER(route_name_) << "\n";
   }
 
   void setUpstreamClusterInfo(
@@ -458,7 +464,6 @@ private:
                                                  ? downstream_connection_info_provider
                                                  : emptyDownstreamAddressProvider()),
         trace_reason_(Tracing::Reason::NotTraceable) {}
-
 
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};

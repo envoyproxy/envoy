@@ -232,10 +232,27 @@ struct UpstreamTiming {
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
+  void onUpstreamConnectStart(TimeSource& time_source) {
+    ASSERT(!upstream_connect_start_);
+    upstream_connect_start_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamConnectComplete(TimeSource& time_source) {
+    upstream_connect_complete_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamHandshakeComplete(TimeSource& time_source) {
+    upstream_handshake_complete_ = time_source.monotonicTime();
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+
+  absl::optional<MonotonicTime> upstream_connect_start_;
+  absl::optional<MonotonicTime> upstream_connect_complete_;
+  absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 class DownstreamTiming {
@@ -296,8 +313,18 @@ using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 // TODO(alyssawilk) after landing this, remove all the duplicate getters and
 // setters from StreamInfo.
 class UpstreamInfo {
- public:
+public:
   virtual ~UpstreamInfo() = default;
+
+  /**
+   * Dump the upstream info to the specified ostream.
+   *
+   * @param os the ostream to dump state to
+   * @param indent_level the depth, for pretty-printing.
+   *
+   * This function is called on Envoy fatal errors so should avoid memory allocation.
+   */
+  virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
 
   /**
    * @param connection ID of the upstream connection.
@@ -331,7 +358,8 @@ class UpstreamInfo {
   /*
    * @return the upstream timing for this stream
    * */
-  virtual const UpstreamTiming& upstreamTiming() PURE;
+  virtual UpstreamTiming& upstreamTiming() PURE;
+  virtual const UpstreamTiming& upstreamTiming() const PURE;
 
   /**
    * @param upstream_local_address sets the local address of the upstream connection. Note that it
@@ -487,8 +515,23 @@ public:
    */
   virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
 
+  /**
+   * Sets the upstream information for this stream.
+   */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
+
+  /**
+   * Returns the upstream information for this stream.
+   */
   virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
+  virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
+
+  /**
+   * Returns the upstream timing information for this stream.
+   * It is not expected that the fields in upstreamTiming() will be set until
+   * the upstream request is complete.
+   */
+  virtual UpstreamTiming& upstreamTiming() PURE;
 
   /**
    * @return the duration between the first byte of the request was sent upstream and the start of

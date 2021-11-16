@@ -47,6 +47,12 @@ void FakeConnectionSocket::setRequestedServerName(absl::string_view server_name)
 
 absl::string_view FakeConnectionSocket::requestedServerName() const { return server_name_; }
 
+void FakeConnectionSocket::setJA3Hash(absl::string_view ja3_hash) {
+  ja3_hash_ = std::string(ja3_hash);
+}
+
+absl::string_view FakeConnectionSocket::ja3Hash() const { return ja3_hash_; }
+
 Api::SysCallIntResult FakeConnectionSocket::getSocketOption([[maybe_unused]] int level, int,
                                                             [[maybe_unused]] void* optval,
                                                             socklen_t*) const {
