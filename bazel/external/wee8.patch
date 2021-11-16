@@ -1,5 +1,4 @@
 # 1. Fix linking with unbundled toolchain on macOS.
-# 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix linking with MSAN.
 # 4. Fix build with LLVM/Clang versions older than 13.0.0.
 --- build/toolchain/gcc_toolchain.gni
@@ -22,17 +21,6 @@
          # the "--start-group .. --end-group" feature isn't available on the aix ld.
          start_group_flag = "-Wl,--start-group"
          end_group_flag = "-Wl,--end-group "
---- src/objects/backing-store.cc
-+++ src/objects/backing-store.cc
-@@ -47,7 +47,7 @@ constexpr size_t kAddressSpaceLimit = 0x8000000000L;  // 512 GiB
- // RISC-V64 has a user space of 256GB on the Sv39 scheme.
- constexpr size_t kAddressSpaceLimit = 0x4000000000L;  // 256 GiB
- #elif V8_TARGET_ARCH_64_BIT
--constexpr size_t kAddressSpaceLimit = 0x10100000000L;  // 1 TiB + 4 GiB
-+constexpr size_t kAddressSpaceLimit = 0x400100000000L; // 64 TiB + 4 GiB
- #else
- constexpr size_t kAddressSpaceLimit = 0xC0000000;  // 3 GiB
- #endif
 --- build/config/sanitizers/sanitizers.gni
 +++ build/config/sanitizers/sanitizers.gni
 @@ -158,7 +158,7 @@ if (!is_a_target_toolchain) {
