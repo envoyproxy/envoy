@@ -479,9 +479,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
 
   // We expect FilterState and resolution times to be populated
   EXPECT_TRUE(
-      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::dnsStart()).has_value());
+      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::DNS_START).has_value());
   EXPECT_TRUE(
-      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::dnsEnd()).has_value());
+      callbacks_.streamInfo().downstreamTiming().getValue(ProxyFilter::DNS_END).has_value());
 
   const StreamInfo::UpstreamAddress& updated_address_obj =
       filter_state->getDataReadOnly<StreamInfo::UpstreamAddress>(
