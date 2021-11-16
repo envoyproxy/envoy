@@ -73,7 +73,7 @@ void FakeStream::postToConnectionThread(std::function<void()> cb) {
   parent_.postToConnectionThread(cb);
 }
 
-void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
+void FakeStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   postToConnectionThread([this, headers_copy]() -> void {
@@ -84,7 +84,7 @@ void FakeStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers
         return;
       }
     }
-    encoder_.encode100ContinueHeaders(*headers_copy);
+    encoder_.encode1xxHeaders(*headers_copy);
   });
 }
 

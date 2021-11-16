@@ -354,6 +354,7 @@ envoy_cc_test(
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
         "//test/mocks/http:http_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
@@ -527,7 +528,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 5,
+    shard_count = 10,
     deps = [
         ":protocol_integration_test_lib",
     ],
@@ -546,6 +547,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:encoder_decoder_buffer_filter_lib",
         "//test/integration/filters:random_pause_filter_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -998,24 +1000,6 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_test(
-    name = "echo_integration_test",
-    srcs = [
-        "echo_integration_test.cc",
-    ],
-    tags = [
-        # Uncomment this line to run this test repeatedly in exclusive mode if not using docker-sandbox,
-        # or RBE, see comments in AddRemoveListener.
-        # "exclusive",
-    ],
-    deps = [
-        ":integration_lib",
-        "//source/extensions/filters/network/echo:config",
-        "//test/server:utility_lib",
-        "//test/test_common:utility_lib",
     ],
 )
 
@@ -1553,6 +1537,13 @@ envoy_cc_test_library(
 envoy_cc_fuzz_test(
     name = "h2_capture_fuzz_test",
     srcs = ["h2_capture_fuzz_test.cc"],
+    corpus = "h2_corpus",
+    deps = [":h2_fuzz_lib"],
+)
+
+envoy_cc_fuzz_test(
+    name = "h2_wrapped_capture_fuzz_test",
+    srcs = ["h2_wrapped_capture_fuzz_test.cc"],
     corpus = "h2_corpus",
     deps = [":h2_fuzz_lib"],
 )

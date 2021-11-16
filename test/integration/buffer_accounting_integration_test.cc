@@ -26,13 +26,14 @@ namespace {
 using testing::HasSubstr;
 
 std::string protocolTestParamsAndBoolToString(
-    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
-  return fmt::format("{}_{}",
+    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool, bool>>& params) {
+  return fmt::format("{}_{}_{}",
                      HttpProtocolIntegrationTest::protocolTestParamsToString(
                          ::testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(params.param),
                                                                           /*an_index=*/0)),
                      std::get<1>(params.param) ? "with_per_stream_buffer_accounting"
-                                               : "without_per_stream_buffer_accounting");
+                                               : "without_per_stream_buffer_accounting",
+                     std::get<2>(params.param) ? "WrappedHttp2" : "BareHttp2");
 }
 
 void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
@@ -66,7 +67,7 @@ void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::funct
 
 class Http2BufferWatermarksTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   std::vector<IntegrationStreamDecoderPtr>
@@ -99,7 +100,9 @@ public:
     } else {
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
-
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
@@ -138,7 +141,7 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2BufferWatermarksTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 // We should create four buffers each billing the same downstream request's
@@ -274,7 +277,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
 // up notifying the BufferMemoryAccount when the dtor of the downstream stream
 // occurs.
 class ProtocolsBufferWatermarksTest
-    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   ProtocolsBufferWatermarksTest()
@@ -289,6 +292,9 @@ public:
     } else {
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
@@ -304,7 +310,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                          {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 TEST_P(ProtocolsBufferWatermarksTest, AccountShouldBeRegisteredAndUnregisteredOnce) {
@@ -429,7 +435,7 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2OverloadManagerIntegrationTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 TEST_P(Http2OverloadManagerIntegrationTest,

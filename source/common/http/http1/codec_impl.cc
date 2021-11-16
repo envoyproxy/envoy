@@ -93,7 +93,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
       is_response_to_connect_request_(false), envoy_stream_complete_(false),
-      encode_complete_(false), bytes_meter_(bytes_meter) {
+      encode_complete_(false), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }
@@ -127,8 +127,8 @@ void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::strin
   }
 }
 
-void ResponseEncoderImpl::encode100ContinueHeaders(const ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
+  ASSERT(HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
@@ -1359,8 +1359,8 @@ Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {
       }
     }
 
-    if (parser_->statusCode() == enumToInt(Http::Code::Continue)) {
-      pending_response_.value().decoder_->decode100ContinueHeaders(std::move(headers));
+    if (HeaderUtility::isSpecial1xx(*headers)) {
+      pending_response_.value().decoder_->decode1xxHeaders(std::move(headers));
     } else if (cannotHaveBody() && !handling_upgrade_) {
       deferred_end_stream_headers_ = true;
     } else {
