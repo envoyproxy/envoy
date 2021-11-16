@@ -191,7 +191,7 @@ static_resources:
             trusted_ca:
               filename: certs/cacert.pem
             match_typed_subject_alt_names:
-            - san_type: URI
+            - san_type: DNS
               matcher:
                 exact: "collector-grpc.lightstep.com"
 flags_path: "/etc/envoy/flags"

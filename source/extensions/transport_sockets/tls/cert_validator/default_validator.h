@@ -19,6 +19,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -56,7 +57,7 @@ public:
   // Utility functions.
   Envoy::Ssl::ClientValidationStatus
   verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
-                    const std::vector<Envoy::Ssl::SanMatcherPtr>& subject_alt_name_matchers);
+                    const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -98,9 +99,8 @@ public:
    * @param subject_alt_name_matchers the configured matchers to match
    * @return true if the verification succeeds
    */
-  static bool
-  matchSubjectAltName(X509* cert,
-                      const std::vector<Envoy::Ssl::SanMatcherPtr>& subject_alt_name_matchers);
+  static bool matchSubjectAltName(X509* cert,
+                                  const std::vector<SanMatcherPtr>& subject_alt_name_matchers);
 
 private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
@@ -110,7 +110,7 @@ private:
   bool allow_untrusted_certificate_{false};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
-  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers_;
+  std::vector<SanMatcherPtr> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
   bool verify_trusted_ca_{false};

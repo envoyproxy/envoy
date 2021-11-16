@@ -17,6 +17,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"
@@ -67,7 +68,7 @@ private:
   bool allow_expired_certificate_{false};
   std::vector<bssl::UniquePtr<X509>> ca_certs_;
   std::string ca_file_name_;
-  std::vector<Envoy::Ssl::SanMatcherPtr> subject_alt_name_matchers_{};
+  std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
   absl::flat_hash_map<std::string, X509StorePtr> trust_bundle_stores_;
 
   SslStats& stats_;

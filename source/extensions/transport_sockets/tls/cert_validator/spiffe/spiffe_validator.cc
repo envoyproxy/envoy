@@ -12,7 +12,6 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -43,6 +42,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
           envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI) {
         // Only match against URI SAN since SPIFFE specification does not restrict values in other
         // SAN types. See the discussion: https://github.com/envoyproxy/envoy/issues/15392
+        // TODO(pradeepcrao): Throw an exception when a non-URI matcher is encountered after the
+        // deprecated field match_subject_alt_names is removed
         subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
       }
     }

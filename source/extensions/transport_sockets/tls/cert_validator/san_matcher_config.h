@@ -10,7 +10,6 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
 
 #include "openssl/x509v3.h"
@@ -20,27 +19,30 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-template <int general_name_type> class StringSanMatcher : public Envoy::Ssl::SanMatcher {
+/** Interface to verify if there is a match in a list of subject alternative
+ * names.
+ */
+class SanMatcher {
 public:
-  bool match(const GENERAL_NAME* general_name) const override {
-    return general_name->type == general_name_type &&
-           DefaultCertValidator::verifySubjectAltName(general_name, matcher_);
-  }
+  virtual bool match(GENERAL_NAME const*) const PURE;
+  virtual ~SanMatcher() = default;
+};
 
+using SanMatcherPtr = std::unique_ptr<SanMatcher>;
+
+class StringSanMatcher : public SanMatcher {
+public:
+  bool match(const GENERAL_NAME* general_name) const override;
   ~StringSanMatcher() override = default;
-
-  StringSanMatcher(envoy::type::matcher::v3::StringMatcher matcher) : matcher_(matcher) {}
+  StringSanMatcher(int general_name_type, envoy::type::matcher::v3::StringMatcher matcher)
+      : general_name_type_(general_name_type), matcher_(matcher) {}
 
 private:
+  const int general_name_type_;
   const Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> matcher_;
 };
 
-using DnsSanMatcher = StringSanMatcher<GEN_DNS>;
-using EmailSanMatcher = StringSanMatcher<GEN_EMAIL>;
-using UriSanMatcher = StringSanMatcher<GEN_URI>;
-using IpAddSanMatcher = StringSanMatcher<GEN_IPADD>;
-
-Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
+SanMatcherPtr createStringSanMatcher(
     const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher);
 
 } // namespace Tls

@@ -6,38 +6,14 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/typed_config.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "absl/types/optional.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Ssl {
-
-/** Interface to verify if there is a match in a list of subject alternative
- * names.
- */
-class SanMatcher {
-public:
-  virtual bool match(GENERAL_NAME const*) const PURE;
-  virtual ~SanMatcher() = default;
-};
-
-using SanMatcherPtr = std::unique_ptr<SanMatcher>;
-
-class SanMatcherFactory : public Config::TypedFactory {
-public:
-  ~SanMatcherFactory() override = default;
-
-  virtual SanMatcherPtr
-  createSanMatcher(const envoy::config::core::v3::TypedExtensionConfig& config) PURE;
-
-  std::string category() const override { return "envoy.san_matchers"; }
-};
 
 class CertificateValidationContextConfig {
 public:

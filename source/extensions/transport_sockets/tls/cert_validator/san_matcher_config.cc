@@ -14,7 +14,12 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
+bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
+  return general_name->type == general_name_type_ &&
+         DefaultCertValidator::verifySubjectAltName(general_name, matcher_);
+}
+
+SanMatcherPtr createStringSanMatcher(
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher const& matcher) {
   // Verify that a new san type has not been added.
   static_assert(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType_MAX ==
@@ -22,17 +27,17 @@ Envoy::Ssl::SanMatcherPtr createStringSanMatcher(
 
   switch (matcher.san_type()) {
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS:
-    return Envoy::Ssl::SanMatcherPtr{std::make_unique<DnsSanMatcher>(matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher.matcher())};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL:
-    return Envoy::Ssl::SanMatcherPtr{std::make_unique<EmailSanMatcher>(matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher.matcher())};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI:
-    return Envoy::Ssl::SanMatcherPtr{std::make_unique<UriSanMatcher>(matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher.matcher())};
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS:
-    return Envoy::Ssl::SanMatcherPtr{std::make_unique<IpAddSanMatcher>(matcher.matcher())};
+    return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher.matcher())};
   default:
     RELEASE_ASSERT(true, "Invalid san type for "
                          "envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher");
-    return Envoy::Ssl::SanMatcherPtr();
+    return SanMatcherPtr();
   }
 }
 

@@ -67,8 +67,8 @@ CertificateValidationContextConfigImpl::getSubjectAltNameMatchers(
   // Handle deprecated string type san matchers without san type specified, by
   // creating a matcher for each supported type.
   for (const envoy::type::matcher::v3::StringMatcher& matcher : config.match_subject_alt_names()) {
-    static const std::vector<
-        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType>
+    static constexpr std::array<
+        envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::SanType, 4>
         san_types{envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
                   envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
                   envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,

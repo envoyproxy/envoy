@@ -21,7 +21,7 @@ TEST(SanMatcherConfigTest, TestInvalidSanType) {
   san_matcher.set_san_type(
       envoy::extensions::transport_sockets::tls::v3::
           SubjectAltNameMatcher_SanType_SubjectAltNameMatcher_SanType_INT_MIN_SENTINEL_DO_NOT_USE_);
-  const Envoy::Ssl::SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
+  const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
   EXPECT_EQ(matcher.get(), nullptr);
 }
 
@@ -38,7 +38,7 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
     san_matcher.mutable_matcher()->set_exact("foo.example");
     san_matcher.set_san_type(san_type);
-    const Envoy::Ssl::SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
+    const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
       // Unspecified san type is not a valid for creating a string san matcher.

@@ -26,7 +26,6 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/factory.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/utility.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/utility.h"
@@ -234,7 +233,7 @@ int DefaultCertValidator::doVerifyCertChain(
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<Envoy::Ssl::SanMatcherPtr>& subject_alt_name_matchers) {
+    const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
 
   if (!verify_san_list.empty()) {
@@ -304,13 +303,13 @@ bool DefaultCertValidator::verifySubjectAltName(
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert, const std::vector<Envoy::Ssl::SanMatcherPtr>& subject_alt_name_matchers) {
+    X509* cert, const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
     return false;
   }
-  for (auto& config_san_matcher : subject_alt_name_matchers) {
+  for (const auto& config_san_matcher : subject_alt_name_matchers) {
     for (const GENERAL_NAME* general_name : san_names.get()) {
       if (config_san_matcher->match(general_name)) {
         return true;
