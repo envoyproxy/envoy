@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP Tap filter
-# Public docs: docs/root/configuration/http_filters/tap_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/tap_filter.rst
 
 envoy_extension_package()
 

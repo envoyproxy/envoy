@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace GrpcWeb {
 
 /**
- * See docs/configuration/http_filters/grpc_web_filter.rst
+ * See docs/configuration/http/http_filters/grpc_web_filter.rst
  */
 class GrpcWebFilter : public Http::StreamFilter, NonCopyable {
 public:

@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Local Ratelimit L7 HTTP filter
-# Public docs: docs/root/configuration/http_filters/local_rate_limit_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/local_rate_limit_filter.rst
 
 envoy_extension_package()
 

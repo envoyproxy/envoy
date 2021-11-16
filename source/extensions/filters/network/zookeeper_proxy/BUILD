@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # ZooKeeper proxy L7 network filter.
-# Public docs: docs/root/configuration/network_filters/zookeeper_proxy_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/zookeeper_proxy_filter.rst
 
 envoy_extension_package()
 

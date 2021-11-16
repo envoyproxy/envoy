@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-# Public docs: docs/root/configuration/network_filters/wasm_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/wasm_filter.rst
 
 envoy_cc_library(
     name = "wasm_filter_lib",

@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Local Bandwidthlimit HTTP L7 filter
-# Public docs: docs/root/configuration/http_filters/bandwidth_limit_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/bandwidth_limit_filter.rst
 
 envoy_extension_package()
 

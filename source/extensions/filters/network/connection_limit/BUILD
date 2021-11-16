@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Connection limit L4 network filter
-# Public docs: docs/root/configuration/network_filters/connection_limit_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/connection_limit_filter.rst
 
 envoy_extension_package()
 

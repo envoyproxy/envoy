@@ -11,7 +11,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 /**
- * See docs/configuration/http_filters/grpc_http1_bridge_filter.rst
+ * See docs/configuration/http/http_filters/grpc_http1_bridge_filter.rst
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:

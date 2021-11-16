@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Client SSL authorization L4 network filter
-# Public docs: docs/root/configuration/network_filters/client_ssl_auth_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/client_ssl_auth_filter.rst
 
 envoy_extension_package()
 

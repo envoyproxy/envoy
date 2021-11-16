@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP AWS request signing filter
-# Public docs: docs/root/configuration/http_filters/aws_request_signing_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/aws_request_signing_filter.rst
 
 envoy_extension_package()
 

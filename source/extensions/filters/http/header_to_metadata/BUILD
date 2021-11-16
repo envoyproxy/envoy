@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that transforms request data into dynamic metadata
-# Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/header_to_metadata_filter.rst
 
 envoy_extension_package()
 

@@ -12,7 +12,7 @@ envoy_contrib_package()
 #package(default_visibility = ["//visibility:public"])
 
 # PostgresSQL proxy L7 network filter.
-# Public docs: docs/root/configuration/network_filters/postgres_proxy_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/postgres_proxy_filter.rst
 
 envoy_cc_library(
     name = "filter",

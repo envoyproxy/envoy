@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that performs decompression with configurable decompression libraries
-# Public docs: docs/root/configuration/http_filters/decompressor_filter.rst
+# Public docs: docs/root/configuration/http/http_filters/decompressor_filter.rst
 
 envoy_extension_package()
 

@@ -7,7 +7,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # TCP proxy L4 network filter.
-# Public docs: docs/root/configuration/network_filters/tcp_proxy_filter.rst
+# Public docs: docs/root/configuration/listeners/network_filters/tcp_proxy_filter.rst
 
 envoy_extension_package()
 
