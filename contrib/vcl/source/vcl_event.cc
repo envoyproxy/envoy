@@ -33,8 +33,6 @@ void VclEvent::activate(uint32_t events) {
   ASSERT((events & (Event::FileReadyType::Read | Event::FileReadyType::Write |
                     Event::FileReadyType::Closed)) == events);
 
-  cb_(events);
-
   // Schedule the activation callback so it runs as part of the next loop iteration if it is not
   // already scheduled.
   if (injected_activation_events_ == 0) {

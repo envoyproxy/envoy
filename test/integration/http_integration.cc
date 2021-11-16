@@ -1006,9 +1006,9 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  ASSERT(response->continueHeaders() != nullptr);
-  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
-  EXPECT_EQ(nullptr, response->continueHeaders()->Via());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ("100", response->informationalHeaders()->getStatusValue());
+  EXPECT_EQ(nullptr, response->informationalHeaders()->Via());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (via.empty()) {
     EXPECT_EQ(nullptr, response->headers().Via());
@@ -1073,8 +1073,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  ASSERT(response->continueHeaders() != nullptr);
-  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ("100", response->informationalHeaders()->getStatusValue());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
