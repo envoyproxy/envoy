@@ -1210,7 +1210,8 @@ void ConnectionImpl::addOutboundFrameFragment(Buffer::OwnedImpl& output, const u
   // onBeforeFrameSend callback is not called for DATA frames.
   bool is_outbound_flood_monitored_control_frame = false;
   std::swap(is_outbound_flood_monitored_control_frame, is_outbound_flood_monitored_control_frame_);
-  auto releasor = trackOutboundFrames(is_outbound_flood_monitored_control_frame);
+  auto releasor =
+      protocol_constraints_.incrementOutboundFrameCount(is_outbound_flood_monitored_control_frame);
   output.add(data, length);
   output.addDrainTracker(releasor);
 }
@@ -1864,8 +1865,7 @@ ClientConnectionImpl::ClientConnectionImpl(
     Nghttp2SessionFactory& http2_session_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_response_headers_kb,
                      max_response_headers_count),
-      callbacks_(callbacks), enable_upstream_http2_flood_checks_(Runtime::runtimeFeatureEnabled(
-                                 "envoy.reloadable_features.upstream_http2_flood_checks")) {
+      callbacks_(callbacks) {
   ClientHttp2Options client_http2_options(http2_options);
   if (use_new_codec_wrapper_) {
     adapter_ = http2_session_factory.create(http2_callbacks_.callbacks(), base(),
@@ -1932,34 +1932,22 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 Status ClientConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
                                                 uint32_t padding_length) {
   Status result;
-  if (enable_upstream_http2_flood_checks_) {
-    ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
-                   connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
-                   static_cast<uint64_t>(hd->length), padding_length);
+  ENVOY_CONN_LOG(trace, "track inbound frame type={} flags={} length={} padding_length={}",
+                 connection_, static_cast<uint64_t>(hd->type), static_cast<uint64_t>(hd->flags),
+                 static_cast<uint64_t>(hd->length), padding_length);
 
-    result = protocol_constraints_.trackInboundFrames(hd, padding_length);
-    if (!result.ok()) {
-      ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
-                     result.message());
-      if (isInboundFramesWithEmptyPayloadError(result)) {
-        ConnectionImpl::StreamImpl* stream = getStream(hd->stream_id);
-        if (stream) {
-          stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
-        }
+  result = protocol_constraints_.trackInboundFrames(hd, padding_length);
+  if (!result.ok()) {
+    ENVOY_CONN_LOG(trace, "error reading frame: {} received in this HTTP/2 session.", connection_,
+                   result.message());
+    if (isInboundFramesWithEmptyPayloadError(result)) {
+      ConnectionImpl::StreamImpl* stream = getStream(hd->stream_id);
+      if (stream) {
+        stream->setDetails(Http2ResponseCodeDetails::get().inbound_empty_frame_flood);
       }
     }
   }
   return result;
-}
-
-// TODO(yanavlasov): move to the base class once the runtime flag is removed.
-ProtocolConstraints::ReleasorProc
-ClientConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
-  if (enable_upstream_http2_flood_checks_) {
-    return protocol_constraints_.incrementOutboundFrameCount(
-        is_outbound_flood_monitored_control_frame);
-  }
-  return ProtocolConstraints::ReleasorProc([]() {});
 }
 
 StreamResetReason ClientConnectionImpl::getMessagingErrorResetReason() const {
@@ -2051,12 +2039,6 @@ Status ServerConnectionImpl::trackInboundFrames(const nghttp2_frame_hd* hd,
     }
   }
   return result;
-}
-
-ProtocolConstraints::ReleasorProc
-ServerConnectionImpl::trackOutboundFrames(bool is_outbound_flood_monitored_control_frame) {
-  return protocol_constraints_.incrementOutboundFrameCount(
-      is_outbound_flood_monitored_control_frame);
 }
 
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
