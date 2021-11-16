@@ -53,7 +53,7 @@ public:
     }
   }
 
-  bool local_end_stream_{};
+  bool local_end_stream_{false};
 
 protected:
   void addCallbacksHelper(StreamCallbacks& callbacks) {
