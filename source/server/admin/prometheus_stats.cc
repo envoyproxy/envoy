@@ -47,7 +47,7 @@ std::string sanitizeValue(const absl::string_view value) {
   // text serialization issues. This matches the prometheus text formatting code:
   // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
   // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
-  auto tmp = backslashRegex().replaceAll(value, R"(\\\\)");
+  std::string tmp = backslashRegex().replaceAll(value, R"(\\\\)");
   tmp = newlineRegex().replaceAll(tmp, R"(\\n)");
   return quoteRegex().replaceAll(tmp, R"(\\")");
 }
