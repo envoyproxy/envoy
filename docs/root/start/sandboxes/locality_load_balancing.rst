@@ -15,16 +15,17 @@ This example creates a setup for demonstrating the :ref: `locality weighted load
 The components used in this demo are as follows:
 
 - A client container: runs Envoy proxy
-- Backend container in the same locality as the client, namely ``local-a``.
-- Backend container in a different locality, namely ``local-b``.
-- Backend container in yet another locality, namely ``remote``.
+- Backend container in the same locality as the client, with priority set to 0, namely ``local-1``.
+- Backend container in the same locality as the client, with priority set to 1, namely ``local-2``.
+- Backend container in the the remote locality, with priority set to 1, namely ``remote-1``.
+- Backend container in the the remote locality, with priority set to 2, namely ``remote-2``.
 
-The client Envoy proxy configures the 3 backend containers in the same Envoy cluster, so that Envoy handle load balancing to those backend servers.
+The client Envoy proxy configures the 4 backend containers in the same Envoy cluster, so that Envoy handles load balancing to those backend servers.
 
 Step 1: Start all of our containers
 ***********************************
 
-Change to the ``examples/locality_load_balancing`` directory.
+In terminal, move to the ``examples/locality_load_balancing`` directory.
 
 To build this sandbox example and start the example services, run the following commands:
 
@@ -35,20 +36,19 @@ To build this sandbox example and start the example services, run the following 
 
 The locality configuration is set in the client container via static Envoy configuration file. Please refer to the `clusters configuration <_include/locality-load-balancing/configs/cds.yaml>_` file.
 
-Step 2: Scenario with 1 replica per locaility
-*********************************************
+Step 2: Scenario with one replica in the highest priority locality
+******************************************************************
 
-In this scenario, each locality has 1 healthy replica running. In this case, all the requests should be sent to the locality with the highest priority, which is ``local-a``.
+In this scenario, each locality has 1 healthy replica running. In this case, all the requests should be sent to the locality with the highest priority, which is ``local-1``.
 
 .. code:: shell
 
     # all requests to local-1
     $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
-    Hello from backend-local-1!
-    : 100, 100.0%
+    Hello from backend-local-1!: 100, 100.0%
     Failed: 0
 
-If locality ``local-1`` becomes unhealthy, the requests should be load balanced among the subsequent priority localities, which are ``local-b`` and ``remote``. We are sending 100 requests to the backend cluster, and observe the receivers.
+If locality ``local-1`` becomes unhealthy, the requests should be load balanced among the subsequent priority localities, which are ``local-2`` and ``remote-1``. They both have priority 1. We then send 100 requests to the backend cluster, and check the responders.
 
 .. code:: shell
 
@@ -56,25 +56,23 @@ If locality ``local-1`` becomes unhealthy, the requests should be load balanced 
     $ docker-compose exec -T client-envoy curl -s "locality-load-balancing_backend-local-1_1":8000/unhealthy
     [backend-local-1] Set to unhealthy
 
-    # local-2 and remote locaility split the traffic 50:50
+    # local-2 and remote-1 localities split the traffic 50:50
     $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
-    Hello from backend-remote!
-    : 51, 51.0%
-    Hello from backend-local-2!
-    : 49, 49.0%
+    Hello from backend-remote-1!: 51, 51.0%
+    Hello from backend-local-2!: 49, 49.0%
     Failed: 0
 
-Now if ``local-2`` becomes unhealthy also, the requests will be solely sent to the ``remote`` locality.
+Now if ``local-2`` becomes unhealthy also, priority 1 locality is only 50% healthy. Requests will be sent to the ``remote-1`` and ``remote-2``.
 
 .. code:: shell
 
     # bring down local-2
     $ docker-compose exec -T client-envoy curl -s "locality-load-balancing_backend-local-2_1":8000/unhealthy
 
-    # remote locaility receive 100% of the traffic
+    # remote-1 locality receive 100% of the traffic
     $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
-    Hello from backend-remote!
-    : 100, 100.0%
+    Hello from backend-remote-1!: actual weight 69.0%
+    Hello from backend-remote-2!: actual weight 31.0%
     Failed: 0
 
     # recover local-1 and local-2 after the demo
@@ -82,8 +80,8 @@ Now if ``local-2`` becomes unhealthy also, the requests will be solely sent to t
     $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/healthy
 
 
-Step 3: Scenario with multiple replicas per locaility
-*****************************************************
+Step 3: Scenario with multiple replica in the highest priority locality
+***********************************************************************
 
 Continue from previous step. We first scale up the ``local-1`` locality to 5 replicas.
 
@@ -112,7 +110,7 @@ We are going to show the scenario that ``local-1`` is just partially healthy. So
     backend::172.28.0.8:8000::health_flags::healthy
     backend::172.28.0.3:8000::health_flags::healthy
 
-You should see that 4 backend endpoints become not healthy.
+You should see that 4 backend endpoints become unhealthy.
 
 Now we send the 100 requests again.
 
@@ -121,16 +119,23 @@ Now we send the 100 requests again.
     # watch traffic change
     $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
 
-    Hello from backend-local-2!
-    : 35, 35.0%
-    Hello from backend-remote!
-    : 33, 33.0%
-    Hello from backend-local-1!
-    : 32, 32.0%
+    Hello from backend-remote-1!: actual weight 37.0%
+    Hello from backend-local-2!: actual weight 36.0%
+    Hello from backend-local-1!: actual weight 27.0%
     Failed: 0
 
 As ``local-1`` does not have enough healthy workloads, requests are partially shared by secondary localities.
 
-**Conclusion:** default overprovisioning factor is 1.4, which means,
-when the highest cluster has less than 71% of the workloads health, the
-LB will gradually shift traffic to other localities.
+If we bring down all the servers in priority 1 locality, it will make priority 1 locality 0% healthy. The traffic should split between priority 0 and priority 2 localities.
+
+.. code:: shell
+
+    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/unhealthy
+    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-remote-1_1:8000/unhealthy
+    $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
+
+    Hello from backend-remote-2!: actual weight 77.0%
+    Hello from backend-local-1!: actual weight 23.0%
+    Failed: 0
+
+**Conclusion:** When the healthiness of a locality drops below a threshold, the next priority locality will start to share the traffic. The default overprovisioning factor is 1.4, which means that the shifting healthiness threshold is at around 71%.
