@@ -137,6 +137,10 @@ public:
   void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
   }
+  Envoy::StreamInfo::UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
+  const Envoy::StreamInfo::UpstreamTiming& upstreamTiming() const override {
+    return upstream_timing_;
+  }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
     return duration(end_time_);
