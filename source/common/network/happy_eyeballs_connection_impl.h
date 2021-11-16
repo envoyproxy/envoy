@@ -100,7 +100,7 @@ public:
 
   // Returns a new vector containing the contents of |address_list| sorted
   // with address families interleaved, as per Section 4 of RFC 8305, Happy
-  // Eyeballs v2. It is assumed that the list must already sorted as per
+  // Eyeballs v2. It is assumed that the list must already be sorted as per
   // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
   // and Apple DNS).
   static std::vector<Address::InstanceConstSharedPtr>
