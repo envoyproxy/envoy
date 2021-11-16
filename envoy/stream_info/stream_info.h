@@ -238,7 +238,6 @@ struct UpstreamTiming {
   }
 
   void onUpstreamConnectComplete(TimeSource& time_source) {
-    ASSERT(!upstream_connect_complete_);
     upstream_connect_complete_ = time_source.monotonicTime();
   }
 
