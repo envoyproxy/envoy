@@ -960,6 +960,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           const std::string& virtual_cluster_name = stream_info.getVirtualClusterName();
           if (!virtual_cluster_name.empty()) {
             result = virtual_cluster_name;
+          }
+          return result;
+        });
   } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
