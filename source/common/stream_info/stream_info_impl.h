@@ -371,7 +371,7 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    // FIXME upstream info.
+    // TODO(alyssawilk) dump upstream info.
     os << spaces << "StreamInfoImpl " << this
        << DUMP_OPTIONAL_MEMBER(protocol_) << DUMP_OPTIONAL_MEMBER(response_code_)
        << DUMP_OPTIONAL_MEMBER(response_code_details_) << DUMP_OPTIONAL_MEMBER(attempt_count_)
@@ -392,7 +392,6 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   const std::string& filterChainName() const override { return filter_chain_name_; }
-
   void setAttemptCount(uint32_t attempt_count) override { attempt_count_ = attempt_count; }
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
