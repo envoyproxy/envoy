@@ -3525,6 +3525,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 }
 
+// Touches raw sockets.
+#ifndef WIN32
 TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   autonomous_allow_incomplete_streams_ = true;
   autonomous_upstream_ = true;
@@ -3540,5 +3542,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
+#endif
 
 } // namespace Envoy
