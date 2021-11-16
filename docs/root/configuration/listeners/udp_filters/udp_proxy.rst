@@ -35,7 +35,8 @@ Load balancing and unhealthy host handling
 Envoy will fully utilize the configured load balancer for the configured upstream cluster when
 load balancing UDP datagrams. By default, when a new session is created, Envoy will associate the session
 with an upstream host selected using the configured load balancer. All future datagrams that
-belong to the session will be routed to the same upstream host. However, if :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
+belong to the session will be routed to the same upstream host. However, if :ref:`use_per_packet_load_balancing
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>`
 field is set to true, Envoy selects another upstream host on next datagram using the configured load balancer
 and creates a new session if such does not exist. So in case of several upstream hosts available for the load balancer
 each data chunk is forwarded to a different host.
