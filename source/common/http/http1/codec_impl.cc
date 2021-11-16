@@ -93,7 +93,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
       is_response_to_connect_request_(false), envoy_stream_complete_(false),
-      bytes_meter_(std::move(bytes_meter)) {
+      encode_complete_(false), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }
@@ -291,7 +291,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   }
 
   flushOutput();
-  local_end_stream_ = true;
+  encode_complete_ = true;
   onEncodeCompleteGuard();
 }
 
@@ -306,7 +306,7 @@ void StreamEncoderImpl::endEncode() {
   }
 
   flushOutput(true);
-  local_end_stream_ = true;
+  encode_complete_ = true;
   onEncodeCompleteGuard();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
   if (connect_request_ || is_tcp_tunneling_) {
@@ -382,7 +382,7 @@ void ResponseEncoderImpl::resetStream(StreamResetReason reason) {
 }
 
 void ResponseEncoderImpl::onEncodeCompleteGuard() {
-  if (local_end_stream_ && envoy_stream_complete_) {
+  if (encode_complete_ && envoy_stream_complete_) {
     // Only call onEncodeComplete after both the Envoy level stream and the
     // codec is finished as it will destroy the ActiveRequest holding the
     // encoder.
