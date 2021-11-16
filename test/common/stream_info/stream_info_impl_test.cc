@@ -48,7 +48,7 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
   EXPECT_FALSE(info.lastDownstreamRxByteReceived());
-  info.onLastDownstreamRxByteReceived();
+  info.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
   std::chrono::nanoseconds dur =
       checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
@@ -72,12 +72,12 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstDownstreamTxByteSent());
-  info.onFirstDownstreamTxByteSent();
+  EXPECT_FALSE(info.downstreamTiming().firstDownstreamTxByteSent());
+  info.downstreamTiming().onFirstDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, info.firstDownstreamTxByteSent());
 
   EXPECT_FALSE(info.lastDownstreamTxByteSent());
-  info.onLastDownstreamTxByteSent();
+  info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, info.lastDownstreamTxByteSent());
 
   EXPECT_FALSE(info.requestComplete());

@@ -215,7 +215,7 @@ public:
         auto headers =
             fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
-        state.response_encoder_->encode100ContinueHeaders(headers);
+        state.response_encoder_->encode1xxHeaders(headers);
       }
       break;
     }

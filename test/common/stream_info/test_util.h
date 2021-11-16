@@ -107,10 +107,6 @@ public:
     return duration(last_rx_byte_received_);
   }
 
-  void onLastDownstreamRxByteReceived() override {
-    last_rx_byte_received_ = timeSystem().monotonicTime();
-  }
-
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
@@ -127,22 +123,16 @@ public:
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    return duration(first_downstream_tx_byte_sent_);
-  }
-
-  void onFirstDownstreamTxByteSent() override {
-    first_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.firstDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    return duration(last_downstream_tx_byte_sent_);
-  }
-
-  void onLastDownstreamTxByteSent() override {
-    last_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.lastDownstreamTxByteSent());
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
+
+  Envoy::StreamInfo::DownstreamTiming& downstreamTiming() override { return downstream_timing_; }
 
   void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
@@ -241,13 +231,8 @@ public:
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
+  Envoy::StreamInfo::DownstreamTiming downstream_timing_;
   absl::optional<MonotonicTime> last_rx_byte_received_;
-  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> end_time_;
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};

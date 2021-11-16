@@ -36,6 +36,9 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     parent_.transitionActiveClientState(*this, ActiveClient::State::READY);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();
+  } else if (currentUnusedCapacity() == 0 && state() == ActiveClient::State::READY) {
+    // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
+    parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
   }
 }
 
@@ -89,9 +92,10 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         auto factory = &pool->host()->transportSocketFactory();
         ASSERT(dynamic_cast<Quic::QuicClientTransportSocketFactory*>(factory) != nullptr);
         if (static_cast<Quic::QuicClientTransportSocketFactory*>(factory)->sslCtx() == nullptr) {
-          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
-                              "Failed to create Http/3 client. Transport socket "
-                              "factory is not configured correctly.");
+          ENVOY_LOG_EVERY_POW_2_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool),
+                                          warn,
+                                          "Failed to create Http/3 client. Transport socket "
+                                          "factory is not configured correctly.");
           return nullptr;
         }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
@@ -105,6 +109,12 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         data.connection_ =
             Quic::createQuicNetworkConnection(h3_pool->quicInfo(), pool->dispatcher(), host_address,
                                               source_address, quic_stat_names, scope);
+        if (data.connection_ == nullptr) {
+          ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
+              Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
+              "Failed to create Http/3 client. Failed to create quic network connection.");
+          return nullptr;
+        }
         // Store a handle to connection as it will be moved during client construction.
         Network::Connection& connection = *data.connection_;
         auto client = std::make_unique<ActiveClient>(*pool, data);
