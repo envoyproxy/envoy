@@ -261,7 +261,7 @@ modify different aspects of the server:
 
 .. http:get:: /init_dump
 
-  Dump currently information of unready targets of various Envoy components as JSON-serialized proto
+  Dump current information of unready targets of various Envoy components as JSON-serialized proto
   messages. See the :ref:`response definition <envoy_v3_api_msg_admin.v3.UnreadyTargetsDumps>` for more
   information.
 

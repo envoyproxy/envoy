@@ -1235,7 +1235,7 @@ TEST_P(IntegrationTest, AbsolutePathUsingHttpsAllowedInternally) {
 
 // Make that both IPv4 and IPv6 hosts match when using relative and absolute URLs.
 TEST_P(IntegrationTest, TestHostWithAddress) {
-  useAccessLog("%REQ(Host)%\n");
+  useAccessLog("%REQ(Host)%");
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {
     address_string = TestUtility::getIpv4Loopback();
@@ -1391,7 +1391,7 @@ TEST_P(IntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
-  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%\n");
+  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -2195,7 +2195,7 @@ TEST_P(IntegrationTest, RetryOptionsPredicate) {
 // successfully overrides the cached route, and subsequently, the request's upstream cluster
 // selection.
 TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
-  useAccessLog("%UPSTREAM_CLUSTER%\n");
+  useAccessLog("%UPSTREAM_CLUSTER%");
 
   config_helper_.prependFilter(R"EOF(
     name: set-route-filter
