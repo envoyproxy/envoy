@@ -311,13 +311,14 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
 }
 
 SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
-// TODO: eliminate this branching by upstreaming an alternative Android implementation
-// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
-#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
   if (alternate_getifaddrs_.has_value()) {
     return alternate_getifaddrs_.value()(interfaces);
   }
-  return {0, 0};
+
+// TODO: eliminate this branching by upstreaming an alternative Android implementation
+// e.g.: https://github.com/envoyproxy/envoy-mobile/blob/main/third_party/android/ifaddrs-android.h
+#if defined(__ANDROID_API__) && __ANDROID_API__ < 24
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 #else
   struct ifaddrs* ifaddr;
   struct ifaddrs* ifa;
