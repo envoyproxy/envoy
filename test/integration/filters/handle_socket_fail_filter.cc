@@ -19,10 +19,10 @@ public:
   }
 
   os_fd_t fd() {
-    const Network::ConnectionImpl* impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
+    const Network::ConnectionImpl* impl =
+        dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
     return impl->ioHandle().fdDoNotUse();
   }
-
 };
 
 class OnSocketFailFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
