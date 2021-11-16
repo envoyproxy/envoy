@@ -293,6 +293,88 @@ private:
 
 using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
 
+// TODO(alyssawilk) after landing this, remove all the duplicate getters and
+// setters from StreamInfo.
+class UpstreamInfo {
+ public:
+  virtual ~UpstreamInfo() = default;
+
+  /**
+   * @param connection ID of the upstream connection.
+   */
+  virtual void setUpstreamConnectionId(uint64_t id) PURE;
+
+  /**
+   * @return the ID of the upstream connection, or absl::nullopt if not available.
+   */
+  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
+
+  /**
+   * @param connection_info sets the upstream ssl connection.
+   */
+  virtual void
+  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @return the upstream SSL connection. This will be nullptr if the upstream
+   * connection does not use SSL.
+   */
+  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
+
+  /**
+   * Sets the upstream timing information for this stream. This is useful for
+   * when multiple upstream requests are issued and we want to save timing
+   * information for the one that "wins".
+   */
+  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
+
+  /*
+   * @return the upstream timing for this stream
+   * */
+  virtual const UpstreamTiming& upstreamTiming() PURE;
+
+  /**
+   * @param upstream_local_address sets the local address of the upstream connection. Note that it
+   * can be different than the local address of the downstream connection.
+   */
+  virtual void setUpstreamLocalAddress(
+      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
+
+  /**
+   * @return the upstream local address.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
+
+  /**
+   * @param failure_reason the upstream transport failure reason.
+   */
+  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
+
+  /**
+   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
+   *         failed.
+   */
+  virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param host the selected upstream host for the request.
+   */
+  virtual void setUpstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * @return upstream host description.
+   */
+  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
+
+  /**
+   * Filter State object to be shared between upstream and downstream filters.
+   * @param pointer to upstream connections filter state.
+   * @return pointer to filter state to be used by upstream connections.
+   */
+  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
+  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
+};
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -404,6 +486,9 @@ public:
    * information for the one that "wins".
    */
   virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
+
+  virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
+  virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
 
   /**
    * @return the duration between the first byte of the request was sent upstream and the start of

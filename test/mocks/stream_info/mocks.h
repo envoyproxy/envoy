@@ -31,6 +31,8 @@ public:
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastDownstreamRxByteReceived, (), (const));
   MOCK_METHOD(void, setUpstreamTiming, (const UpstreamTiming&));
+  MOCK_METHOD(void, setUpstreamInfo, (std::shared_ptr<UpstreamInfo>));
+  MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, firstUpstreamTxByteSent, (), (const));
   MOCK_METHOD(void, onFirstUpstreamTxByteSent, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastUpstreamTxByteSent, (), (const));

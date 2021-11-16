@@ -227,6 +227,13 @@ public:
     downstream_bytes_meter_ = downstream_bytes_meter;
   }
 
+  virtual void setUpstreamInfo(std::shared_ptr<Envoy::StreamInfo::UpstreamInfo> info) override {
+    upstream_info_ = info;
+  }
+  virtual std::shared_ptr<Envoy::StreamInfo::UpstreamInfo> upstreamInfo() override {
+    return upstream_info_;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -255,6 +262,7 @@ public:
           Envoy::StreamInfo::FilterState::LifeSpan::FilterChain)};
   Envoy::StreamInfo::FilterStateSharedPtr upstream_filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
+  std::shared_ptr<Envoy::StreamInfo::UpstreamInfo> upstream_info_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
   const Http::RequestHeaderMap* request_headers_{};
