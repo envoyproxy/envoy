@@ -10,7 +10,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: ExpressionFilter]
-// [#extension: envoy.access_loggers.filters.cel]
+// [#extension: envoy.access_loggers.extension_filters.cel]
 
 // ExpressionFilter is an access logging filter that evaluates configured
 // symbolic Common Expression Language expressions to inform the decision

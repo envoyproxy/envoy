@@ -37,7 +37,7 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
   return std::make_unique<CELAccessLogExtensionFilter>(getOrCreateBuilder(),
                                                        parse_status.value().expr());
 #else
-  return nullptr;
+  throw EnvoyException("CEL is not available for use in this environment.");
 #endif
 }
 
