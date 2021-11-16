@@ -578,19 +578,21 @@ TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
         l.mutable_connection_balance_config()->mutable_exact_balance();
       },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_enable_reuse_port(); },
-      [](envoy::config::listener::v3::Listener& l) { l.mutable_freebind(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_freebind()->set_value(true); },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_backlog_size(); },
       [](envoy::config::listener::v3::Listener& l) { l.mutable_tcp_fast_open_queue_length(); },
-      [](envoy::config::listener::v3::Listener& l) { l.mutable_transparent(); },
+      [](envoy::config::listener::v3::Listener& l) { l.mutable_transparent()->set_value(true); },
+
   };
   for (const auto& f : listener_mutators) {
     auto new_listener = listener;
     f(new_listener);
-    EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(new_listener, "", true), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(new ListenerImpl(new_listener, "version", *manager_, "foo", true,
+                                               false, /*hash=*/static_cast<uint64_t>(0), 1),
+                              EnvoyException,
                               "error adding listener 'envoy://test_internal_listener_name': has "
                               "unsupported tcp listener feature");
   }
-
   {
     auto new_listener = listener;
     new_listener.mutable_socket_options()->Add();
@@ -598,7 +600,6 @@ TEST_F(ListenerManagerImplTest, RejectTcpOptionsWithInternalListenerConfig) {
                               "error adding listener 'envoy://test_internal_listener_name': does "
                               "not support socket option")
   }
-
   {
     auto new_listener = listener;
     new_listener.set_enable_mptcp(true);
