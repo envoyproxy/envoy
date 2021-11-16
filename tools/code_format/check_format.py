@@ -268,7 +268,7 @@ UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
   "envoy.reloadable_features.upstream_http2_flood_checks",
-  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+  "envoy.reloadable_features.sanitize_http_header_referer",
 }
 # yapf: enable
 

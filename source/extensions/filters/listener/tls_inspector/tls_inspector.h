@@ -2,6 +2,7 @@
 
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/listener/tls_inspector/v3/tls_inspector.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -49,10 +50,13 @@ enum class ParseState {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+  Config(Stats::Scope& scope,
+         const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
+         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
+  bool enableJA3Fingerprinting() const { return enable_ja3_fingerprinting_; }
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
@@ -62,6 +66,7 @@ public:
 private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  bool enable_ja3_fingerprinting_;
   const uint32_t max_client_hello_size_;
 };
 
@@ -83,6 +88,7 @@ private:
   void done(bool success);
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
+  void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

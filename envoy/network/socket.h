@@ -98,6 +98,11 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
+
+  /**
+   * @return ja3 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja3Hash() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -142,6 +147,11 @@ public:
    * @param connection_info sets the downstream ssl connection.
    */
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @param JA3 fingerprint.
+   */
+  virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;

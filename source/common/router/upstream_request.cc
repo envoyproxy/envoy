@@ -427,6 +427,11 @@ void UpstreamRequest::onPoolReady(
     stream_info_.protocol(protocol.value());
   }
 
+  upstream_timing_.upstream_connect_start_ = info.upstreamTiming().upstream_connect_start_;
+  upstream_timing_.upstream_connect_complete_ = info.upstreamTiming().upstream_connect_complete_;
+  upstream_timing_.upstream_handshake_complete_ =
+      info.upstreamTiming().upstream_handshake_complete_;
+
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   parent_.callbacks()->streamInfo().setUpstreamFilterState(
