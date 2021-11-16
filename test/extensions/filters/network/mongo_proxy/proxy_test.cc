@@ -128,7 +128,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
-  MockTimeSystem time_source_;
+  NiceMock<MockTimeSystem> time_source_;
   TestStreamInfo stream_info_;
 };
 
