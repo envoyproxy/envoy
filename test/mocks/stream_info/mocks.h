@@ -30,8 +30,9 @@ public:
   MOCK_METHOD(SystemTime, startTime, (), (const));
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastDownstreamRxByteReceived, (), (const));
-  MOCK_METHOD(void, onLastDownstreamRxByteReceived, ());
   MOCK_METHOD(void, setUpstreamTiming, (const UpstreamTiming&));
+  MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
+  MOCK_METHOD(const UpstreamTiming&, upstreamTiming, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, firstUpstreamTxByteSent, (), (const));
   MOCK_METHOD(void, onFirstUpstreamTxByteSent, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastUpstreamTxByteSent, (), (const));
@@ -41,11 +42,10 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastUpstreamRxByteReceived, (), (const));
   MOCK_METHOD(void, onLastUpstreamRxByteReceived, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, firstDownstreamTxByteSent, (), (const));
-  MOCK_METHOD(void, onFirstDownstreamTxByteSent, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastDownstreamTxByteSent, (), (const));
-  MOCK_METHOD(void, onLastDownstreamTxByteSent, ());
   MOCK_METHOD(void, onRequestComplete, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
+  MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
   MOCK_METHOD(void, addBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, bytesReceived, (), (const));
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
@@ -124,6 +124,7 @@ public:
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
   absl::optional<std::string> connection_termination_details_;
+  UpstreamTiming upstream_timing_;
   uint64_t response_flags_{};
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr upstream_filter_state_;
@@ -141,6 +142,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  DownstreamTiming downstream_timing_;
 };
 
 } // namespace StreamInfo

@@ -24,7 +24,30 @@ public:
       headers.addCopy(Http::LowerCaseString("alpn"),
                       decoder_callbacks_->streamInfo().upstreamSslConnection()->alpn());
     }
+
     return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap& trailers) override {
+    StreamInfo::UpstreamTiming& upstream_timing = decoder_callbacks_->streamInfo().upstreamTiming();
+    // Upstream metrics aren't available until the response is complete.
+    if (upstream_timing.upstream_connect_start_.has_value()) {
+      trailers.addCopy(
+          Http::LowerCaseString("upstream_connect_start"),
+          absl::StrCat(upstream_timing.upstream_connect_start_.value().time_since_epoch().count()));
+    }
+    if (upstream_timing.upstream_connect_complete_.has_value()) {
+      trailers.addCopy(
+          Http::LowerCaseString("upstream_connect_complete"),
+          absl::StrCat(
+              upstream_timing.upstream_connect_complete_.value().time_since_epoch().count()));
+    }
+    if (upstream_timing.upstream_handshake_complete_.has_value()) {
+      trailers.addCopy(
+          Http::LowerCaseString("upstream_handshake_complete"),
+          absl::StrCat(
+              upstream_timing.upstream_handshake_complete_.value().time_since_epoch().count()));
+    }
+    return Http::FilterTrailersStatus::Continue;
   }
 };
 

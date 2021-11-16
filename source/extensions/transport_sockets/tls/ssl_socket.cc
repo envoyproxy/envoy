@@ -43,6 +43,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
 };
+
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -179,6 +180,8 @@ Network::Connection& SslSocket::connection() const { return callbacks_->connecti
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
+  callbacks_->connection().streamInfo().upstreamTiming().onUpstreamHandshakeComplete(
+      callbacks_->connection().dispatcher().timeSource());
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 

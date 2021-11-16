@@ -29,7 +29,7 @@ public:
   bool complete() { return saw_end_stream_; }
   bool reset() { return saw_reset_; }
   Http::StreamResetReason resetReason() { return reset_reason_; }
-  const Http::ResponseHeaderMap* continueHeaders() { return continue_headers_.get(); }
+  const Http::ResponseHeaderMap* informationalHeaders() { return continue_headers_.get(); }
   const Http::ResponseHeaderMap& headers() { return *headers_; }
   const Http::ResponseTrailerMapPtr& trailers() { return trailers_; }
   const Http::MetadataMap& metadataMap() { return *metadata_map_; }

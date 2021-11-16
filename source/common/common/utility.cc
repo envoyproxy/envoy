@@ -194,7 +194,7 @@ void DateFormatter::parse(const std::string& format_string) {
 
 std::string
 DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
-                                                  const std::string& seconds_str) const {
+                                                  const absl::string_view seconds_str) const {
   std::string formatted_time;
 
   int32_t previous = 0;
@@ -435,7 +435,7 @@ std::string StringUtil::subspan(absl::string_view source, size_t start, size_t e
   return std::string(source.data() + start, end - start);
 }
 
-std::string StringUtil::escape(const std::string& source) {
+std::string StringUtil::escape(const absl::string_view source) {
   std::string ret;
 
   // Prevent unnecessary allocation by allocating 2x original size.

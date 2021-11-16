@@ -56,6 +56,7 @@ MockStreamInfo::MockStreamInfo()
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
   }));
+  ON_CALL(*this, downstreamTiming()).WillByDefault(ReturnRef(downstream_timing_));
   ON_CALL(*this, setUpstreamLocalAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {
@@ -140,6 +141,8 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
+  ON_CALL(*this, upstreamTiming()).WillByDefault(ReturnRef(upstream_timing_));
+  ON_CALL(Const(*this), upstreamTiming()).WillByDefault(ReturnRef(upstream_timing_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

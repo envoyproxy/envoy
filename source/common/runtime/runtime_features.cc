@@ -90,7 +90,6 @@ constexpr const char* runtime_features[] = {
     "envoy.restart_features.explicit_wildcard_resource",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     // Misplaced flags: please do not add flags to this section.
-    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
     // End misplaced flags: please do not add flags in this section.
@@ -116,6 +115,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
+    // TODO(birenroy): flip to true in a future PR to enable by default
+    "envoy.reloadable_features.http2_new_codec_wrapper",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

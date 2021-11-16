@@ -31,6 +31,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
+  streamInfo().upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
       ->setUpConnectionSocket(
           *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
@@ -132,6 +133,9 @@ void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   // before use. This may result in OnCanCreateNewOutgoingStream with zero
   // available streams.
   OnCanCreateNewOutgoingStream(false);
+  streamInfo().upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  streamInfo().upstreamTiming().onUpstreamHandshakeComplete(dispatcher_.timeSource());
+
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
