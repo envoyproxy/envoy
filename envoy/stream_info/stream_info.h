@@ -158,6 +158,8 @@ struct ResponseCodeDetailValues {
   const std::string UpstreamTimeout = "upstream_response_timeout";
   // The final upstream try timed out.
   const std::string UpstreamPerTryTimeout = "upstream_per_try_timeout";
+  // The final upstream try idle timed out.
+  const std::string UpstreamPerTryIdleTimeout = "upstream_per_try_idle_timeout";
   // The request was destroyed because of user defined max stream duration.
   const std::string UpstreamMaxStreamDurationReached = "upstream_max_stream_duration_reached";
   // The upstream connection was reset before a response was started. This
@@ -236,6 +238,61 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
 };
 
+class DownstreamTiming {
+public:
+  absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
+    return last_downstream_rx_byte_received_;
+  }
+  absl::optional<MonotonicTime> firstDownstreamTxByteSent() const {
+    return first_downstream_tx_byte_sent_;
+  }
+  absl::optional<MonotonicTime> lastDownstreamTxByteSent() const {
+    return last_downstream_tx_byte_sent_;
+  }
+
+  void onLastDownstreamRxByteReceived(TimeSource& time_source) {
+    ASSERT(!last_downstream_rx_byte_received_);
+    last_downstream_rx_byte_received_ = time_source.monotonicTime();
+  }
+  void onFirstDownstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!first_downstream_tx_byte_sent_);
+    first_downstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+  void onLastDownstreamTxByteSent(TimeSource& time_source) {
+    ASSERT(!last_downstream_tx_byte_sent_);
+    last_downstream_tx_byte_sent_ = time_source.monotonicTime();
+  }
+
+private:
+  absl::flat_hash_map<std::string, MonotonicTime> timings_;
+  // The time when the last byte of the request was received.
+  absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
+  // The time when the first byte of the response was sent downstream.
+  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
+  // The time when the last byte of the response was sent downstream.
+  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+};
+
+// Measure the number of bytes sent and received for a stream.
+struct BytesMeter {
+  uint64_t wireBytesSent() const { return wire_bytes_sent_; }
+  uint64_t wireBytesReceived() const { return wire_bytes_received_; }
+  uint64_t headerBytesSent() const { return header_bytes_sent_; }
+  uint64_t headerBytesReceived() const { return header_bytes_received_; }
+  void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
+  void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
+  void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
+  void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
+
+private:
+  uint64_t header_bytes_sent_{};
+  uint64_t header_bytes_received_{};
+  uint64_t wire_bytes_sent_{};
+  uint64_t wire_bytes_received_{};
+};
+
+using BytesMeterSharedPtr = std::shared_ptr<BytesMeter>;
+
 /**
  * Additional information about a completed request for logging.
  */
@@ -288,13 +345,14 @@ public:
    * @return std::string& the name of the route.
    */
   virtual const std::string& getRouteName() const PURE;
+
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
 
   /**
-   * @return the number of body bytes received in the request.
+   * @return the number of body bytes received by the stream.
    */
   virtual uint64_t bytesReceived() const PURE;
 
@@ -341,11 +399,6 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
 
   /**
-   * Sets the time when the last byte of the request was received.
-   */
-  virtual void onLastDownstreamRxByteReceived() PURE;
-
-  /**
    * Sets the upstream timing information for this stream. This is useful for
    * when multiple upstream requests are issued and we want to save timing
    * information for the one that "wins".
@@ -384,20 +437,10 @@ public:
   virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
 
   /**
-   * Sets the time when the first byte of the response is sent downstream.
-   */
-  virtual void onFirstDownstreamTxByteSent() PURE;
-
-  /**
    * @return the duration between the last byte of the response is sent downstream and the start of
    * the request.
    */
   virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
-
-  /**
-   * Sets the time when the last byte of the response is sent downstream.
-   */
-  virtual void onLastDownstreamTxByteSent() PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
@@ -410,6 +453,11 @@ public:
    * completed (i.e., when the request's ActiveStream is destroyed).
    */
   virtual void onRequestComplete() PURE;
+
+  /**
+   * @return the downstream timing information.
+   */
+  virtual DownstreamTiming& downstreamTiming() PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
@@ -464,7 +512,7 @@ public:
   virtual void healthCheck(bool is_health_check) PURE;
 
   /**
-   * @return the downstream address provider.
+   * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
 
@@ -602,6 +650,32 @@ public:
    * was never attempted upstream.
    */
   virtual absl::optional<uint32_t> attemptCount() const PURE;
+
+  /**
+   * @return the bytes meter for upstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getUpstreamBytesMeter() const PURE;
+
+  /**
+   * @return the bytes meter for downstream http stream.
+   */
+  virtual const BytesMeterSharedPtr& getDownstreamBytesMeter() const PURE;
+
+  /**
+   * @param upstream_bytes_meter, the bytes meter for upstream http stream.
+   */
+  virtual void setUpstreamBytesMeter(const BytesMeterSharedPtr& upstream_bytes_meter) PURE;
+
+  /**
+   * @param downstream_bytes_meter, the bytes meter for downstream http stream.
+   */
+  virtual void setDownstreamBytesMeter(const BytesMeterSharedPtr& downstream_bytes_meter) PURE;
+
+  static void syncUpstreamAndDownstreamBytesMeter(StreamInfo& downstream_info,
+                                                  StreamInfo& upstream_info) {
+    downstream_info.setUpstreamBytesMeter(upstream_info.getUpstreamBytesMeter());
+    upstream_info.setDownstreamBytesMeter(downstream_info.getDownstreamBytesMeter());
+  }
 };
 
 } // namespace StreamInfo

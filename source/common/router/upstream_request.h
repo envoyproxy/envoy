@@ -46,7 +46,6 @@ public:
 
   void resetStream();
   void setupPerTryTimeout();
-  void onPerTryTimeout();
   void maybeEndDecode(bool end_stream);
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
 
@@ -55,7 +54,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // UpstreamToDownstream (Http::ResponseDecoder)
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override;
@@ -120,7 +119,7 @@ public:
   bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
-  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
 
 private:
   bool shouldSendEndStream() {
@@ -132,11 +131,15 @@ private:
   void addResponseHeadersSize(uint64_t size) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
   }
+  void resetPerTryIdleTimer();
+  void onPerTryTimeout();
+  void onPerTryIdleTimeout();
 
   RouterFilterInterface& parent_;
   std::unique_ptr<GenericConnPool> conn_pool_;
   bool grpc_rq_success_deferred_;
   Event::TimerPtr per_try_timeout_;
+  Event::TimerPtr per_try_idle_timeout_;
   std::unique_ptr<GenericUpstream> upstream_;
   absl::optional<Http::StreamResetReason> deferred_reset_reason_;
   Buffer::InstancePtr buffered_request_body_;

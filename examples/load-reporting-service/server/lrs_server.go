@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v2"
+	gcpLoadStats "github.com/envoyproxy/go-control-plane/envoy/service/load_stats/v3"
 	"github.com/golang/protobuf/ptypes/duration"
 )
 

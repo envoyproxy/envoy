@@ -120,7 +120,7 @@ typed_config:
   path: /dev/null
   log_format:
     text_format_source:
-      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
+      inline_string: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH):256% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %ROUTE_NAME% %BYTES_RECEIVED% %BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% %UPSTREAM_WIRE_BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\"  \"%REQ(:AUTHORITY)%\"\n"
   )EOF";
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
@@ -135,10 +135,10 @@ typed_config:
 
   log->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
 
-  EXPECT_EQ(
-      "[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 3 - \"x.x.x.x\" "
-      "\"user-agent-set\" \"id\"  \"host\"\n",
-      output_);
+  EXPECT_EQ("[1999-01-01T00:00:00.000Z] \"GET / HTTP/1.1\" 0 UF route-test-name 1 2 0 0 3 - "
+            "\"x.x.x.x\" "
+            "\"user-agent-set\" \"id\"  \"host\"\n",
+            output_);
 }
 
 TEST_F(AccessLogImplTest, HeadersBytes) {
@@ -1592,42 +1592,37 @@ typed_config:
   }
 }
 
-// Test that the deprecated extension names still function.
+// Test that the deprecated extension names are disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  {
-    envoy::config::accesslog::v3::AccessLog config;
-    config.set_name("envoy.access_loggers.file");
-
-    EXPECT_NO_THROW(
-        Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
-  }
-
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.file_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.http_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 
   {
     envoy::config::accesslog::v3::AccessLog config;
     config.set_name("envoy.tcp_grpc_access_log");
 
-    EXPECT_NO_THROW(
+    EXPECT_THROW(
         Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-            config));
+            config),
+        EnvoyException);
   }
 }
 

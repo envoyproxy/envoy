@@ -23,7 +23,7 @@ envoy_extension_cc_test(
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http/bandwidth_limit:bandwidth_limit_lib",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/bandwidth_limit/v3:pkg_cc_proto",
     ],
 )
 

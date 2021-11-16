@@ -886,22 +886,56 @@ TEST(ValidateHeaders, HeaderNameWithUnderscores) {
                 rejected));
 }
 
+TEST(ValidateHeaders, Connect) {
+  {
+    // Basic connect.
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"}, {":authority", "foo.com:80"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Extended connect.
+    TestRequestHeaderMapImpl headers{{":method", "CONNECT"},
+                                     {":authority", "foo.com:80"},
+                                     {":path", "/"},
+                                     {":protocol", "websocket"}};
+    EXPECT_EQ(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Missing path.
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {":protocol", "websocket"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+  {
+    // Missing protocol.
+    TestRequestHeaderMapImpl headers{
+        {":method", "CONNECT"}, {":authority", "foo.com:80"}, {":path", "/"}};
+    EXPECT_NE(Http::okStatus(), HeaderUtility::checkRequiredRequestHeaders(headers));
+  }
+}
+
 TEST(ValidateHeaders, ContentLength) {
   bool should_close_connection;
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::ACCEPT,
-            HeaderUtility::validateContentLength("1,1", true, should_close_connection));
+  size_t content_length{0};
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::ACCEPT,
+      HeaderUtility::validateContentLength("1,1", true, should_close_connection, content_length));
+  EXPECT_FALSE(should_close_connection);
+  EXPECT_EQ(1, content_length);
+
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", true, should_close_connection, content_length));
   EXPECT_FALSE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", true, should_close_connection));
-  EXPECT_FALSE(should_close_connection);
-
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("1,2", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("1,2", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 
-  EXPECT_EQ(HeaderUtility::HeaderValidationResult::REJECT,
-            HeaderUtility::validateContentLength("-1", false, should_close_connection));
+  EXPECT_EQ(
+      HeaderUtility::HeaderValidationResult::REJECT,
+      HeaderUtility::validateContentLength("-1", false, should_close_connection, content_length));
   EXPECT_TRUE(should_close_connection);
 }
 

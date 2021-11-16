@@ -168,7 +168,8 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Socket::Type::Stream ||
@@ -212,11 +213,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Socket::Type::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::TcpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::UdpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   }
 }
 
@@ -984,6 +985,23 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
 
   if (existing_draining_listener != draining_listeners_.cend()) {
     draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
+    existing_draining_listener->listener_->debugLog("clones listener sockets");
+  } else {
+    auto existing_draining_filter_chain = std::find_if(
+        draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
+        [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
+          return draining_filter_chain.getDrainingListener()
+                     .listenSocketFactory()
+                     .getListenSocket(0)
+                     ->isOpen() &&
+                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+        });
+
+    if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
+      draining_listen_socket_factory =
+          &existing_draining_filter_chain->getDrainingListener().getSocketFactory();
+      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+    }
   }
 
   listener.setSocketFactory(draining_listen_socket_factory != nullptr
@@ -1000,9 +1018,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
                                      : ListenerComponentFactory::BindType::NoReusePort;
   }
   TRY_ASSERT_MAIN_THREAD {
+    Network::SocketCreationOptions creation_options;
+    creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     return std::make_unique<ListenSocketFactoryImpl>(
         factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, server_.options().concurrency());
+        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {

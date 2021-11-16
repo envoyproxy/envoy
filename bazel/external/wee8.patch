@@ -1,9 +1,9 @@
 # 1. Fix linking with unbundled toolchain on macOS.
-# 2. Increase VSZ limit to 64 TiB (allows us to start up to 6,553 VMs).
 # 3. Fix linking with MSAN.
---- wee8/build/toolchain/gcc_toolchain.gni
-+++ wee8/build/toolchain/gcc_toolchain.gni
-@@ -376,6 +376,8 @@ template("gcc_toolchain") {
+# 4. Fix build with LLVM/Clang versions older than 13.0.0.
+--- build/toolchain/gcc_toolchain.gni
++++ build/toolchain/gcc_toolchain.gni
+@@ -381,6 +381,8 @@ template("gcc_toolchain") {
          # AIX does not support either -D (deterministic output) or response
          # files.
          command = "$ar -X64 {{arflags}} -r -c -s {{output}} {{inputs}}"
@@ -12,7 +12,7 @@
        } else {
          rspfile = "{{output}}.rsp"
          rspfile_content = "{{inputs}}"
-@@ -565,7 +567,7 @@ template("gcc_toolchain") {
+@@ -595,7 +597,7 @@ template("gcc_toolchain") {
 
        start_group_flag = ""
        end_group_flag = ""
@@ -21,20 +21,9 @@
          # the "--start-group .. --end-group" feature isn't available on the aix ld.
          start_group_flag = "-Wl,--start-group"
          end_group_flag = "-Wl,--end-group "
---- wee8/src/objects/backing-store.cc
-+++ wee8/src/objects/backing-store.cc
-@@ -53,7 +53,7 @@ constexpr size_t kAddressSpaceLimit = 0x8000000000L;  // 512 GiB
- // RISC-V64 has a user space of 256GB on the Sv39 scheme.
- constexpr size_t kAddressSpaceLimit = 0x4000000000L;  // 256 GiB
- #elif V8_TARGET_ARCH_64_BIT
--constexpr size_t kAddressSpaceLimit = 0x10100000000L;  // 1 TiB + 4 GiB
-+constexpr size_t kAddressSpaceLimit = 0x400100000000L; // 64 TiB + 4 GiB
- #else
- constexpr size_t kAddressSpaceLimit = 0xC0000000;  // 3 GiB
- #endif
---- wee8/build/config/sanitizers/sanitizers.gni
-+++ wee8/build/config/sanitizers/sanitizers.gni
-@@ -153,7 +153,7 @@ if (!is_a_target_toolchain) {
+--- build/config/sanitizers/sanitizers.gni
++++ build/config/sanitizers/sanitizers.gni
+@@ -158,7 +158,7 @@ if (!is_a_target_toolchain) {
  # standard system libraries. We have instrumented system libraries for msan,
  # which requires them to prevent false positives.
  # TODO(thakis): Maybe remove this variable.
@@ -43,7 +32,7 @@
 
  # Whether we are doing a fuzzer build. Normally this should be checked instead
  # of checking "use_libfuzzer || use_afl" because often developers forget to
-@@ -202,8 +202,7 @@ assert(!using_sanitizer || is_clang,
+@@ -207,8 +207,7 @@ assert(!using_sanitizer || is_clang,
  assert(!is_cfi || is_clang,
         "is_cfi requires setting is_clang = true in 'gn args'")
 
@@ -53,3 +42,158 @@
 
  if (use_libfuzzer && (is_linux || is_chromeos)) {
    if (is_asan) {
+--- build/config/compiler/BUILD.gn
++++ build/config/compiler/BUILD.gn
+@@ -1253,19 +1253,12 @@ config("compiler_deterministic") {
+     # different build directory like "out/feature_a" and "out/feature_b" if
+     # we build same files with same compile flag.
+     # Other paths are already given in relative, no need to normalize them.
+-    if (is_nacl) {
+-      # TODO(https://crbug.com/1231236): Use -ffile-compilation-dir= here.
+-      cflags += [
+-        "-Xclang",
+-        "-fdebug-compilation-dir",
+-        "-Xclang",
+-        ".",
+-      ]
+-    } else {
+-      # -ffile-compilation-dir is an alias for both -fdebug-compilation-dir=
+-      # and -fcoverage-compilation-dir=.
+-      cflags += [ "-ffile-compilation-dir=." ]
+-    }
++    cflags += [
++      "-Xclang",
++      "-fdebug-compilation-dir",
++      "-Xclang",
++      ".",
++    ]
+     if (!is_win) {
+       # We don't use clang -cc1as on Windows (yet? https://crbug.com/762167)
+       asmflags = [ "-Wa,-fdebug-compilation-dir,." ]
+--- build/config/sanitizers/BUILD.gn
++++ build/config/sanitizers/BUILD.gn
+@@ -272,11 +272,11 @@ config("asan_flags") {
+   if (is_asan) {
+     cflags += [ "-fsanitize=address" ]
+     if (is_win) {
+-      if (!defined(asan_win_blocklist_path)) {
+-        asan_win_blocklist_path =
++      if (!defined(asan_win_blacklist_path)) {
++        asan_win_blacklist_path =
+             rebase_path("//tools/memory/asan/blocklist_win.txt", root_build_dir)
+       }
+-      cflags += [ "-fsanitize-ignorelist=$asan_win_blocklist_path" ]
++      cflags += [ "-fsanitize-blacklist=$asan_win_blacklist_path" ]
+     }
+   }
+ }
+@@ -306,13 +306,13 @@ config("link_shared_library") {
+ config("cfi_flags") {
+   cflags = []
+   if (is_cfi && current_toolchain == default_toolchain) {
+-    if (!defined(cfi_ignorelist_path)) {
+-      cfi_ignorelist_path =
++    if (!defined(cfi_blacklist_path)) {
++      cfi_blacklist_path =
+           rebase_path("//tools/cfi/ignores.txt", root_build_dir)
+     }
+     cflags += [
+       "-fsanitize=cfi-vcall",
+-      "-fsanitize-ignorelist=$cfi_ignorelist_path",
++      "-fsanitize-blacklist=$cfi_blacklist_path",
+     ]
+ 
+     if (use_cfi_cast) {
+@@ -409,14 +409,14 @@ config("msan_flags") {
+   if (is_msan) {
+     assert(is_linux || is_chromeos,
+            "msan only supported on linux x86_64/ChromeOS")
+-    if (!defined(msan_ignorelist_path)) {
+-      msan_ignorelist_path =
+-          rebase_path("//tools/msan/ignorelist.txt", root_build_dir)
++    if (!defined(msan_blacklist_path)) {
++      msan_blacklist_path =
++          rebase_path("//tools/msan/blacklist.txt", root_build_dir)
+     }
+     cflags = [
+       "-fsanitize=memory",
+       "-fsanitize-memory-track-origins=$msan_track_origins",
+-      "-fsanitize-ignorelist=$msan_ignorelist_path",
++      "-fsanitize-blacklist=$msan_blacklist_path",
+     ]
+   }
+ }
+@@ -424,13 +424,13 @@ config("msan_flags") {
+ config("tsan_flags") {
+   if (is_tsan) {
+     assert(is_linux || is_chromeos, "tsan only supported on linux x86_64")
+-    if (!defined(tsan_ignorelist_path)) {
+-      tsan_ignorelist_path =
++    if (!defined(tsan_blacklist_path)) {
++      tsan_blacklist_path =
+           rebase_path("//tools/memory/tsan_v2/ignores.txt", root_build_dir)
+     }
+     cflags = [
+       "-fsanitize=thread",
+-      "-fsanitize-ignorelist=$tsan_ignorelist_path",
++      "-fsanitize-blacklist=$tsan_blacklist_path",
+     ]
+   }
+ }
+@@ -438,8 +438,8 @@ config("tsan_flags") {
+ config("ubsan_flags") {
+   cflags = []
+   if (is_ubsan) {
+-    if (!defined(ubsan_ignorelist_path)) {
+-      ubsan_ignorelist_path =
++    if (!defined(ubsan_blacklist_path)) {
++      ubsan_blacklist_path =
+           rebase_path("//tools/ubsan/ignorelist.txt", root_build_dir)
+     }
+     cflags += [
+@@ -456,7 +456,7 @@ config("ubsan_flags") {
+       "-fsanitize=signed-integer-overflow",
+       "-fsanitize=unreachable",
+       "-fsanitize=vla-bound",
+-      "-fsanitize-ignorelist=$ubsan_ignorelist_path",
++      "-fsanitize-blacklist=$ubsan_blacklist_path",
+     ]
+ 
+     # Chromecast ubsan builds fail to compile with these
+@@ -486,8 +486,8 @@ config("ubsan_no_recover") {
+ 
+ config("ubsan_security_flags") {
+   if (is_ubsan_security) {
+-    if (!defined(ubsan_security_ignorelist_path)) {
+-      ubsan_security_ignorelist_path =
++    if (!defined(ubsan_security_blacklist_path)) {
++      ubsan_security_blacklist_path =
+           rebase_path("//tools/ubsan/security_ignorelist.txt", root_build_dir)
+     }
+     cflags = [
+@@ -495,7 +495,7 @@ config("ubsan_security_flags") {
+       "-fsanitize=shift",
+       "-fsanitize=signed-integer-overflow",
+       "-fsanitize=vla-bound",
+-      "-fsanitize-ignorelist=$ubsan_security_ignorelist_path",
++      "-fsanitize-blacklist=$ubsan_security_blacklist_path",
+     ]
+   }
+ }
+@@ -508,13 +508,13 @@ config("ubsan_null_flags") {
+ 
+ config("ubsan_vptr_flags") {
+   if (is_ubsan_vptr) {
+-    if (!defined(ubsan_vptr_ignorelist_path)) {
+-      ubsan_vptr_ignorelist_path =
++    if (!defined(ubsan_vptr_blacklist_path)) {
++      ubsan_vptr_blacklist_path =
+           rebase_path("//tools/ubsan/vptr_ignorelist.txt", root_build_dir)
+     }
+     cflags = [
+       "-fsanitize=vptr",
+-      "-fsanitize-ignorelist=$ubsan_vptr_ignorelist_path",
++      "-fsanitize-blacklist=$ubsan_vptr_blacklist_path",
+     ]
+   }
+ }

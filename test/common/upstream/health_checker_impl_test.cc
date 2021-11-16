@@ -900,7 +900,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercent) {
   }
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
+TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious1xx) {
   setupNoServiceValidationHC();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
 
@@ -921,8 +921,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessWithSpurious100Continue) {
 
   std::unique_ptr<Http::TestResponseHeaderMapImpl> continue_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  test_sessions_[0]->stream_response_callbacks_->decode100ContinueHeaders(
-      std::move(continue_headers));
+  test_sessions_[0]->stream_response_callbacks_->decode1xxHeaders(std::move(continue_headers));
 
   respond(0, "200", false, false, true);
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
@@ -2076,6 +2075,7 @@ TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 
@@ -3134,14 +3134,17 @@ TEST(HttpStatusChecker, Default) {
     path: /healthcheck
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_TRUE(http_status_checker.inRange(200));
-  EXPECT_FALSE(http_status_checker.inRange(204));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(200));
 }
 
-TEST(HttpStatusChecker, Single100) {
+TEST(HttpStatusChecker, SingleExpected100) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3156,17 +3159,44 @@ TEST(HttpStatusChecker, Single100) {
         end: 101
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(99));
-  EXPECT_TRUE(http_status_checker.inRange(100));
-  EXPECT_FALSE(http_status_checker.inRange(101));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(99));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(100));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(101));
 }
 
-TEST(HttpStatusChecker, Single599) {
+TEST(HttpStatusChecker, SingleRetriable100) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 100
+        end: 101
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(99));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(100));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(101));
+}
+
+TEST(HttpStatusChecker, SingleExpected599) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3181,17 +3211,44 @@ TEST(HttpStatusChecker, Single599) {
         end: 600
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(598));
-  EXPECT_TRUE(http_status_checker.inRange(599));
-  EXPECT_FALSE(http_status_checker.inRange(600));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(598));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(599));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(600));
 }
 
-TEST(HttpStatusChecker, Ranges_204_304) {
+TEST(HttpStatusChecker, SingleRetriable599) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 599
+        end: 600
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(598));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(599));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(600));
+}
+
+TEST(HttpStatusChecker, ExpectedRanges_204_304) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3208,20 +3265,52 @@ TEST(HttpStatusChecker, Ranges_204_304) {
         end: 305
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-      parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200);
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
 
-  EXPECT_FALSE(http_status_checker.inRange(200));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(200));
 
-  EXPECT_FALSE(http_status_checker.inRange(203));
-  EXPECT_TRUE(http_status_checker.inRange(204));
-  EXPECT_FALSE(http_status_checker.inRange(205));
-  EXPECT_FALSE(http_status_checker.inRange(303));
-  EXPECT_TRUE(http_status_checker.inRange(304));
-  EXPECT_FALSE(http_status_checker.inRange(305));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(203));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(204));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(205));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(303));
+  EXPECT_TRUE(http_status_checker.inExpectedRanges(304));
+  EXPECT_FALSE(http_status_checker.inExpectedRanges(305));
 }
 
-TEST(HttpStatusChecker, Below100) {
+TEST(HttpStatusChecker, RetriableRanges_304_404) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 304
+        end: 305
+      - start: 404
+        end: 405
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+      conf.http_health_check().expected_statuses(), conf.http_health_check().retriable_statuses(),
+      200);
+
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(303));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(304));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(305));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(403));
+  EXPECT_TRUE(http_status_checker.inRetriableRanges(404));
+  EXPECT_FALSE(http_status_checker.inRetriableRanges(405));
+}
+
+TEST(HttpStatusChecker, ExpectedBelow100) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3236,13 +3325,40 @@ TEST(HttpStatusChecker, Below100) {
         end: 100
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException, "Invalid http status range: expecting start >= 100, but found start=99");
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http expected status range: expecting start >= 100, but found start=99");
 }
 
-TEST(HttpStatusChecker, Above599) {
+TEST(HttpStatusChecker, RetriableBelow100) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthcheck
+    retriable_statuses:
+      - start: 99
+        end: 100
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http retriable status range: expecting start >= 100, but found start=99");
+}
+
+TEST(HttpStatusChecker, ExpectedAbove599) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3257,13 +3373,40 @@ TEST(HttpStatusChecker, Above599) {
         end: 601
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException, "Invalid http status range: expecting end <= 600, but found end=601");
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http expected status range: expecting end <= 600, but found end=601");
 }
 
-TEST(HttpStatusChecker, InvalidRange) {
+TEST(HttpStatusChecker, RetriableAbove599) {
+  const std::string yaml = R"EOF(
+  timeout: 1s
+  interval: 1s
+  unhealthy_threshold: 2
+  healthy_threshold: 2
+  http_health_check:
+    service_name_matcher:
+        prefix: locations
+    path: /healthchecka
+    retriable_statuses:
+      - start: 600
+        end: 601
+  )EOF";
+
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(
+      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
+      EnvoyException,
+      "Invalid http retriable status range: expecting end <= 600, but found end=601");
+}
+
+TEST(HttpStatusChecker, InvalidExpectedRange) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3278,14 +3421,16 @@ TEST(HttpStatusChecker, InvalidRange) {
         end: 200
   )EOF";
 
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
   EXPECT_THROW_WITH_MESSAGE(
       HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
+          conf.http_health_check().expected_statuses(),
+          conf.http_health_check().retriable_statuses(), 200),
       EnvoyException,
-      "Invalid http status range: expecting start < end, but found start=200 and end=200");
+      "Invalid http expected status range: expecting start < end, but found start=200 and end=200");
 }
 
-TEST(HttpStatusChecker, InvalidRange2) {
+TEST(HttpStatusChecker, InvalidRetriableRange) {
   const std::string yaml = R"EOF(
   timeout: 1s
   interval: 1s
@@ -3295,16 +3440,18 @@ TEST(HttpStatusChecker, InvalidRange2) {
     service_name_matcher:
         prefix: locations
     path: /healthchecka
-    expected_statuses:
-      - start: 201
+    retriable_statuses:
+      - start: 200
         end: 200
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
-          parseHealthCheckFromV3Yaml(yaml).http_health_check().expected_statuses(), 200),
-      EnvoyException,
-      "Invalid http status range: expecting start < end, but found start=201 and end=200");
+  auto conf = parseHealthCheckFromV3Yaml(yaml);
+  EXPECT_THROW_WITH_MESSAGE(HttpHealthCheckerImpl::HttpStatusChecker http_status_checker(
+                                conf.http_health_check().expected_statuses(),
+                                conf.http_health_check().retriable_statuses(), 200),
+                            EnvoyException,
+                            "Invalid http retriable status range: expecting start < end, but found "
+                            "start=200 and end=200");
 }
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
@@ -4657,6 +4804,7 @@ TEST_F(GrpcHealthCheckerImplTest, DynamicAddAndRemove) {
   HostVector removed{cluster_->prioritySet().getMockHostSet(0)->hosts_.back()};
   cluster_->prioritySet().getMockHostSet(0)->hosts_.clear();
   EXPECT_CALL(*test_sessions_[0]->client_connection_, close(_));
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
   cluster_->prioritySet().getMockHostSet(0)->runCallbacks({}, removed);
 }
 

@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //    :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
 //    where TYPE is type of metadata (see above for supported types),
 //    NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-//    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+//    lookup key in the namespace with the option of specifying nested keys separated by ':',
 //    and Z is an optional parameter denoting string truncation up to Z characters long.
 //    The data will be logged as a JSON string. For example, for the following ROUTE metadata:
 //

@@ -35,3 +35,18 @@ envoy_extension_cc_test(
         "//test/mocks/server:factory_context_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "grpc_http1_bridge_integration_test",
+    srcs = [
+        "grpc_http1_bridge_integration_test.cc",
+    ],
+    extension_names = ["envoy.filters.http.grpc_http1_bridge"],
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/integration:http_integration_lib",
+    ],
+)

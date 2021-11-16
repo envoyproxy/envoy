@@ -48,17 +48,21 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
   EXPECT_EQ(1, admin_.concurrency());
-  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  EXPECT_FALSE(admin_.preserveExternalRequestId());
   EXPECT_EQ(nullptr, admin_.tracer());
-  EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
-  EXPECT_EQ(false, admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
+  EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED);
+  EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
   std::ifstream address_file(address_out_path_);
   std::string address_from_file;
   std::getline(address_file, address_from_file);
-  EXPECT_EQ(admin_.socket().addressProvider().localAddress()->asString(), address_from_file);
+  EXPECT_EQ(admin_.socket().connectionInfoProvider().localAddress()->asString(), address_from_file);
 }
 
 TEST_P(AdminInstanceTest, AdminAddress) {

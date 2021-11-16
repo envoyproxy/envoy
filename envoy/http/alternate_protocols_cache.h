@@ -9,6 +9,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/time.h"
 #include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/event/dispatcher.h"
 
 #include "absl/strings/string_view.h"
 
@@ -92,10 +93,11 @@ public:
    * Sets the possible alternative protocols which can be used to connect to the
    * specified origin. Expires after the specified expiration time.
    * @param origin The origin to set alternate protocols for.
-   * @param protocols A list of alternate protocols.
+   * @param protocols A list of alternate protocols. This list may be truncated
+   * by the cache.
    */
   virtual void setAlternatives(const Origin& origin,
-                               const std::vector<AlternateProtocol>& protocols) PURE;
+                               std::vector<AlternateProtocol>& protocols) PURE;
 
   /**
    * Returns the possible alternative protocols which can be used to connect to the
@@ -127,9 +129,11 @@ public:
    * Get an alternate protocols cache.
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
+   * @param dispatcher supplies the current thread's dispatcher, for cache creation.
    */
   virtual AlternateProtocolsCacheSharedPtr
-  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config) PURE;
+  getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
+           Event::Dispatcher& dispatcher) PURE;
 };
 
 using AlternateProtocolsCacheManagerSharedPtr = std::shared_ptr<AlternateProtocolsCacheManager>;

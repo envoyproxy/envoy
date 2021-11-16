@@ -12,6 +12,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/dns_utils.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
@@ -49,13 +50,13 @@ LogicalDnsCluster::LogicalDnsCluster(
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api,
-                      factory_context.dispatcher().timeSource()),
+                      factory_context.mainThreadDispatcher().timeSource()),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(
-          factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
+          factory_context.mainThreadDispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
       load_assignment_(convertPriority(cluster.load_assignment())) {
   failure_backoff_strategy_ =
@@ -122,15 +123,16 @@ void LogicalDnsCluster::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
           info_->stats().update_success_.inc();
           // TODO(mattklein123): Move port handling into the DNS interface.
+          uint32_t port = Network::Utility::portFromTcpUrl(dns_url_);
           ASSERT(response.front().address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*(response.front().address_),
-                                                   Network::Utility::portFromTcpUrl(dns_url_));
+              Network::Utility::getAddressWithPort(*(response.front().address_), port);
+          auto address_list = DnsUtils::generateAddressList(response, port);
 
           if (!logical_host_) {
-            logical_host_ =
-                std::make_shared<LogicalHost>(info_, hostname_, new_address, localityLbEndpoint(),
-                                              lbEndpoint(), nullptr, time_source_);
+            logical_host_ = std::make_shared<LogicalHost>(info_, hostname_, new_address,
+                                                          address_list, localityLbEndpoint(),
+                                                          lbEndpoint(), nullptr, time_source_);
 
             const auto& locality_lb_endpoint = localityLbEndpoint();
             PriorityStateManager priority_state_manager(*this, local_info_, nullptr);
@@ -143,12 +145,15 @@ void LogicalDnsCluster::startResolve() {
                 absl::nullopt, absl::nullopt, absl::nullopt);
           }
 
-          if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
+          if (!current_resolved_address_ ||
+              (*new_address != *current_resolved_address_ ||
+               DnsUtils::listChanged(address_list, current_resolved_address_list_))) {
             current_resolved_address_ = new_address;
+            current_resolved_address_list_ = address_list;
 
             // Make sure that we have an updated address for admin display, health
             // checking, and creating real host connections.
-            logical_host_->setNewAddress(new_address, lbEndpoint());
+            logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
           }
 
           // reset failure backoff strategy because there was a success.

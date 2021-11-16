@@ -122,9 +122,6 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
                                      route_config_name_, route_config.name()));
   }
-  if (route_config_provider_opt_.has_value()) {
-    route_config_provider_opt_.value()->validateConfig(route_config);
-  }
   std::unique_ptr<Init::ManagerImpl> noop_init_manager;
   std::unique_ptr<Cleanup> resume_rds;
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
@@ -292,12 +289,6 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   }
 }
 
-void RdsRouteConfigProviderImpl::validateConfig(
-    const envoy::config::route::v3::RouteConfiguration& config) const {
-  // TODO(lizan): consider cache the config here until onConfigUpdate.
-  ConfigImpl validation_config(config, optional_http_filters_, factory_context_, validator_, false);
-}
-
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
@@ -309,9 +300,11 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
   // determine if the RdsRouteConfigProviderImpl instance is still valid.
-  factory_context_.dispatcher().post([this, maybe_still_alive = std::weak_ptr<bool>(still_alive_),
-                                      alias, &thread_local_dispatcher,
-                                      route_config_updated_cb]() -> void {
+  factory_context_.mainThreadDispatcher().post([this,
+                                                maybe_still_alive =
+                                                    std::weak_ptr<bool>(still_alive_),
+                                                alias, &thread_local_dispatcher,
+                                                route_config_updated_cb]() -> void {
     if (maybe_still_alive.lock()) {
       subscription_->updateOnDemand(alias);
       config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});

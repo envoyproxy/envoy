@@ -76,7 +76,7 @@ public:
   bool healthCheck() const override { return health_check_request_; }
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
   const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
-    return *downstream_address_provider_;
+    return *downstream_connection_info_provider_;
   }
 
   void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
@@ -107,10 +107,6 @@ public:
     return duration(last_rx_byte_received_);
   }
 
-  void onLastDownstreamRxByteReceived() override {
-    last_rx_byte_received_ = timeSystem().monotonicTime();
-  }
-
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }
@@ -127,22 +123,16 @@ public:
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    return duration(first_downstream_tx_byte_sent_);
-  }
-
-  void onFirstDownstreamTxByteSent() override {
-    first_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.firstDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    return duration(last_downstream_tx_byte_sent_);
-  }
-
-  void onLastDownstreamTxByteSent() override {
-    last_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
+    return duration(downstream_timing_.lastDownstreamTxByteSent());
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
+
+  Envoy::StreamInfo::DownstreamTiming& downstreamTiming() override { return downstream_timing_; }
 
   void setUpstreamTiming(const Envoy::StreamInfo::UpstreamTiming& upstream_timing) override {
     upstream_timing_ = upstream_timing;
@@ -219,17 +209,30 @@ public:
 
   absl::optional<uint32_t> attemptCount() const override { return attempt_count_; }
 
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getUpstreamBytesMeter() const override {
+    return upstream_bytes_meter_;
+  }
+
+  const Envoy::StreamInfo::BytesMeterSharedPtr& getDownstreamBytesMeter() const override {
+    return downstream_bytes_meter_;
+  }
+
+  void setUpstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& upstream_bytes_meter) override {
+    upstream_bytes_meter_ = upstream_bytes_meter;
+  }
+
+  void setDownstreamBytesMeter(
+      const Envoy::StreamInfo::BytesMeterSharedPtr& downstream_bytes_meter) override {
+    downstream_bytes_meter_ = downstream_bytes_meter;
+  }
+
   Random::RandomGeneratorImpl random_;
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
+  Envoy::StreamInfo::DownstreamTiming downstream_timing_;
   absl::optional<MonotonicTime> last_rx_byte_received_;
-  absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
-  absl::optional<MonotonicTime> first_downstream_tx_byte_sent_;
-  absl::optional<MonotonicTime> last_downstream_tx_byte_sent_;
   absl::optional<MonotonicTime> end_time_;
 
   absl::optional<Http::Protocol> protocol_{Http::Protocol::Http11};
@@ -241,7 +244,7 @@ public:
   bool health_check_request_{};
   std::string route_name_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
-  Network::ConnectionInfoSetterSharedPtr downstream_address_provider_{
+  Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
@@ -262,6 +265,10 @@ public:
   Tracing::Reason trace_reason_{Tracing::Reason::NotTraceable};
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  Envoy::StreamInfo::BytesMeterSharedPtr upstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
+  Envoy::StreamInfo::BytesMeterSharedPtr downstream_bytes_meter_{
+      std::make_shared<Envoy::StreamInfo::BytesMeter>()};
 };
 
 } // namespace Envoy

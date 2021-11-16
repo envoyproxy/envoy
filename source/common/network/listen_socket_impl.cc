@@ -19,13 +19,13 @@ namespace Envoy {
 namespace Network {
 
 Api::SysCallIntResult ListenSocketImpl::bind(Network::Address::InstanceConstSharedPtr address) {
-  address_provider_->setLocalAddress(address);
+  connection_info_provider_->setLocalAddress(address);
 
-  const Api::SysCallIntResult result = SocketImpl::bind(address_provider_->localAddress());
+  const Api::SysCallIntResult result = SocketImpl::bind(connection_info_provider_->localAddress());
   if (SOCKET_FAILURE(result.return_value_)) {
     close();
     throw SocketBindException(fmt::format("cannot bind '{}': {}",
-                                          address_provider_->localAddress()->asString(),
+                                          connection_info_provider_->localAddress()->asString(),
                                           errorDetails(result.errno_)),
                               result.errno_);
   }
@@ -41,13 +41,13 @@ void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsShar
 
 void ListenSocketImpl::setupSocket(const Network::Socket::OptionsSharedPtr& options) {
   setListenSocketOptions(options);
-  bind(address_provider_->localAddress());
+  bind(connection_info_provider_->localAddress());
 }
 
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
-    : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address), address) {
+    : ListenSocketImpl(ioHandleForAddr(Socket::Type::Stream, address, {}), address) {
   RELEASE_ASSERT(io_handle_->isOpen(), "");
-  bind(address_provider_->localAddress());
+  bind(connection_info_provider_->localAddress());
 }
 
 UdsListenSocket::UdsListenSocket(IoHandlePtr&& io_handle,

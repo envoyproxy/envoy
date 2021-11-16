@@ -21,6 +21,9 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 
+#include "test/common/protobuf/utility_test_file_wip.pb.h"
+#include "test/common/protobuf/utility_test_file_wip_2.pb.h"
+#include "test/common/protobuf/utility_test_message_field_wip.pb.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -36,6 +39,7 @@
 #include "absl/container/node_hash_set.h"
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
+#include "xds/type/v3/typed_struct.pb.h"
 
 using namespace std::chrono_literals;
 
@@ -45,30 +49,17 @@ using testing::HasSubstr;
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
-  RuntimeStatsHelper(bool allow_deprecated_v2_api = false)
+  explicit RuntimeStatsHelper()
       : runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")),
         deprecated_feature_seen_since_process_start_(
             store_.gauge("runtime.deprecated_feature_seen_since_process_start",
-                         Stats::Gauge::ImportMode::NeverImport)) {
-    if (allow_deprecated_v2_api) {
-      Runtime::LoaderSingleton::getExisting()->mergeValues({
-          {"envoy.test_only.broken_in_production.enable_deprecated_v2_api", "true"},
-          {"envoy.features.enable_all_deprecated_features", "true"},
-      });
-    }
-  }
+                         Stats::Gauge::ImportMode::NeverImport)) {}
 
   Stats::Counter& runtime_deprecated_feature_use_;
   Stats::Gauge& deprecated_feature_seen_since_process_start_;
 };
 
 class ProtobufUtilityTest : public testing::Test, protected RuntimeStatsHelper {};
-// TODO(htuch): During/before the v2 removal, cleanup the various examples that explicitly refer to
-// v2 API protos and replace with upgrade examples not tie to the concrete API.
-class ProtobufV2ApiUtilityTest : public testing::Test, protected RuntimeStatsHelper {
-public:
-  ProtobufV2ApiUtilityTest() : RuntimeStatsHelper(true) {}
-};
 
 TEST_F(ProtobufUtilityTest, ConvertPercentNaNDouble) {
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
@@ -448,6 +439,37 @@ insensitive_string: This field should not be redacted.
 insensitive_repeated_string:
   - This field should not be redacted (1 of 2).
   - This field should not be redacted (2 of 2).
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Fields that are values in a sensitive map should be redacted.
+TEST_F(ProtobufUtilityTest, RedactMap) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string_map:
+  "a": "b"
+sensitive_int_map:
+  "x": 12345
+insensitive_string_map:
+  "c": "d"
+insensitive_int_map:
+  "y": 123456
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string_map:
+  "a": "[redacted]"
+sensitive_int_map:
+  "x":
+insensitive_string_map:
+  "c": "d"
+insensitive_int_map:
+  "y": 123456
 )EOF",
                             expected);
 
@@ -978,35 +1000,40 @@ insensitive_repeated_typed_struct:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+template <typename T> class TypedStructUtilityTest : public ProtobufUtilityTest {};
+
+using TypedStructTypes = ::testing::Types<xds::type::v3::TypedStruct, udpa::type::v1::TypedStruct>;
+TYPED_TEST_SUITE(TypedStructUtilityTest, TypedStructTypes);
+
 // Empty `TypedStruct` can be trivially redacted.
-TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypedStruct) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.test.Sensitive
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithNoTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithNoTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 value:
   sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 // Messages packed into `TypedStruct` with unknown type URLs are skipped.
-TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
-  udpa::type::v1::TypedStruct actual;
+TYPED_TEST(TypedStructUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  TypeParam actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.unknown.Message
 value:
@@ -1014,14 +1041,14 @@ value:
 )EOF",
                             actual);
 
-  udpa::type::v1::TypedStruct expected = actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
-TEST_F(ProtobufUtilityTest, RedactEmptyTypeUrlTypedStruct) {
-  udpa::type::v1::TypedStruct actual;
-  udpa::type::v1::TypedStruct expected = actual;
+TYPED_TEST(TypedStructUtilityTest, RedactEmptyTypeUrlTypedStruct) {
+  TypeParam actual;
+  TypeParam expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
@@ -1333,7 +1360,7 @@ TEST_F(ProtobufUtilityTest, AnyConvertAndValidateFailedValidation) {
 }
 
 // MessageUtility::unpackTo() with the wrong type throws.
-TEST_F(ProtobufV2ApiUtilityTest, UnpackToWrongType) {
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
@@ -1558,6 +1585,76 @@ TEST(DurationUtilTest, OutOfRange) {
     duration.set_seconds(Protobuf::util::TimeUtil::kDurationMaxSeconds + 1);
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
   }
+}
+
+// Verify WIP accounting of the file based annotations. This test uses the strict validator to test
+// that code path.
+TEST_F(ProtobufUtilityTest, MessageInWipFile) {
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::StrictValidationVisitorImpl validation_visitor;
+
+  utility_test::file_wip::Foo foo;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.file_wip.Foo' is contained in proto file "
+      "'test/common/protobuf/utility_test_file_wip.proto' marked as work-in-progress. API features "
+      "marked as work-in-progress are not considered stable, are not covered by the threat model, "
+      "are not supported by the security team, and are subject to breaking changes. Do not use "
+      "this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
+
+  utility_test::file_wip_2::Foo foo2;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.file_wip_2.Foo' is contained in proto file "
+      "'test/common/protobuf/utility_test_file_wip_2.proto' marked as work-in-progress. API "
+      "features marked as work-in-progress are not considered stable, are not covered by the "
+      "threat model, are not supported by the security team, and are subject to breaking changes. "
+      "Do not use this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo2, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
+}
+
+// Verify WIP accounting for message and field annotations. This test uses the warning validator
+// to test that code path.
+TEST_F(ProtobufUtilityTest, MessageWip) {
+  Stats::TestUtil::TestStore stats;
+  Stats::Counter& unknown_counter = stats.counter("unknown_counter");
+  Stats::Counter& wip_counter = stats.counter("wip_counter");
+  ProtobufMessage::WarningValidationVisitorImpl validation_visitor;
+
+  utility_test::message_field_wip::Foo foo;
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "message 'utility_test.message_field_wip.Foo' is marked as work-in-progress. API features "
+      "marked as work-in-progress are not considered stable, are not covered by the threat model, "
+      "are not supported by the security team, and are subject to breaking changes. Do not use "
+      "this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(foo, validation_visitor));
+
+  EXPECT_EQ(0, wip_counter.value());
+  validation_visitor.setCounters(unknown_counter, wip_counter);
+  EXPECT_EQ(1, wip_counter.value());
+
+  utility_test::message_field_wip::Bar bar;
+  EXPECT_NO_LOGS(MessageUtil::checkForUnexpectedFields(bar, validation_visitor));
+
+  bar.set_test_field(true);
+  EXPECT_LOG_CONTAINS(
+      "warning",
+      "field 'utility_test.message_field_wip.Bar.test_field' is marked as work-in-progress. API "
+      "features marked as work-in-progress are not considered stable, are not covered by the "
+      "threat model, are not supported by the security team, and are subject to breaking changes. "
+      "Do not use this feature without understanding each of the previous points.",
+      MessageUtil::checkForUnexpectedFields(bar, validation_visitor));
+
+  EXPECT_EQ(2, wip_counter.value());
 }
 
 class DeprecatedFieldsTest : public testing::Test, protected RuntimeStatsHelper {
@@ -1857,51 +1954,6 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnumGlobalOverride)) {
       "'envoy.test.deprecation_test.Base.InnerMessageWithDeprecationEnum.deprecated_enum' "
       "from file deprecated.proto. This enum value will be removed from Envoy soon.",
       checkForDeprecation(base));
-}
-
-// Verify that direct use of a hidden_envoy_deprecated field fails, but upgrade
-// succeeds
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(ManualDeprecatedFieldAddition)) {
-  // Create a base message and insert a deprecated field. When upgrading the
-  // deprecated field should be set as deprecated, and a warning should be logged
-  envoy::test::deprecation_test::Base base_should_warn =
-      TestUtility::parseYaml<envoy::test::deprecation_test::Base>(R"EOF(
-      not_deprecated: field1
-      is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  // Non-fatal checks for a deprecated field should log rather than throw an exception.
-  EXPECT_LOG_CONTAINS("warning",
-                      "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated'",
-                      checkForDeprecation(base_should_warn));
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
-
-  // Create an upgraded message and insert a deprecated field. This is a bypass
-  // of the upgrading procedure validation, and should fail
-  envoy::test::deprecation_test::UpgradedBase base_should_fail =
-      TestUtility::parseYaml<envoy::test::deprecation_test::UpgradedBase>(R"EOF(
-      not_deprecated: field1
-      hidden_envoy_deprecated_is_deprecated: hidden_field1
-      not_deprecated_message:
-        inner_not_deprecated: subfield1
-      repeated_message:
-        - inner_not_deprecated: subfield2
-    )EOF");
-
-  EXPECT_THROW_WITH_REGEX(
-      MessageUtil::checkForUnexpectedFields(base_should_fail,
-                                            ProtobufMessage::getStrictValidationVisitor()),
-      ProtoValidationException,
-      "Illegal use of hidden_envoy_deprecated_ V2 field "
-      "'envoy.test.deprecation_test.UpgradedBase.hidden_envoy_deprecated_is_deprecated'");
-  // The config will be rejected, so the feature will not be used.
-  EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
-  EXPECT_EQ(1, deprecated_feature_seen_since_process_start_.value());
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};

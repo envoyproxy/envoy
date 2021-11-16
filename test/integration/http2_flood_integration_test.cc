@@ -18,6 +18,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -31,19 +32,31 @@ const uint32_t ControlFrameFloodLimit = 100;
 const uint32_t AllFrameFloodLimit = 1000;
 } // namespace
 
+std::string testParamsToString(
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
+  const bool is_v4 = (std::get<0>(params.param) == Network::Address::IpVersion::v4);
+  const bool http2_new_codec_wrapper = std::get<1>(params.param);
+  return absl::StrCat(is_v4 ? "IPv4" : "IPv6",
+                      http2_new_codec_wrapper ? "WrappedHttp2" : "BareHttp2");
+}
+
 // It is important that the new socket interface is installed before any I/O activity starts and
 // the previous one is restored after all I/O activity stops. Since the HttpIntegrationTest
 // destructor stops Envoy the SocketInterfaceSwap destructor needs to run after it. This order of
 // multiple inheritance ensures that SocketInterfaceSwap destructor runs after
 // Http2FrameIntegrationTest destructor completes.
-class Http2FloodMitigationTest : public SocketInterfaceSwap,
-                                 public testing::TestWithParam<Network::Address::IpVersion>,
-                                 public Http2RawFrameIntegrationTest {
+class Http2FloodMitigationTest
+    : public SocketInterfaceSwap,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public Http2RawFrameIntegrationTest {
 public:
-  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(GetParam()) {
+  Http2FloodMitigationTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(1); });
+    const bool enable_new_wrapper = std::get<1>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
   }
 
 protected:
@@ -62,9 +75,11 @@ protected:
   void triggerListenerDrain();
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, Http2FloodMitigationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, Http2FloodMitigationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn({false, true})),
+    testParamsToString);
 
 bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -418,7 +433,7 @@ TEST_P(Http2FloodMitigationTest, Headers) {
 }
 
 // Verify that the server can detect overflow by 100 continue response sent by Envoy itself
-TEST_P(Http2FloodMitigationTest, Envoy100ContinueHeaders) {
+TEST_P(Http2FloodMitigationTest, Envoy1xxHeaders) {
   // pre-fill one away from overflow
   prefillOutboundDownstreamQueue(AllFrameFloodLimit - 1);
 
@@ -577,7 +592,7 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 // Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
 // the downstream via DecoderFilterBelowWriteBufferLowWatermark.
 TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
-  config_helper_.addFilter(R"EOF(
+  config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
   )EOF");
   config_helper_.setBufferLimits(1024 * 1024 * 1024, 1024 * 1024 * 1024);
@@ -1499,23 +1514,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamFloodDetectionIsOnByDefault) {
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
-class Http2ManyStreamsTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
-      public Http2RawFrameIntegrationTest {
-protected:
-  Http2ManyStreamsTest() : Http2RawFrameIntegrationTest(std::get<0>(GetParam())) {
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.improved_stream_limit_handling",
-                                      useImprovedStreamLimitHandling() ? "true" : "false");
-  }
-
-  bool useImprovedStreamLimitHandling() const { return std::get<1>(GetParam()); }
-};
-
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsAndRuntimeFeature, Http2ManyStreamsTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()));
-
-TEST_P(Http2ManyStreamsTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
+TEST_P(Http2FloodMitigationTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTest) {
   const uint32_t num_requests = 80;
 
   envoy::config::core::v3::Http2ProtocolOptions config;
@@ -1555,8 +1554,7 @@ TEST_P(Http2ManyStreamsTest, UpstreamRstStreamStormOnDownstreamCloseRegressionTe
   // The disconnect shouldn't trigger an outbound control frame flood.
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.http2.outbound_control_flood")->value());
   // Verify that the upstream connections are still active.
-  EXPECT_EQ(useImprovedStreamLimitHandling() ? 2 : 1,
-            test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.upstream_cx_active")->value());
 }
 
 } // namespace Envoy

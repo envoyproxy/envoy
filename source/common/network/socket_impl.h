@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -53,6 +54,7 @@ public:
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
 
@@ -69,13 +71,16 @@ private:
 class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address);
+             const Address::InstanceConstSharedPtr& remote_address,
+             const SocketCreationOptions& options);
 
   // Network::Socket
-  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
-  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
@@ -128,7 +133,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const std::shared_ptr<ConnectionInfoSetterImpl> address_provider_;
+  const std::shared_ptr<ConnectionInfoSetterImpl> connection_info_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

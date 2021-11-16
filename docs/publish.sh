@@ -19,7 +19,11 @@ RELEASE_TAG_REGEX="^refs/tags/v.*"
 if [[ "${AZP_BRANCH}" =~ ${RELEASE_TAG_REGEX} ]]; then
   PUBLISH_DIR="${CHECKOUT_DIR}"/docs/envoy/"${AZP_BRANCH/refs\/tags\//}"
 elif [[ "$AZP_BRANCH" == "${MAIN_BRANCH}" ]]; then
-  PUBLISH_DIR="${CHECKOUT_DIR}"/docs/envoy/latest
+    if [[ -n "$NETLIFY_TRIGGER_URL" ]]; then
+        echo "Triggering netlify docs build for (${BUILD_SHA})"
+        curl -X POST -d "$BUILD_SHA" "$NETLIFY_TRIGGER_URL"
+    fi
+    exit 0
 else
   echo "Ignoring docs push"
   exit 0

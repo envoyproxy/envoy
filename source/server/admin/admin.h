@@ -230,7 +230,6 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -319,7 +318,7 @@ private:
     // Network::ListenSocketFactory
     Network::Socket::Type socketType() const override { return socket_->socketType(); }
     const Network::Address::InstanceConstSharedPtr& localAddress() const override {
-      return socket_->addressProvider().localAddress();
+      return socket_->connectionInfoProvider().localAddress();
     }
     Network::SocketSharedPtr getListenSocket(uint32_t) override {
       // This is only supposed to be called once.
