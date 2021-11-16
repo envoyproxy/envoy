@@ -11,19 +11,20 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::core::v3::ConfigSource& config_source,
     const std::string& route_config_name, const uint64_t manager_identifier,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    RouteConfigProviderManager& route_config_provider_manager)
+    const std::string& rds_type, RouteConfigProviderManager& route_config_provider_manager)
     : route_config_name_(route_config_name),
-      scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
+      scope_(factory_context.scope().createScope(stat_prefix + route_config_name_ + ".")),
       factory_context_(factory_context),
-      parent_init_target_(fmt::format("RdsRouteConfigSubscription init {}", route_config_name_),
-                          [this]() { local_init_manager_.initialize(local_init_watcher_); }),
-      local_init_watcher_(fmt::format("RDS local-init-watcher {}", route_config_name_),
+      parent_init_target_(
+          fmt::format("RdsRouteConfigSubscription {} init {}", rds_type, route_config_name_),
+          [this]() { local_init_manager_.initialize(local_init_watcher_); }),
+      local_init_watcher_(fmt::format("{} local-init-watcher {}", rds_type, route_config_name_),
                           [this]() { parent_init_target_.ready(); }),
-      local_init_target_(
-          fmt::format("RdsRouteConfigSubscription local-init-target {}", route_config_name_),
-          [this]() { subscription_->start({route_config_name_}); }),
-      local_init_manager_(fmt::format("RDS local-init-manager {}", route_config_name_)),
-      stat_prefix_(stat_prefix),
+      local_init_target_(fmt::format("RdsRouteConfigSubscription {} local-init-target {}", rds_type,
+                                     route_config_name_),
+                         [this]() { subscription_->start({route_config_name_}); }),
+      local_init_manager_(fmt::format("{} local-init-manager {}", rds_type, route_config_name_)),
+      stat_prefix_(stat_prefix), rds_type_(rds_type),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)),
@@ -61,7 +62,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   config_update_info_->configTraits().validateResourceType(route_config);
   if (config_update_info_->configTraits().resourceName(route_config) != route_config_name_) {
     throw EnvoyException(
-        fmt::format("Unexpected RDS configuration (expecting {}): {}", route_config_name_,
+        fmt::format("Unexpected {} configuration (expecting {}): {}", rds_type_, route_config_name_,
                     config_update_info_->configTraits().resourceName(route_config)));
   }
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
@@ -89,10 +90,9 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense
     // (see discussion in #6879), and so we should do something other than ignoring here.
-    ENVOY_LOG(
-        error,
-        "Server sent a delta RDS update attempting to remove a resource (name: {}). Ignoring.",
-        removed_resources[0]);
+    ENVOY_LOG(error,
+              "Server sent a delta {} update attempting to remove a resource (name: {}). Ignoring.",
+              rds_type_, removed_resources[0]);
   }
   if (!added_resources.empty()) {
     onConfigUpdate(added_resources, added_resources[0].get().version());
@@ -109,13 +109,15 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(
 
 bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
   if (num_resources == 0) {
-    ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
+    ENVOY_LOG(debug, "Missing {} RouteConfiguration for {} in onConfigUpdate()", rds_type_,
+              route_config_name_);
     stats_.update_empty_.inc();
     local_init_target_.ready();
     return false;
   }
   if (num_resources != 1) {
-    throw EnvoyException(fmt::format("Unexpected RDS resource length: {}", num_resources));
+    throw EnvoyException(
+        fmt::format("Unexpected {} resource length: {}", rds_type_, num_resources));
     // (would be a return false here)
   }
   return true;

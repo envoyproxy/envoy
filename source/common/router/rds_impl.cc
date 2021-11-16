@@ -78,7 +78,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           RouteConfigUpdatePtr(config_update),
           std::unique_ptr<Envoy::Config::OpaqueResourceDecoder>(resource_decoder),
           rds.config_source(), rds.route_config_name(), manager_identifier, factory_context,
-          stat_prefix, route_config_provider_manager),
+          stat_prefix + "rds.", "RDS", route_config_provider_manager),
       config_update_info_(config_update) {}
 
 void RdsRouteConfigSubscription::beforeProviderUpdate() {
