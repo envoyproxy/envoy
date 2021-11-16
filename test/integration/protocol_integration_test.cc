@@ -3525,4 +3525,20 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+  autonomous_allow_incomplete_streams_ = true;
+  autonomous_upstream_ = true;
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // Filter does not yet support HTTP/3
+    return;
+  }
+  config_helper_.addFilter("{ name: on-socket-fail-filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace Envoy
