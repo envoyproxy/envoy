@@ -34,21 +34,32 @@ public:
   }
 };
 
-TEST(QuicFilterManagerConnectionImplTest, ConnectionInfoProviderSharedPtr) {
-  auto socket = std::make_unique<Network::MockConnectionSocket>();
-  EXPECT_CALL(*socket, close());
-  QuicNetworkConnection connection(std::move(socket));
-  const quic::QuicConnectionId connection_id;
-  Event::MockDispatcher dispatcher;
-  uint32_t send_buffer_limit = 0;
-  quic::test::MockQuicConnectionHelper helper;
-  quic::test::MockAlarmFactory alarm_factory;
-  quic::test::MockQuicSession quic_session(
-      new quic::test::MockQuicConnection(&helper, &alarm_factory, quic::Perspective::IS_SERVER));
-  auto ssl_info = std::make_shared<QuicSslConnectionInfo>(quic_session);
+class QuicFilterManagerConnectionImplTest : public ::testing::Test {
+public:
+  QuicFilterManagerConnectionImplTest()
+      : socket_(std::make_unique<NiceMock<Network::MockConnectionSocket>>()),
+        connection_(std::move(socket_)),
+        quic_session_(
+            new quic::test::MockQuicConnection(&helper_, &alarm_factory_, quic::Perspective::IS_SERVER)),
+        ssl_info_(std::make_shared<QuicSslConnectionInfo>(quic_session_)),
+        impl_(connection_, connection_id_, dispatcher_,
+              send_buffer_limit_, std::move(ssl_info_)) {
+  }
 
-  TestQuicFilterManagerConnectionImpl impl_(connection, connection_id, dispatcher,
-                                            send_buffer_limit, std::move(ssl_info));
+protected:
+  std::unique_ptr<NiceMock<Network::MockConnectionSocket>> socket_;
+  const quic::QuicConnectionId connection_id_;
+  Event::MockDispatcher dispatcher_;
+  uint32_t send_buffer_limit_ = 0;
+  quic::test::MockQuicConnectionHelper helper_;
+  quic::test::MockAlarmFactory alarm_factory_;
+  QuicNetworkConnection connection_;
+  quic::test::MockQuicSession quic_session_;
+  std::shared_ptr<QuicSslConnectionInfo> ssl_info_;
+  TestQuicFilterManagerConnectionImpl impl_;
+};
+
+TEST_F(QuicFilterManagerConnectionImplTest, ConnectionInfoProviderSharedPtr) {
   EXPECT_TRUE(impl_.connectionInfoProviderSharedPtr() != nullptr);
   impl_.closeNow();
   EXPECT_TRUE(impl_.connectionInfoProviderSharedPtr() == nullptr);
