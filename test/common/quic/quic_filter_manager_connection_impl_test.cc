@@ -39,12 +39,10 @@ public:
   QuicFilterManagerConnectionImplTest()
       : socket_(std::make_unique<NiceMock<Network::MockConnectionSocket>>()),
         connection_(std::move(socket_)),
-        quic_session_(
-            new quic::test::MockQuicConnection(&helper_, &alarm_factory_, quic::Perspective::IS_SERVER)),
+        quic_session_(new quic::test::MockQuicConnection(&helper_, &alarm_factory_,
+                                                         quic::Perspective::IS_SERVER)),
         ssl_info_(std::make_shared<QuicSslConnectionInfo>(quic_session_)),
-        impl_(connection_, connection_id_, dispatcher_,
-              send_buffer_limit_, std::move(ssl_info_)) {
-  }
+        impl_(connection_, connection_id_, dispatcher_, send_buffer_limit_, std::move(ssl_info_)) {}
 
 protected:
   std::unique_ptr<NiceMock<Network::MockConnectionSocket>> socket_;
