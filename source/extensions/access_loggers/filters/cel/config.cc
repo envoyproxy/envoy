@@ -18,8 +18,8 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config, Runtime::Loader&,
     Random::RandomGenerator&) {
 
-  // TODO: use factory_context validation. likely needs update to createFilter
-  // signature to pass in validation visitor.
+  // TODO(douglas-reid): use factory_context validation. likely needs update to
+  // createFilter signature to pass in validation visitor.
   auto factory_config = Config::Utility::translateToFactoryConfig(
       config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
 
