@@ -22,6 +22,7 @@ pybind_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
+        "//library/cc:engine_builder_lib",
         "//library/cc:envoy_engine_cc_lib",
     ],
 )

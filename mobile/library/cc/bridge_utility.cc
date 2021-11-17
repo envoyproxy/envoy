@@ -27,8 +27,8 @@ envoy_headers rawHeaderMapAsEnvoyHeaders(const RawHeaderMap& headers) {
   }
 
   envoy_headers raw_headers{
-      .length = static_cast<envoy_map_size_t>(header_count),
-      .entries = headers_list,
+      static_cast<envoy_map_size_t>(header_count),
+      headers_list,
   };
   return raw_headers;
 }
@@ -45,7 +45,7 @@ RawHeaderMap envoyHeadersAsRawHeaderMap(envoy_headers raw_headers) {
     headers[key].push_back(value);
   }
   // free instead of release_envoy_headers
-  // because we already free each envoy_data piecewise
+  // because we already free each envoy_data individually
   // during calls to envoy_data_as_string
   free(raw_headers.entries);
   return headers;
