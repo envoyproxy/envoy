@@ -64,7 +64,7 @@ message CircuitBreakers {
 
     // The maximum number of parallel requests that Envoy will make to the
     // upstream cluster. If not specified, the default is 1024.
-    // This limit is not applied as a connection limit for non-HTTP traffic.
+    // This limit does not apply to non-HTTP traffic.
     google.protobuf.UInt32Value max_requests = 4;
 
     // The maximum number of parallel retries that Envoy will allow to the
