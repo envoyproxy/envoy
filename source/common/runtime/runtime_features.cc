@@ -76,6 +76,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.preserve_downstream_scheme",
+    "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",

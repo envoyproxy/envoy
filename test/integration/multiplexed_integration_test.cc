@@ -507,7 +507,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
 
   waitForNextUpstreamRequest();
   upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  response->waitForContinueHeaders();
+  response->waitFor1xxHeaders();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 
