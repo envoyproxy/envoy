@@ -10,7 +10,7 @@ Locality Weighted Load Balancing
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
-This example creates a setup for demonstrating the :ref: `locality weighted load balancing <_arch_overview_load_balancing_locality_weighted_lb>` feature in Envoy proxy. The demo simulates a scenario that a backend service resides in two local zones and one remote zone.
+This example creates a setup for demonstrating the :ref:`locality weighted load balancing <_arch_overview_load_balancing_locality_weighted_lb>` feature in Envoy proxy. The demo simulates a scenario that a backend service resides in two local zones and one remote zone.
 
 The components used in this demo are as follows:
 
@@ -34,7 +34,7 @@ To build this sandbox example and start the example services, run the following 
     # Start demo
     $ docker-compose up --build -d
 
-The locality configuration is set in the client container via static Envoy configuration file. Please refer to the `clusters configuration <_include/locality-load-balancing/configs/cds.yaml>_` file.
+The locality configuration is set in the client container via static Envoy configuration file. Please refer to the :download:`clusters configuration <_include/locality-load-balancing/configs/cds.yaml>` file.
 
 Step 2: Scenario with one replica in the highest priority locality
 ******************************************************************
@@ -53,7 +53,7 @@ If locality ``local-1`` becomes unhealthy, the requests should be load balanced 
 .. code:: shell
 
     # bring down local-1
-    $ docker-compose exec -T client-envoy curl -s "locality-load-balancing_backend-local-1_1":8000/unhealthy
+    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-1_1:8000/unhealthy
     [backend-local-1] Set to unhealthy
 
     # local-2 and remote-1 localities split the traffic 50:50
@@ -67,7 +67,7 @@ Now if ``local-2`` becomes unhealthy also, priority 1 locality is only 50% healt
 .. code:: shell
 
     # bring down local-2
-    $ docker-compose exec -T client-envoy curl -s "locality-load-balancing_backend-local-2_1":8000/unhealthy
+    $ docker-compose exec -T client-envoy curl -s locality-load-balancing_backend-local-2_1:8000/unhealthy
 
     # remote-1 locality receive 100% of the traffic
     $ docker-compose exec -T client-envoy python3 client.py http://localhost:3000/ 100
