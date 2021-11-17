@@ -220,9 +220,10 @@ def format_header_from_file(
     if file_proto.package.split(".")[-1] in ("v2", "v3"):
         name = "".join(file_proto.package.split(".")[-2:])
         golang_package_name = ";" + name
-    options.go_package = "".join(
-        ["github.com/envoyproxy/go-control-plane/",
-         file_proto.package.replace(".", "/"), golang_package_name])
+    options.go_package = "".join([
+        "github.com/envoyproxy/go-control-plane/",
+        file_proto.package.replace(".", "/"), golang_package_name
+    ])
 
     # This is a workaround for C#/Ruby namespace conflicts between packages and
     # objects, see https://github.com/envoyproxy/envoy/pull/3854.
