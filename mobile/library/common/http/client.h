@@ -144,7 +144,7 @@ private:
     void encodeTrailers(const ResponseTrailerMap& trailers) override;
     Stream& getStream() override { return direct_stream_; }
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
-    void encode100ContinueHeaders(const ResponseHeaderMap&) override {
+    void encode1xxHeaders(const ResponseHeaderMap&) override {
       // TODO(goaway): implement?
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
