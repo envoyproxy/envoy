@@ -86,6 +86,9 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_timing_ = upstream_timing;
   }
 
+  UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
+  const UpstreamTiming& upstreamTiming() const override { return upstream_timing_; }
+
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
     return duration(upstream_timing_.first_upstream_tx_byte_sent_);
   }

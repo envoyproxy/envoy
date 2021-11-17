@@ -232,14 +232,41 @@ struct UpstreamTiming {
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
+  void onUpstreamConnectStart(TimeSource& time_source) {
+    ASSERT(!upstream_connect_start_);
+    upstream_connect_start_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamConnectComplete(TimeSource& time_source) {
+    upstream_connect_complete_ = time_source.monotonicTime();
+  }
+
+  void onUpstreamHandshakeComplete(TimeSource& time_source) {
+    upstream_handshake_complete_ = time_source.monotonicTime();
+  }
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;
   absl::optional<MonotonicTime> last_upstream_rx_byte_received_;
+
+  absl::optional<MonotonicTime> upstream_connect_start_;
+  absl::optional<MonotonicTime> upstream_connect_complete_;
+  absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
 class DownstreamTiming {
 public:
+  void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
+
+  absl::optional<MonotonicTime> getValue(absl::string_view value) const {
+    auto ret = timings_.find(value);
+    if (ret == timings_.end()) {
+      return {};
+    }
+    return ret->second;
+  }
+
   absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
     return last_downstream_rx_byte_received_;
   }
@@ -414,6 +441,14 @@ public:
    * information for the one that "wins".
    */
   virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
+
+  /**
+   * Returns the upstream timing information for this stream.
+   * It is not expected that the fields in upstreamTiming() will be set until
+   * the upstream request is complete.
+   */
+  virtual UpstreamTiming& upstreamTiming() PURE;
+  virtual const UpstreamTiming& upstreamTiming() const PURE;
 
   /**
    * @return the duration between the first byte of the request was sent upstream and the start of

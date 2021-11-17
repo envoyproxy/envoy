@@ -20,7 +20,7 @@ Is there a contract my HTTP filter must adhere to?
     ``FilterHeadersStatus::ContinueAndDontEndStream`` when called with ``end_stream`` set to *false*. In this case
     ``FilterHeadersStatus::Continue`` should be returned.
 
-  * A filter's ``encode100ContinueHeaders()`` must return ``FilterHeadersStatus::Continue`` or
+  * A filter's ``encode1xxHeaders()`` must return ``FilterHeadersStatus::Continue`` or
     ``FilterHeadersStatus::StopIteration``.
 
 * Data encoding/decoding
@@ -47,4 +47,3 @@ The first filter of the decoding filter chain will have the following headers in
 
 Although these headers may be omitted by one of the filters on the decoding filter chain,
 they should be reinserted before the terminal filter is triggered.
-
