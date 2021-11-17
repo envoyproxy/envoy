@@ -380,6 +380,20 @@ TEST(HttpUtility, updateAuthority) {
   }
 
   {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
     TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
     Utility::updateAuthority(headers, "dns.name", true);
     EXPECT_EQ("dns.name", headers.get_(":authority"));
@@ -390,6 +404,20 @@ TEST(HttpUtility, updateAuthority) {
     TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
     Utility::updateAuthority(headers, "dns.name", false);
     EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
     EXPECT_EQ("", headers.get_("x-forwarded-host"));
   }
 
