@@ -129,11 +129,12 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 const std::string TestSubjectPeer =
     "CN=Test Server,OU=Lyft Engineering,O=Lyft,L=San Francisco,ST=California,C=US";
 
-inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamInfo& stream_info) {
+inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamInfo& stream_info,
+                                                      TimeSource& time_source) {
   // Set mocks' default string return value to be an empty string.
   // TODO(asraa): Speed up this function, which is slowed because of the use of mocks.
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
-  auto test_stream_info = std::make_unique<TestStreamInfo>();
+  auto test_stream_info = std::make_unique<TestStreamInfo>(time_source);
   test_stream_info->metadata_ = stream_info.dynamic_metadata();
   // Truncate recursive filter metadata fields.
   // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
@@ -164,7 +165,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
-  test_stream_info->upstream_local_address_ = upstream_local_address;
+  test_stream_info->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
   test_stream_info->downstream_connection_info_provider_->setRequestedServerName(
