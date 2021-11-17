@@ -48,6 +48,8 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
             api, Common::Aws::Utility::metadataFetcher);
         auto signer = std::make_unique<Common::Aws::SignerImpl>(
             config.service_name(), getRegion(config), credentials_provider, api.timeSource(),
+            // TODO: extend API to allow specifying header exclusion. ref:
+            // https://github.com/envoyproxy/envoy/pull/18998
             Common::Aws::AwsSigV4HeaderExclusionVector{});
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<AwsIamHeaderAuthenticator>(std::move(signer)));

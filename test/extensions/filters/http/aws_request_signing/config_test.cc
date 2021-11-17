@@ -30,6 +30,18 @@ match_excluded_headers:
   AwsRequestSigningProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
+  AwsRequestSigningProtoConfig expected_config;
+  expected_config.set_service_name("s3");
+  expected_config.set_region("us-west-2");
+  expected_config.add_match_excluded_headers()->set_prefix("x-envoy");
+  expected_config.add_match_excluded_headers()->set_exact("foo");
+  expected_config.add_match_excluded_headers()->set_exact("bar");
+
+  Protobuf::util::MessageDifferencer differencer;
+  differencer.set_message_field_comparison(Protobuf::util::MessageDifferencer::EQUAL);
+  differencer.set_repeated_field_comparison(Protobuf::util::MessageDifferencer::AS_SET);
+  EXPECT_TRUE(differencer.Compare(expected_config, proto_config));
+
   testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   AwsRequestSigningFilterFactory factory;
 

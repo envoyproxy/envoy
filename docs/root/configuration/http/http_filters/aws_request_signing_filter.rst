@@ -27,7 +27,7 @@ ref:`flow control docs <faq_flow_control>` for details.
 
 The :ref:`match_excluded_headers <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.match_excluded_headers>`
 option allows excluding certain request headers from being signed. This usually applies to headers that are likely to mutate or
-are added later such as in retries.
+are added later such as in retries. By default, the headers ``x-forwarded-for``, ``x-forwarded-proto``, and ``x-amzn-trace-id`` are always excluded.
 
 Example configuration
 ---------------------
