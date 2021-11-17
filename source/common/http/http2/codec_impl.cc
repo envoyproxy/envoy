@@ -400,7 +400,7 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
   received_noninformational_headers_ =
       !CodeUtility::is1xx(status) || status == enumToInt(Http::Code::SwitchingProtocols);
 
-  if (status == enumToInt(Http::Code::Continue)) {
+  if (HeaderUtility::isSpecial1xx(*headers)) {
     ASSERT(!remote_end_stream_);
     response_decoder_.decode1xxHeaders(std::move(headers));
   } else {

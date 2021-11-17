@@ -1227,8 +1227,9 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
 
 void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
                                   UpstreamRequest& upstream_request) {
-  chargeUpstreamCode(100, *headers, upstream_request.upstreamHost(), false);
-  ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  chargeUpstreamCode(response_code, *headers, upstream_request.upstreamHost(), false);
+  ENVOY_STREAM_LOG(debug, "upstream 1xx ({}).", *callbacks_, response_code);
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
