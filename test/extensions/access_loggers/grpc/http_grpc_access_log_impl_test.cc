@@ -854,6 +854,56 @@ response: {}
   access_log_->log(nullptr, nullptr, nullptr, stream_info);
 }
 
+TEST_F(HttpGrpcAccessLogTest, CustomTagTestMetadataDefaultValue) {
+  envoy::type::tracing::v3::CustomTag tag;
+  const auto tag_yaml = R"EOF(
+tag: mtag
+metadata:
+  kind: { host: {} }
+  metadata_key:
+    key: foo
+    path:
+    - key: baz
+  default_value: piyo
+  )EOF";
+  TestUtility::loadFromYaml(tag_yaml, tag);
+  *config_.mutable_common_config()->add_custom_tags() = tag;
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.start_time_ = SystemTime(1h);
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+
+  expectLog(R"EOF(
+common_properties:
+  downstream_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_cluster: fake_cluster
+  downstream_local_address:
+    socket_address:
+      address: "127.0.0.2"
+      port_value: 0
+  downstream_direct_remote_address:
+    socket_address:
+      address: "127.0.0.1"
+      port_value: 0
+  start_time:
+    seconds: 3600
+  custom_tags:
+    mtag: piyo
+request: {}
+response: {}
+)EOF");
+  access_log_->log(nullptr, nullptr, nullptr, stream_info);
+}
+
 } // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
