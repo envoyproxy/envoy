@@ -329,19 +329,19 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
   }
 
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->interface_addr == nullptr) {
+    if (ifa->ifa_addr == nullptr) {
       continue;
     }
 
-    if (ifa->interface_addr->sa_family == AF_INET || ifa->interface_addr->sa_family == AF_INET6) {
-      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->interface_addr);
+    if (ifa->ifa_addr->sa_family == AF_INET || ifa->ifa_addr->sa_family == AF_INET6) {
+      const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
       size_t ss_len =
-          ifa->interface_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
+          ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
       StatusOr<Network::Address::InstanceConstSharedPtr> address =
           Network::Address::addressFromSockAddr(*ss, ss_len,
-                                                ifa->interface_addr->sa_family == AF_INET6);
+                                                ifa->ifa_addr->sa_family == AF_INET6);
       if (address.ok()) {
-        interfaces.emplace_back(ifa->interface_name, ifa->interface_flags, *address);
+        interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
       }
     }
   }
