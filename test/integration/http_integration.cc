@@ -1021,12 +1021,11 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
 void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
                                                bool with_encoder_filter,
                                                bool with_multiple_1xx_headers,
-                                               bool with_102_first) {
+                                               absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
     config_helper_.prependFilter("name: passthrough-filter");
   }
-  std::string initial_code = with_102_first ? "102" : "100";
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
@@ -1049,7 +1048,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   // This case tests sending on 100-Continue headers before the client has sent all the
   // request data.
   if (continue_before_upstream_complete) {
-    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", initial_code}});
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
@@ -1063,7 +1063,8 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
 
   // This case tests forwarding 100-Continue after the client has sent all data.
   if (!continue_before_upstream_complete) {
-    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", initial_code}});
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);

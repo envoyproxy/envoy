@@ -1342,7 +1342,11 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
 }
 
 TEST_P(ProtocolIntegrationTest, EnvoyProxying102) {
-  testEnvoyProxying1xx(false, false, false, true);
+  testEnvoyProxying1xx(false, false, false, "102");
+}
+
+TEST_P(ProtocolIntegrationTest, EnvoyProxying103) {
+  testEnvoyProxying1xx(false, false, false, "103");
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
