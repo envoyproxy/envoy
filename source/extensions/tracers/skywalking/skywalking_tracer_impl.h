@@ -2,6 +2,7 @@
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/server/tracer_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
 
@@ -30,7 +31,7 @@ public:
 
 private:
   void loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
-                  Server::Configuration::ServerFactoryContext& server_factory_context);
+                  Server::Configuration::TracerFactoryContext& tracer_factory_context);
 
   class TlsTracer : public ThreadLocal::ThreadLocalObject {
   public:
@@ -44,8 +45,9 @@ private:
 
   TracerConfig config_;
   SkyWalkingTracerStats tracing_stats_;
-  ThreadLocal::SlotPtr tls_slot_ptr_;
+  ThreadLocal::TypedSlot<TlsTracer> tls_;
   std::unique_ptr<TracingContextFactory> tracing_context_factory_;
+  Envoy::Common::CallbackHandlePtr token_update_handler_;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

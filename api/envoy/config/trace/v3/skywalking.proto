@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.trace.v3;
 
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -34,6 +35,7 @@ message SkyWalkingConfig {
 }
 
 // Client config for SkyWalking tracer.
+// [#next-free-field: 6]
 message ClientConfig {
   // Service name for SkyWalking tracer. If this field is empty, then local service cluster name
   // that configured by :ref:`Bootstrap node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>`
@@ -52,10 +54,12 @@ message ClientConfig {
   // Authentication token config for SkyWalking. SkyWalking can use token authentication to secure
   // that monitoring application data can be trusted. In current version, Token is considered as a
   // simple string.
-  // [#comment:TODO(wbpcode): Get backend token through the SDS API.]
   oneof backend_token_specifier {
     // Inline authentication token string.
     string backend_token = 3 [(udpa.annotations.sensitive) = true];
+
+    // SDS config to extract backend token.
+    envoy.extensions.transport_sockets.tls.v3.SdsSecretConfig backend_token_sds_config = 5;
   }
 
   // Envoy caches the segment in memory when the SkyWalking backend service is temporarily unavailable.

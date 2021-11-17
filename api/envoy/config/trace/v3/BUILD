@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/extensions/transport_sockets/tls/v3:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
         "@opencensus_proto//opencensus/proto/trace/v1:trace_config_proto",
     ],

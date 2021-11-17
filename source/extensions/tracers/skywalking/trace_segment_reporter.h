@@ -4,11 +4,13 @@
 
 #include "envoy/config/trace/v3/skywalking.pb.h"
 #include "envoy/grpc/async_client_manager.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "source/common/common/backoff_strategy.h"
 #include "source/common/grpc/async_client_impl.h"
 #include "source/extensions/tracers/skywalking/skywalking_stats.h"
 
+#include "absl/synchronization/mutex.h"
 #include "cpp2sky/tracing_context.h"
 
 namespace Envoy {
@@ -16,6 +18,7 @@ namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
+using cpp2sky::TracerConfig;
 using cpp2sky::TracingContextPtr;
 
 class TraceSegmentReporter : public Logger::Loggable<Logger::Id::tracing>,
@@ -35,6 +38,7 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
   void report(TracingContextPtr tracing_context);
+  void updateToken(const std::string& token) { token_ = token; }
 
 private:
   /*

@@ -16,6 +16,7 @@ public:
 
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(TransportSocketFactoryContext&, transportSocketFactoryContext, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
 };

@@ -49,6 +49,13 @@ public:
                              const std::string& operation, TracingContextPtr tracing_context,
                              TracingSpanPtr parent);
 
+  /**
+   * Get reporter.
+   *
+   * @return The reference of trace segment reporter pointer.
+   */
+  TraceSegmentReporterPtr& reporter() { return reporter_; }
+
 private:
   TraceSegmentReporterPtr reporter_;
 };

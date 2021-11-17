@@ -4,6 +4,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/datasource.h"
 #include "source/common/http/path_utility.h"
 
 #include "cpp2sky/propagation.h"
@@ -30,11 +31,11 @@ Driver::Driver(const envoy::config::trace::v3::SkyWalkingConfig& proto_config,
                Server::Configuration::TracerFactoryContext& context)
     : tracing_stats_{SKYWALKING_TRACER_STATS(
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.skywalking."))},
-      tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()) {
-  loadConfig(proto_config.client_config(), context.serverFactoryContext());
+      tls_(context.serverFactoryContext().threadLocal()) {
+  loadConfig(proto_config.client_config(), context);
   tracing_context_factory_ = std::make_unique<TracingContextFactory>(config_);
   auto& factory_context = context.serverFactoryContext();
-  tls_slot_ptr_->set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
+  tls_.set([proto_config, &factory_context, this](Event::Dispatcher& dispatcher) {
     TracerPtr tracer = std::make_unique<Tracer>(std::make_unique<TraceSegmentReporter>(
         factory_context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
             proto_config.grpc_service(), factory_context.scope(), true),
@@ -48,7 +49,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::TraceContext& trace_context,
                                    const std::string& operation_name, Envoy::SystemTime start_time,
                                    const Tracing::Decision decision) {
-  auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
+  const auto& tracer = tls_.get();
+  ASSERT(tracer.has_value());
   TracingContextPtr tracing_context;
   // TODO(shikugawa): support extension span header.
   auto propagation_header = trace_context.getByKey(skywalkingPropagationHeaderKey());
@@ -71,11 +73,13 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     }
   }
 
-  return tracer.startSpan(config, start_time, operation_name, tracing_context, nullptr);
+  return tracer.value().get().tracer().startSpan(config, start_time, operation_name,
+                                                 tracing_context, nullptr);
 }
 
 void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
-                        Server::Configuration::ServerFactoryContext& server_factory_context) {
+                        Server::Configuration::TracerFactoryContext& tracer_factory_context) {
+  const auto& server_factory_context = tracer_factory_context.serverFactoryContext();
   config_.set_service_name(!client_config.service_name().empty()
                                ? client_config.service_name()
                                : (!server_factory_context.localInfo().clusterName().empty()
@@ -86,9 +90,37 @@ void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_con
                                 : (!server_factory_context.localInfo().nodeName().empty()
                                        ? server_factory_context.localInfo().nodeName()
                                        : DEFAULT_SERVICE_AND_INSTANCE.data()));
-  config_.set_token(client_config.backend_token());
   config_.set_delayed_buffer_size(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       client_config, max_cache_size, DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE));
+
+  switch (client_config.backend_token_specifier_case()) {
+  case envoy::config::trace::v3::ClientConfig::kBackendToken:
+    config_.set_token(client_config.backend_token());
+    break;
+  case envoy::config::trace::v3::ClientConfig::kBackendTokenSdsConfig: {
+    auto& transport_socket_factory_context = tracer_factory_context.transportSocketFactoryContext();
+    auto& secret_manager = transport_socket_factory_context.secretManager();
+    const auto& token_sds_config = client_config.backend_token_sds_config();
+    auto secret_provider = secret_manager.findOrCreateGenericSecretProvider(
+        token_sds_config.sds_config(), token_sds_config.name(), transport_socket_factory_context);
+
+    token_update_handler_ = secret_provider->addUpdateCallback([&] {
+      const auto* new_secret = secret_provider->secret();
+      if (!new_secret) {
+        return;
+      }
+      tls_.runOnAllThreads(
+          [&new_secret, &transport_socket_factory_context](OptRef<TlsTracer> tracer) {
+            tracer->tracer().reporter()->updateToken(Config::DataSource::read(
+                new_secret->secret(), true, transport_socket_factory_context.api()));
+          });
+    });
+    config_.set_token(EMPTY_STRING);
+    break;
+  }
+  default:
+    break;
+  }
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}

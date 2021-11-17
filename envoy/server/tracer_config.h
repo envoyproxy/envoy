@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -28,6 +29,11 @@ public:
    *         messages.
    */
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
 };
 
 using TracerFactoryContextPtr = std::unique_ptr<TracerFactoryContext>;

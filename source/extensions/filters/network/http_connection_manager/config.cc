@@ -173,7 +173,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
       SINGLETON_MANAGER_REGISTERED_NAME(http_tracer_manager), [&context] {
         return std::make_shared<Tracing::HttpTracerManagerImpl>(
             std::make_unique<Tracing::TracerFactoryContextImpl>(
-                context.getServerFactoryContext(), context.messageValidationVisitor()));
+                context.getServerFactoryContext(), context.getTransportSocketFactoryContext(),
+                context.messageValidationVisitor()));
       });
 
   std::shared_ptr<FilterConfigProviderManager> filter_config_provider_manager =

@@ -24,7 +24,6 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
           "skywalking.v3.TraceSegmentReportService.collect")),
       random_generator_(random_generator), token_(token),
       delayed_buffer_size_(delayed_buffer_size) {
-
   static constexpr uint32_t RetryInitialDelayMs = 500;
   static constexpr uint32_t RetryMaxDelayMs = 30000;
   backoff_strategy_ = std::make_unique<JitteredExponentialBackOffStrategy>(
