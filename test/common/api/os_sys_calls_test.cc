@@ -29,6 +29,6 @@ TEST(OsSyscallsTest, SetAlternateGetifaddrs) {
   EXPECT_TRUE(post_alternate_support);
   EXPECT_EQ(0, os_syscalls.getifaddrs(interfaces).return_value_);
   EXPECT_EQ(1, interfaces.size());
-  EXPECT_EQ("made_up_if", interfaces.front().ifa_name_);
+  EXPECT_EQ("made_up_if", interfaces.front().interface_name_);
 }
 } // namespace Envoy

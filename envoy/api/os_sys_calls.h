@@ -24,18 +24,19 @@ struct EnvoyTcpInfo {
 // Small struct to avoid exposing ifaddrs -- which is not defined in all platforms -- to the
 // codebase.
 struct InterfaceAddress {
-  InterfaceAddress(absl::string_view ifa_name, unsigned int ifa_flags,
-                   Envoy::Network::Address::InstanceConstSharedPtr ifa_addr)
-      : ifa_name_(ifa_name), ifa_flags_(ifa_flags), ifa_addr_(ifa_addr) {}
+  InterfaceAddress(absl::string_view interface_name, unsigned int interface_flags,
+                   Envoy::Network::Address::InstanceConstSharedPtr interface_addr)
+      : interface_name_(interface_name), interface_flags_(interface_flags),
+        interface_addr_(interface_addr) {}
 
-  std::string ifa_name_;
-  unsigned int ifa_flags_;
-  Envoy::Network::Address::InstanceConstSharedPtr ifa_addr_;
+  std::string interface_name_;
+  unsigned int interface_flags_;
+  Envoy::Network::Address::InstanceConstSharedPtr interface_addr_;
 };
 
 using InterfaceAddressVector = std::vector<InterfaceAddress>;
 
-using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& ifap)>;
+using AlternateGetifaddrs = std::function<SysCallIntResult(InterfaceAddressVector& interfaces)>;
 
 class OsSysCalls {
 public:
@@ -224,7 +225,7 @@ public:
   /**
    * @see man getifaddrs
    */
-  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& ifap) PURE;
+  virtual SysCallIntResult getifaddrs(InterfaceAddressVector& interfaces) PURE;
 
   /**
    * allows a platform to override getifaddrs or provide an implementation if one does not exist
