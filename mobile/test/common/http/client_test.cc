@@ -680,8 +680,7 @@ TEST_P(ClientTest, Encode100Continue) {
 
   // Encode 100 continue should blow up.
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_DEATH(response_encoder_->encode100ContinueHeaders(response_headers),
-               "panic: not implemented");
+  EXPECT_DEATH(response_encoder_->encode1xxHeaders(response_headers), "panic: not implemented");
 }
 
 TEST_P(ClientTest, EncodeMetadata) {
