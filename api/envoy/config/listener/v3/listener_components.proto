@@ -415,12 +415,13 @@ message TransportProtocolInput {
 // Suggested values include:
 //
 // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
-//   <config_listener_filters_tls_inspector>`,
-// * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+//   <config_listener_filters_tls_inspector>` and :ref:`envoy.filters.listener.http_inspector
+//   <config_listener_filters_http_inspector>`,
+// * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>` and :ref:`envoy.filters.listener.http_inspector <config_listener_filters_http_inspector>`
 //
 // .. attention::
 //
-//   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+//   Currently, :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
 //   application protocol detection based on the requested
 //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
 //
