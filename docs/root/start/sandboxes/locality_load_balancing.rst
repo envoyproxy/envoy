@@ -10,7 +10,7 @@ Locality Weighted Load Balancing
    :ref:`curl <start_sandboxes_setup_curl>`
         Used to make ``HTTP`` requests.
 
-This example creates a setup for demonstrating the :ref:`locality weighted load balancing <_arch_overview_load_balancing_locality_weighted_lb>` feature in Envoy proxy. The demo simulates a scenario that a backend service resides in two local zones and one remote zone.
+This example creates a setup for demonstrating the :ref:`locality weighted load balancing <arch_overview_load_balancing_locality_weighted_lb>` feature in Envoy proxy. The demo simulates a scenario that a backend service resides in two local zones and one remote zone.
 
 The components used in this demo are as follows:
 
@@ -34,7 +34,7 @@ To build this sandbox example and start the example services, run the following 
     # Start demo
     $ docker-compose up --build -d
 
-The locality configuration is set in the client container via static Envoy configuration file. Please refer to the :download:`clusters configuration <_include/locality-load-balancing/configs/cds.yaml>` file.
+The locality configuration is set in the client container via static Envoy configuration file. Please refer to the :download:`clusters configuration <_include/locality-load-balancing/envoy-client.yaml>` file.
 
 Step 2: Scenario with one replica in the highest priority locality
 ******************************************************************
