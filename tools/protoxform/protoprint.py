@@ -218,7 +218,7 @@ def format_header_from_file(
     # foo/bar/v2 to use barv2 as the package in the generated code
     golang_package_name = ""
     if file_proto.package.split(".")[-1] in ("v2", "v3"):
-        name = "".join(file_proto.package.rsplit(".", 2)[1:])
+        name = "".join(file_proto.package.split(".")[-2:])
         golang_package_name = ";" + name
     options.go_package = "".join(
         ["github.com/envoyproxy/go-control-plane/",
