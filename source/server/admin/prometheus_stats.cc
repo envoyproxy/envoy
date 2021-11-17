@@ -6,6 +6,7 @@
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Server {
@@ -14,18 +15,6 @@ namespace {
 
 const Regex::CompiledGoogleReMatcher& promRegex() {
   CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "[^a-zA-Z0-9_]", false);
-}
-
-const Regex::CompiledGoogleReMatcher& backslashRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, R"(\\)", false);
-}
-
-const Regex::CompiledGoogleReMatcher& newlineRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, "\n", false);
-}
-
-const Regex::CompiledGoogleReMatcher& quoteRegex() {
-  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, R"(")", false);
 }
 
 /**
@@ -47,9 +36,11 @@ std::string sanitizeValue(const absl::string_view value) {
   // text serialization issues. This matches the prometheus text formatting code:
   // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
   // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
-  std::string tmp = backslashRegex().replaceAll(value, R"(\\\\)");
-  tmp = newlineRegex().replaceAll(tmp, R"(\\n)");
-  return quoteRegex().replaceAll(tmp, R"(\\")");
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
 }
 
 /*
