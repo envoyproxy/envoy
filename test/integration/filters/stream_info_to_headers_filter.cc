@@ -9,6 +9,13 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+namespace {
+
+uint64_t toMs(MonotonicTime time) {
+  return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch()).count();
+}
+
+} // namespace
 
 // A filter that sticks stream info into headers for integration testing.
 class StreamInfoToHeadersFilter : public Http::PassThroughFilter {
@@ -20,6 +27,19 @@ public:
   }
 
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override {
+    const std::string dns_start = "envoy.dynamic_forward_proxy.dns_start_ms";
+    const std::string dns_end = "envoy.dynamic_forward_proxy.dns_end_ms";
+    StreamInfo::StreamInfo& stream_info = decoder_callbacks_->streamInfo();
+
+    if (stream_info.downstreamTiming().getValue(dns_start).has_value()) {
+      headers.addCopy(
+          Http::LowerCaseString("dns_start"),
+          absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_start).value())));
+    }
+    if (stream_info.downstreamTiming().getValue(dns_end).has_value()) {
+      headers.addCopy(Http::LowerCaseString("dns_end"),
+                      absl::StrCat(toMs(stream_info.downstreamTiming().getValue(dns_end).value())));
+    }
     if (decoder_callbacks_->streamInfo().upstreamSslConnection()) {
       headers.addCopy(Http::LowerCaseString("alpn"),
                       decoder_callbacks_->streamInfo().upstreamSslConnection()->alpn());

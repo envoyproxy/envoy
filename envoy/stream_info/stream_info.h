@@ -257,6 +257,16 @@ struct UpstreamTiming {
 
 class DownstreamTiming {
 public:
+  void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
+
+  absl::optional<MonotonicTime> getValue(absl::string_view value) const {
+    auto ret = timings_.find(value);
+    if (ret == timings_.end()) {
+      return {};
+    }
+    return ret->second;
+  }
+
   absl::optional<MonotonicTime> lastDownstreamRxByteReceived() const {
     return last_downstream_rx_byte_received_;
   }
