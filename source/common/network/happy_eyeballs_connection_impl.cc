@@ -10,7 +10,8 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
     Address::InstanceConstSharedPtr source_address, TransportSocketFactory& socket_factory,
     TransportSocketOptionsConstSharedPtr transport_socket_options,
     const ConnectionSocket::OptionsSharedPtr options)
-    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher), address_list_(address_list),
+    : id_(ConnectionImpl::next_global_id_++), dispatcher_(dispatcher),
+      address_list_(sortAddresses(address_list)),
       connection_construction_state_(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
@@ -377,6 +378,44 @@ void HappyEyeballsConnectionImpl::dumpState(std::ostream& os, int indent_level) 
   for (auto& connection : connections_) {
     DUMP_DETAILS(connection);
   }
+}
+
+namespace {
+bool hasMatchingAddressFamily(const Address::InstanceConstSharedPtr& a,
+                              const Address::InstanceConstSharedPtr& b) {
+  return (a->type() == Address::Type::Ip && b->type() == Address::Type::Ip &&
+          a->ip()->version() == b->ip()->version());
+}
+
+} // namespace
+
+std::vector<Address::InstanceConstSharedPtr>
+HappyEyeballsConnectionImpl::sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& in) {
+  std::vector<Address::InstanceConstSharedPtr> address_list;
+  address_list.reserve(in.size());
+  // Iterator which will advance through all addresses matching the first family.
+  auto first = in.begin();
+  // Iterator which will advance through all addresses not matching the first family.
+  // This initial value is ignored and will be overwritten in the loop below.
+  auto other = in.begin();
+  while (first != in.end() || other != in.end()) {
+    if (first != in.end()) {
+      address_list.push_back(*first);
+      first = std::find_if(first + 1, in.end(),
+                           [&](const auto& val) { return hasMatchingAddressFamily(in[0], val); });
+    }
+
+    if (other != in.end()) {
+      other = std::find_if(other + 1, in.end(),
+                           [&](const auto& val) { return !hasMatchingAddressFamily(in[0], val); });
+
+      if (other != in.end()) {
+        address_list.push_back(*other);
+      }
+    }
+  }
+  ASSERT(address_list.size() == in.size());
+  return address_list;
 }
 
 ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {

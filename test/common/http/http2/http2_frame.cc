@@ -316,7 +316,7 @@ Http2Frame Http2Frame::makeMalformedRequestWithZerolenHeader(uint32_t stream_ind
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.appendEmptyHeader();
   frame.adjustPayloadSize();
   return frame;
@@ -340,7 +340,7 @@ Http2Frame Http2Frame::makeRequest(uint32_t stream_index, absl::string_view host
   frame.appendStaticHeader(StaticHeaderIndex::MethodGet);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
 }
@@ -364,7 +364,7 @@ Http2Frame Http2Frame::makePostRequest(uint32_t stream_index, absl::string_view 
   frame.appendStaticHeader(StaticHeaderIndex::MethodPost);
   frame.appendStaticHeader(StaticHeaderIndex::SchemeHttps);
   frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Path, path);
-  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Host, host);
+  frame.appendHeaderWithoutIndexing(StaticHeaderIndex::Authority, host);
   frame.adjustPayloadSize();
   return frame;
 }

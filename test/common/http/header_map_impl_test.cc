@@ -751,10 +751,6 @@ TEST_P(HeaderMapImplTest, DoubleCookieAdd) {
 }
 
 TEST_P(HeaderMapImplTest, AppendCookieHeadersWithSemicolon) {
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_map_correctly_coalesce_cookies")) {
-    return;
-  }
   TestRequestHeaderMapImpl headers;
   const std::string foo("foo=1");
   const std::string bar("bar=2");

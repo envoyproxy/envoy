@@ -94,13 +94,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
                          FilterMatchStateSharedPtr match_state)
       : parent_(parent), iteration_state_(IterationState::Continue),
         filter_match_state_(std::move(match_state)), iterate_from_current_filter_(false),
-        headers_continued_(false), continue_headers_continued_(false), end_stream_(false),
+        headers_continued_(false), continued_1xx_headers_(false), end_stream_(false),
         dual_filter_(dual_filter), decode_headers_called_(false), encode_headers_called_(false) {}
 
   // Functions in the following block are called after the filter finishes processing
   // corresponding data. Those functions handle state updates and data storage (if needed)
   // according to the status returned by filter's callback functions.
-  bool commonHandleAfter100ContinueHeadersCallback(FilterHeadersStatus status);
+  bool commonHandleAfter1xxHeadersCallback(FilterHeadersStatus status);
   bool commonHandleAfterHeadersCallback(FilterHeadersStatus status, bool& end_stream);
   bool commonHandleAfterDataCallback(FilterDataStatus status, Buffer::Instance& provided_data,
                                      bool& buffer_was_streaming);
@@ -118,8 +118,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
   virtual bool complete() PURE;
-  virtual bool has100Continueheaders() PURE;
-  virtual void do100ContinueHeaders() PURE;
+  virtual bool has1xxheaders() PURE;
+  virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
   virtual void doData(bool end_stream) PURE;
   virtual void doTrailers() PURE;
@@ -201,7 +201,7 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // filter. Otherwise, starts with the next filter in the chain.
   bool iterate_from_current_filter_ : 1;
   bool headers_continued_ : 1;
-  bool continue_headers_continued_ : 1;
+  bool continued_1xx_headers_ : 1;
   // If true, end_stream is called for this filter.
   bool end_stream_ : 1;
   const bool dual_filter_ : 1;
@@ -226,8 +226,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has100Continueheaders() override { return false; }
-  void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  bool has1xxheaders() override { return false; }
+  void do1xxHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void doMetadata() override {
@@ -259,8 +259,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                       absl::string_view details) override;
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override;
-  ResponseHeaderMapOptRef continueHeaders() const override;
+  void encode1xxHeaders(ResponseHeaderMapPtr&& headers) override;
+  ResponseHeaderMapOptRef informationalHeaders() const override;
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
   ResponseHeaderMapOptRef responseHeaders() const override;
@@ -319,8 +319,8 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
-  bool has100Continueheaders() override;
-  void do100ContinueHeaders() override;
+  bool has1xxheaders() override;
+  void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
@@ -380,7 +380,7 @@ public:
    * chain.
    * @param response_headers the encoded headers.
    */
-  virtual void encode100ContinueHeaders(ResponseHeaderMap& response_headers) PURE;
+  virtual void encode1xxHeaders(ResponseHeaderMap& response_headers) PURE;
 
   /**
    * Called when the provided data has been encoded by all filters in the chain.
@@ -407,10 +407,10 @@ public:
   virtual void setRequestTrailers(RequestTrailerMapPtr&& request_trailers) PURE;
 
   /**
-   * Passes ownership of received continue headers to the parent. This may be called multiple times
-   * in the case of multiple upstream calls.
+   * Passes ownership of received informational headers to the parent. This may be called multiple
+   * times in the case of multiple upstream calls.
    */
-  virtual void setContinueHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
+  virtual void setInformationalHeaders(ResponseHeaderMapPtr&& response_headers) PURE;
 
   /**
    * Passes ownership of received response headers to the parent. This may be called multiple times
@@ -443,9 +443,9 @@ public:
   virtual RequestTrailerMapOptRef requestTrailers() PURE;
 
   /**
-   * Retrieves a pointer to the continue headers set via the call to setContinueHeaders.
+   * Retrieves a pointer to the continue headers set via the call to setInformationalHeaders.
    */
-  virtual ResponseHeaderMapOptRef continueHeaders() PURE;
+  virtual ResponseHeaderMapOptRef informationalHeaders() PURE;
 
   /**
    * Retrieves a pointer to the response headers set via the last call to setResponseHeaders.
@@ -643,6 +643,9 @@ public:
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
   }
+  absl::string_view ja3Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;
@@ -677,7 +680,7 @@ public:
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_continue_headers_) << "\n";
+    os << spaces << "FilterManager " << this << DUMP_MEMBER(state_.has_1xx_headers_) << "\n";
 
     DUMP_DETAILS(filter_manager_callbacks_.requestHeaders());
     DUMP_DETAILS(filter_manager_callbacks_.requestTrailers());
@@ -970,7 +973,7 @@ private:
   void decodeMetadata(ActiveStreamDecoderFilter* filter, MetadataMap& metadata_map);
   void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
   ResponseTrailerMap& addEncodedTrailers();
-  void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
+  void encode1xxHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers);
   // As with most of the encode functions, this runs encodeHeaders on various
   // filters before calling encodeHeadersInternal which does final header munging and passes the
   // headers to the encoder.
@@ -1046,11 +1049,11 @@ private:
       static constexpr uint32_t EncodeHeaders   = 0x08;
       static constexpr uint32_t EncodeData      = 0x10;
       static constexpr uint32_t EncodeTrailers  = 0x20;
-      // Encode100ContinueHeaders is a bit of a special state as 100 continue
+      // Encode1xxHeaders is a bit of a special state as 1xx
       // headers may be sent during request processing. This state is only used
-      // to verify we do not encode100Continue headers more than once per
+      // to verify we do not encode1xx headers more than once per
       // filter.
-      static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
+      static constexpr uint32_t Encode1xxHeaders  = 0x40;
       // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
@@ -1059,7 +1062,7 @@ private:
 
   struct State {
     State()
-        : remote_complete_(false), local_complete_(false), has_continue_headers_(false),
+        : remote_complete_(false), local_complete_(false), has_1xx_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false), under_on_local_reply_(false),
           decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false) {}
@@ -1070,9 +1073,9 @@ private:
     bool local_complete_ : 1; // This indicates that local is complete prior to filter processing.
                               // A filter can still stop the stream from being complete as seen
                               // by the codec.
-    // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
-    // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
-    bool has_continue_headers_ : 1;
+    // By default, we will assume there are no 1xx. If encode1xxHeaders
+    // is ever called, this is set to true so commonContinue resumes processing the 1xx.
+    bool has_1xx_headers_ : 1;
     bool created_filter_chain_ : 1;
     // These two are latched on initial header read, to determine if the original headers
     // constituted a HEAD or gRPC request, respectively.
