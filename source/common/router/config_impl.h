@@ -236,16 +236,18 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(Stats::StatName stat_name, Stats::ScopePtr&& scope,
-                       const VirtualClusterStatNames& stat_names)
-        : stat_name_(stat_name), scope_(std::move(scope)),
+    VirtualClusterBase(const std::string& vc_name, Stats::StatName stat_name,
+                       Stats::ScopePtr&& scope, const VirtualClusterStatNames& stat_names)
+        : vc_name_(vc_name), stat_name_(stat_name), scope_(std::move(scope)),
           stats_(generateStats(*scope_, stat_names)) {}
 
     // Router::VirtualCluster
+    const std::string& vcName() const override { return vc_name_; }
     Stats::StatName statName() const override { return stat_name_; }
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
+    const std::string vc_name_;
     const Stats::StatName stat_name_;
     Stats::ScopePtr scope_;
     mutable VirtualClusterStats stats_;
@@ -258,9 +260,10 @@ private:
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
+    static constexpr char other_vc_name_[] = "other";
     CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(stat_names.other_, scope.scopeFromStatName(stat_names.other_),
-                             stat_names) {}
+        : VirtualClusterBase(other_vc_name_, stat_names.other_,
+                             scope.scopeFromStatName(stat_names.other_), stat_names) {}
   };
 
   static const std::shared_ptr<const SslRedirectRoute> SSL_REDIRECT_ROUTE;
