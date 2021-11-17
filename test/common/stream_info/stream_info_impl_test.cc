@@ -147,6 +147,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 
+    EXPECT_FALSE(stream_info.attemptCount().has_value());
+    stream_info.setAttemptCount(93);
+    ASSERT_TRUE(stream_info.attemptCount().has_value());
+    EXPECT_EQ(stream_info.attemptCount().value(), 93);
+
     EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
     stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
@@ -264,6 +269,24 @@ TEST_F(StreamInfoImplTest, Details) {
   stream_info.setResponseCodeDetails("two words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
+}
+
+TEST(UpstreamInfoImplTest, DumpState) {
+  UpstreamInfoImpl upstream_info;
+
+  {
+    std::stringstream out;
+    upstream_info.dumpState(out, 0);
+    std::string state = out.str();
+    EXPECT_THAT(state, testing::HasSubstr("upstream_connection_id_: null"));
+  }
+  upstream_info.setUpstreamConnectionId(5);
+  {
+    std::stringstream out;
+    upstream_info.dumpState(out, 0);
+    std::string state = out.str();
+    EXPECT_THAT(state, testing::HasSubstr("upstream_connection_id_: 5"));
+  }
 }
 
 } // namespace
