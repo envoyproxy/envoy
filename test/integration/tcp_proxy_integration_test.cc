@@ -172,8 +172,17 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
 
 TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   autonomous_upstream_ = true;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    for (int i = 0; i < static_resources->clusters_size(); ++i) {
+      auto* cluster = static_resources->mutable_clusters(i);
+      auto* thresholds = cluster->mutable_circuit_breakers()->add_thresholds();
+      thresholds->mutable_max_connections()->set_value(1027);
+      thresholds->mutable_max_pending_requests()->set_value(1027);
+    }
+  });
   initialize();
-  const int num_connections = 50;
+  const int num_connections = 1026;
   std::vector<IntegrationTcpClientPtr> clients(num_connections);
 
   for (int i = 0; i < num_connections; ++i) {
