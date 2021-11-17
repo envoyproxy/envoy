@@ -197,6 +197,8 @@ public:
 
 private:
   std::string token_;
+  std::string id_token_;
+  std::string refresh_token_;
   std::string expires_;
   std::string hmac_;
   std::vector<uint8_t> secret_;
@@ -219,7 +221,8 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
 
   // FilterCallbacks
-  void onGetAccessTokenSuccess(const std::string& access_code,
+  void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
+                               const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
@@ -235,6 +238,8 @@ private:
   // wrap up some of these in a UserData struct or something...
   std::string auth_code_;
   std::string access_token_; // TODO - see if we can avoid this being a member variable
+  std::string id_token_;
+  std::string refresh_token_;
   std::string new_expires_;
   absl::string_view host_;
   std::string state_;

@@ -62,6 +62,8 @@ cat <<EOF >sed_commands
 
 # Rewrite third_party includes.
 /^#include/ s!third_party/boringssl/src/include/!!
+/^#include/ s!third_party/nghttp2/src/lib/includes/nghttp2!nghttp2!
+/^#include/ s!third_party/nghttp2!nghttp2!
 /^#include/ s!third_party/zlib/zlib!zlib!
 
 /^import/ s!quic/core/proto/cached_network_parameters!quiche/quic/core/proto/cached_network_parameters!

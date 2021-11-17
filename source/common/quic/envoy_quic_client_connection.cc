@@ -217,6 +217,14 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   }
 }
 
+void EnvoyQuicClientConnection::setNumPtosForPortMigration(uint32_t num_ptos_for_path_degrading) {
+  if (num_ptos_for_path_degrading < 1) {
+    return;
+  }
+  migrate_port_on_path_degrading_ = true;
+  sent_packet_manager().set_num_ptos_for_path_degrading(num_ptos_for_path_degrading);
+}
+
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(
     quic::QuicSocketAddress& self_address, quic::QuicSocketAddress& peer_address,
     std::unique_ptr<EnvoyQuicPacketWriter> writer,

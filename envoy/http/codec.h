@@ -140,10 +140,11 @@ public:
 class ResponseEncoder : public virtual StreamEncoder {
 public:
   /**
-   * Encode 100-Continue headers.
-   * @param headers supplies the 100-Continue header map to encode.
+   * Encode supported 1xx headers.
+   * Currently only 100-Continue headers are supported.
+   * @param headers supplies the 1xx header map to encode.
    */
-  virtual void encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
+  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -235,10 +236,11 @@ public:
 class ResponseDecoder : public virtual StreamDecoder {
 public:
   /**
-   * Called with decoded 100-Continue headers.
-   * @param headers supplies the decoded 100-Continue headers map.
+   * Called with decoded 1xx headers.
+   * Currently only 100-Continue headers are supported.
+   * @param headers supplies the decoded 1xx headers map.
    */
-  virtual void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  virtual void decode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
