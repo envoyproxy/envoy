@@ -258,8 +258,10 @@ TEST_P(TlsInspectorTest, ConnectionFingerprint) {
   EXPECT_CALL(socket_, setRequestedServerName(_)).Times(0);
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
-  EXPECT_CALL(cb_, continueFilterChain(true));
+  // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
 
 void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_server_name,
@@ -287,9 +289,12 @@ void TlsInspectorTest::testJA3(const std::string& fingerprint, bool expect_serve
     EXPECT_CALL(socket_, setRequestedServerName(absl::string_view("www.envoyproxy.io")));
   }
   EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
-  EXPECT_CALL(cb_, continueFilterChain(true));
+  // EXPECT_CALL(cb_, continueFilterChain(true));
   EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")));
+  // trigger the event to copy the client hello message into buffer
   file_event_callback_(Event::FileReadyType::Read);
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
 }
 
 // Test that the filter sets the correct `JA3` hash.
