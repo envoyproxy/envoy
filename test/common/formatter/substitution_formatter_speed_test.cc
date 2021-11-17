@@ -46,8 +46,8 @@ std::unique_ptr<Envoy::Formatter::StructFormatter> makeStructFormatter(bool type
   return std::make_unique<Envoy::Formatter::StructFormatter>(StructLogFormat, typed, false);
 }
 
-std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
-  auto stream_info = std::make_unique<Envoy::TestStreamInfo>();
+std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {
+  auto stream_info = std::make_unique<Envoy::TestStreamInfo>(time_source);
   stream_info->downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Envoy::Network::Address::Ipv4Instance>("203.0.113.1"));
   return stream_info;
@@ -57,7 +57,8 @@ std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo() {
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_AccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
+  MockTimeSystem time_system;
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   static const char* LogFormat =
       "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %START_TIME(%Y/%m/%dT%H:%M:%S%z %s)% "
       "%REQ(:METHOD)% "
@@ -83,7 +84,8 @@ BENCHMARK(BM_AccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StructAccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
+  MockTimeSystem time_system;
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> struct_formatter = makeStructFormatter(false);
 
   size_t output_bytes = 0;
@@ -103,7 +105,8 @@ BENCHMARK(BM_StructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedStructAccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
+  MockTimeSystem time_system;
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::StructFormatter> typed_struct_formatter =
       makeStructFormatter(true);
 
@@ -124,7 +127,8 @@ BENCHMARK(BM_TypedStructAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
+  MockTimeSystem time_system;
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> json_formatter = makeJsonFormatter(false);
 
   size_t output_bytes = 0;
@@ -144,7 +148,8 @@ BENCHMARK(BM_JsonAccessLogFormatter);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_TypedJsonAccessLogFormatter(benchmark::State& state) {
-  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo();
+  MockTimeSystem time_system;
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
   std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> typed_json_formatter =
       makeJsonFormatter(true);
 
