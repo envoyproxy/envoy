@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.config.listener.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
-import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -16,6 +15,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/security.proto";
@@ -95,23 +95,6 @@ message Listener {
   message InternalListenerConfig {
   }
 
-  // Filter chain with a name.
-  message NamedFilterChain {
-    // Filter chain name.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-
-    oneof config_type {
-      // Filter chain configuration.
-      FilterChain filter_chain = 2;
-
-      // Configuration source specifier for an extension configuration discovery
-      // service. In case of a failure and without the default configuration, the
-      // connection is rejected.
-      // [#not-implemented-hide:]
-      core.v3.ExtensionConfigSource config_discovery = 3;
-    }
-  }
-
   reserved 14, 23;
 
   // The unique name by which this listener is known. If no name is provided,
@@ -141,21 +124,25 @@ message Listener {
   // A filter chain matcher resolving the filter chain name based on the connection properties.
   // The following inputs are supported by the matcher:
   //
-  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationPortInput>`.
-  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DestinationIPInput>`.
-  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SNIInput>`.
-  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.TransportProtocolInput>`.
-  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.ApplicationProtocolInput>`.
-  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.DirectSourceIPInput>`.
-  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceTypeInput>`.
-  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourceIPInput>`.
-  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.FilterChainMatch.SourcePortInput>`.
+  // 1. :ref:`DestinationPort <envoy_v3_api_msg_config.listener.v3.DestinationPortInput>`.
+  // 2. :ref:`DestinationIP <envoy_v3_api_msg_config.listener.v3.DestinationIPInput>`.
+  // 3. :ref:`SNI <envoy_v3_api_msg_config.listener.v3.SNIInput>`.
+  // 4. :ref:`TransportProtocol <envoy_v3_api_msg_config.listener.v3.TransportProtocolInput>`.
+  // 5. :ref:`ApplicationProtocol <envoy_v3_api_msg_config.listener.v3.ApplicationProtocolInput>`.
+  // 6. :ref:`DirectSourceIP <envoy_v3_api_msg_config.listener.v3.DirectSourceIPInput>`.
+  // 7. :ref:`SourceType <envoy_v3_api_msg_config.listener.v3.SourceTypeInput>`.
+  // 8. :ref:`SourceIP <envoy_v3_api_msg_config.listener.v3.SourceIPInput>`.
+  // 9. :ref:`SourcePort <envoy_v3_api_msg_config.listener.v3.SourcePortInput>`.
+  //
+  // If specified, all :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must
+  // have a non-empty :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` and empty :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
   // [#not-implemented-hide:]
-  repeated common.matcher.v3.Matcher filter_chain_matcher = 31;
+  repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 31;
 
-  // Filter chains.
+  // Defines the discovery service configuration for filter chains indexed by the filter chain name.
+  // The set of filter chain names must be disjoint from the filter chain names in the field :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>`.
   // [#not-implemented-hide:]
-  repeated NamedFilterChain named_filter_chains = 32;
+  map<string, core.v3.ExtensionConfigSource> filter_chain_discovery = 32;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to

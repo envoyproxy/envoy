@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.listener.v3;
 
-import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
@@ -11,6 +10,8 @@ import "envoy/type/v3/range.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -108,163 +109,6 @@ message FilterChainMatch {
 
     // Match a connection originating from a different host.
     EXTERNAL = 2;
-  }
-
-  // Matches filter chains by the destination port.
-  message DestinationPortInput {
-  }
-
-  // Matches filter chains by the destination IP address.
-  message DestinationIPInput {
-  }
-
-  // Matches filter chains by the source IP address.
-  message SourceIPInput {
-  }
-
-  // Matches filter chains by the directly connected source IP address (this
-  // will only be different from the source IP address when using a listener
-  // filter that overrides the source address, such as the :ref:`Proxy Protocol
-  // listener filter <config_listener_filters_proxy_protocol>`).
-  message DirectSourceIPInput {
-  }
-
-  // Matches filter chains by the source port.
-  message SourcePortInput {
-  }
-
-  // Matches filter chains by the connection source IP type.
-  // Specifies the connection source IP match type. The values include:
-  //
-  // * ``any`` - any connection source,
-  // * ``local`` - matches a connection originating from the same host,
-  // * ``external`` - matches a connection originating from a different host
-  message SourceTypeInput {
-  }
-
-  // Matches filter chains by the server names of a new connection, when detected by one of the listener filters.
-  message SNIInput {
-  }
-
-  // Matches filter chains by the transport protocol.
-  // This value will be compared against the transport protocol of a new connection, when
-  // it's detected by one of the listener filters.
-  //
-  // Suggested values include:
-  //
-  // * ``raw_buffer`` - default, used when no transport protocol is detected,
-  // * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
-  //   when TLS protocol is detected.
-  message TransportProtocolInput {
-  }
-
-  // Matches filter chains by the application protocol (e.g. ALPN for TLS protocol).
-  // This values will be compared against the application
-  // protocols of a new connection, when detected by one of the listener filters.
-  //
-  // Suggested values include:
-  //
-  // * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
-  //   <config_listener_filters_tls_inspector>`,
-  // * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
-  //
-  // .. attention::
-  //
-  //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
-  //   application protocol detection based on the requested
-  //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
-  //
-  //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
-  //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
-  //   unless all connecting clients are known to use ALPN.
-  message ApplicationProtocolInput {
-  }
-
-  // Matches a specific port against a set of possibly overlapping port ranges.
-  message PortMatcher {
-    // Specifies an optional list of port ranges and a match action.
-    message PortRangeMatcher {
-      // Optional set of port ranges. An empty set matches any port.
-      repeated type.v3.Int32Range ranges = 1;
-
-      // Match action to apply when the port is within one of the port ranges.
-      common.matcher.v3.Matcher.OnMatch on_match = 2;
-
-      // Indicates whether this match option should be considered if there is a
-      // matcher for the specific port value. For example, consider a matcher
-      // for the port range [1, 1000] applied to a specific port 80. If there
-      // is another matcher for the specific port 80 that fully matches, then
-      // the specific port matcher is selected. However, if the specific port
-      // matcher does not fully match, then the behavior depends on whether the
-      // range matcher [1, 1000] is exclusive. Exclusive port matchers do not
-      // apply when there is a more specific port match. Non-exclusive port
-      // matchers may apply when the nested match conditions are satisfied for
-      // the range matcher but not for the specific port value nested matcher.
-      //
-      // The order of range matchers is important since it dictates the order
-      // of matching in case of overlapping port ranges.
-      bool exclusive = 3;
-    }
-
-    // Match port by value. Takes precedence over matching by the port ranges.
-    map<int32, common.matcher.v3.Matcher.OnMatch> port_map = 1;
-
-    // Match port by port ranges.
-    repeated PortRangeMatcher range_matchers = 2;
-  }
-
-  // Matches a specific IP address against a set of possibly overlapping subnets.
-  message IPMatcher {
-    // Specifies an optional list of IP address ranges and a match action.
-    message IPRangeMatcher {
-      // Optional set of CIDR ranges. An empty set matches any IP address.
-      repeated core.v3.CidrRange ranges = 1;
-
-      // Match action to apply when the IP address is within one of the CIDR ranges.
-      common.matcher.v3.Matcher.OnMatch on_match = 2;
-
-      // Indicates whether this match option should be considered if there is a
-      // more specific matcher. Exclusive matchers are not selected whenever a
-      // more specific matcher exists (e.g. matcher with a longer prefix) even
-      // when the more specific matcher fails its nested match condition.
-      // Non-exclusive matchers are considered if the more specific matcher
-      // exists but its nested match condition does not entirely match.
-      // Non-exclusive matchers are selected in the order of their specificity
-      // first (longest prefix first), then the order of declaration next.
-      bool exclusive = 3;
-    }
-
-    // Match IP address by CIDR ranges.
-    repeated IPRangeMatcher range_matchers = 1;
-  }
-
-  // Matches a specific server name against of a set of possibly overlapping wildcard domains.
-  message ServerNameMatcher {
-    // Specifies an optional list of wildcard domains and a match action.
-    // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
-    // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
-    //
-    // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
-    message DomainMatcher {
-      // Optional set of wildcard domains. An empty set matches any server name.
-      repeated string server_names = 1;
-
-      // Match action to apply when the server name matches.
-      common.matcher.v3.Matcher.OnMatch on_match = 2;
-
-      // Indicates whether this match option should be considered if there is a
-      // more specific matcher. Exclusive matches are not selected whenever a
-      // more specific matcher exists even when the more specific matcher fails
-      // to match its nested match condition. For example, an exclusive matcher
-      // for ```*.com``` does not match ``www.example.com``` if there is a
-      // matcher for ```*.example.com```. Matchers are selected in the order of
-      // their specificity first (longest suffix first), then
-      // the order of declaration next.
-      bool exclusive = 3;
-    }
-
-    // Match server name by wildcard domains.
-    repeated DomainMatcher domain_matchers = 1;
   }
 
   reserved 1;
@@ -514,4 +358,161 @@ message ListenerFilter {
   // See :ref:`ListenerFilterChainMatchPredicate <envoy_v3_api_msg_config.listener.v3.ListenerFilterChainMatchPredicate>`
   // for further examples.
   ListenerFilterChainMatchPredicate filter_disabled = 4;
+}
+
+// Matcher input that allows matching connections by by the destination port.
+message DestinationPortInput {
+}
+
+// Matcher input that allows matching connections by by the destination IP address.
+message DestinationIPInput {
+}
+
+// Matcher input that allows matching connections by by the source IP address.
+message SourceIPInput {
+}
+
+// Matcher input that allows matching connections by by the directly connected source IP address (this
+// will only be different from the source IP address when using a listener
+// filter that overrides the source address, such as the :ref:`Proxy Protocol
+// listener filter <config_listener_filters_proxy_protocol>`).
+message DirectSourceIPInput {
+}
+
+// Matcher input that allows matching connections by by the source port.
+message SourcePortInput {
+}
+
+// Matcher input that allows matching connections by by the connection source IP type.
+// Specifies the connection source IP match type. The values include:
+//
+// * ``any`` - any connection source,
+// * ``local`` - matches a connection originating from the same host,
+// * ``external`` - matches a connection originating from a different host
+message SourceTypeInput {
+}
+
+// Matcher input that allows matching connections by by the server names of a new connection, when detected by one of the listener filters.
+message SNIInput {
+}
+
+// Matcher input that allows matching connections by by the transport protocol.
+// This value will be compared against the transport protocol of a new connection, when
+// it's detected by one of the listener filters.
+//
+// Suggested values include:
+//
+// * ``raw_buffer`` - default, used when no transport protocol is detected,
+// * ``tls`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+//   when TLS protocol is detected.
+message TransportProtocolInput {
+}
+
+// Matcher input that allows matching connections by by the application protocol (e.g. ALPN for TLS protocol).
+// This values will be compared against the application
+// protocols of a new connection, when detected by one of the listener filters.
+//
+// Suggested values include:
+//
+// * ``http/1.1`` - set by :ref:`envoy.filters.listener.tls_inspector
+//   <config_listener_filters_tls_inspector>`,
+// * ``h2`` - set by :ref:`envoy.filters.listener.tls_inspector <config_listener_filters_tls_inspector>`
+//
+// .. attention::
+//
+//   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
+//   application protocol detection based on the requested
+//   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
+//
+//   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
+//   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
+//   unless all connecting clients are known to use ALPN.
+message ApplicationProtocolInput {
+}
+
+// Matches a specific port against a set of possibly overlapping port ranges.
+message PortMatcher {
+  // Specifies an optional list of port ranges and a match action.
+  message PortRangeMatcher {
+    // Optional set of port ranges. An empty set matches any port.
+    repeated type.v3.Int32Range ranges = 1;
+
+    // Match action to apply when the port is within one of the port ranges.
+    xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
+
+    // Indicates whether this match option should be considered if there is a
+    // matcher for the specific port value. For example, consider a matcher
+    // for the port range [1, 1000] applied to a specific port 80. If there
+    // is another matcher for the specific port 80 that fully matches, then
+    // the specific port matcher is selected. However, if the specific port
+    // matcher does not fully match, then the behavior depends on whether the
+    // range matcher [1, 1000] is exclusive. Exclusive port matchers do not
+    // apply when there is a more specific port match. Non-exclusive port
+    // matchers may apply when the nested match conditions are satisfied for
+    // the range matcher but not for the specific port value nested matcher.
+    //
+    // The order of range matchers is important since it dictates the order
+    // of matching in case of overlapping port ranges.
+    bool exclusive = 3;
+  }
+
+  // Match port by value. Takes precedence over matching by the port ranges.
+  map<int32, xds.type.matcher.v3.Matcher.OnMatch> port_map = 1;
+
+  // Match port by port ranges.
+  repeated PortRangeMatcher range_matchers = 2;
+}
+
+// Matches a specific IP address against a set of possibly overlapping subnets.
+message IPMatcher {
+  // Specifies an optional list of IP address ranges and a match action.
+  message IPRangeMatcher {
+    // Optional set of CIDR ranges. An empty set matches any IP address.
+    repeated core.v3.CidrRange ranges = 1;
+
+    // Match action to apply when the IP address is within one of the CIDR ranges.
+    xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
+
+    // Indicates whether this match option should be considered if there is a
+    // more specific matcher. Exclusive matchers are not selected whenever a
+    // more specific matcher exists (e.g. matcher with a longer prefix) even
+    // when the more specific matcher fails its nested match condition.
+    // Non-exclusive matchers are considered if the more specific matcher
+    // exists but its nested match condition does not entirely match.
+    // Non-exclusive matchers are selected in the order of their specificity
+    // first (longest prefix first), then the order of declaration next.
+    bool exclusive = 3;
+  }
+
+  // Match IP address by CIDR ranges.
+  repeated IPRangeMatcher range_matchers = 1;
+}
+
+// Matches a specific server name against of a set of possibly overlapping wildcard domains.
+message ServerNameMatcher {
+  // Specifies an optional list of wildcard domains and a match action.
+  // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
+  // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
+  //
+  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
+  message DomainMatcher {
+    // Optional set of wildcard domains. An empty set matches any server name.
+    repeated string server_names = 1;
+
+    // Match action to apply when the server name matches.
+    xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
+
+    // Indicates whether this match option should be considered if there is a
+    // more specific matcher. Exclusive matches are not selected whenever a
+    // more specific matcher exists even when the more specific matcher fails
+    // to match its nested match condition. For example, an exclusive matcher
+    // for ```*.com``` does not match ``www.example.com``` if there is a
+    // matcher for ```*.example.com```. Matchers are selected in the order of
+    // their specificity first (longest suffix first), then
+    // the order of declaration next.
+    bool exclusive = 3;
+  }
+
+  // Match server name by wildcard domains.
+  repeated DomainMatcher domain_matchers = 1;
 }
