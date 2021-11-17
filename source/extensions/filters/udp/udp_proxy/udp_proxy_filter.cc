@@ -61,9 +61,10 @@ Network::FilterStatus UdpProxyFilter::onReceiveError(Api::IoError::IoErrorCode) 
 }
 
 UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
-                                         Upstream::ThreadLocalCluster& cluster)
+                                         Upstream::ThreadLocalCluster& cluster,
+                                         SessionStorageType&& sessions)
     : filter_(filter), cluster_(cluster),
-      cluster_stats_(generateStats(cluster.info()->statsScope())),
+      cluster_stats_(generateStats(cluster.info()->statsScope())), sessions_(std::move(sessions)),
       member_update_cb_handle_(cluster.prioritySet().addMemberUpdateCb(
           [this](const Upstream::HostVector&, const Upstream::HostVector& hosts_removed) {
             for (const auto& host : hosts_removed) {
@@ -71,7 +72,14 @@ UdpProxyFilter::ClusterInfo::ClusterInfo(UdpProxyFilter& filter,
             }
           })) {}
 
-UdpProxyFilter::ClusterInfo::~ClusterInfo() { ASSERT(host_to_sessions_.empty()); }
+UdpProxyFilter::ClusterInfo::~ClusterInfo() {
+  // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
+  // not a performance critical path.
+  while (!sessions_.empty()) {
+    removeSession(sessions_.begin()->get());
+  }
+  ASSERT(host_to_sessions_.empty());
+}
 
 void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
   // First remove from the host to sessions map.
@@ -122,6 +130,15 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::ClusterInfo::createSessionWithHos
   return new_session_ptr;
 }
 
+void UdpProxyFilter::ClusterInfo::storeSession(ActiveSessionPtr session) {
+  sessions_.emplace(std::move(session));
+}
+
+void UdpProxyFilter::ClusterInfo::removeSessionFromStorage(const ActiveSession* session) {
+  ASSERT(sessions_.count(session) == 1);
+  sessions_.erase(session);
+}
+
 Upstream::HostConstSharedPtr UdpProxyFilter::ClusterInfo::chooseHost(
     const Network::Address::InstanceConstSharedPtr& peer_address) const {
   UdpLoadBalancerContext context(filter_.config_->hashPolicy(), peer_address);
@@ -141,15 +158,9 @@ void UdpProxyFilter::ClusterInfo::removeHostSessions(const Upstream::HostConstSh
 
 UdpProxyFilter::StickySessionClusterInfo::StickySessionClusterInfo(
     UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster)
-    : ClusterInfo(filter, cluster) {}
-
-UdpProxyFilter::StickySessionClusterInfo::~StickySessionClusterInfo() {
-  // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
-  // not a performance critical path.
-  while (!sessions_.empty()) {
-    removeSession(sessions_.begin()->get());
-  }
-}
+    : ClusterInfo(filter, cluster,
+                  SessionStorageType(1, HeterogeneousActiveSessionHash(false),
+                                     HeterogeneousActiveSessionEqual(false))) {}
 
 Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::UdpRecvData& data) {
   auto active_session = getSession(data.addresses_);
@@ -191,27 +202,11 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::StickySessionClusterInfo::getSess
   return nullptr;
 }
 
-void UdpProxyFilter::StickySessionClusterInfo::storeSession(ActiveSessionPtr session) {
-  sessions_.emplace(std::move(session));
-}
-
-void UdpProxyFilter::StickySessionClusterInfo::removeSessionFromStorage(
-    const ActiveSession* session) {
-  ASSERT(sessions_.count(session) == 1);
-  sessions_.erase(session);
-}
-
 UdpProxyFilter::PerPacketLoadBalancingClusterInfo::PerPacketLoadBalancingClusterInfo(
     UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster)
-    : ClusterInfo(filter, cluster) {}
-
-UdpProxyFilter::PerPacketLoadBalancingClusterInfo::~PerPacketLoadBalancingClusterInfo() {
-  // Sanity check the session accounting. This is not as fast as a straight teardown, but this is
-  // not a performance critical path.
-  while (!sessions_.empty()) {
-    removeSession(sessions_.begin()->get());
-  }
-}
+    : ClusterInfo(filter, cluster,
+                  SessionStorageType(1, HeterogeneousActiveSessionHash(true),
+                                     HeterogeneousActiveSessionEqual(true))) {}
 
 Network::FilterStatus
 UdpProxyFilter::PerPacketLoadBalancingClusterInfo::onData(Network::UdpRecvData& data) {
@@ -250,16 +245,6 @@ UdpProxyFilter::ActiveSession* UdpProxyFilter::PerPacketLoadBalancingClusterInfo
     return active_session_it->get();
   }
   return nullptr;
-}
-
-void UdpProxyFilter::PerPacketLoadBalancingClusterInfo::storeSession(ActiveSessionPtr session) {
-  sessions_.emplace(std::move(session));
-}
-
-void UdpProxyFilter::PerPacketLoadBalancingClusterInfo::removeSessionFromStorage(
-    const ActiveSession* session) {
-  ASSERT(sessions_.count(session) == 1);
-  sessions_.erase(session);
 }
 
 UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,

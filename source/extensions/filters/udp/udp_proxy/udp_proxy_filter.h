@@ -203,6 +203,11 @@ private:
 
   using ActiveSessionPtr = std::unique_ptr<ActiveSession>;
 
+  struct LocalPeerHostAddresses {
+    const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
+    const Upstream::Host& host_;
+  };
+
   struct HeterogeneousActiveSessionHash {
     // Specifying is_transparent indicates to the library infrastructure that
     // type-conversions should not be applied when calling find(), but instead
@@ -213,73 +218,52 @@ private:
     // using it in the context of absl.
     using is_transparent = void; // NOLINT(readability-identifier-naming)
 
+    HeterogeneousActiveSessionHash(const bool consider_host) : consider_host_(consider_host) {}
+
     size_t operator()(const Network::UdpRecvData::LocalPeerAddresses& value) const {
       return absl::Hash<const Network::UdpRecvData::LocalPeerAddresses>()(value);
     }
-    size_t operator()(const ActiveSessionPtr& value) const {
-      return absl::Hash<const Network::UdpRecvData::LocalPeerAddresses>()(value->addresses());
+    size_t operator()(const LocalPeerHostAddresses& value) const {
+      auto hash = this->operator()(value.local_peer_addresses_);
+      if (consider_host_) {
+        hash = absl::HashOf(hash, value.host_.address()->asStringView());
+      }
+      return hash;
     }
     size_t operator()(const ActiveSession* value) const {
-      return absl::Hash<const Network::UdpRecvData::LocalPeerAddresses>()(value->addresses());
+      LocalPeerHostAddresses key{value->addresses(), value->host()};
+      return this->operator()(key);
     }
+    size_t operator()(const ActiveSessionPtr& value) const { return this->operator()(value.get()); }
+
+  private:
+    const bool consider_host_;
   };
 
   struct HeterogeneousActiveSessionEqual {
     // See description for HeterogeneousActiveSessionHash::is_transparent.
     using is_transparent = void; // NOLINT(readability-identifier-naming)
 
+    HeterogeneousActiveSessionEqual(const bool consider_host) : consider_host_(consider_host) {}
+
     bool operator()(const ActiveSessionPtr& lhs,
                     const Network::UdpRecvData::LocalPeerAddresses& rhs) const {
       return lhs->addresses() == rhs;
     }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
-      return lhs->addresses() == rhs->addresses();
-    }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSession* rhs) const {
-      return lhs->addresses() == rhs->addresses();
-    }
-  };
-
-  struct LocalPeerHostAddresses {
-    const Network::UdpRecvData::LocalPeerAddresses& local_peer_addresses_;
-    const Upstream::Host& host_;
-  };
-
-  struct HeterogeneousActiveSessionHashWithUpstreamHost {
-    // See description for HeterogeneousActiveSessionHash::is_transparent.
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-
-    size_t operator()(const LocalPeerHostAddresses& value) const {
-      return absl::HashOf(base_hasher_(value.local_peer_addresses_),
-                          value.host_.address()->asStringView());
-    }
-    size_t operator()(const ActiveSessionPtr& value) const {
-      return absl::HashOf(base_hasher_(value), value->host().address()->asStringView());
-    }
-    size_t operator()(const ActiveSession* value) const {
-      return absl::HashOf(base_hasher_(value), value->host().address()->asStringView());
-    }
-
-  private:
-    HeterogeneousActiveSessionHash base_hasher_;
-  };
-
-  struct HeterogeneousActiveSessionEqualWithUpstreamHost {
-    // See description for HeterogeneousActiveSessionHash::is_transparent.
-    using is_transparent = void; // NOLINT(readability-identifier-naming)
-
     bool operator()(const ActiveSessionPtr& lhs, const LocalPeerHostAddresses& rhs) const {
-      return base_equal_(lhs, rhs.local_peer_addresses_) && &lhs->host() == &rhs.host_;
-    }
-    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
-      return base_equal_(lhs, rhs) && &lhs->host() == &rhs->host();
+      return this->operator()(lhs, rhs.local_peer_addresses_) &&
+             (consider_host_ ? &lhs->host() == &rhs.host_ : true);
     }
     bool operator()(const ActiveSessionPtr& lhs, const ActiveSession* rhs) const {
-      return base_equal_(lhs, rhs) && &lhs->host() == &rhs->host();
+      LocalPeerHostAddresses key{rhs->addresses(), rhs->host()};
+      return this->operator()(lhs, key);
+    }
+    bool operator()(const ActiveSessionPtr& lhs, const ActiveSessionPtr& rhs) const {
+      return this->operator()(lhs, rhs.get());
     }
 
   private:
-    HeterogeneousActiveSessionEqual base_equal_;
+    const bool consider_host_;
   };
 
   /**
@@ -287,8 +271,13 @@ private:
    * we will very likely support different types of routing to multiple upstream clusters.
    */
   class ClusterInfo {
+  protected:
+    using SessionStorageType = absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
+                                                   HeterogeneousActiveSessionEqual>;
+
   public:
-    ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
+    ClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster,
+                SessionStorageType&& sessions);
     virtual ~ClusterInfo();
     virtual Network::FilterStatus onData(Network::UdpRecvData& data) PURE;
     void removeSession(const ActiveSession* session);
@@ -307,6 +296,8 @@ private:
     Upstream::HostConstSharedPtr
     chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
 
+    SessionStorageType sessions_;
+
   private:
     static UdpProxyUpstreamStats generateStats(Stats::Scope& scope) {
       const auto final_prefix = "udp";
@@ -316,8 +307,8 @@ private:
     ActiveSession* createSessionWithHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                          const Upstream::HostConstSharedPtr& host);
 
-    virtual void storeSession(ActiveSessionPtr session) PURE;
-    virtual void removeSessionFromStorage(const ActiveSession* session) PURE;
+    void storeSession(ActiveSessionPtr session);
+    void removeSessionFromStorage(const ActiveSession* session);
     virtual ActiveSession*
     getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
                const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const PURE;
@@ -336,16 +327,9 @@ private:
   class StickySessionClusterInfo : public ClusterInfo {
   public:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
-    ~StickySessionClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
 
   private:
-    absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHash,
-                        HeterogeneousActiveSessionEqual>
-        sessions_;
-
-    void storeSession(ActiveSessionPtr session) override;
-    void removeSessionFromStorage(const ActiveSession* session) override;
     ActiveSession*
     getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
                const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const override;
@@ -359,16 +343,9 @@ private:
   public:
     PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
                                       Upstream::ThreadLocalCluster& cluster);
-    ~PerPacketLoadBalancingClusterInfo() override;
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
 
   private:
-    absl::flat_hash_set<ActiveSessionPtr, HeterogeneousActiveSessionHashWithUpstreamHost,
-                        HeterogeneousActiveSessionEqualWithUpstreamHost>
-        sessions_;
-
-    void storeSession(ActiveSessionPtr session) override;
-    void removeSessionFromStorage(const ActiveSession* session) override;
     ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
                               const HostConstSharedPtrOptConstRef& optional_host) const override;
   };
