@@ -84,6 +84,18 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
+    name = "http2_event_forwarder",
+    srcs = ["quiche/http2/adapter/event_forwarder.cc"],
+    hdrs = ["quiche/http2/adapter/event_forwarder.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    deps = [
+        ":quiche_common_platform_export",
+        ":spdy_core_http2_deframer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "http2_adapter",
     srcs = [
         "quiche/http2/adapter/callback_visitor.cc",
@@ -129,6 +141,7 @@ envoy_cc_library(
     deps = [
         ":http2_core_http2_trace_logging_lib",
         ":http2_core_priority_write_scheduler_lib",
+        ":http2_event_forwarder",
         ":spdy_core_framer_lib",
         ":spdy_core_header_block_lib",
         ":spdy_core_http2_deframer_lib",

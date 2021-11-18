@@ -119,7 +119,7 @@ public:
   static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter();
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();

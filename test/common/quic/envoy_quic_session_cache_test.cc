@@ -31,9 +31,10 @@ std::vector<uint8_t> createFakeStatelessResetToken() {
 std::unique_ptr<quic::TransportParameters> makeFakeTransportParams() {
   auto params = std::make_unique<quic::TransportParameters>();
   params->perspective = quic::Perspective::IS_CLIENT;
-  params->version = FakeVersionLabel;
-  params->supported_versions.push_back(FakeVersionLabel);
-  params->supported_versions.push_back(FakeVersionLabel2);
+  params->legacy_version_information = quic::TransportParameters::LegacyVersionInformation();
+  params->legacy_version_information->version = FakeVersionLabel;
+  params->legacy_version_information->supported_versions.push_back(FakeVersionLabel);
+  params->legacy_version_information->supported_versions.push_back(FakeVersionLabel2);
   params->max_idle_timeout_ms.set_value(FakeIdleTimeoutMilliseconds);
   params->stateless_reset_token = createFakeStatelessResetToken();
   params->max_udp_payload_size.set_value(FakeMaxPacketSize);

@@ -160,7 +160,7 @@ public:
     EXPECT_TRUE(session->IsEncryptionEstablished());
     EXPECT_EQ(1u, connection_handler_.numConnections());
     auto envoy_connection = static_cast<const EnvoyQuicServerSession*>(session);
-    EXPECT_EQ("test.example.org", envoy_connection->requestedServerName());
+    EXPECT_EQ("test.example.com", envoy_connection->requestedServerName());
     EXPECT_EQ(peer_addr, envoyIpAddressToQuicSocketAddress(
                              envoy_connection->connectionInfoProvider().remoteAddress()->ip()));
     ASSERT(envoy_connection->connectionInfoProvider().localAddress() != nullptr);
@@ -190,7 +190,7 @@ public:
     EXPECT_CALL(filter_chain_manager, findFilterChain(_))
         .WillOnce(Invoke([this](const Network::ConnectionSocket& socket) {
           EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
-          EXPECT_EQ("test.example.org", socket.requestedServerName());
+          EXPECT_EQ("test.example.com", socket.requestedServerName());
           return &proof_source_->filterChain();
         }));
     Network::MockTransportSocketFactory transport_socket_factory;
