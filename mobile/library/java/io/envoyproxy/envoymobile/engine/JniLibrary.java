@@ -85,10 +85,11 @@ public class JniLibrary {
    *
    * @param stream,    the stream to send data over.
    * @param data,      the data to send.
+   * @param length,    the size in bytes of the data to send. 0 <= length <= data.length
    * @param endStream, supplies whether this is the last data in the stream.
-   * @return int, the resulting status of the operation.
+   * @return int,      the resulting status of the operation.
    */
-  protected static native int sendData(long stream, byte[] data, boolean endStream);
+  protected static native int sendData(long stream, byte[] data, int length, boolean endStream);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple
@@ -96,10 +97,11 @@ public class JniLibrary {
    *
    * @param stream,    the stream to send data over.
    * @param data,      the data to send; must be a <b>direct</b> ByteBuffer.
+   * @param length,    the size in bytes of the data to send. 0 <= length <= data.capacity()
    * @param endStream, supplies whether this is the last data in the stream.
-   * @return int, the resulting status of the operation.
+   * @return int,      the resulting status of the operation.
    */
-  protected static native int sendData(long stream, ByteBuffer data, boolean endStream);
+  protected static native int sendData(long stream, ByteBuffer data, int length, boolean endStream);
 
   /**
    * Read data from the response stream. Returns immediately.

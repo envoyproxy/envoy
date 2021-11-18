@@ -21,6 +21,8 @@ int unbox_integer(JNIEnv* env, jobject boxedInteger);
 
 envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data);
 
+envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data, size_t data_length);
+
 /**
  * Utility function that copies envoy_data to jbyteArray.
  *
@@ -46,6 +48,8 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map);
 jstring native_data_to_string(JNIEnv* env, envoy_data data);
 
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data);
+
+envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data, size_t data_length);
 
 envoy_data* buffer_to_native_data_ptr(JNIEnv* env, jobject j_data);
 

@@ -53,7 +53,11 @@ int unbox_integer(JNIEnv* env, jobject boxedInteger) {
 }
 
 envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data) {
-  size_t data_length = env->GetArrayLength(j_data);
+  size_t data_length = static_cast<size_t>(env->GetArrayLength(j_data));
+  return array_to_native_data(env, j_data, data_length);
+}
+
+envoy_data array_to_native_data(JNIEnv* env, jbyteArray j_data, size_t data_length) {
   uint8_t* native_bytes = static_cast<uint8_t*>(safe_malloc(data_length));
   void* critical_data = env->GetPrimitiveArrayCritical(j_data, 0);
   memcpy(native_bytes, critical_data, data_length); // NOLINT(safe-memcpy)
@@ -109,6 +113,11 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map) {
 }
 
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
+  size_t data_length = static_cast<size_t>(env->GetDirectBufferCapacity(j_data));
+  return buffer_to_native_data(env, j_data, data_length);
+}
+
+envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data, size_t data_length) {
   uint8_t* direct_address = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
 
   if (direct_address == nullptr) {
@@ -120,14 +129,14 @@ envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
     jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
     env->DeleteLocalRef(jcls_ByteBuffer);
 
-    envoy_data native_data = array_to_native_data(env, array);
+    envoy_data native_data = array_to_native_data(env, array, data_length);
     env->DeleteLocalRef(array);
     return native_data;
   }
 
   envoy_data native_data;
   native_data.bytes = direct_address;
-  native_data.length = env->GetDirectBufferCapacity(j_data);
+  native_data.length = data_length;
   native_data.release = jni_delete_global_ref;
   native_data.context = env->NewGlobalRef(j_data);
 
