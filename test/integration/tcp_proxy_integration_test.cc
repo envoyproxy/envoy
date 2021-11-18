@@ -183,7 +183,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   });
   initialize();
 // The large number of connection is meant to regression test
-// https://github.com/envoyproxy/envoy/issues/19033 but fails on macos CI
+// https://github.com/envoyproxy/envoy/issues/19033 but fails on apple CI
 // TODO(alyssawilk) debug.
 #if defined(__APPLE__)
   const int num_connections = 50;
