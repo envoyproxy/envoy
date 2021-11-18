@@ -68,6 +68,40 @@ jobs:
       - run: cat /tmp/envoy.log
         if: ${{ failure() || cancelled() }}
         name: 'Log app run'
+  swiftasyncawait:
+    name: swift_async_await
+    needs: iosbuild
+    runs-on: macos-11
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - run: ./ci/mac_ci_setup.sh
+        name: 'Install dependencies'
+      - uses: actions/cache@v2
+        id: check-cache
+        with:
+          key: framework-${{ github.sha }}
+          path: dist/Envoy.framework
+        name: 'Download framework'
+      - run: exit 1
+        if: steps.check-cache.outputs.cache-hit != 'true'
+        name: 'Short-circuit'
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app
+        name: 'Build swift app'
+      # Run the app in the background and redirect logs.
+      - env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bazelisk run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app &> /tmp/envoy.log &
+        name: 'Run swift app'
+      - run: sed '/\[2\] Uploaded 7 MB of data/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
+        name: 'Check upload succeeded'
+      - run: cat /tmp/envoy.log
+        if: ${{ failure() || cancelled() }}
+        name: 'Log app run'
   objchelloworld:
     name: objc_helloworld
     needs: iosbuild
