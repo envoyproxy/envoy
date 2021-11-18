@@ -137,7 +137,9 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
     StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
+    EXPECT_EQ(nullptr, stream_info.upstreamInfo());
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
+    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
 
     stream_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
@@ -182,6 +184,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
+    EXPECT_EQ(nullptr, stream_info.upstreamFilterState());
     stream_info.setUpstreamFilterState(stream_info.filterState());
     EXPECT_EQ(1,
               stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
@@ -203,6 +206,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamConnectionId(12345);
     ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
     EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
+
+    std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
+    EXPECT_NE(stream_info.upstreamInfo(), new_info);
+    stream_info.setUpstreamInfo(new_info);
+    EXPECT_EQ(stream_info.upstreamInfo(), new_info);
   }
 }
 

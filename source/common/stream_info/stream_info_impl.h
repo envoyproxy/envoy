@@ -79,7 +79,6 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const override {
     const char* spaces = spacesForLevel(indent_level);
-    // TODO(alyssawilk) dump upstream info.
     os << spaces << "UpstreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
        << "\n";
   }
@@ -377,11 +376,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
-    // TODO(alyssawilk) dump upstream info.
     os << spaces << "StreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(protocol_)
        << DUMP_OPTIONAL_MEMBER(response_code_) << DUMP_OPTIONAL_MEMBER(response_code_details_)
        << DUMP_OPTIONAL_MEMBER(attempt_count_) << DUMP_MEMBER(health_check_request_)
-       << DUMP_MEMBER(route_name_) << "\n";
+       << DUMP_MEMBER(route_name_);
+    DUMP_DETAILS(upstream_info_);
   }
 
   void setUpstreamClusterInfo(
@@ -416,7 +415,6 @@ struct StreamInfoImpl : public StreamInfo {
     upstream_bytes_meter->addWireBytesReceived(upstream_bytes_meter_->wireBytesReceived());
     upstream_bytes_meter->addHeaderBytesSent(upstream_bytes_meter_->headerBytesSent());
     upstream_bytes_meter->addHeaderBytesReceived(upstream_bytes_meter_->headerBytesReceived());
-
     upstream_bytes_meter_ = upstream_bytes_meter;
   }
 
