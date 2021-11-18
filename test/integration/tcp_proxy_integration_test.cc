@@ -188,7 +188,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyManyConnections) {
   for (int i = 0; i < num_connections; ++i) {
     clients[i] = makeTcpConnection(lookupPort("tcp_proxy"));
   }
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", num_connections, 2 * TestUtility::DefaultTimeout);
   for (int i = 0; i < num_connections; ++i) {
     IntegrationTcpClientPtr& tcp_client = clients[i];
     // The autonomous upstream is an HTTP upstream, so send raw HTTP.
