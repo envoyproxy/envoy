@@ -251,6 +251,7 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
                                    generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
+  // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
   metric_name_count +=
       outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
                                          generateTextReadoutOutput, "gauge", custom_namespaces);
