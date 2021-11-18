@@ -147,9 +147,9 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestedServerNameVariable)
   testFormatting(stream_info, "REQUESTED_SERVER_NAME", "");
 
   // Validate for a valid Request Server Name
-  const std::string requested_server_name_ = "foo.bar";
-  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name_);
-  testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name_);
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name);
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
@@ -944,8 +944,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  const std::string requested_server_name_ = "foo.bar";
-  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name_);
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
