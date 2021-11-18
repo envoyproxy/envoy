@@ -16,6 +16,7 @@ import java.util.concurrent.Executors
 open class StreamPrototype(private val engine: EnvoyEngine) {
   private val callbacks = StreamCallbacks()
   private var explicitFlowControl = false
+  private var useByteBufferPosition = false
 
   /**
    * Start a new stream.
@@ -25,7 +26,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
    */
   open fun start(executor: Executor = Executors.newSingleThreadExecutor()): Stream {
     val engineStream = engine.startStream(createCallbacks(executor), explicitFlowControl)
-    return Stream(engineStream)
+    return Stream(engineStream, useByteBufferPosition)
   }
 
   /**
@@ -41,6 +42,17 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
    */
   fun setExplicitFlowControl(enabled: Boolean): StreamPrototype {
     this.explicitFlowControl = enabled
+    return this
+  }
+
+  /**
+   * Specify how to determine the length of data to send for a given ByteBuffer.
+   *
+   * @param enabled Use ByteBuffer's position when true, otherwise use its capacity.
+   * @return This stream, for chaining syntax.
+   */
+  fun setUseByteBufferPosition(enabled: Boolean): StreamPrototype {
+    this.useByteBufferPosition = enabled
     return this
   }
 

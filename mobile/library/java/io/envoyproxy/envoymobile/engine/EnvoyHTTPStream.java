@@ -44,7 +44,7 @@ public class EnvoyHTTPStream {
 
   /**
    * Send data over an open HTTP streamHandle. This method can be invoked multiple
-   * times.
+   * times. The data length is the {@link ByteBuffer#capacity}.
    *
    * @param data,      the data to send.
    * @param endStream, supplies whether this is the last data in the streamHandle.
@@ -53,10 +53,28 @@ public class EnvoyHTTPStream {
    *                                       on-heap byte array.
    */
   public void sendData(ByteBuffer data, boolean endStream) {
+    sendData(data, data.capacity(), endStream);
+  }
+
+  /**
+   * Send data over an open HTTP streamHandle. This method can be invoked multiple
+   * times.
+   *
+   * @param data,      the data to send.
+   * @param length,    number of bytes to send: 0 <= length <= ByteBuffer.capacity()
+   * @param endStream, supplies whether this is the last data in the streamHandle.
+   * @throws UnsupportedOperationException - if the provided buffer is neither a
+   *                                       direct ByteBuffer nor backed by an
+   *                                       on-heap byte array.
+   */
+  public void sendData(ByteBuffer data, int length, boolean endStream) {
+    if (length < 0 || length > data.capacity()) {
+      throw new IllegalArgumentException("Length out of bound");
+    }
     if (data.isDirect()) {
-      JniLibrary.sendData(streamHandle, data, endStream);
+      JniLibrary.sendData(streamHandle, data, length, endStream);
     } else if (data.hasArray()) {
-      JniLibrary.sendData(streamHandle, data.array(), endStream);
+      JniLibrary.sendData(streamHandle, data.array(), length, endStream);
     } else {
       throw new UnsupportedOperationException("Unsupported ByteBuffer implementation.");
     }
