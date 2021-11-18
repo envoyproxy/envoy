@@ -59,9 +59,9 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "san_matcher_config_test",
+    name = "san_matcher_test",
     srcs = [
-        "san_matcher_config_test.cc",
+        "san_matcher_test.cc",
     ],
     deps = [
         "//source/common/protobuf:utility_lib",

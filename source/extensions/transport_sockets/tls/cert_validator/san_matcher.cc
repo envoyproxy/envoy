@@ -1,4 +1,4 @@
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 
 #include <memory>
 
@@ -7,7 +7,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 
-#include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
+#include "source/extensions/transport_sockets/tls/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,8 +15,16 @@ namespace TransportSockets {
 namespace Tls {
 
 bool StringSanMatcher::match(const GENERAL_NAME* general_name) const {
-  return general_name->type == general_name_type_ &&
-         DefaultCertValidator::verifySubjectAltName(general_name, matcher_);
+  if (general_name->type != general_name_type_) {
+    return false;
+  }
+  // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
+  const std::string san = Utility::generalNameAsString(general_name);
+  return general_name->type == GEN_DNS &&
+                 matcher_.matcher().match_pattern_case() ==
+                     envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
+             ? Utility::dnsNameMatch(matcher_.matcher().exact(), absl::string_view(san))
+             : matcher_.match(san);
 }
 
 SanMatcherPtr createStringSanMatcher(
@@ -35,9 +43,7 @@ SanMatcherPtr createStringSanMatcher(
   case envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS:
     return SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_IPADD, matcher.matcher())};
   default:
-    RELEASE_ASSERT(true, "Invalid san type for "
-                         "envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher");
-    return SanMatcherPtr();
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

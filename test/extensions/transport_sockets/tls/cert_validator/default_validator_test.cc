@@ -2,7 +2,7 @@
 #include <vector>
 
 #include "source/extensions/transport_sockets/tls/cert_validator/default_validator.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 
 #include "test/extensions/transport_sockets/tls/ssl_test_utility.h"
 #include "test/test_common/environment.h"

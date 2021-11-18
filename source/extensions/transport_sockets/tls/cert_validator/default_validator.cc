@@ -290,18 +290,6 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   return false;
 }
 
-bool DefaultCertValidator::verifySubjectAltName(
-    const GENERAL_NAME* general_name,
-    Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher> const& matcher) {
-  // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
-  const std::string san = Utility::generalNameAsString(general_name);
-  return general_name->type == GEN_DNS &&
-                 matcher.matcher().match_pattern_case() ==
-                     envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-             ? Utility::dnsNameMatch(matcher.matcher().exact(), absl::string_view(san))
-             : matcher.match(san);
-}
-
 bool DefaultCertValidator::matchSubjectAltName(
     X509* cert, const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(

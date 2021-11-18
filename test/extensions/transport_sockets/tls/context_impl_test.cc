@@ -923,8 +923,10 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
             private_key:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
           validation_context:
-            match_subject_alt_names:
-              exact : "spiffe://lyft.com/testclient"
+            match_typed_subject_alt_names:
+            - san_type: URI
+              matcher:
+                exact: "spiffe://lyft.com/testclient"
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "

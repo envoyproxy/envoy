@@ -2,7 +2,7 @@
 
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 
 #include "test/test_common/utility.h"
 
@@ -13,17 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-// Verify that we handle an invalid san type enum.
-TEST(SanMatcherConfigTest, TestInvalidSanType) {
-  envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
-  san_matcher.mutable_matcher()->set_exact("foo.example");
-  san_matcher.set_san_type(
-      envoy::extensions::transport_sockets::tls::v3::
-          SubjectAltNameMatcher_SanType_SubjectAltNameMatcher_SanType_INT_MIN_SENTINEL_DO_NOT_USE_);
-  const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
-  EXPECT_EQ(matcher.get(), nullptr);
-}
 
 // Verify that we get a valid string san matcher for all valid san types.
 TEST(SanMatcherConfigTest, TestValidSanType) {
@@ -38,12 +27,11 @@ TEST(SanMatcherConfigTest, TestValidSanType) {
     envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher san_matcher;
     san_matcher.mutable_matcher()->set_exact("foo.example");
     san_matcher.set_san_type(san_type);
-    const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
     if (san_type == envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::
                         SAN_TYPE_UNSPECIFIED) {
-      // Unspecified san type is not a valid for creating a string san matcher.
-      EXPECT_EQ(matcher.get(), nullptr);
+      continue;
     } else {
+      const SanMatcherPtr matcher = createStringSanMatcher(san_matcher);
       EXPECT_NE(matcher.get(), nullptr);
       // Verify that the message is valid.
       TestUtility::validate(san_matcher);

@@ -17,7 +17,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table_impl.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/cert_validator.h"
-#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher_config.h"
+#include "source/extensions/transport_sockets/tls/cert_validator/san_matcher.h"
 #include "source/extensions/transport_sockets/tls/stats.h"
 
 #include "openssl/ssl.h"
