@@ -534,6 +534,9 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Socket::Type::Stream;
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    // Currently internal address supports stream operation only.
+    return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
