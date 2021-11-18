@@ -107,7 +107,7 @@ void UdpProxyFilter::ClusterInfo::removeSession(const ActiveSession* session) {
 
 UdpProxyFilter::ActiveSession*
 UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                                           const HostConstSharedPtrOptConstRef& optional_host) {
+                                           const Upstream::HostConstSharedPtr& optional_host) {
   if (!cluster_.info()
            ->resourceManager(Upstream::ResourcePriority::Default)
            .connections()
@@ -118,7 +118,7 @@ UdpProxyFilter::ClusterInfo::createSession(Network::UdpRecvData::LocalPeerAddres
   }
 
   if (optional_host) {
-    return createSessionWithHost(std::move(addresses), *optional_host);
+    return createSessionWithHost(std::move(addresses), optional_host);
   }
 
   auto host = chooseHost(addresses.peer_);

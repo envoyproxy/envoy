@@ -287,12 +287,8 @@ private:
     UdpProxyUpstreamStats cluster_stats_;
 
   protected:
-    using HostConstSharedPtrOptConstRef =
-        absl::optional<std::reference_wrapper<const Upstream::HostConstSharedPtr>>;
-
-    ActiveSession*
-    createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
-                  const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt);
+    ActiveSession* createSession(Network::UdpRecvData::LocalPeerAddresses&& addresses,
+                                 const Upstream::HostConstSharedPtr& optional_host = nullptr);
     Upstream::HostConstSharedPtr
     chooseHost(const Network::Address::InstanceConstSharedPtr& peer_address) const;
 
@@ -325,7 +321,7 @@ private:
 
   /**
    * On each data chunk selects another host using underlying load balancing method and communicates
-   * with that host
+   * with that host.
    */
   class PerPacketLoadBalancingClusterInfo : public ClusterInfo {
   public:
