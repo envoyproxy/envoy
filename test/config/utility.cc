@@ -629,6 +629,18 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
+    if (listener->mutable_address()->has_envoy_internal_address()) {
+      ENVOY_LOG_MISC(
+          debug, "Listener {} has internal address {}. Will not reset to loop back socket address.",
+          i, listener->mutable_address()->envoy_internal_address().server_listener_name());
+      continue;
+    }
+    if (listener->mutable_address()->has_pipe()) {
+      ENVOY_LOG_MISC(debug,
+                     "Listener {} has pipe address {}. Will not reset to loop back socket address.",
+                     i, listener->mutable_address()->pipe().path());
+      continue;
+    }
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
     if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
       listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
@@ -913,7 +925,6 @@ void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std:
 void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
                                    uint32_t downstream_buffer_limit) {
   RELEASE_ASSERT(!finalized_, "");
-  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
   const uint32_t stream_buffer_size = std::max(

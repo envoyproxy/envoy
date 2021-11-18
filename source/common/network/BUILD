@@ -64,6 +64,7 @@ envoy_cc_library(
     hdrs = ["connection_impl_base.h"],
     deps = [
         ":filter_manager_lib",
+        ":listen_socket_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
