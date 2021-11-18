@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "library/common/config/templates.h"
 #include "library/common/engine.h"
+#include "library/common/engine_handle.h"
 #include "library/common/main_interface.h"
 
 namespace Envoy {
@@ -45,18 +46,18 @@ layered_runtime:
 // thread is not torn down, we end up with TSAN failures during shutdown due to a data race
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
-struct EngineHandle {
-  EngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
+struct TestEngineHandle {
+  TestEngineHandle(envoy_engine_callbacks callbacks, const std::string& level) {
     init_engine(callbacks, {}, {});
     run_engine(0, MINIMAL_TEST_CONFIG.c_str(), level.c_str());
   }
 
-  ~EngineHandle() { terminate_engine(0); }
+  ~TestEngineHandle() { terminate_engine(0); }
 };
 
 class EngineTest : public testing::Test {
 public:
-  std::unique_ptr<EngineHandle> engine_;
+  std::unique_ptr<TestEngineHandle> engine_;
 };
 
 typedef struct {
@@ -79,7 +80,7 @@ TEST_F(EngineTest, EarlyExit) {
                                    } /*on_exit*/,
                                    &test_context /*context*/};
 
-  engine_ = std::make_unique<EngineHandle>(callbacks, level);
+  engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
   ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
 
   engine_.reset();
@@ -87,4 +88,37 @@ TEST_F(EngineTest, EarlyExit) {
 
   start_stream(0, {}, false);
 }
+
+TEST_F(EngineTest, AccessEngineAfterInitialization) {
+  const std::string level = "debug";
+
+  engine_test_context test_context{};
+  envoy_engine_callbacks callbacks{[](void* context) -> void {
+                                     auto* engine_running =
+                                         static_cast<engine_test_context*>(context);
+                                     engine_running->on_engine_running.Notify();
+                                   } /*on_engine_running*/,
+                                   [](void*) -> void {} /*on_exit*/, &test_context /*context*/};
+
+  engine_ = std::make_unique<TestEngineHandle>(callbacks, level);
+  ASSERT_TRUE(test_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(3)));
+
+  absl::Notification getClusterManagerInvoked;
+  // Scheduling on the dispatcher should work, the engine is running.
+  EXPECT_EQ(ENVOY_SUCCESS, EngineHandle::runOnEngineDispatcher(
+                               1, [&getClusterManagerInvoked](Envoy::Engine& engine) {
+                                 engine.getClusterManager();
+                                 getClusterManagerInvoked.Notify();
+                               }));
+
+  // Validate that we actually invoked the function.
+  EXPECT_TRUE(getClusterManagerInvoked.WaitForNotificationWithTimeout(absl::Seconds(1)));
+
+  engine_.reset();
+
+  // Now that the engine has been shut down, we no longer expect scheduling to work.
+  EXPECT_EQ(ENVOY_FAILURE, EngineHandle::runOnEngineDispatcher(
+                               1, [](Envoy::Engine& engine) { engine.getClusterManager(); }));
+}
+
 } // namespace Envoy

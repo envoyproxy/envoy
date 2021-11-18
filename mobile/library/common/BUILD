@@ -18,9 +18,13 @@ envoy_cc_library(
     srcs = [
         "engine.cc",
         "engine.h",
+        "engine_handle.cc",
         "main_interface.cc",
     ],
-    hdrs = ["main_interface.h"],
+    hdrs = [
+        "engine_handle.h",
+        "main_interface.h",
+    ],
     repository = "@envoy",
     deps = [
         ":engine_common_lib",

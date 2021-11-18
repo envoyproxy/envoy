@@ -303,6 +303,12 @@ void Engine::drainConnections() {
   server_->clusterManager().drainConnections();
 }
 
+Upstream::ClusterManager& Engine::getClusterManager() {
+  ASSERT(dispatcher_->isThreadSafe(),
+         "getClusterManager must be called from the dispatcher's context");
+  return server_->clusterManager();
+}
+
 void Engine::logInterfaces(absl::string_view event,
                            std::vector<Network::InterfacePair>& interfaces) {
   std::vector<std::string> names;
