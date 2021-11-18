@@ -303,15 +303,8 @@ private:
       const auto final_prefix = "udp";
       return {ALL_UDP_PROXY_UPSTREAM_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
     }
-    void removeHostSessions(const Upstream::HostConstSharedPtr& host);
     ActiveSession* createSessionWithHost(Network::UdpRecvData::LocalPeerAddresses&& addresses,
                                          const Upstream::HostConstSharedPtr& host);
-
-    void storeSession(ActiveSessionPtr session);
-    void removeSessionFromStorage(const ActiveSession* session);
-    virtual ActiveSession*
-    getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-               const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const PURE;
 
     Envoy::Common::CallbackHandlePtr member_update_cb_handle_;
     absl::flat_hash_map<const Upstream::Host*, absl::flat_hash_set<const ActiveSession*>>
@@ -321,18 +314,13 @@ private:
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
 
   /**
-   * Performs forwarding and replying data to one upstream host, selected when the first datagram for a session is received.
-   * In the upstream host becomes unhealthy, a new one is selected.
+   * Performs forwarding and replying data to one upstream host, selected when the first datagram
+   * for a session is received. If the upstream host becomes unhealthy, a new one is selected.
    */
   class StickySessionClusterInfo : public ClusterInfo {
   public:
     StickySessionClusterInfo(UdpProxyFilter& filter, Upstream::ThreadLocalCluster& cluster);
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
-
-  private:
-    ActiveSession*
-    getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-               const HostConstSharedPtrOptConstRef& optional_host = absl::nullopt) const override;
   };
 
   /**
@@ -344,10 +332,6 @@ private:
     PerPacketLoadBalancingClusterInfo(UdpProxyFilter& filter,
                                       Upstream::ThreadLocalCluster& cluster);
     Network::FilterStatus onData(Network::UdpRecvData& data) override;
-
-  private:
-    ActiveSession* getSession(const Network::UdpRecvData::LocalPeerAddresses& addresses,
-                              const HostConstSharedPtrOptConstRef& optional_host) const override;
   };
 
   virtual Network::SocketPtr createSocket(const Upstream::HostConstSharedPtr& host) {
