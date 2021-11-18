@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/stateful_session/stateful_session.h"
 
+#include <cstdint>
 #include <memory>
 
 #include "source/common/config/utility.h"
@@ -13,12 +14,16 @@ namespace StatefulSession {
 
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::CommonFactoryContext& context) {
-  std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
-  host_statuses.reserve(config.host_statuses_size());
-  for (int i = 0; i < config.host_statuses_size(); i++) {
-    host_statuses.push_back(config.host_statuses(i));
+  if (config.host_statuses_size() > 0) {
+    std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
+    host_statuses.reserve(config.host_statuses_size());
+    for (int i = 0; i < config.host_statuses_size(); i++) {
+      host_statuses.push_back(config.host_statuses(i));
+    }
+    host_statuses_ = Upstream::LoadBalancerContextBase::createOverrideHostStatus(host_statuses);
+  } else {
+    host_statuses_ = ~host_statuses_;
   }
-  host_statuses_ = Upstream::LoadBalancerContextBase::createOverrideHostStatus(host_statuses);
 
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SessionStateFactoryConfig>(

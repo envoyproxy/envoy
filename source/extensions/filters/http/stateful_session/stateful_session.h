@@ -38,7 +38,7 @@ public:
   }
 
 private:
-  Upstream::LoadBalancerContext::OverrideHostStatus host_statuses_;
+  Upstream::LoadBalancerContext::OverrideHostStatus host_statuses_{};
   Http::SessionStateFactorySharedPtr factory_;
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;
