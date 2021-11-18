@@ -141,6 +141,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithProtocolVariable) {
   testFormatting(stream_info, "PROTOCOL", "HTTP/1.1");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestedServerNameVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for empty Request Server Name
+  testFormatting(stream_info, "REQUESTED_SERVER_NAME", "");
+
+  // Validate for a valid Request Server Name
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name);
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -835,6 +846,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
+      {"%REQUESTED_SERVER_NAME%", {"foo.bar"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
@@ -932,6 +944,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   };
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const std::string requested_server_name = "foo.bar";
+  stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
