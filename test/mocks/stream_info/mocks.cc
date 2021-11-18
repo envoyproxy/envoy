@@ -115,7 +115,7 @@ MockStreamInfo::MockStreamInfo()
         virtual_cluster_name_ = std::string(virtual_cluster_name);
       }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, getVirtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
+  ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
   ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {

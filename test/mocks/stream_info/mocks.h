@@ -53,7 +53,7 @@ public:
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
   MOCK_METHOD(void, setVirtualClusterName, (const std::string& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
-  MOCK_METHOD(const std::string&, getVirtualClusterName, (), (const));
+  MOCK_METHOD(const std::string&, virtualClusterName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
@@ -144,7 +144,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  std::string virtual_cluster_name_;
+  std::string& virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
 };
 

@@ -381,7 +381,7 @@ public:
   /**
    * @return std::string& the name of the virtual cluster which got matched.
    */
-  virtual const std::string& getVirtualClusterName() const PURE;
+  virtual const std::string& virtualClusterName() const PURE;
 
   /**
    * @param bytes_received denotes number of bytes to add to total received bytes.

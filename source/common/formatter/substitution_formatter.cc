@@ -686,6 +686,7 @@ private:
 };
 
 StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+  // TODO: Change this huge if-else ladder to use a switch case instead.
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -957,7 +958,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          const std::string& virtual_cluster_name = stream_info.getVirtualClusterName();
+          const std::string& virtual_cluster_name = stream_info.virtualClusterName();
           if (!virtual_cluster_name.empty()) {
             result = virtual_cluster_name;
           }

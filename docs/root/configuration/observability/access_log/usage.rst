@@ -388,7 +388,7 @@ The following command operators are supported:
   HTTP
     Name of the matched Virtual Cluster (if any).
 
-  TCP
+  TCP/UDP
     Not implemented ("-")
 
 %UPSTREAM_HOST%

@@ -263,7 +263,7 @@ public:
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
-  const std::string& vcName() const override { return vc_name_; }
+  const std::string& name() const override { return vc_name_; }
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 

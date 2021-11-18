@@ -504,7 +504,7 @@ public:
   /**
    * @return the string name of the virtual cluster.
    */
-  virtual const std::string& vcName() const PURE;
+  virtual const std::string& name() const PURE;
 
   /**
    * @return the stat-name of the virtual cluster.

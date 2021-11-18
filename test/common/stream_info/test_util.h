@@ -34,7 +34,7 @@ public:
     return *downstream_connection_info_provider_;
   }
 
-  const std::string& getVirtualClusterName() const override { return virtual_cluster_name_; }
+  const std::string& virtualClusterName() const override { return virtual_cluster_name_; }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
@@ -56,7 +56,7 @@ public:
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> end_time_;
-  std::string virtual_cluster_name_;
+  std::string& virtual_cluster_name_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Envoy::Event::SimulatedTimeSystem test_time_;
