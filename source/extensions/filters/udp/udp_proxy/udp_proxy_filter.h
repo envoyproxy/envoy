@@ -321,8 +321,8 @@ private:
   using ClusterInfoPtr = std::unique_ptr<ClusterInfo>;
 
   /**
-   * Performs forwarding and replying data to one, selected at the beginning upstream host
-   * In case of not healthy upstream host, selects a new one
+   * Performs forwarding and replying data to one upstream host, selected when the first datagram for a session is received.
+   * In the upstream host becomes unhealthy, a new one is selected.
    */
   class StickySessionClusterInfo : public ClusterInfo {
   public:
