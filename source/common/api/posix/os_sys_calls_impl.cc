@@ -306,6 +306,13 @@ bool OsSysCallsImpl::supportsGetifaddrs() const {
   }
   return false;
 #else
+  // Note: posix defaults to true regardless of whether an alternate getifaddrs has been set or not.
+  // This is because as far as we are aware only Android<24 lacks an implementation and thus another
+  // posix based platform that lacks a native getifaddrs implementation should be a programming
+  // error.
+  //
+  // That being said, if an alternate getifaddrs impl is set, that will be used in calls to
+  // OsSysCallsImpl::getifaddrs as seen below.
   return true;
 #endif
 }
@@ -338,8 +345,7 @@ SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVec
       size_t ss_len =
           ifa->ifa_addr->sa_family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
       StatusOr<Network::Address::InstanceConstSharedPtr> address =
-          Network::Address::addressFromSockAddr(*ss, ss_len,
-                                                ifa->ifa_addr->sa_family == AF_INET6);
+          Network::Address::addressFromSockAddr(*ss, ss_len, ifa->ifa_addr->sa_family == AF_INET6);
       if (address.ok()) {
         interfaces.emplace_back(ifa->ifa_name, ifa->ifa_flags, *address);
       }
