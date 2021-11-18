@@ -109,7 +109,8 @@ private:
 
   static absl::optional<std::string>
   maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
-  static std::vector<in_addr> maybeBuildResolversVector(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+  static std::vector<in_addr>
+  maybeBuildResolversVector(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);

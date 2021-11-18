@@ -77,14 +77,14 @@ std::vector<in_addr> DnsResolverImpl::maybeBuildResolversVector(
 
   std::vector<in_addr> resolver_addrs;
 
-  for (const auto& resolver: resolvers) {
+  for (const auto& resolver : resolvers) {
     if (resolver->ip() == nullptr) {
       throw EnvoyException(
           fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
     }
 
     // c-ares only supports ipv4 addresses set this way
-    if(resolver->ip()->ipv4()) {
+    if (resolver->ip()->ipv4()) {
       in_addr in;
       in.s_addr = resolver->ip()->ipv4()->address();
       resolver_addrs.push_back(in);
@@ -418,7 +418,8 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, cares.use_resolvers_as_fallback(), dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(
+        dispatcher, resolvers, cares.use_resolvers_as_fallback(), dns_resolver_options);
   }
 };
 
