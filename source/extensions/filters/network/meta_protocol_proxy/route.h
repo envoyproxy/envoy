@@ -20,22 +20,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
-class RetryPolicyImpl : public RetryPolicy {
-public:
-  RetryPolicyImpl(
-      const envoy::extensions::filters::network::meta_protocol_proxy::v3::RetryPolicy&) {}
-
-  bool shouldRetry(uint32_t, const Response*, absl::optional<Event>) const override {
-    return false;
-  }
-  std::chrono::milliseconds timeout() const override { return {}; }
-};
+using ProtoRouteAction = envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction;
 
 class RouteEntryImpl : public RouteEntry {
 public:
-  RouteEntryImpl(
-      const envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction& route,
-      Envoy::Server::Configuration::ServerFactoryContext& context);
+  RouteEntryImpl(const ProtoRouteAction& route,
+                 Envoy::Server::Configuration::ServerFactoryContext& context);
 
   // RouteEntry
   const std::string& clusterName() const override { return cluster_name_; }
@@ -43,12 +33,8 @@ public:
     auto iter = per_filter_configs_.find(name);
     return iter != per_filter_configs_.end() ? iter->second.get() : nullptr;
   }
-  void finalizeRequest(Request&) const override {}
-  void finalizeResponse(Response&) const override {}
-  const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   std::chrono::milliseconds timeout() const override { return timeout_; };
-  const RetryPolicy& retryPolicy() const override { return retry_policy_; }
 
 private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -56,10 +42,8 @@ private:
   std::string cluster_name_;
 
   const std::chrono::milliseconds timeout_;
-  const RetryPolicyImpl retry_policy_;
 
   envoy::config::core::v3::Metadata metadata_;
-  Envoy::Config::TypedMetadataImpl<RouteTypedMetadataFactory> typed_metadata_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };
@@ -70,9 +54,7 @@ struct RouteActionContext {
 };
 
 // Action used with the matching tree to specify route to use for an incoming stream.
-class RouteMatchAction
-    : public Matcher::ActionBase<
-          envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction> {
+class RouteMatchAction : public Matcher::ActionBase<ProtoRouteAction> {
 public:
   explicit RouteMatchAction(RouteEntryImplConstSharedPtr route) : route_(std::move(route)) {}
 

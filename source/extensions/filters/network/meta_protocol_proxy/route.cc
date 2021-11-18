@@ -24,8 +24,7 @@ RouteEntryImpl::RouteEntryImpl(
     Envoy::Server::Configuration::ServerFactoryContext& context)
     : cluster_name_(route_action.cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route_action, timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
-      retry_policy_(route_action.retry()), metadata_(route_action.metadata()),
-      typed_metadata_(metadata_) {
+      metadata_(route_action.metadata()) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {
     auto& factory = Config::Utility::getAndCheckFactoryByName<NamedFilterConfigFactory>(

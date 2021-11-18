@@ -20,8 +20,14 @@ public:
 };
 using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpecificFilterConfig>;
 
+/**
+ * Interface of typed metadata factory.
+ */
 class RouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
+/**
+ * Interface of retry policy.
+ */
 class RetryPolicy {
 public:
   virtual ~RetryPolicy() = default;
@@ -58,22 +64,6 @@ public:
   }
 
   /**
-   * Update request before encode and send request to upstream.
-   */
-  virtual void finalizeRequest(Request& request) const PURE;
-
-  /**
-   * Update response before encode and send response to downstream.
-   */
-  virtual void finalizeResponse(Response& response) const PURE;
-
-  /**
-   * @return const Envoy::Config::TypedMetadata& return the typed metadata provided in the config
-   * for this route.
-   */
-  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
-
-  /**
    * @return const envoy::config::core::v3::Metadata& return the metadata provided in the config for
    * this route.
    */
@@ -83,12 +73,6 @@ public:
    * @return std::chrono::milliseconds the route's timeout.
    */
   virtual std::chrono::milliseconds timeout() const PURE;
-
-  /**
-   * const RetryPolicy& the retry policy for the route. All routes have a retry policy even if it is
-   * empty and does not allow retries.
-   */
-  virtual const RetryPolicy& retryPolicy() const PURE;
 };
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
