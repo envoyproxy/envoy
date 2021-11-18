@@ -55,11 +55,19 @@ class SinkPredicates {
 public:
   virtual ~SinkPredicates() = default;
 
-  /// @return true if @param counter needs to be flushed to sinks.
+  /**
+   * @return true if @param counter needs to be flushed to sinks.
+   */
   virtual bool includeCounter(const Counter& counter) PURE;
-  /// @return true if @param gague needs to be flushed to sinks.
+
+  /**
+   * @return true if @param gague needs to be flushed to sinks.
+   */
   virtual bool includeGauge(const Gauge& gauge) PURE;
-  /// @return true if @param text_readout needs to be flushed to sinks.
+
+  /**
+   * @return true if @param text_readout needs to be flushed to sinks.
+   */
   virtual bool includeTextReadout(const TextReadout& text_readout) PURE;
 };
 

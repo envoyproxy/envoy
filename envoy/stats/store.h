@@ -134,6 +134,9 @@ public:
 
   /**
    * Set predicates for filtering stats to be flushed to sinks.
+   * Note that if the sink predicates object is set, we do not send non-sink stats over to the
+   * child process during hot restart. This will result in the admin stats console being wrong
+   * during hot restart.
    */
   virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 };

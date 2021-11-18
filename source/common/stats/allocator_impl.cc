@@ -425,7 +425,9 @@ void AllocatorImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_pre
   Thread::LockGuard lock(mutex_);
   ASSERT(sink_predicates_ == nullptr);
   sink_predicates_ = std::move(sink_predicates);
-
+  sinked_counters_.clear();
+  sinked_gauges_.clear();
+  sinked_text_readouts_.clear();
   // Add counters to the set of sinked counters.
   for (auto& counter : counters_) {
     if (sink_predicates_->includeCounter(*counter)) {
