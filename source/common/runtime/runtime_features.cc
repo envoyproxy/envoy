@@ -88,7 +88,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
-    "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.explicit_wildcard_resource",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     // Misplaced flags: please do not add flags to this section.
