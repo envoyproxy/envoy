@@ -120,7 +120,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       if (!entry.empty()) {
         // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
         // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+        for (size_t i = 0; i < entry.size(); i++) {
+          logged_headers->insert({header.get(), std::string(entry[i]->value().getStringView())});
+        }
       }
     }
   }
@@ -143,7 +145,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       if (!entry.empty()) {
         // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
         // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+        for (size_t i = 0; i < entry.size(); i++) {
+          logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+        }
       }
     }
   }
@@ -156,7 +160,9 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       if (!entry.empty()) {
         // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
         // values.
-        logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+        for (size_t i = 0; i < entry.size(); i++) {
+          logged_headers->insert({header.get(), std::string(entry[0]->value().getStringView())});
+        }
       }
     }
   }
