@@ -48,6 +48,7 @@ private:
   ThreadLocal::TypedSlot<TlsTracer> tls_;
   std::unique_ptr<TracingContextFactory> tracing_context_factory_;
   Envoy::Common::CallbackHandlePtr token_update_handler_;
+  Secret::GenericSecretConfigProviderSharedPtr secret_provider_;
 };
 
 using DriverPtr = std::unique_ptr<Driver>;

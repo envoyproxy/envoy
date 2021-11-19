@@ -101,16 +101,16 @@ void Driver::loadConfig(const envoy::config::trace::v3::ClientConfig& client_con
     auto& transport_socket_factory_context = tracer_factory_context.transportSocketFactoryContext();
     auto& secret_manager = transport_socket_factory_context.secretManager();
     const auto& token_sds_config = client_config.backend_token_sds_config();
-    auto secret_provider = secret_manager.findOrCreateGenericSecretProvider(
+    secret_provider_ = secret_manager.findOrCreateGenericSecretProvider(
         token_sds_config.sds_config(), token_sds_config.name(), transport_socket_factory_context);
 
-    token_update_handler_ = secret_provider->addUpdateCallback([&] {
-      const auto* new_secret = secret_provider->secret();
+    token_update_handler_ = secret_provider_->addUpdateCallback([&] {
+      const auto* new_secret = secret_provider_->secret();
       if (!new_secret) {
         return;
       }
       tls_.runOnAllThreads(
-          [&new_secret, &transport_socket_factory_context](OptRef<TlsTracer> tracer) {
+          [new_secret, &transport_socket_factory_context](OptRef<TlsTracer> tracer) {
             tracer->tracer().reporter()->updateToken(Config::DataSource::read(
                 new_secret->secret(), true, transport_socket_factory_context.api()));
           });
