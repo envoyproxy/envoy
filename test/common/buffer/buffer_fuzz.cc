@@ -116,7 +116,7 @@ public:
 
   uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
                            uint64_t num_slice) const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void drain(uint64_t size) override {
