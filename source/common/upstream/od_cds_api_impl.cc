@@ -52,6 +52,10 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
       helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   sendAwaiting();
   status_ = StartStatus::InitialFetchDone;
+  // According to the XDS specification, the server can send a reply with names in the
+  // removed_resources field for requested resources that do not exist. That way we can notify the
+  // interested parties about the missing resource immediately without waiting for some timeout to
+  // be triggered.
   for (const auto& resource_name : removed_resources) {
     ENVOY_LOG(debug, "odcds: notifying about potential missing cluster {}", resource_name);
     notifier_.notifyMissingCluster(resource_name);
