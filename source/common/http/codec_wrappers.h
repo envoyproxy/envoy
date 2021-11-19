@@ -11,8 +11,8 @@ namespace Http {
 class ResponseDecoderWrapper : public ResponseDecoder {
 public:
   // ResponseDecoder
-  void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) override {
-    inner_.decode100ContinueHeaders(std::move(headers));
+  void decode1xxHeaders(ResponseHeaderMapPtr&& headers) override {
+    inner_.decode1xxHeaders(std::move(headers));
   }
 
   void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {

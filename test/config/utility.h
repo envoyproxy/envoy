@@ -119,7 +119,7 @@ public:
   static std::string baseUdpListenerConfig(std::string listen_address = "0.0.0.0");
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter();
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
 
   // A basic configuration for L4 proxying.
   static std::string tcpProxyConfig();
@@ -312,6 +312,9 @@ public:
 
   // Add this key value pair to the static runtime.
   void addRuntimeOverride(const std::string& key, const std::string& value);
+
+  // Add typed_filter_metadata to the first listener.
+  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

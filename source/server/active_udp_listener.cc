@@ -103,7 +103,7 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 
   // If filter is nullptr warn that we will be dropping packets. This is an edge case and should
   // only happen due to a bad factory. It's not worth adding per-worker error handling for this.
-  if (read_filter_ == nullptr) {
+  if (read_filters_.empty()) {
     ENVOY_LOG(warn, "UDP listener has no filters. Packets will be dropped.");
   }
 
@@ -113,8 +113,11 @@ ActiveRawUdpListener::ActiveRawUdpListener(uint32_t worker_index, uint32_t concu
 }
 
 void ActiveRawUdpListener::onDataWorker(Network::UdpRecvData&& data) {
-  if (read_filter_ != nullptr) {
-    read_filter_->onData(data);
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onData(data);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
   }
 }
 
@@ -130,14 +133,16 @@ void ActiveRawUdpListener::onWriteReady(const Network::Socket&) {
 }
 
 void ActiveRawUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
-  if (read_filter_ != nullptr) {
-    read_filter_->onReceiveError(error_code);
+  for (auto& read_filter : read_filters_) {
+    Network::FilterStatus status = read_filter->onReceiveError(error_code);
+    if (status == Network::FilterStatus::StopIteration) {
+      return;
+    }
   }
 }
 
 void ActiveRawUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {
-  ASSERT(read_filter_ == nullptr, "Cannot add a 2nd UDP read filter");
-  read_filter_ = std::move(filter);
+  read_filters_.emplace_back(std::move(filter));
 }
 
 Network::UdpListener& ActiveRawUdpListener::udpListener() { return *udp_listener_; }

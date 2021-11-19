@@ -171,5 +171,26 @@ TEST(EnvoyQuicUtilsTest, deduceSignatureAlgorithmFromNullPublicKey) {
   EXPECT_EQ("Invalid leaf cert, bad public key", error);
 }
 
+TEST(EnvoyQuicUtilsTest, ConvertQuicConfig) {
+  envoy::config::core::v3::QuicProtocolOptions config;
+  quic::QuicConfig quic_config;
+
+  // Test defaults.
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(100, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(100, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(16777216, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+  EXPECT_EQ(25165824, quic_config.GetInitialSessionFlowControlWindowToSend());
+
+  // Test converting values.
+  config.mutable_max_concurrent_streams()->set_value(2);
+  config.mutable_initial_stream_window_size()->set_value(3);
+  config.mutable_initial_connection_window_size()->set_value(50);
+  convertQuicConfig(config, quic_config);
+  EXPECT_EQ(2, quic_config.GetMaxBidirectionalStreamsToSend());
+  EXPECT_EQ(2, quic_config.GetMaxUnidirectionalStreamsToSend());
+  EXPECT_EQ(3, quic_config.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend());
+}
+
 } // namespace Quic
 } // namespace Envoy

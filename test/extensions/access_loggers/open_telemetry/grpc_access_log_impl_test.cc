@@ -4,6 +4,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/access_loggers/open_telemetry/grpc_access_log_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
@@ -79,9 +80,10 @@ public:
       : async_client_(new Grpc::MockAsyncClient), timer_(new Event::MockTimer(&dispatcher_)),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(*timer_, enableTimer(_, _));
-    logger_ = std::make_unique<GrpcAccessLoggerImpl>(
-        Grpc::RawAsyncClientPtr{async_client_}, "test_log_name", FlushInterval, BUFFER_SIZE_BYTES,
-        dispatcher_, local_info_, stats_store_);
+    *config_.mutable_log_name() = "test_log_name";
+    logger_ = std::make_unique<GrpcAccessLoggerImpl>(Grpc::RawAsyncClientPtr{async_client_},
+                                                     config_, FlushInterval, BUFFER_SIZE_BYTES,
+                                                     dispatcher_, local_info_, stats_store_);
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -91,9 +93,10 @@ public:
   Event::MockTimer* timer_;
   std::unique_ptr<GrpcAccessLoggerImpl> logger_;
   GrpcAccessLoggerImplTestHelper grpc_access_logger_impl_test_helper_;
+  envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig config_;
 };
 
-TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
+TEST_F(GrpcAccessLoggerImplTest, Log) {
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   resource_logs:
     resource:
@@ -117,32 +120,8 @@ TEST_F(GrpcAccessLoggerImplTest, LogHttp) {
   opentelemetry::proto::logs::v1::LogRecord entry;
   entry.set_severity_text("test-severity-text");
   logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
-}
-
-TEST_F(GrpcAccessLoggerImplTest, LogTcp) {
-  grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
-  resource_logs:
-    resource:
-      attributes:
-        - key: "log_name"
-          value:
-            string_value: "test_log_name"
-        - key: "zone_name"
-          value:
-            string_value: "zone_name"
-        - key: "cluster_name"
-          value:
-            string_value: "cluster_name"
-        - key: "node_name"
-          value:
-            string_value: "node_name"
-    instrumentation_library_logs:
-      - logs:
-          - severity_text: "test-severity-text"
-  )EOF");
-  opentelemetry::proto::logs::v1::LogRecord entry;
-  entry.set_severity_text("test-severity-text");
-  logger_->log(opentelemetry::proto::logs::v1::LogRecord(entry));
+  // TCP logging shouldn't do anything.
+  logger_->log(ProtobufWkt::Empty());
 }
 
 class GrpcAccessLoggerCacheImplTest : public testing::Test {

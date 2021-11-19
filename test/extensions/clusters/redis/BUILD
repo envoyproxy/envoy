@@ -93,6 +93,9 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["redis_cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.redis"],
+    # This test takes a while to run specially under tsan.
+    # Shard it to avoid test timeout.
+    shard_count = 2,
     deps = [
         "//source/extensions/clusters/redis:redis_cluster",
         "//source/extensions/clusters/redis:redis_cluster_lb",

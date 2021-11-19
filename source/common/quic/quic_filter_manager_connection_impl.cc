@@ -3,16 +3,19 @@
 #include <initializer_list>
 #include <memory>
 
+#include "quic_ssl_connection_info.h"
+
 namespace Envoy {
 namespace Quic {
 
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
     QuicNetworkConnection& connection, const quic::QuicConnectionId& connection_id,
-    Event::Dispatcher& dispatcher, uint32_t send_buffer_limit)
+    Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+    std::shared_ptr<QuicSslConnectionInfo>&& info)
     // Using this for purpose other than logging is not safe. Because QUIC connection id can be
     // 18 bytes, so there might be collision when it's hashed to 8 bytes.
     : Network::ConnectionImplBase(dispatcher, /*id=*/connection_id.Hash()),
-      network_connection_(&connection),
+      network_connection_(&connection), quic_ssl_info_(std::move(info)),
       filter_manager_(
           std::make_unique<Network::FilterManagerImpl>(*this, *connection.connectionSocket())),
       stream_info_(dispatcher.timeSource(),
@@ -21,6 +24,8 @@ QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
   stream_info_.protocol(Http::Protocol::Http3);
+  network_connection_->connectionSocket()->connectionInfoProvider().setSslConnection(
+      Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_));
 }
 
 void QuicFilterManagerConnectionImpl::addWriteFilter(Network::WriteFilterSharedPtr filter) {
@@ -117,8 +122,7 @@ QuicFilterManagerConnectionImpl::socketOptions() const {
 }
 
 Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
-  // TODO(danzh): construct Ssl::ConnectionInfo from crypto stream
-  return nullptr;
+  return Ssl::ConnectionInfoConstSharedPtr(quic_ssl_info_);
 }
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
@@ -178,9 +182,14 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     // The connection was closed before it could be used. Stats are not recorded.
     return;
   }
-  if (version.transport_version == quic::QUIC_VERSION_IETF_RFC_V1) {
+  switch (version.transport_version) {
+  case quic::QUIC_VERSION_IETF_DRAFT_29:
+    codec_stats_->quic_version_h3_29_.inc();
+    return;
+  case quic::QUIC_VERSION_IETF_RFC_V1:
     codec_stats_->quic_version_rfc_v1_.inc();
-  } else {
+    return;
+  default:
     ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
                                  quic::QuicVersionToString(version.transport_version)));
   }

@@ -148,9 +148,13 @@ TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
   Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+  Stats::Tag tag3 = {"replace_problematic", R"(val"ue with\ some
+ issues)"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+  tags.push_back(tag3);
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\","
+                         "replace_problematic=\"val\\\"ue with\\\\ some\\n issues\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }
@@ -249,7 +253,8 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
   HistogramWrapper h1_cumulative;
   h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
   Stats::ConstSupportedBuckets buckets{10, 20};
-  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(), buckets);
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(
+      h1_cumulative.getHistogram(), Stats::Histogram::Unit::Unspecified, buckets);
 
   auto histogram = makeHistogram("histogram1", {});
   ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
@@ -267,6 +272,46 @@ envoy_histogram1_bucket{le="20"} 0
 envoy_histogram1_bucket{le="+Inf"} 0
 envoy_histogram1_sum{} 0
 envoy_histogram1_count{} 0
+
+)EOF";
+
+  EXPECT_EQ(expected_output, response.toString());
+}
+
+// Test that scaled percents are emitted in the expected 0.0-1.0 range, and that the buckets
+// apply to the final output range, not the internal scaled range.
+TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  HistogramWrapper h1_cumulative;
+  h1_cumulative.setHistogramValues(std::vector<uint64_t>(0));
+  Stats::ConstSupportedBuckets buckets{0.5, 1.0};
+
+  constexpr double scale_factor = Stats::Histogram::PercentScale;
+  h1_cumulative.setHistogramValuesWithCounts(std::vector<std::pair<uint64_t, uint64_t>>({
+      {0.25 * scale_factor, 1},
+      {0.75 * scale_factor, 1},
+      {1.25 * scale_factor, 1},
+  }));
+
+  Stats::HistogramStatisticsImpl h1_cumulative_statistics(h1_cumulative.getHistogram(),
+                                                          Stats::Histogram::Unit::Percent, buckets);
+
+  auto histogram = makeHistogram("histogram1", {});
+  ON_CALL(*histogram, cumulativeStatistics()).WillByDefault(ReturnRef(h1_cumulative_statistics));
+
+  addHistogram(histogram);
+
+  Buffer::OwnedImpl response;
+  const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
+      counters_, gauges_, histograms_, response, false, absl::nullopt, custom_namespaces);
+  EXPECT_EQ(1UL, size);
+
+  const std::string expected_output = R"EOF(# TYPE envoy_histogram1 histogram
+envoy_histogram1_bucket{le="0.5"} 1
+envoy_histogram1_bucket{le="1"} 2
+envoy_histogram1_bucket{le="+Inf"} 3
+envoy_histogram1_sum{} 2.2599999999999997868371792719699
+envoy_histogram1_count{} 3
 
 )EOF";
 

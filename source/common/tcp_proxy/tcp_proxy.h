@@ -259,9 +259,7 @@ public:
   absl::optional<uint64_t> computeHashKey() override {
     auto hash_policy = config_->hashPolicy();
     if (hash_policy) {
-      return hash_policy->generateHash(
-          downstreamConnection()->connectionInfoProvider().remoteAddress().get(),
-          downstreamConnection()->connectionInfoProvider().localAddress().get());
+      return hash_policy->generateHash(*downstreamConnection());
     }
 
     return {};
@@ -382,7 +380,7 @@ protected:
 // This class deals with an upstream connection that needs to finish flushing, when the downstream
 // connection has been closed. The TcpProxy is destroyed when the downstream connection is closed,
 // so handling the upstream connection here allows it to finish draining or timeout.
-class Drainer : public Event::DeferredDeletable {
+class Drainer : public Event::DeferredDeletable, protected Logger::Loggable<Logger::Id::filter> {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,

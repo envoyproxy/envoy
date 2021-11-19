@@ -91,10 +91,10 @@ public:
     return createUdpListenerFilterFactoryList_(filters, context);
   }
 
-  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
-                                              Network::Socket::Type socket_type,
-                                              const Network::Socket::OptionsSharedPtr& options,
-                                              BindType bind_type, uint32_t worker_index) override;
+  Network::SocketSharedPtr createListenSocket(
+      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t worker_index) override;
 
   DrainManagerPtr
   createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) override;
@@ -143,7 +143,7 @@ public:
   const std::list<const Network::FilterChain*>& getDrainingFilterChains() const {
     return draining_filter_chains_;
   }
-  ListenerImpl& getDrainingListener() { return *draining_listener_; }
+  ListenerImpl& getDrainingListener() const { return *draining_listener_; }
   uint64_t decWorkersPendingRemoval() { return --workers_pending_removal_; }
 
   // Schedule listener destroy.

@@ -202,8 +202,6 @@ private:
   std::list<ActiveMessageEncoderFilterPtr> encoder_filters_;
   std::function<FilterStatus(DubboFilters::EncoderFilter*)> encoder_filter_action_;
 
-  int32_t request_id_;
-
   // This value is used in the calculation of the weighted cluster.
   uint64_t stream_id_;
   StreamInfo::StreamInfoImpl stream_info_;

@@ -168,9 +168,8 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
-    const Network::Socket::OptionsSharedPtr& options, BindType bind_type, uint32_t worker_index) {
-  ASSERT(address->type() == Network::Address::Type::Ip ||
-         address->type() == Network::Address::Type::Pipe);
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -191,6 +190,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
+  } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+    // Listener manager should have validated that envoy internal address doesn't work with udp
+    // listener yet.
+    ASSERT(socket_type == Network::Socket::Type::Stream);
+    return std::make_shared<Network::InternalListenSocket>(address);
   }
 
   const std::string scheme = (socket_type == Network::Socket::Type::Stream)
@@ -212,11 +216,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Socket::Type::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::TcpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(address, options,
-                                                      bind_type != BindType::NoBind);
+    return std::make_shared<Network::UdpListenSocket>(
+        address, options, bind_type != BindType::NoBind, creation_options);
   }
 }
 
@@ -328,11 +332,12 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
-  RELEASE_ASSERT(
-      !config.address().has_envoy_internal_address(),
-      fmt::format("listener {} has envoy internal address {}. Internal address cannot be used by "
-                  "listener yet",
-                  config.name(), config.address().envoy_internal_address().DebugString()));
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
+    RELEASE_ASSERT(
+        !config.address().has_envoy_internal_address(),
+        fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
+                    config.name(), config.address().envoy_internal_address().DebugString()));
+  }
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
@@ -984,6 +989,23 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
 
   if (existing_draining_listener != draining_listeners_.cend()) {
     draining_listen_socket_factory = &existing_draining_listener->listener_->getSocketFactory();
+    existing_draining_listener->listener_->debugLog("clones listener sockets");
+  } else {
+    auto existing_draining_filter_chain = std::find_if(
+        draining_filter_chains_manager_.cbegin(), draining_filter_chains_manager_.cend(),
+        [&listener](const DrainingFilterChainsManager& draining_filter_chain) {
+          return draining_filter_chain.getDrainingListener()
+                     .listenSocketFactory()
+                     .getListenSocket(0)
+                     ->isOpen() &&
+                 listener.hasCompatibleAddress(draining_filter_chain.getDrainingListener());
+        });
+
+    if (existing_draining_filter_chain != draining_filter_chains_manager_.cend()) {
+      draining_listen_socket_factory =
+          &existing_draining_filter_chain->getDrainingListener().getSocketFactory();
+      existing_draining_filter_chain->getDrainingListener().debugLog("clones listener socket");
+    }
   }
 
   listener.setSocketFactory(draining_listen_socket_factory != nullptr
@@ -1000,9 +1022,11 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
                                      : ListenerComponentFactory::BindType::NoReusePort;
   }
   TRY_ASSERT_MAIN_THREAD {
+    Network::SocketCreationOptions creation_options;
+    creation_options.mptcp_enabled_ = listener.mptcpEnabled();
     return std::make_unique<ListenSocketFactoryImpl>(
         factory_, listener.address(), socket_type, listener.listenSocketOptions(), listener.name(),
-        listener.tcpBacklogSize(), bind_type, server_.options().concurrency());
+        listener.tcpBacklogSize(), bind_type, creation_options, server_.options().concurrency());
   }
   END_TRY
   catch (const EnvoyException& e) {

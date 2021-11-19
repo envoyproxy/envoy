@@ -1,5 +1,3 @@
-#include "test/integration/multiplexed_upstream_integration_test.h"
-
 #include <iostream>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
@@ -8,6 +6,7 @@
 #include "source/common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -15,33 +14,53 @@
 
 namespace Envoy {
 
-INSTANTIATE_TEST_SUITE_P(Protocols, Http2UpstreamIntegrationTest,
+class MultiplexedUpstreamIntegrationTest : public HttpProtocolIntegrationTest {
+public:
+  void initialize() override {
+    upstream_tls_ = true;
+    config_helper_.configureUpstreamTls(use_alpn_, upstreamProtocol() == Http::CodecType::HTTP3);
+    HttpProtocolIntegrationTest::initialize();
+  }
+
+  void bidirectionalStreaming(uint32_t bytes);
+  void manySimultaneousRequests(uint32_t request_bytes, uint32_t max_response_bytes,
+                                uint32_t num_streams = 50);
+
+  bool use_alpn_{false};
+
+  uint64_t upstreamRxResetCounterValue();
+  uint64_t upstreamTxResetCounterValue();
+  uint64_t downstreamRxResetCounterValue();
+  uint64_t downstreamTxResetCounterValue();
+};
+
+INSTANTIATE_TEST_SUITE_P(Protocols, MultiplexedUpstreamIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                              {Http::CodecType::HTTP2},
                              {Http::CodecType::HTTP2, Http::CodecType::HTTP3})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyNoBuffer) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithZeroByteBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(0, 0, false);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
   testRouterUpstreamDisconnectBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete();
 
   // Given the downstream disconnect, Envoy will reset the upstream stream.
@@ -49,21 +68,21 @@ TEST_P(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComp
   EXPECT_EQ(0, upstreamRxResetCounterValue());
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
+TEST_P(MultiplexedUpstreamIntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
   testRouterUpstreamResponseBeforeRequestComplete();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
+TEST_P(MultiplexedUpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
+TEST_P(MultiplexedUpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
+TEST_P(MultiplexedUpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
-TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
+TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
   autonomous_upstream_ = true;
   initialize();
 
@@ -91,7 +110,12 @@ TEST_P(Http2UpstreamIntegrationTest, TestSchemeAndXFP) {
 }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
-void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
+void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -124,34 +148,44 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
   upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  std::string expected_alpn = upstreamProtocol() == Http::CodecType::HTTP2 ? "h2" : "h3";
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("alpn")).empty());
+  ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
+            expected_alpn);
+
+  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(
+      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(
+      response->trailers()->get(Http::LowerCaseString("upstream_handshake_complete")).empty());
 }
 
-TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
+TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
 
-TEST_P(Http2UpstreamIntegrationTest, LargeBidirectionalStreamingWithBufferLimits) {
+TEST_P(MultiplexedUpstreamIntegrationTest, LargeBidirectionalStreamingWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   bidirectionalStreaming(1024 * 32);
 }
 
-uint64_t Http2UpstreamIntegrationTest::upstreamRxResetCounterValue() {
+uint64_t MultiplexedUpstreamIntegrationTest::upstreamRxResetCounterValue() {
   return test_server_
       ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".rx_reset"))
       ->value();
 }
 
-uint64_t Http2UpstreamIntegrationTest::upstreamTxResetCounterValue() {
+uint64_t MultiplexedUpstreamIntegrationTest::upstreamTxResetCounterValue() {
   return test_server_
       ->counter(absl::StrCat("cluster.cluster_0.", upstreamProtocolStatsRoot(), ".tx_reset"))
       ->value();
 }
-uint64_t Http2UpstreamIntegrationTest::downstreamRxResetCounterValue() {
+uint64_t MultiplexedUpstreamIntegrationTest::downstreamRxResetCounterValue() {
   return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".rx_reset"))->value();
 }
-uint64_t Http2UpstreamIntegrationTest::downstreamTxResetCounterValue() {
+uint64_t MultiplexedUpstreamIntegrationTest::downstreamTxResetCounterValue() {
   return test_server_->counter(absl::StrCat(downstreamProtocolStatsRoot(), ".tx_reset"))->value();
 }
 
-TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
+TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreamingReset) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -193,18 +227,19 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
   EXPECT_EQ(1, downstreamTxResetCounterValue());
 }
 
-TEST_P(Http2UpstreamIntegrationTest, SimultaneousRequest) {
+TEST_P(MultiplexedUpstreamIntegrationTest, SimultaneousRequest) {
   simultaneousRequest(1024, 512, 1023, 513);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
+TEST_P(MultiplexedUpstreamIntegrationTest, LargeSimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
-void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes, uint32_t) {
+void MultiplexedUpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_bytes,
+                                                                  uint32_t max_response_bytes,
+                                                                  uint32_t num_requests) {
   TestRandomGenerator rand;
-  const uint32_t num_requests = 50;
   std::vector<Http::RequestEncoder*> encoders;
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<int> response_bytes;
@@ -213,7 +248,7 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   for (uint32_t i = 0; i < num_requests; ++i) {
-    response_bytes.push_back(rand.random() % (1024 * 2));
+    response_bytes.push_back(rand.random() % (max_response_bytes));
     auto headers = Http::TestRequestHeaderMapImpl{
         {":method", "POST"},
         {":path", "/test/long/url"},
@@ -246,16 +281,60 @@ void Http2UpstreamIntegrationTest::manySimultaneousRequests(uint32_t request_byt
   EXPECT_EQ(0, test_server_->gauge("http2.pending_send_bytes")->value());
 }
 
-TEST_P(Http2UpstreamIntegrationTest, ManySimultaneousRequest) {
-  manySimultaneousRequests(1024, 1024);
+TEST_P(MultiplexedUpstreamIntegrationTest, ManySimultaneousRequest) {
+  manySimultaneousRequests(1024, 1024, 100);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
+TEST_P(MultiplexedUpstreamIntegrationTest, TooManySimultaneousRequests) {
+  manySimultaneousRequests(1024, 1024, 200);
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ManySimultaneousRequestsTightUpstreamLimits) {
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    return;
+  }
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(config);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(1);
+  mergeOptions(options);
+
+  manySimultaneousRequests(1024, 1024, 10);
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ManySimultaneousRequestsLaxUpstreamLimits) {
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(10000);
+  mergeOptions(config);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(10000);
+  mergeOptions(options);
+
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http3_protocol_options()
+              ->mutable_quic_protocol_options()
+              ->mutable_max_concurrent_streams()
+              ->set_value(10000);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  }
+
+  manySimultaneousRequests(1024, 1024, 10);
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBackup) {
   if (upstreamProtocol() == Http::CodecType::HTTP3 &&
       downstreamProtocol() == Http::CodecType::HTTP2) {
     // This test depends on fragile preconditions.
@@ -274,7 +353,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyLargeSimultaneousRequestWithRandomBacku
   manySimultaneousRequests(1024 * 20, 1024 * 20);
 }
 
-TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   const uint32_t num_requests = 20;
   std::vector<Http::RequestEncoder*> encoders;
@@ -336,7 +415,7 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/6744
-TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
+TEST_P(MultiplexedUpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -404,7 +483,7 @@ typed_config:
 
 // Tests the default limit for the number of response headers is 100. Results in a stream reset if
 // exceeds.
-TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
+TEST_P(MultiplexedUpstreamIntegrationTest, TestManyResponseHeadersRejected) {
   // Default limit for response headers is 100.
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -423,7 +502,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 }
 
 // Tests bootstrap configuration of max response headers.
-TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
+TEST_P(MultiplexedUpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     ConfigHelper::HttpProtocolOptions protocol_options;
@@ -451,7 +530,7 @@ TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
 }
 
 // Tests that HTTP/2 response headers over 60 kB are rejected and result in a stream reset.
-TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
+TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -469,7 +548,7 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
 // Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
 // TODO(asraa): Test output of the upstream logs.
 // See https://github.com/envoyproxy/envoy/issues/8828.
-TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
+TEST_P(MultiplexedUpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -510,7 +589,7 @@ typed_config:
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933
-TEST_P(Http2UpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
+TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   autonomous_upstream_ = true;
   envoy::config::core::v3::Http2ProtocolOptions config;
   config.mutable_max_concurrent_streams()->set_value(1);
@@ -541,7 +620,7 @@ TEST_P(Http2UpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933
-TEST_P(Http2UpstreamIntegrationTest, UpstreamGoaway) {
+TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamGoaway) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
