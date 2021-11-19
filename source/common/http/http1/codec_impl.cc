@@ -1175,10 +1175,11 @@ ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
   if (active_request_) {
 
-    if (active_request_->request_decoder_) {
-      active_request_->response_encoder_.readDisable(true);
-    }
+    // The request_decoder should be non-null after we've called the newStream on callbacks.
+    ASSERT(active_request_->request_decoder_);
+    active_request_->response_encoder_.readDisable(true);
     active_request_->remote_complete_ = true;
+
     if (deferred_end_stream_headers_) {
       active_request_->request_decoder_->decodeHeaders(
           std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
