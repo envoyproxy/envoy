@@ -208,8 +208,6 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
                                       bool delay_attaching_stream) {
   ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", client, client.numActiveStreams());
   ASSERT(num_active_streams_ > 0);
-  // Reflect there's one less stream in flight.
-  bool had_negative_capacity = client.hadNegativeDeltaOnStreamClosed();
   state_.decrActiveStreams(1);
   num_active_streams_--;
   host_->stats().rq_active_.dec();
@@ -220,9 +218,12 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // increment as no capacity is freed up.
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
-  if (trackStreamCapacity() && (client.remaining_streams_ > client.concurrent_stream_limit_ -
-                                                                client.numActiveStreams() - 1 ||
-                                had_negative_capacity)) {
+  // The capacity caculated by concurrency could be nagative, in this case, efficient client
+  // capacity was limited by concurrency, compare client.concurrent_stream_limit_ and
+  // client.numActiveStreams() directly to avoid overflow.
+  if (trackStreamCapacity() && ((client.concurrent_stream_limit_ < client.numActiveStreams() + 1) ||
+                                (client.remaining_streams_ > client.concurrent_stream_limit_ -
+                                                                 client.numActiveStreams() - 1))) {
     state_.incrConnectingAndConnectedStreamCapacity(1);
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
