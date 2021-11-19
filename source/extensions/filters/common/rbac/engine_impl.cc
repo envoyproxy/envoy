@@ -27,13 +27,11 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   // guard expression builder by presence of a condition in policies
 
   if (rules.has_custom_library_config()) {
-    std::cout << "********** has_custom_library_config, calling getAndCheckFactory" << std::endl;
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<
             BaseCustomLibraryFactory>(rules.custom_library_config());
     custom_library_ = factory.createInterface(rules.custom_library_config(), validation_visitor);
   } else {
-    std::cout << "********** !has_custom_library_config" << std::endl;
     custom_library_ = nullptr;
   }
 

@@ -17,12 +17,9 @@ absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const
   if (value == "team") {
     return CelValue::CreateStringView("swg");
   } else if (value == "ip") {
-    std::cout << "custom vocabulary ip!" << std::endl;
     auto upstream_local_address = info_.upstreamLocalAddress();
     if (upstream_local_address != nullptr) {
       return CelValue::CreateStringView(upstream_local_address->asStringView());
-    } else {
-      std::cout << "upstream_local_address is null" << std::endl;
     }
   }
 
@@ -68,18 +65,11 @@ CustomLibraryPtr CustomLibraryFactory::createInterface(
   const auto& custom_library_config_typed_config =
       MessageUtil::downcastAndValidate<const envoy::config::core::v3::TypedExtensionConfig&>(
           config, validation_visitor);
-  std::cout << "********************* downcastAndValidate" << std::endl;
   const auto custom_library_config = MessageUtil::anyConvertAndValidate<
       CustomLibraryConfig>(
       custom_library_config_typed_config.typed_config(), validation_visitor);
-  std::cout << "********************* anyConvertAndValidate" << std::endl;
   auto library = std::make_unique<CustomLibrary>();
   library->replace_default_library_ = custom_library_config.replace_default_library_in_case_of_overlap();
-  if (library->replace_default_library_) {
-    std::cout << "********************* replace_default_library is true" << std::endl;
-  } else {
-    std::cout << "********************* replace_default_library is false" << std::endl;
-  }
   return library;
 }
 

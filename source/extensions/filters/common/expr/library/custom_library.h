@@ -86,7 +86,6 @@ class CustomLibraryFactory : public BaseCustomLibraryFactory {
       ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override {
-    std::cout << "*********** name envoy.expr.custom_library" << std::endl;
     return "envoy.expr.custom_library";
   }
 };
