@@ -5,8 +5,8 @@
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
-#include "source/extensions/filters/common/expr/custom_library/custom_functions.h"
-#include "source/extensions/filters/common/expr/custom_library/custom_library.h"
+#include "source/extensions/filters/common/expr/library/custom_functions.h"
+#include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,8 +21,8 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const CustomLibrary* custom_library) {
   auto activation = std::make_unique<Activation>();
 
-  if (custom_library) {
-    custom_library->FillActivation(activation.get(), arena, info);
+  if (custom_library && custom_library->replace_default_library_) {
+    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers, response_trailers);
   }
 
   activation->InsertValueProducer(Request,
@@ -37,6 +37,11 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                   std::make_unique<MetadataProducer>(info.dynamicMetadata()));
   activation->InsertValueProducer(FilterState,
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
+
+  if (custom_library && !custom_library->replace_default_library_) {
+    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers, response_trailers);
+  }
+
   return activation;
 }
 
@@ -100,10 +105,9 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers,
-             const CustomLibrary* custom_library) {
+             const Http::RequestHeaderMap& headers) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }

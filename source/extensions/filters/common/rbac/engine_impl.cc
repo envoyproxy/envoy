@@ -8,7 +8,7 @@
 
 #include "source/common/config/utility.h"
 
-#include "source/extensions/filters/common/expr/custom_library/custom_library.h"
+#include "source/extensions/filters/common/expr/library/custom_library.h"
 
 #include "envoy/protobuf/message_validator.h"
 
@@ -18,6 +18,8 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+using BaseCustomLibraryFactory = Envoy::Extensions::Filters::Common::Expr::Library::BaseCustomLibraryFactory;
+
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v3::RBAC& rules,
     ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
@@ -25,17 +27,25 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   // guard expression builder by presence of a condition in policies
 
   if (rules.has_custom_library_config()) {
+    std::cout << "********** has_custom_library_config, calling getAndCheckFactory" << std::endl;
     auto& factory =
         Envoy::Config::Utility::getAndCheckFactory<
-            CustomLibraryFactory>(rules.custom_library_config());
+            BaseCustomLibraryFactory>(rules.custom_library_config());
     custom_library_ = factory.createInterface(rules.custom_library_config(), validation_visitor);
   } else {
+    std::cout << "********** !has_custom_library_config" << std::endl;
     custom_library_ = nullptr;
   }
 
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
-      builder_ = Expr::createBuilder(&constant_arena_);
+      if (custom_library_) {
+        builder_ = Expr::createBuilder(&constant_arena_,
+                                       custom_library_.get());
+      } else {
+        builder_ = Expr::createBuilder(&constant_arena_,
+                                       nullptr);
+      }
       break;
     }
   }

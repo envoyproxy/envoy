@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace CustomLibrary {
+namespace Library {
 
 using google::api::expr::runtime::CelFunctionDescriptor;
 using google::api::expr::runtime::CelFunction;
@@ -33,7 +33,7 @@ class ConstCelFunction : public CelFunction {
 
 CelValue GetConstValue(Protobuf::Arena* arena, int64_t i);
 
-} // namespace CustomLibrary
+} // namespace Library
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

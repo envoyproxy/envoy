@@ -25,8 +25,8 @@ public:
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 
-using CustomVocabularyWrapper = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomVocabularyWrapper;
-using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomLibrary;
+using CustomVocabularyWrapper = Envoy::Extensions::Filters::Common::Expr::Library::CustomVocabularyWrapper;
+using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::Library::CustomLibrary;
 using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
 
 enum class EnforcementMode { Enforced, Shadow };

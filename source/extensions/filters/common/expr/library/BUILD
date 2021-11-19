@@ -11,11 +11,8 @@ envoy_cc_library(
     name = "custom_functions_lib",
     srcs = ["custom_functions.cc"],
     hdrs = [
-        "custom_functions.cc",
+        "custom_functions.h",
     ],
-    #    copts = [
-    #        "-Wno-unused-parameter",
-    #    ],
     deps = [
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
@@ -33,6 +30,9 @@ envoy_cc_extension(
     hdrs = [
         "custom_library.h",
     ],
+    copts = [
+        "-Wno-unused-parameter",
+    ],
     deps = [
         ":custom_functions_lib",
         "//envoy/registry",
@@ -45,6 +45,7 @@ envoy_cc_extension(
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_function",
         "@com_google_cel_cpp//eval/public:cel_value",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/common/expr/custom_library/v3:pkg_cc_proto",
     ],
 )

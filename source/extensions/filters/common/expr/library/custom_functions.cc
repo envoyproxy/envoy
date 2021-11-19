@@ -1,11 +1,11 @@
-#include "source/extensions/filters/common/expr/custom_library/custom_functions.h"
+#include "source/extensions/filters/common/expr/library/custom_functions.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace CustomLibrary {
+namespace Library {
 
 absl::Status ConstCelFunction::Evaluate(absl::Span<const CelValue> args,
                                         CelValue* output,
@@ -22,7 +22,7 @@ CelValue GetConstValue(Protobuf::Arena* arena, int64_t i) {
   return CelValue::CreateInt64(99);
 }
 
-} // namespace CustomLibrary
+} // namespace Library
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

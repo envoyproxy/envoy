@@ -12,8 +12,6 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomLibrary;
-
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (permission.rule_case()) {
@@ -243,6 +241,18 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
          (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
 }
 
+bool PolicyMatcher::matches(const Network::Connection& connection,
+                            const Envoy::Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& info,
+                            const CustomLibrary* custom_library) const {
+  return permissions_.matches(connection, headers, info) &&
+      principals_.matches(connection, headers, info) &&
+      (expr_ == nullptr ? true : Expr::matches(*expr_,
+                                               info,
+                                               headers,
+                                               custom_library));
+}
+
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
                                          const Envoy::Http::RequestHeaderMap&,
                                          const StreamInfo::StreamInfo&) const {
@@ -255,23 +265,6 @@ bool PathMatcher::matches(const Network::Connection&, const Envoy::Http::Request
     return false;
   }
   return path_matcher_.match(headers.getPathValue());
-}
-
-bool PolicyMatcher::matches(const Network::Connection& connection,
-                            const Envoy::Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& info) const {
-  return permissions_.matches(connection, headers, info) &&
-         principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, nullptr));
-}
-
-bool PolicyMatcher::matches(const Network::Connection& connection,
-                            const Envoy::Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& info,
-                            const CustomLibrary* custom_library_) const {
-  return permissions_.matches(connection, headers, info) &&
-         principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, custom_library_));
 }
 
 } // namespace RBAC

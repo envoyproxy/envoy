@@ -8,7 +8,7 @@
 #include "absl/types/optional.h"
 
 #include "source/extensions/filters/common/expr/context.h"
-#include "source/extensions/filters/common/expr/custom_library/custom_functions.h"
+#include "source/extensions/filters/common/expr/library/custom_functions.h"
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
@@ -31,11 +31,11 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace CustomLibrary {
+namespace Library {
 
 using Activation = google::api::expr::runtime::Activation;
 using CelFunctionRegistry = google::api::expr::runtime::CelFunctionRegistry;
-using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomVocabularyConfig;
+using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
 
 class CustomVocabularyWrapper : public BaseWrapper {
  public:
@@ -55,9 +55,13 @@ class CustomVocabularyWrapper : public BaseWrapper {
 class CustomLibrary {
  public:
   void FillActivation(Activation* activation, Protobuf::Arena& arena,
-                      const StreamInfo::StreamInfo& info) const;
+                      const StreamInfo::StreamInfo& info,
+                      const Http::RequestHeaderMap* request_headers,
+                      const Http::ResponseHeaderMap* response_headers,
+                      const Http::ResponseTrailerMap* response_trailers) const;
 
   void RegisterFunctions(CelFunctionRegistry* registry) const;
+  bool replace_default_library_;
 };
 
 using CustomLibraryPtr = std::unique_ptr<CustomLibrary>;
@@ -85,10 +89,9 @@ class CustomLibraryFactory : public BaseCustomLibraryFactory {
     std::cout << "*********** name envoy.expr.custom_library" << std::endl;
     return "envoy.expr.custom_library";
   }
-
 };
 
-} // namespace CustomLibrary
+} // namespace Library
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

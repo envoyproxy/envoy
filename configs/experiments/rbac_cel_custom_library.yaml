@@ -32,136 +32,83 @@ static_resources:
                   prefix: "/"
                 route:
                   cluster: admin_cluster
-              request_headers_to_add:
-                - header:
-                    key: server
-                    value: envoy
-                  append: true
           http_filters:
-#          - name: rbac-deny-admin-clusters-endpoint
-#            typed_config:
-#              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-#              rules:
-#                action: DENY
-#                policies:
-#                  "deny-admin-clusters-endpoint-policy":
-#                    # deny if request.path.endsWith("/clusters")
-#                    condition:
-#                      call_expr:
-#                        function: endsWith
-#                        args:
-#                        - select_expr:
-#                           operand:
-#                             ident_expr:
-#                               name: request
-#                           field: path
-#                        - const_expr:
-#                           string_value: /clusters
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#          - name: rbac-deny-if-header-host-is-localhost
-#            typed_config:
-#              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-#              rules:
-#                action: DENY
-#                policies:
-#                  "policy-deny-if-header-host-is-localhost":
-#                    # deny if request.headers[host] == "localhost"
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              select_expr:
-#                                operand:
-#                                  ident_expr:
-#                                    name: request
-#                                field: headers
-#                            field: host
-#                        - const_expr:
-#                            string_value: localhost
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-#          - name: rbac-deny-if-header-server-name-is-envoy
-#            typed_config:
-#              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-#              rules:
-#                action: DENY
-#                policies:
-#                  "policy-deny-if-header-server-name-is-envoy":
-#                    # deny if request.headers[server] == "envoy"
-#                    condition:
-#                      call_expr:
-#                        function: contains
-#                        args:
-#                        - select_expr:
-#                            operand:
-#                              select_expr:
-#                                operand:
-#                                  ident_expr:
-#                                    name: request
-#                                field: headers
-#                            field: server
-#                        - const_expr:
-#                            string_value: envoy
-#                    permissions:
-#                    - any: true
-#                    principals:
-#                    - any: true
-          - name: rbac-deny-if-header-user-agent-is-chrome
+          - name: rbac-deny-if-custom-team-is-swg
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
               rules:
                 action: DENY
+                custom_library_config:
+                  name: envoy.expr.custom_library
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.common.expr.custom_library.v3.CustomLibraryConfig
+                    replace_default_library_in_case_of_overlap: false
                 policies:
-#                  "policy-deny-if-header-user-agent-is-chrome":
-#                    # deny if request.headers[user-agent].contains("Chrome")
+#                  "policy-rbac-deny-if-custom-team-is-swg":
+#                    # deny if custom[team].equals("swg")
 #                    condition:
 #                      call_expr:
 #                        function: contains
 #                        args:
 #                        - select_expr:
 #                            operand:
-#                              select_expr:
-#                                operand:
-#                                  ident_expr:
-#                                    name: request
-#                                field: headers
-#                            field: user-agent
+#                              ident_expr:
+#                                name: custom
+#                            field: team
 #                        - const_expr:
-#                            string_value: Chrome
+#                            string_value: swg
 #                    permissions:
 #                    - any: true
 #                    principals:
 #                    - any: true
-          - name: rbac-deny-if-header-user-agent-is-curl
-            typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
-              rules:
-                action: DENY
-                policies:
-                  "policy-deny-if-header-user-agent-is-curl":
-                    # deny if request.headers[user-agent] == "curl"
+                  "policy-rbac-deny-if-lazy-func-returns-99":
+                    # deny if LazyConstFuncReturns99() == 99
                     condition:
                       call_expr:
-                        function: contains
+                        function: _==_
                         args:
-                        - select_expr:
-                            operand:
-                              ident_expr:
-                                name: request
-                            field: useragent
+                        - call_expr:
+                            function: LazyConstFuncReturns99
                         - const_expr:
-                            string_value: curl
+                            int64_value: 99
                     permissions:
                     - any: true
                     principals:
                     - any: true
+#                  "policy-deny-if-eager-func-returns-99":
+#                    # deny if EagerConstFuncReturns99(1) == 99
+#                    condition:
+#                      call_expr:
+#                        function: _==_
+#                        args:
+#                        - call_expr:
+#                            function: EagerConstFuncReturns99
+#                            args:
+#                            - const_expr:
+#                                int64_value: 1
+#                        - const_expr:
+#                            int64_value: 99
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-rbac-deny-if-ip-is-localhost":
+#                    # deny if custom[ip].equals("127.0.0.1")
+#                    condition:
+#                      call_expr:
+#                        function: _==_
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              ident_expr:
+#                                name: custom
+#                            field: ip
+#                        - const_expr:
+#                            string_value: 127.0.0.1
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
           - name: envoy.filters.http.router
   clusters:
   - name: admin_cluster

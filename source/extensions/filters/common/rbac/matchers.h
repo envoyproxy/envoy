@@ -14,6 +14,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
+#include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +24,7 @@ namespace RBAC {
 
 class Matcher;
 using MatcherConstSharedPtr = std::shared_ptr<const Matcher>;
+using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::Library::CustomLibrary;
 
 /**
  *  Matchers describe the rules for matching either a permission action or principal.
@@ -220,6 +222,9 @@ public:
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo&, const CustomLibrary* custom_library) const;
 
 private:
   const OrMatcher permissions_;

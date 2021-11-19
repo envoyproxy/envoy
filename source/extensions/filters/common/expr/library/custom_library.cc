@@ -1,4 +1,5 @@
-#include "source/extensions/filters/common/expr/custom_library/custom_library.h"
+#include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
@@ -6,7 +7,7 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
-namespace CustomLibrary {
+namespace Library {
 
 absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const {
   if (!key.IsString()) {
@@ -29,7 +30,10 @@ absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const
 }
 
 void CustomLibrary::FillActivation(Activation *activation, Protobuf::Arena& arena,
-                                  const StreamInfo::StreamInfo& info) const {
+                             const StreamInfo::StreamInfo& info,
+                             const Http::RequestHeaderMap* request_headers,
+                             const Http::ResponseHeaderMap* response_headers,
+                             const Http::ResponseTrailerMap* response_trailers) const {
 
   //words
   activation->InsertValueProducer("custom",
@@ -61,23 +65,27 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
 
 CustomLibraryPtr CustomLibraryFactory::createInterface(
       const Protobuf::Message& config, ProtobufMessage::ValidationVisitor& validation_visitor) {
-  const auto& typed_config = MessageUtil::downcastAndValidate<
-      const CustomLibraryConfig&>(config, validation_visitor);
-  const auto config = MessageUtil::anyConvertAndValidate<
+  const auto& custom_library_config_typed_config =
+      MessageUtil::downcastAndValidate<const envoy::config::core::v3::TypedExtensionConfig&>(
+          config, validation_visitor);
+  std::cout << "********************* downcastAndValidate" << std::endl;
+  const auto custom_library_config = MessageUtil::anyConvertAndValidate<
       CustomLibraryConfig>(
-      typed_config.config().typed_config(), validation_visitor);
-  bool replace_default_vocab = config.replace_default_vocab_in_case_of_overlap();
-  if (replace_default_vocab) {
-    std::cout << "********************* replace_default_vocab is true" << std::endl;
+      custom_library_config_typed_config.typed_config(), validation_visitor);
+  std::cout << "********************* anyConvertAndValidate" << std::endl;
+  auto library = std::make_unique<CustomLibrary>();
+  library->replace_default_library_ = custom_library_config.replace_default_library_in_case_of_overlap();
+  if (library->replace_default_library_) {
+    std::cout << "********************* replace_default_library is true" << std::endl;
   } else {
-    std::cout << "********************* replace_default_vocab is false" << std::endl;
+    std::cout << "********************* replace_default_library is false" << std::endl;
   }
-  return std::make_unique<CustomLibrary>();
+  return library;
 }
 
 REGISTER_FACTORY(CustomLibraryFactory, BaseCustomLibraryFactory);
 
-} // namespace CustomLibrary
+} // namespace Library
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

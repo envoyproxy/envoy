@@ -16,7 +16,7 @@ envoy_cc_library(
         ":context_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
-        "//source/extensions/filters/common/expr/custom_library:custom_library_lib",
+        "//source/extensions/filters/common/expr/library:custom_library_lib",
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
         "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
