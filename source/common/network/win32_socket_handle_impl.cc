@@ -80,9 +80,9 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, 
 
 Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (flags & MSG_PEEK) {
-    // The caller is responsible for calling with the larger size in cases it needs to do so
-    // it can't rely on transparent reactivations.
-    // So no activations should be needed in this case.
+    // The caller is responsible for calling with the larger size
+    // in cases it needs to do so it can't rely on transparent event activation.
+    // So no in this case we should activate read again unless the read blocked.
     Api::IoCallUint64Result peek_result = drainToPeekBuffer(length);
 
     //  Some error happened
