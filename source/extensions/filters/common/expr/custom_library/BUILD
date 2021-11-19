@@ -5,6 +5,8 @@ load(
     "envoy_extension_package",
 )
 
+envoy_extension_package()
+
 envoy_cc_library(
     name = "custom_functions_lib",
     srcs = ["custom_functions.cc"],
