@@ -114,8 +114,7 @@ public:
     ::memcpy(data, this->start() + start, size);
   }
 
-  uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
-                                      uint64_t num_slice) const {
+  uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices, uint64_t num_slice) const {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE
   }
 
