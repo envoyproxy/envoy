@@ -27,6 +27,7 @@ public:
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
                                     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
                                     Buffer::Instance& response, const bool used_only,
+                                    const bool export_text_readouts,
                                     const absl::optional<std::regex>& regex,
                                     const Stats::CustomStatNamespaces& custom_namespaces);
   /**
