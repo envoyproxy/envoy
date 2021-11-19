@@ -51,6 +51,9 @@ class ProxyFilter
 public:
   ProxyFilter(const ProxyFilterConfigSharedPtr& config) : config_(config) {}
 
+  static constexpr absl::string_view DNS_START = "envoy.dynamic_forward_proxy.dns_start_ms";
+  static constexpr absl::string_view DNS_END = "envoy.dynamic_forward_proxy.dns_end_ms";
+
   // Http::PassThroughDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;

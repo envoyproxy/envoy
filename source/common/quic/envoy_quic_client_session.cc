@@ -5,21 +5,6 @@
 
 #include "quic_filter_manager_connection_impl.h"
 
-namespace quic {
-namespace test {
-
-// TODO(alyssawilk) add the necessary accessors to quiche and remove this.
-class QuicSessionPeer {
-public:
-  static quic::QuicStreamIdManager&
-  getStreamIdManager(Envoy::Quic::EnvoyQuicClientSession* session) {
-    return session->ietf_streamid_manager_.bidirectional_stream_id_manager_;
-  }
-};
-
-} // namespace test
-} // namespace quic
-
 namespace Envoy {
 namespace Quic {
 
@@ -31,13 +16,12 @@ EnvoyQuicClientSession::EnvoyQuicClientSession(
     uint32_t send_buffer_limit, EnvoyQuicCryptoClientStreamFactoryInterface& crypto_stream_factory,
     QuicStatNames& quic_stat_names, Stats::Scope& scope)
     : QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
-                                      send_buffer_limit),
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this)),
       quic::QuicSpdyClientSession(config, supported_versions, connection.release(), server_id,
                                   crypto_config.get(), push_promise_index),
       crypto_config_(crypto_config), crypto_stream_factory_(crypto_stream_factory),
-      quic_stat_names_(quic_stat_names), scope_(scope) {
-  quic_ssl_info_ = std::make_shared<QuicSslConnectionInfo>(*this);
-}
+      quic_stat_names_(quic_stat_names), scope_(scope) {}
 
 EnvoyQuicClientSession::~EnvoyQuicClientSession() {
   ASSERT(!connection()->connected());
@@ -47,6 +31,7 @@ EnvoyQuicClientSession::~EnvoyQuicClientSession() {
 absl::string_view EnvoyQuicClientSession::requestedServerName() const { return server_id().host(); }
 
 void EnvoyQuicClientSession::connect() {
+  streamInfo().upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   dynamic_cast<EnvoyQuicClientConnection*>(network_connection_)
       ->setUpConnectionSocket(
           *static_cast<EnvoyQuicClientConnection*>(connection())->connectionSocket(), *this);
@@ -101,9 +86,7 @@ void EnvoyQuicClientSession::OnCanCreateNewOutgoingStream(bool unidirectional) {
     return;
   }
   uint32_t streams_available = streamsAvailable();
-  if (streams_available > 0) {
-    http_connection_callbacks_->onMaxStreamsChanged(streams_available);
-  }
+  http_connection_callbacks_->onMaxStreamsChanged(streams_available);
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
@@ -135,21 +118,25 @@ quic::QuicConnection* EnvoyQuicClientSession::quicConnection() {
 }
 
 uint64_t EnvoyQuicClientSession::streamsAvailable() {
-  quic::QuicStreamIdManager& manager = quic::test::QuicSessionPeer::getStreamIdManager(this);
-  ASSERT(manager.outgoing_max_streams() >= manager.outgoing_stream_count());
-  uint32_t streams_available = manager.outgoing_max_streams() - manager.outgoing_stream_count();
+  const quic::UberQuicStreamIdManager& manager = ietf_streamid_manager();
+  ASSERT(manager.max_outgoing_bidirectional_streams() >=
+         manager.outgoing_bidirectional_stream_count());
+  uint32_t streams_available =
+      manager.max_outgoing_bidirectional_streams() - manager.outgoing_bidirectional_stream_count();
   return streams_available;
 }
 
 void EnvoyQuicClientSession::OnTlsHandshakeComplete() {
   quic::QuicSpdyClientSession::OnTlsHandshakeComplete();
 
-  // TODO(alyssawilk) support the case where a connection starts with 0 max streams.
-  ASSERT(streamsAvailable());
-  if (streamsAvailable() > 0) {
-    OnCanCreateNewOutgoingStream(false);
-    raiseConnectionEvent(Network::ConnectionEvent::Connected);
-  }
+  // Fake this to make sure we set the connection pool stream limit correctly
+  // before use. This may result in OnCanCreateNewOutgoingStream with zero
+  // available streams.
+  OnCanCreateNewOutgoingStream(false);
+  streamInfo().upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  streamInfo().upstreamTiming().onUpstreamHandshakeComplete(dispatcher_.timeSource());
+
+  raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
 std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::CreateQuicCryptoStream() {
@@ -165,7 +152,7 @@ void EnvoyQuicClientSession::setHttp3Options(
     return;
   }
   static_cast<EnvoyQuicClientConnection*>(connection())
-      ->setMigratePortOnPathDegrading(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      ->setNumPtosForPortMigration(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           http3_options.quic_protocol_options(), num_timeouts_to_trigger_port_migration, 1));
 
   if (http3_options_->quic_protocol_options().has_connection_keepalive()) {

@@ -1,6 +1,7 @@
 #include "source/common/router/route_config_update_receiver_impl.h"
 
 #include <string>
+#include <utility>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
@@ -14,23 +15,49 @@
 namespace Envoy {
 namespace Router {
 
+namespace {
+
+// Resets 'route_config::virtual_hosts' by merging VirtualHost contained in
+// 'rds_vhosts' and 'vhds_vhosts'.
+void rebuildRouteConfigVirtualHosts(
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
+    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
+    envoy::config::route::v3::RouteConfiguration& route_config) {
+  route_config.clear_virtual_hosts();
+  for (const auto& vhost : rds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
+  for (const auto& vhost : vhds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
+}
+
+} // namespace
+
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
     const envoy::config::route::v3::RouteConfiguration& rc, const std::string& version_info) {
   const uint64_t new_hash = MessageUtil::hash(rc);
   if (new_hash == last_config_hash_) {
     return false;
   }
-  route_config_proto_ = std::make_unique<envoy::config::route::v3::RouteConfiguration>(rc);
-  last_config_hash_ = new_hash;
   const uint64_t new_vhds_config_hash = rc.has_vhds() ? MessageUtil::hash(rc.vhds()) : 0ul;
+  std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts;
+  for (const auto& vhost : rc.virtual_hosts()) {
+    rds_virtual_hosts.emplace(vhost.name(), vhost);
+  }
+  envoy::config::route::v3::RouteConfiguration new_route_config = rc;
+  rebuildRouteConfigVirtualHosts(rds_virtual_hosts, *vhds_virtual_hosts_, new_route_config);
+  auto new_config = std::make_shared<ConfigImpl>(
+      new_route_config, optional_http_filters_, factory_context_,
+      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
+  // If the above validation/validation doesn't raise exception, update the
+  // other cached config entries.
+  config_ = new_config;
+  rds_virtual_hosts_ = std::move(rds_virtual_hosts);
+  last_config_hash_ = new_hash;
+  *route_config_proto_ = std::move(new_route_config);
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
-  initializeRdsVhosts(*route_config_proto_);
-
-  rebuildRouteConfig(rds_virtual_hosts_, *vhds_virtual_hosts_, *route_config_proto_);
-  config_ = std::make_shared<ConfigImpl>(
-      *route_config_proto_, optional_http_filters_, factory_context_,
-      factory_context_.messageValidationContext().dynamicValidationVisitor(), false);
 
   onUpdateCommon(version_info);
   return true;
@@ -50,8 +77,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   auto route_config_after_this_update =
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   route_config_after_this_update->CopyFrom(*route_config_proto_);
-  rebuildRouteConfig(rds_virtual_hosts_, *vhosts_after_this_update,
-                     *route_config_after_this_update);
+  rebuildRouteConfigVirtualHosts(rds_virtual_hosts_, *vhosts_after_this_update,
+                                 *route_config_after_this_update);
 
   auto new_config = std::make_shared<ConfigImpl>(
       *route_config_after_this_update, optional_http_filters_, factory_context_,
@@ -71,14 +98,6 @@ void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_in
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
   config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, last_config_version_});
-}
-
-void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
-    const envoy::config::route::v3::RouteConfiguration& route_configuration) {
-  rds_virtual_hosts_.clear();
-  for (const auto& vhost : route_configuration.virtual_hosts()) {
-    rds_virtual_hosts_.emplace(vhost.name(), vhost);
-  }
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(
@@ -108,19 +127,6 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
     vhosts_added = true;
   }
   return vhosts_added;
-}
-
-void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& rds_vhosts,
-    const std::map<std::string, envoy::config::route::v3::VirtualHost>& vhds_vhosts,
-    envoy::config::route::v3::RouteConfiguration& route_config) {
-  route_config.clear_virtual_hosts();
-  for (const auto& vhost : rds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
-  }
-  for (const auto& vhost : vhds_vhosts) {
-    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
-  }
 }
 
 } // namespace Router

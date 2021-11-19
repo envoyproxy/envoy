@@ -35,8 +35,15 @@ public:
     ASSERT_TRUE(testClient != nullptr);
     testClient->active_streams_++;
   }
+  int64_t currentUnusedCapacity() const override {
+    if (capacity_override_.has_value()) {
+      return capacity_override_.value();
+    }
+    return ActiveClient::currentUnusedCapacity();
+  }
 
   uint32_t active_streams_{};
+  absl::optional<uint64_t> capacity_override_;
 };
 
 class TestPendingStream : public PendingStream {
@@ -413,6 +420,26 @@ TEST_F(ConnPoolImplDispatcherBaseTest, MaxConnectionDurationCallbackWhileConnect
                    "max connection duration reached while connecting");
 
   // Finish the test as if the connection was never successful.
+  EXPECT_CALL(pool_, onPoolFailure);
+  pool_.destructAllConnections();
+}
+
+// Test the behavior of a client created with 0 zero streams available.
+TEST_F(ConnPoolImplDispatcherBaseTest, NoAvailableStreams) {
+  // Start with a concurrent stream limit of 0.
+  stream_limit_ = 1;
+  newConnectingClient();
+  clients_.back()->capacity_override_ = 0;
+  pool_.decrClusterStreamCapacity(stream_limit_);
+
+  // Make sure that when the connected event is raised, there is no call to
+  // onPoolReady, and the client is marked as busy.
+  EXPECT_CALL(pool_, onPoolReady).Times(0);
+  clients_.back()->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(ActiveClient::State::BUSY, clients_.back()->state());
+
+  // Clean up.
+  EXPECT_CALL(pool_, instantiateActiveClient);
   EXPECT_CALL(pool_, onPoolFailure);
   pool_.destructAllConnections();
 }

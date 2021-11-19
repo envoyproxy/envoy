@@ -44,6 +44,12 @@ constexpr const char* SignoutCookieValue =
 constexpr const char* SignoutBearerTokenValue =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
+constexpr absl::string_view SignoutIdTokenValue =
+    "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
+constexpr absl::string_view SignoutRefreshTokenValue =
+    "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+
 constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};secure";
 
 constexpr const char* CookieTailHttpOnlyFormatString =
@@ -149,11 +155,13 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
                                       const std::string& secret) {
   const auto& cookies = Http::Utility::parseCookies(headers, [this](absl::string_view key) -> bool {
     return key == cookie_names_.oauth_expires_ || key == cookie_names_.bearer_token_ ||
-           key == cookie_names_.oauth_hmac_;
+           key == cookie_names_.oauth_hmac_ || key == "IdToken" || key == "RefreshToken";
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
   token_ = findValue(cookies, cookie_names_.bearer_token_);
+  id_token_ = findValue(cookies, "IdToken");
+  refresh_token_ = findValue(cookies, "RefreshToken");
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
   host_ = headers.Host()->value().getStringView();
 
@@ -162,7 +170,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
 
 bool OAuth2CookieValidator::hmacIsValid() const {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-  const auto hmac_payload = absl::StrCat(host_, expires_, token_);
+  const auto hmac_payload = absl::StrCat(host_, expires_, token_, id_token_, refresh_token_);
   const auto pre_encoded_hmac = Hex::encode(crypto_util.getSha256Hmac(secret_, hmac_payload));
   std::string encoded_hmac;
   absl::Base64Escape(pre_encoded_hmac, &encoded_hmac);
@@ -407,6 +415,8 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
       fmt::format(SignoutBearerTokenValue, config_->cookieNames().bearer_token_));
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutIdTokenValue);
+  response_headers->addReferenceKey(Http::Headers::get().SetCookie, SignoutRefreshTokenValue);
   response_headers->setLocation(new_path);
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
@@ -414,8 +424,12 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 }
 
 void OAuth2Filter::onGetAccessTokenSuccess(const std::string& access_code,
+                                           const std::string& id_token,
+                                           const std::string& refresh_token,
                                            std::chrono::seconds expires_in) {
   access_token_ = access_code;
+  id_token_ = id_token;
+  refresh_token_ = refresh_token;
 
   const auto new_epoch = time_source_.systemTime() + expires_in;
   new_expires_ = std::to_string(
@@ -439,7 +453,7 @@ void OAuth2Filter::finishFlow() {
 
   std::string token_payload;
   if (config_->forwardBearerToken()) {
-    token_payload = absl::StrCat(host_, new_expires_, access_token_);
+    token_payload = absl::StrCat(host_, new_expires_, access_token_, id_token_, refresh_token_);
   } else {
     token_payload = absl::StrCat(host_, new_expires_);
   }
@@ -480,6 +494,15 @@ void OAuth2Filter::finishFlow() {
     response_headers->addReferenceKey(
         Http::Headers::get().SetCookie,
         absl::StrCat(cookie_names.bearer_token_, "=", access_token_, cookie_tail));
+    if (id_token_ != EMPTY_STRING) {
+      response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                        absl::StrCat("IdToken=", id_token_, cookie_tail));
+    }
+
+    if (refresh_token_ != EMPTY_STRING) {
+      response_headers->addReferenceKey(Http::Headers::get().SetCookie,
+                                        absl::StrCat("RefreshToken=", refresh_token_, cookie_tail));
+    }
   }
 
   response_headers->setLocation(state_);
