@@ -263,11 +263,11 @@ public:
 class TestVirtualCluster : public VirtualCluster {
 public:
   // Router::VirtualCluster
-  const std::string& name() const override { return vc_name_; }
+  const std::string& name() const override { return name_; }
   Stats::StatName statName() const override { return stat_name_.statName(); }
   VirtualClusterStats& stats() const override { return stats_; }
 
-  const std::string vc_name_ = "fake_virtual_cluster";
+  const std::string name_ = "fake_virtual_cluster";
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNameManagedStorage stat_name_{"fake_virtual_cluster", *symbol_table_};
   Stats::IsolatedStoreImpl stats_store_;

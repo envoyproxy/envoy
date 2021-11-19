@@ -144,7 +144,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  std::string& virtual_cluster_name_;
+  absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
 };
 

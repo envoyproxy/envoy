@@ -195,7 +195,9 @@ struct StreamInfoImpl : public StreamInfo {
     virtual_cluster_name_ = virtual_cluster_name;
   }
 
-  const std::string& virtualClusterName() const override { return virtual_cluster_name_; }
+  const absl::optional<std::string>& virtualClusterName() const override {
+    return virtual_cluster_name_;
+  }
 
   void setUpstreamLocalAddress(
       const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
@@ -338,7 +340,9 @@ struct StreamInfoImpl : public StreamInfo {
   std::string route_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
-  std::string& virtual_cluster_name_;
+  // TODO: Check if the owner of this storage could outlive the StreamInfo. If yes, then we don't
+  //  need to copy the string. It could be referenced instead.
+  absl::optional<std::string> virtual_cluster_name_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
