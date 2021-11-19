@@ -9,7 +9,6 @@
 #include "test/tools/router_check/router.h"
 
 int main(int argc, char* argv[]) {
-  Envoy::Thread::TestThread test_thread;
   Envoy::Options options(argc, argv);
 
   const bool enforce_coverage = options.failUnder() != 0.0;

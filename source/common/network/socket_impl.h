@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -53,8 +54,11 @@ public:
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
+  absl::string_view ja3Hash() const override { return ja3_hash_; }
+  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -64,12 +68,14 @@ private:
   std::string server_name_;
   absl::optional<uint64_t> connection_id_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  std::string ja3_hash_;
 };
 
 class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address);
+             const Address::InstanceConstSharedPtr& remote_address,
+             const SocketCreationOptions& options);
 
   // Network::Socket
   ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }

@@ -35,7 +35,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -314,4 +314,8 @@ message Listener {
     // [#not-implemented-hide:]
     InternalListenerConfig internal_listener = 27;
   }
+
+  // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
+  // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
+  bool enable_mptcp = 30;
 }

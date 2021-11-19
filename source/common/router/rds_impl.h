@@ -81,7 +81,6 @@ public:
   }
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
-  void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                  std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -209,7 +208,6 @@ public:
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
-  void validateConfig(const envoy::config::route::v3::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

@@ -86,9 +86,9 @@ JSON_STRING_TO_MESSAGE_ALLOWLIST = (
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
 HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = (
-    "downstream_cx_length_ms", "downstream_cx_length_ms", "initialization_time_ms",
-    "loop_duration_us", "poll_delay_us", "request_time_ms", "upstream_cx_connect_ms",
-    "upstream_cx_length_ms")
+    "cx_rtt_us", "cx_rtt_variance_us", "downstream_cx_length_ms", "downstream_cx_length_ms",
+    "initialization_time_ms", "loop_duration_us", "poll_delay_us", "request_time_ms",
+    "upstream_cx_connect_ms", "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
 STD_REGEX_ALLOWLIST = (
@@ -267,8 +267,7 @@ UNOWNED_EXTENSIONS = {
 UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.upstream_http2_flood_checks",
-  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+  "envoy.reloadable_features.sanitize_http_header_referer",
 }
 # yapf: enable
 
@@ -1174,7 +1173,7 @@ if __name__ == "__main__":
         owned = []
         maintainers = [
             '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente'
+            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente', '@ggreenway'
         ]
 
         try:

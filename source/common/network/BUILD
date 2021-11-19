@@ -64,6 +64,7 @@ envoy_cc_library(
     hdrs = ["connection_impl_base.h"],
     deps = [
         ":filter_manager_lib",
+        ":listen_socket_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/event:dispatcher_interface",
         "//source/common/common:assert_lib",
@@ -133,6 +134,8 @@ envoy_cc_library(
     srcs = ["hash_policy.cc"],
     hdrs = ["hash_policy.h"],
     deps = [
+        "//envoy/common:hashable_interface",
+        "//envoy/network:connection_interface",
         "//envoy/network:hash_policy_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -182,10 +185,12 @@ envoy_cc_library(
     srcs = [
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
+        "win32_socket_handle_impl.cc",
     ],
     hdrs = [
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
+        "win32_socket_handle_impl.h",
     ],
     deps = [
         ":address_lib",

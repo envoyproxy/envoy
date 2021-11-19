@@ -1582,7 +1582,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseWith100Then200) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   TestResponseHeaderMapImpl continue_headers{{":status", "100"}};
-  response_encoder->encode100ContinueHeaders(continue_headers);
+  response_encoder->encode1xxHeaders(continue_headers);
   EXPECT_EQ("HTTP/1.1 100 Continue\r\n\r\n", output);
   output.clear();
 
@@ -2486,7 +2486,7 @@ TEST_F(Http1ClientConnectionImplTest, 204ResponseTransferEncodingNotAllowed) {
   }
 }
 
-// 100 response followed by 200 results in a [decode100ContinueHeaders, decodeHeaders] sequence.
+// 100 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
 TEST_F(Http1ClientConnectionImplTest, ContinueHeaders) {
   initialize();
 
@@ -2495,9 +2495,53 @@ TEST_F(Http1ClientConnectionImplTest, ContinueHeaders) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
   Buffer::OwnedImpl initial_response("HTTP/1.1 100 Continue\r\n\r\n");
+  auto status = codec_->dispatch(initial_response);
+  EXPECT_TRUE(status.ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
+  status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
+}
+
+// 102 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
+TEST_F(Http1ClientConnectionImplTest, ProcessingHeaders) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl initial_response("HTTP/1.1 102 Processing\r\n\r\n");
+  auto status = codec_->dispatch(initial_response);
+  EXPECT_TRUE(status.ok());
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\n\r\n");
+  status = codec_->dispatch(response);
+  EXPECT_TRUE(status.ok());
+}
+
+// 103 response followed by 200 results in a [decode1xxHeaders, decodeHeaders] sequence.
+TEST_F(Http1ClientConnectionImplTest, EarlyHintHeaders) {
+  initialize();
+
+  NiceMock<MockResponseDecoder> response_decoder;
+  Http::RequestEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
+
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
+  EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
+  Buffer::OwnedImpl initial_response("HTTP/1.1 103 Early Hints\r\n\r\n");
   auto status = codec_->dispatch(initial_response);
   EXPECT_TRUE(status.ok());
 
@@ -2517,13 +2561,13 @@ TEST_F(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
-  EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
   Buffer::OwnedImpl initial_response("HTTP/1.1 100 Continue\r\n\r\n");
   auto status = codec_->dispatch(initial_response);
   EXPECT_TRUE(status.ok());
 
-  EXPECT_CALL(response_decoder, decode100ContinueHeaders_(_));
+  EXPECT_CALL(response_decoder, decode1xxHeaders_(_));
   EXPECT_CALL(response_decoder, decodeData(_, _)).Times(0);
   Buffer::OwnedImpl another_100_response("HTTP/1.1 100 Continue\r\n\r\n");
   status = codec_->dispatch(another_100_response);
@@ -2536,9 +2580,7 @@ TEST_F(Http1ClientConnectionImplTest, MultipleContinueHeaders) {
   EXPECT_TRUE(status.ok());
 }
 
-// 101/102 headers etc. are passed to the response encoder (who is responsibly for deciding to
-// upgrade, ignore, etc.).
-TEST_F(Http1ClientConnectionImplTest, 1xxNonContinueHeaders) {
+TEST_F(Http1ClientConnectionImplTest, Unsupported1xxHeader) {
   initialize();
 
   NiceMock<MockResponseDecoder> response_decoder;
@@ -2547,7 +2589,7 @@ TEST_F(Http1ClientConnectionImplTest, 1xxNonContinueHeaders) {
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
-  Buffer::OwnedImpl response("HTTP/1.1 102 Processing\r\n\r\n");
+  Buffer::OwnedImpl response("HTTP/1.1 199 Unknown\r\n\r\n");
   auto status = codec_->dispatch(response);
   EXPECT_TRUE(status.ok());
 }
