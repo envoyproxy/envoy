@@ -4,7 +4,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
-#include "envoy/event/dispatcher.h"
 
 #include "source/common/common/assert.h"
 
