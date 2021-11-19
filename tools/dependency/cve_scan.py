@@ -8,14 +8,6 @@
 #
 #  $ bazel run //tools/dependency:cve_scan
 #
-# with pip:
-#
-#  $ pip install envoy.dependency.cve_scan
-#  $ envoy.dependency.cve_scan -h
-#
-# usage with pip requires a path, eg
-#
-#  $ envoy.dependency.cve_scan .
 #
 # The upstream lib is maintained here:
 #
