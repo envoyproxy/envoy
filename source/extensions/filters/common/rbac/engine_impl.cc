@@ -4,6 +4,14 @@
 
 #include "source/common/http/header_map_impl.h"
 
+#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
+
+#include "source/common/config/utility.h"
+
+#include "source/extensions/filters/common/expr/custom_library/custom_library.h"
+
+#include "envoy/protobuf/message_validator.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -15,6 +23,16 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     ProtobufMessage::ValidationVisitor& validation_visitor, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // guard expression builder by presence of a condition in policies
+
+  if (rules.has_custom_library_config()) {
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<
+            CustomLibraryFactory>(rules.custom_library_config());
+    custom_library_ = factory.createInterface(rules.custom_library_config(), validation_visitor);
+  } else {
+    custom_library_ = nullptr;
+  }
+
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_ = Expr::createBuilder(&constant_arena_);
@@ -68,7 +86,8 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
   bool matched = false;
 
   for (const auto& policy : policies_) {
-    if (policy.second->matches(connection, headers, info)) {
+    if (policy.second->matches(connection, headers, info,
+                               (custom_library_) ? custom_library_.get() : nullptr)) {
       matched = true;
       if (effective_policy_id != nullptr) {
         *effective_policy_id = policy.first;

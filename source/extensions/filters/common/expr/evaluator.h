@@ -5,10 +5,13 @@
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/common/expr/custom_library/custom_functions.h"
+#include "source/extensions/filters/common/expr/custom_library/custom_library.h"
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
+#include "eval/public/cel_function_adapter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,21 +26,29 @@ using BuilderPtr = std::unique_ptr<Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
 using ExpressionPtr = std::unique_ptr<Expression>;
 
+using CelValue = google::api::expr::runtime::CelValue;
+using ConstCelFunction = Envoy::Extensions::Filters::Common::Expr::ConstCelFunction;
+using CustomVocabularyWrapper = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomVocabularyWrapper;
+using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomLibrary;
+
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
 ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
-                               const Http::ResponseTrailerMap* response_trailers);
+                               const Http::ResponseTrailerMap* response_trailers,
+                               const CustomLibrary* custom_library);
 
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena);
+BuilderPtr createBuilder(Protobuf::Arena* arena,
+                               const CustomLibrary* custom_library);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.
-ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr);
+ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr,
+                               const CustomLibrary* custom_library);
 
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.
@@ -45,12 +56,17 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
-                                  const Http::ResponseTrailerMap* response_trailers);
+                                  const Http::ResponseTrailerMap* response_trailers,
+                               const CustomLibrary* custom_library);
 
 // Evaluates an expression and returns true if the expression evaluates to "true".
 // Returns false if the expression fails to evaluate.
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers);
+
+bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
+             const Http::RequestHeaderMap& headers,
+             const CustomLibrary* custom_library);
 
 // Returns a string for a CelValue.
 std::string print(CelValue value);

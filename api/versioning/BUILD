@@ -66,6 +66,7 @@ proto_library(
         "//envoy/extensions/compression/gzip/compressor/v3:pkg",
         "//envoy/extensions/compression/gzip/decompressor/v3:pkg",
         "//envoy/extensions/filters/common/dependency/v3:pkg",
+        "//envoy/extensions/filters/common/expr/custom_library/v3:pkg",
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/common/matcher/action/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",

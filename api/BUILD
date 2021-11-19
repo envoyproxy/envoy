@@ -53,6 +53,7 @@ proto_library(
         "//envoy/config/transport_socket/tap/v2alpha:pkg",
         "//envoy/data/accesslog/v2:pkg",
         "//envoy/data/tap/v2alpha:pkg",
+        "//envoy/extensions/filters/common/expr/custom_library/v3:pkg",
         "//envoy/service/accesslog/v2:pkg",
         "//envoy/service/auth/v2:pkg",
         "//envoy/service/discovery/v2:pkg",

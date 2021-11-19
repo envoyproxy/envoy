@@ -5,6 +5,8 @@
 #include "source/extensions/filters/common/rbac/engine.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
 
+#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -22,6 +24,10 @@ public:
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
+
+using CustomVocabularyWrapper = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomVocabularyWrapper;
+using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::CustomLibrary::CustomLibrary;
+using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
 
 enum class EnforcementMode { Enforced, Shadow };
 
@@ -48,6 +54,8 @@ private:
   const EnforcementMode mode_;
 
   std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
+
+  std::unique_ptr<CustomLibrary> custom_library_;
 
   Protobuf::Arena constant_arena_;
   Expr::BuilderPtr builder_;

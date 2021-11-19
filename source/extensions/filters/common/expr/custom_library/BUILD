@@ -1,0 +1,48 @@
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
+    "envoy_cc_library",
+    "envoy_extension_package",
+)
+
+envoy_cc_library(
+    name = "custom_functions_lib",
+    srcs = ["custom_functions.cc"],
+    hdrs = [
+        "custom_functions.cc",
+    ],
+    #    copts = [
+    #        "-Wno-unused-parameter",
+    #    ],
+    deps = [
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf",
+        "@com_google_cel_cpp//eval/public:builtin_func_registrar",
+        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
+        "@com_google_cel_cpp//eval/public:cel_expression",
+        "@com_google_cel_cpp//eval/public:cel_function",
+        "@com_google_cel_cpp//eval/public:cel_value",
+    ],
+)
+
+envoy_cc_extension(
+    name = "custom_library_lib",
+    srcs = ["custom_library.cc"],
+    hdrs = [
+        "custom_library.h",
+    ],
+    deps = [
+        ":custom_functions_lib",
+        "//envoy/registry",
+        "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:context_lib",
+        "@com_google_cel_cpp//eval/public:activation",
+        "@com_google_cel_cpp//eval/public:builtin_func_registrar",
+        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
+        "@com_google_cel_cpp//eval/public:cel_expression",
+        "@com_google_cel_cpp//eval/public:cel_function",
+        "@com_google_cel_cpp//eval/public:cel_value",
+        "@envoy_api//envoy/extensions/filters/common/expr/custom_library/v3:pkg_cc_proto",
+    ],
+)

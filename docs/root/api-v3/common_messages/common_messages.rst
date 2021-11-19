@@ -31,3 +31,4 @@ Common messages
   ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
   ../extensions/matching/input_matchers/ip/v3/ip.proto
   ../extensions/matching/common_inputs/environment_variable/v3/input.proto
+  ../extensions/filters/common/expr/custom_library/v3/custom_library.proto

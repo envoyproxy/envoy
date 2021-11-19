@@ -112,6 +112,9 @@ message RBAC {
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   // The policies are evaluated in lexicographic order of the policy name.
   map<string, Policy> policies = 2;
+
+  // [#extension-category: envoy.rbac.custom_library_config]
+  config.core.v3.TypedExtensionConfig custom_library_config = 3;
 }
 
 // Policy specifies a role and the principals that are assigned/denied the role.
