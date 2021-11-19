@@ -117,7 +117,10 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   };
   options->sock_state_cb_data = this;
 
+  ENVOY_LOG_MISC(error, "resolvers {}, use dns fallback {}", resolvers.size(),
+                 use_resolvers_as_fallback_);
   if (!resolvers_vector_.empty() && use_resolvers_as_fallback_) {
+    ENVOY_LOG_MISC(error, "using resolvers as fallback {}", resolvers_vector_.size());
     options->nservers = resolvers_vector_.size();
     options->servers = &resolvers_vector_[0];
   }
