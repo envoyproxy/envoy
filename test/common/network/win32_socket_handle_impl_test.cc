@@ -79,7 +79,6 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithBufferShouldReadFromBuffer) {
   peek_iov[0].iov_base = static_cast<void*>(data.data());
   peek_iov[0].iov_len = data.length();
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(2)
       .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iov) {
         // Gcc treats the variables as unused and this causes
         // a compilation failure.
@@ -88,8 +87,7 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithBufferShouldReadFromBuffer) {
         iov = peek_iov.begin();
         num_iov = 1;
         return Api::SysCallSizeResult{data_length, 0};
-      }))
-      .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+      }));
 
   absl::FixedArray<char> buf(data_length);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
@@ -119,7 +117,6 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekReactivatesReadOnBlock) {
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(1)
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
-  ;
 
   EXPECT_CALL(*file_event_, registerEventIfEmulatedEdge(_));
   absl::FixedArray<char> buf(10);
@@ -144,7 +141,7 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekFlagReturnsFinalError) {
         UNREFERENCED_PARAMETER(num_iov);
         iov = peek_iov.begin();
         num_iov = 1;
-        return Api::SysCallSizeResult{data_length, 0};
+        return Api::SysCallSizeResult{data_length / 2, 0};
       }))
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
 

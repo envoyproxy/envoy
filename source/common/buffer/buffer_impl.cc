@@ -118,6 +118,20 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   ASSERT(size == 0);
 }
 
+uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* slices, uint64_t num_slice) const {
+  uint64_t total_length_to_read = std::min(size, this->length());
+  uint64_t num_slices_to_read = 0;
+  uint64_t num_bytes_to_read = 0;
+  for (; num_slices_to_read < num_slice && num_bytes_to_read < total_length_to_read;
+       num_slices_to_read++) {
+    auto length_to_copy = std::min(static_cast<uint64_t>(slices[num_slices_to_read].len_),
+                                   total_length_to_read - num_bytes_to_read);
+    this->copyOut(num_bytes_to_read, length_to_copy, slices[num_slices_to_read].mem_);
+    num_bytes_to_read += length_to_copy;
+  }
+  return num_bytes_to_read;
+}
+
 void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
 
 void OwnedImpl::drainImpl(uint64_t size) {

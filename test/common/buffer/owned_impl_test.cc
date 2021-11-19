@@ -1080,6 +1080,42 @@ void TestBufferMove(uint64_t buffer1_length, uint64_t buffer2_length,
   EXPECT_EQ(0, buffer2.length());
 }
 
+TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
+  std::string data = "Hello, World!";
+  Buffer::OwnedImpl buffer;
+  buffer.prepend(data);
+
+  EXPECT_EQ(data.size(), buffer.length());
+  EXPECT_EQ(data, buffer.toString());
+
+  {
+    Buffer::OwnedImpl buf;
+    auto reservation = buf.reserveSingleSlice(1024);
+    auto slice = reservation.slice();
+    EXPECT_EQ(data.size(), buffer.copyOutToSlices(100, &slice, 1));
+  }
+
+  {
+    Buffer::OwnedImpl buf;
+    auto reservation = buf.reserveSingleSlice(5);
+    auto slice = reservation.slice();
+    EXPECT_EQ(5, buffer.copyOutToSlices(100, &slice, 1));
+  }
+
+  {
+    Buffer::OwnedImpl buf;
+    auto reservation = buf.reserveForRead();
+    EXPECT_EQ(5, buffer.copyOutToSlices(5, reservation.slices(), reservation.numSlices()));
+  }
+
+  {
+    Buffer::OwnedImpl buf;
+    auto reservation = buf.reserveForRead();
+    EXPECT_EQ(data.size(),
+              buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+  }
+}
+
 // Slice size large enough to prevent slice content from being coalesced into an existing slice
 constexpr uint64_t kLargeSliceSize = 2048;
 
