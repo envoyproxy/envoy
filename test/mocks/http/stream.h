@@ -24,7 +24,7 @@ public:
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
   MOCK_METHOD(void, onEnvoyStreamComplete, ());
 
-  // Use the same underlying structure as codec stream impls to insure iteration stability
+  // Use the same underlying structure as StreamCallbackHelper to insure iteration stability
   // if we remove callbacks during iteration.
   absl::InlinedVector<StreamCallbacks*, 8> callbacks_;
   Network::Address::InstanceConstSharedPtr connection_local_address_;

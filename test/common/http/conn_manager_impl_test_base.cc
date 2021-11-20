@@ -264,8 +264,8 @@ void HttpConnectionManagerImplTest::expectOnDestroy(bool deferred) {
 }
 
 void HttpConnectionManagerImplTest::doRemoteClose(bool deferred) {
-  // Likely need to change to at least once -- we'll do 2x if stream not done,
-  // otherwise once.
+  // We will call removeCallbacks twice.
+  // Once in resetAllStreams, and once in doDeferredStreamDestroy.
   EXPECT_CALL(stream_, removeCallbacks(_)).Times(2);
   expectOnDestroy(deferred);
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);

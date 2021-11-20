@@ -630,7 +630,6 @@ void ConnectionImpl::ServerStreamImpl::resetStream(StreamResetReason reason) {
     buffer_memory_account_->clearDownstream();
   }
 
-  // Forward to base class
   StreamImpl::resetStream(reason);
 }
 
@@ -640,7 +639,9 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 
   // If we submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
   // We want these frames to go out so we defer the reset until we send all of the frames that
-  // end the local stream.
+  // end the local stream. However, if we're resetting the stream due to
+  // overload, we should reset the stream as soon as possible to free used
+  // resources.
   if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
       reason != StreamResetReason::OverloadManager) {
     ASSERT(parent_.getStream(stream_id_) != nullptr);

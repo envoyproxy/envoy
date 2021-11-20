@@ -260,6 +260,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 
+  // The response_encoder should never be dangling as the codec level
+  // stream will either outlive the ActiveStream, or be alive in deferred
+  // deletion queue at this point.
   if (stream.response_encoder_) {
     stream.response_encoder_->getStream().removeCallbacks(stream);
     stream.response_encoder_ = nullptr;
