@@ -996,18 +996,17 @@ ServerConnectionImpl::ServerConnectionImpl(
 
 uint32_t ServerConnectionImpl::getHeadersSize() {
   // Add in the size of the request URL if processing request headers.
-  const uint32_t url_size = (!processing_trailers_ && active_request_.has_value())
-                                ? active_request_.value().request_url_.size()
-                                : 0;
+  const uint32_t url_size =
+      (!processing_trailers_ && active_request_) ? active_request_->request_url_.size() : 0;
   return url_size + ConnectionImpl::getHeadersSize();
 }
 
 void ServerConnectionImpl::onEncodeComplete() {
-  if (active_request_.value().remote_complete_) {
+  if (active_request_->remote_complete_) {
     // Only do this if remote is complete. If we are replying before the request is complete the
     // only logical thing to do is for higher level code to reset() / close the connection so we
     // leave the request around so that it can fire reset callbacks.
-    active_request_.reset();
+    connection_.dispatcher().deferredDelete(std::move(active_request_));
   }
 }
 
@@ -1018,12 +1017,11 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   bool is_connect = (method == header_values.MethodValues.Connect);
 
   // The url is relative or a wildcard when the method is OPTIONS. Nothing to do here.
-  auto& active_request = active_request_.value();
-  if (!is_connect && !active_request.request_url_.getStringView().empty() &&
-      (active_request.request_url_.getStringView()[0] == '/' ||
+  if (!is_connect && !active_request_->request_url_.getStringView().empty() &&
+      (active_request_->request_url_.getStringView()[0] == '/' ||
        (method == header_values.MethodValues.Options &&
-        active_request.request_url_.getStringView()[0] == '*'))) {
-    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
+        active_request_->request_url_.getStringView()[0] == '*'))) {
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
   }
 
@@ -1032,12 +1030,12 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   // CONNECT "urls" are actually host:port so look like absolute URLs to the above checks.
   // Absolute URLS in CONNECT requests will be rejected below by the URL class validation.
   if (!codec_settings_.allow_absolute_url_ && !is_connect) {
-    headers.addViaMove(std::move(path), std::move(active_request.request_url_));
+    headers.addViaMove(std::move(path), std::move(active_request_->request_url_));
     return okStatus();
   }
 
   Utility::Url absolute_url;
-  if (!absolute_url.initialize(active_request.request_url_.getStringView(), is_connect)) {
+  if (!absolute_url.initialize(active_request_->request_url_.getStringView(), is_connect)) {
     RETURN_IF_ERROR(sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl));
     return codecProtocolError("http/1.1 protocol error: invalid url in request line");
   }
@@ -1068,7 +1066,7 @@ Status ServerConnectionImpl::handlePath(RequestHeaderMap& headers, absl::string_
   if (!absolute_url.pathAndQueryParams().empty()) {
     headers.setPath(absolute_url.pathAndQueryParams());
   }
-  active_request.request_url_.clear();
+  active_request_->request_url_.clear();
   return okStatus();
 }
 
@@ -1076,8 +1074,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
   // Handle the case where response happens prior to request complete. It's up to upper layer code
   // to disconnect the connection but we shouldn't fire any more events since it doesn't make
   // sense.
-  if (active_request_.has_value()) {
-    auto& active_request = active_request_.value();
+  if (active_request_) {
     auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Server: onHeadersComplete size={}", connection_, headers->size());
 
@@ -1097,13 +1094,13 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
     // Inform the response encoder about any HEAD method, so it can set content
     // length and transfer encoding headers correctly.
     const Http::HeaderValues& header_values = Http::Headers::get();
-    active_request.response_encoder_.setIsResponseToHeadRequest(parser_->methodName() ==
-                                                                header_values.MethodValues.Head);
-    active_request.response_encoder_.setIsResponseToConnectRequest(
+    active_request_->response_encoder_.setIsResponseToHeadRequest(parser_->methodName() ==
+                                                                  header_values.MethodValues.Head);
+    active_request_->response_encoder_.setIsResponseToConnectRequest(
         parser_->methodName() == header_values.MethodValues.Connect);
 
     RETURN_IF_ERROR(handlePath(*headers, parser_->methodName()));
-    ASSERT(active_request.request_url_.empty());
+    ASSERT(active_request_->request_url_.empty());
 
     headers->setMethod(parser_->methodName());
 
@@ -1124,7 +1121,7 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
     if (parser_->isChunked() ||
         (parser_->contentLength().has_value() && parser_->contentLength().value() > 0) ||
         handling_upgrade_) {
-      active_request.request_decoder_->decodeHeaders(std::move(headers), false);
+      active_request_->request_decoder_->decodeHeaders(std::move(headers), false);
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
       // so we return control to the caller.
@@ -1141,13 +1138,12 @@ Envoy::StatusOr<ParserStatus> ServerConnectionImpl::onHeadersCompleteBase() {
 
 Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
-    ASSERT(!active_request_.has_value());
-    active_request_.emplace(*this, std::move(bytes_meter_before_stream_));
-    auto& active_request = active_request_.value();
+    ASSERT(active_request_ == nullptr);
+    active_request_ = std::make_unique<ActiveRequest>(*this, std::move(bytes_meter_before_stream_));
     if (resetStreamCalled()) {
       return codecClientError("cannot create new streams after calling reset");
     }
-    active_request.request_decoder_ = &callbacks_.newStream(active_request.response_encoder_);
+    active_request_->request_decoder_ = &callbacks_.newStream(active_request_->response_encoder_);
 
     // Check for pipelined request flood as we prepare to accept a new request.
     // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
@@ -1158,8 +1154,8 @@ Status ServerConnectionImpl::onMessageBeginBase() {
 }
 
 Status ServerConnectionImpl::onUrl(const char* data, size_t length) {
-  if (active_request_.has_value()) {
-    active_request_.value().request_url_.append(data, length);
+  if (active_request_) {
+    active_request_->request_url_.append(data, length);
 
     RETURN_IF_ERROR(checkMaxHeadersSize());
   }
@@ -1169,31 +1165,31 @@ Status ServerConnectionImpl::onUrl(const char* data, size_t length) {
 
 void ServerConnectionImpl::onBody(Buffer::Instance& data) {
   ASSERT(!deferred_end_stream_headers_);
-  if (active_request_.has_value()) {
+  if (active_request_) {
     ENVOY_CONN_LOG(trace, "body size={}", connection_, data.length());
-    active_request_.value().request_decoder_->decodeData(data, false);
+    active_request_->request_decoder_->decodeData(data, false);
   }
 }
 
 ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
   ASSERT(!handling_upgrade_);
-  if (active_request_.has_value()) {
-    auto& active_request = active_request_.value();
+  if (active_request_) {
 
-    if (active_request.request_decoder_) {
-      active_request.response_encoder_.readDisable(true);
-    }
-    active_request.remote_complete_ = true;
+    // The request_decoder should be non-null after we've called the newStream on callbacks.
+    ASSERT(active_request_->request_decoder_);
+    active_request_->response_encoder_.readDisable(true);
+    active_request_->remote_complete_ = true;
+
     if (deferred_end_stream_headers_) {
-      active_request.request_decoder_->decodeHeaders(
+      active_request_->request_decoder_->decodeHeaders(
           std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      active_request.request_decoder_->decodeTrailers(
+      active_request_->request_decoder_->decodeTrailers(
           std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
     } else {
       Buffer::OwnedImpl buffer;
-      active_request.request_decoder_->decodeData(buffer, true);
+      active_request_->request_decoder_->decodeData(buffer, true);
     }
 
     // Reset to ensure no information from one requests persists to the next.
@@ -1207,19 +1203,19 @@ ParserStatus ServerConnectionImpl::onMessageCompleteBase() {
 }
 
 void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
-  active_request_.value().response_encoder_.runResetCallbacks(reason);
-  active_request_.reset();
+  active_request_->response_encoder_.runResetCallbacks(reason);
+  connection_.dispatcher().deferredDelete(std::move(active_request_));
 }
 
 Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   // We do this here because we may get a protocol error before we have a logical stream.
-  if (!active_request_.has_value()) {
+  if (active_request_ == nullptr) {
     RETURN_IF_ERROR(onMessageBegin());
   }
-  ASSERT(active_request_.has_value());
+  ASSERT(active_request_);
 
-  active_request_.value().response_encoder_.setDetails(details);
-  if (!active_request_.value().response_encoder_.startedResponse()) {
+  active_request_->response_encoder_.setDetails(details);
+  if (!active_request_->response_encoder_.startedResponse()) {
     active_request_->request_decoder_->sendLocalReply(
         error_code_, CodeUtility::toString(error_code_), nullptr, absl::nullopt, details);
   }
@@ -1227,13 +1223,13 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
 }
 
 void ServerConnectionImpl::onAboveHighWatermark() {
-  if (active_request_.has_value()) {
-    active_request_.value().response_encoder_.runHighWatermarkCallbacks();
+  if (active_request_) {
+    active_request_->response_encoder_.runHighWatermarkCallbacks();
   }
 }
 void ServerConnectionImpl::onBelowLowWatermark() {
-  if (active_request_.has_value()) {
-    active_request_.value().response_encoder_.runLowWatermarkCallbacks();
+  if (active_request_) {
+    active_request_->response_encoder_.runLowWatermarkCallbacks();
   }
 }
 

@@ -683,6 +683,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     dynamic_cast<Http2::ClientConnectionImpl&>(*client).goAway();
     dynamic_cast<Http2::ServerConnectionImpl&>(*server).goAway();
   }
+
+  // Run deletion as would happen on the dispatchers to avoid inversion of
+  // lifetimes of dispatcher and connection.
+  server_connection.dispatcher_.to_delete_.clear();
 }
 
 } // namespace
