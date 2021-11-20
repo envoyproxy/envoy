@@ -14,8 +14,7 @@ load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolch
 GO_VERSION = "1.15.5"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
-    # TODO: allow building of tools for easier onboarding
-    rules_foreign_cc_dependencies(register_default_tools = False, register_built_tools = False)
+    rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     gazelle_dependencies()
