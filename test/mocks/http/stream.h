@@ -22,7 +22,6 @@ public:
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));
-  MOCK_METHOD(void, onEnvoyStreamComplete, ());
 
   // Use the same underlying structure as StreamCallbackHelper to insure iteration stability
   // if we remove callbacks during iteration.
