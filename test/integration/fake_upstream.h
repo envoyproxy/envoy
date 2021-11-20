@@ -13,6 +13,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -795,6 +796,9 @@ private:
     uint64_t listenerTag() const override { return 0; }
     const std::string& name() const override { return name_; }
     Network::UdpListenerConfigOptRef udpListenerConfig() override { return udp_listener_config_; }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override {
+      return Network::InternalListenerConfigOptRef();
+    }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;

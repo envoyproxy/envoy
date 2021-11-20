@@ -90,7 +90,6 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
 }
 
 // Test that connecting to internal address will crash.
-// TODO(lambdai): Add internal connection implementation to enable the connection creation.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -108,7 +107,7 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
 }
 
 // Test that recv from internal address will crash.
-// TODO(lambdai): Add internal socket implementation to enable the io path.
+// TODO(lambdai): Add UDP internal listener implementation to enable the io path.
 TEST_P(SocketInterfaceIntegrationTest, UdpRecvFromInternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
