@@ -21,8 +21,7 @@ class Win32SocketHandleImpl : public IoSocketHandleImpl {
 public:
   explicit Win32SocketHandleImpl(os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                                  absl::optional<int> domain = absl::nullopt)
-      : IoSocketHandleImpl(fd, socket_v6only, domain),
-        peek_buffer_(std::make_unique<Buffer::OwnedImpl>()) {}
+      : IoSocketHandleImpl(fd, socket_v6only, domain) {}
 
   Api::IoCallUint64Result readv(uint64_t max_length, Buffer::RawSlice* slices,
                                 uint64_t num_slice) override;
@@ -51,15 +50,21 @@ public:
 private:
   void reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result, uint32_t event);
 
-  // For windows mimic MSG_PEEK
-  std::unique_ptr<Buffer::Instance> peek_buffer_;
+  // on Windows we use the MSG_PEEK of recv instead of peeking the socket
+  // we drain the socket to memory. Subsequent read calls need to read
+  // first from the class buffer and then go to the underlying socket.
+  Api::IoCallUint64Result drainToPeekBuffer(size_t length);
 
-  Api::IoCallUint64Result drainToPeekBuffer();
+  // Useful functions to read from the peek buffer based on
+  // the signatures of readv/read/recv OS socket functions.
   Api::IoCallUint64Result readFromPeekBuffer(void* buffer, size_t length);
   Api::IoCallUint64Result readFromPeekBuffer(Buffer::Instance& buffer, size_t length);
   Api::IoCallUint64Result readvFromPeekBuffer(uint64_t max_length, Buffer::RawSlice* slices,
                                               uint64_t num_slice);
   Api::IoCallUint64Result peekFromPeekBuffer(void* buffer, size_t length);
+
+  // For windows mimic MSG_PEEK
+  Buffer::OwnedImpl peek_buffer_;
 };
 } // namespace Network
 } // namespace Envoy

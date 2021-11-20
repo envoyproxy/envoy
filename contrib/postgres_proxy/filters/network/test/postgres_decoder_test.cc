@@ -646,6 +646,8 @@ public:
   MOCK_METHOD(void, prepend, (absl::string_view), (override));
   MOCK_METHOD(void, prepend, (Instance&), (override));
   MOCK_METHOD(void, copyOut, (size_t, uint64_t, void*), (const, override));
+  MOCK_METHOD(uint64_t, copyOutToSlices,
+              (uint64_t size, Buffer::RawSlice* slices, uint64_t num_slice), (const, override));
   MOCK_METHOD(void, drain, (uint64_t), (override));
   MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (absl::optional<uint64_t>), (const, override));
   MOCK_METHOD(Buffer::RawSlice, frontSlice, (), (const, override));
