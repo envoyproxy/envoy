@@ -134,15 +134,23 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+
+  const absl::optional<std::string> export_text_readouts_value =
+      Utility::queryParam(params, "export_text_readouts");
+  const bool export_text_readouts =
+      (export_text_readouts_value.has_value() && export_text_readouts_value.value() == "true")
+          ? true
+          : false;
+
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
     return Http::Code::BadRequest;
   }
 
-  PrometheusStatsFormatter::statsAsPrometheus(server_.stats().counters(), server_.stats().gauges(),
-                                              server_.stats().histograms(),
-                                              server_.stats().textReadouts(), response, used_only,
-                                              false, regex, server_.api().customStatNamespaces());
+  PrometheusStatsFormatter::statsAsPrometheus(
+      server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
+      server_.stats().textReadouts(), response, used_only, export_text_readouts, regex,
+      server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 
