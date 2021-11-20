@@ -902,7 +902,7 @@ int ConnectionImpl::onData(int32_t stream_id, const uint8_t* data, size_t len) {
 void ConnectionImpl::goAway() {
   if (use_new_codec_wrapper_) {
     adapter_->SubmitGoAway(adapter_->GetHighestReceivedStreamId(),
-                           http2::adapter::Http2ErrorCode::NO_ERROR, "");
+                           http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
   } else {
     int rc = nghttp2_submit_goaway(session_, NGHTTP2_FLAG_NONE,
                                    nghttp2_session_get_last_proc_stream_id(session_),

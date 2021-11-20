@@ -301,18 +301,6 @@ struct mmsghdr {
 };
 #endif
 
-#define SUPPORTS_GETIFADDRS
-#ifdef WIN32
-#undef SUPPORTS_GETIFADDRS
-#endif
-
-// https://android.googlesource.com/platform/prebuilts/ndk/+/dev/platform/sysroot/usr/include/ifaddrs.h
-#ifdef __ANDROID_API__
-#if __ANDROID_API__ < 24
-#undef SUPPORTS_GETIFADDRS
-#endif // __ANDROID_API__ < 24
-#endif // ifdef __ANDROID_API__
-
 // TODO: Remove once bazel supports NDKs > 21
 #define SUPPORTS_CPP_17_CONTIGUOUS_ITERATOR
 #ifdef __ANDROID_API__

@@ -121,6 +121,7 @@ envoy_cc_library(
         "quiche/http2/adapter/http2_session.h",
         "quiche/http2/adapter/http2_util.h",
         "quiche/http2/adapter/http2_visitor_interface.h",
+        "quiche/http2/adapter/nghttp2.h",
         "quiche/http2/adapter/nghttp2_adapter.h",
         "quiche/http2/adapter/nghttp2_callbacks.h",
         "quiche/http2/adapter/nghttp2_data_provider.h",
@@ -146,6 +147,8 @@ envoy_cc_library(
         ":spdy_core_header_block_lib",
         ":spdy_core_http2_deframer_lib",
         ":spdy_core_protocol_lib",
+        ":spdy_header_byte_listener_interface_lib",
+        ":spdy_no_op_headers_handler_lib",
     ],
 )
 
@@ -857,6 +860,26 @@ envoy_cc_library(
     name = "spdy_simple_arena_lib",
     srcs = ["quiche/spdy/core/spdy_simple_arena.cc"],
     hdrs = ["quiche/spdy/core/spdy_simple_arena.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_no_op_headers_handler_lib",
+    hdrs = ["quiche/spdy/core/no_op_headers_handler.h"],
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":quiche_common_platform",
+    ],
+)
+
+envoy_cc_library(
+    name = "spdy_header_byte_listener_interface_lib",
+    hdrs = ["quiche/spdy/core/header_byte_listener_interface.h"],
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
