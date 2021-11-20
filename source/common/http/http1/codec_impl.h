@@ -76,7 +76,6 @@ public:
     // closing.
     buffer_memory_account_ = account;
   }
-  void onEnvoyStreamComplete() override { envoy_stream_complete_ = true; }
 
   void setIsResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setIsResponseToConnectRequest(bool value) { is_response_to_connect_request_ = value; }
@@ -91,9 +90,6 @@ protected:
   void encodeHeadersBase(const RequestOrResponseHeaderMap& headers, absl::optional<uint64_t> status,
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
-  // Helper to guard calls to onEncodeComplete on the connection which could
-  // destroy the stream.
-  virtual void onEncodeCompleteGuard() {}
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
@@ -107,8 +103,6 @@ protected:
   bool is_tcp_tunneling_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_response_to_connect_request_ : 1;
-  bool envoy_stream_complete_ : 1;
-  bool encode_complete_ : 1;
 
 private:
   /**
@@ -176,13 +170,6 @@ public:
 
   // Http1::StreamEncoderImpl
   void resetStream(StreamResetReason reason) override;
-  void onEncodeCompleteGuard() override;
-  void onEnvoyStreamComplete() override {
-    StreamEncoderImpl::onEnvoyStreamComplete();
-
-    // Check whether to delete the Active Request on the Connection.
-    onEncodeCompleteGuard();
-  }
 
 private:
   bool started_response_{};
@@ -513,8 +500,6 @@ private:
   // ParserCallbacks.
   Status onUrl(const char* data, size_t length) override;
   // ConnectionImpl
-  // Should not directly invoke onEncodeComplete, rather it will be invoked by
-  // the stream. See onEncodeCompleteGuard.
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
     if (active_request_) {

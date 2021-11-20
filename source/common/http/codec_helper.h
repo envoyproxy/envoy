@@ -53,7 +53,7 @@ public:
     }
   }
 
-  bool local_end_stream_{false};
+  bool local_end_stream_{};
 
 protected:
   void addCallbacksHelper(StreamCallbacks& callbacks) {
@@ -126,11 +126,6 @@ protected:
   virtual void onPendingFlushTimer() { stream_idle_timer_.reset(); }
 
   virtual bool hasPendingData() PURE;
-
-  // NOP for H2/H3.
-  // The H2 codec defers deletion of codec level stream until Envoy level has
-  // been destroyed.
-  void onEnvoyStreamComplete() override{};
 
 private:
   Event::Dispatcher& dispatcher_;

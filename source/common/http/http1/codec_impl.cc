@@ -92,8 +92,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
       connect_request_(false), is_tcp_tunneling_(false), is_response_to_head_request_(false),
-      is_response_to_connect_request_(false), envoy_stream_complete_(false),
-      encode_complete_(false), bytes_meter_(std::move(bytes_meter)) {
+      is_response_to_connect_request_(false), bytes_meter_(std::move(bytes_meter)) {
   if (!bytes_meter_) {
     bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
   }
@@ -291,8 +290,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   }
 
   flushOutput();
-  encode_complete_ = true;
-  onEncodeCompleteGuard();
+  connection_.onEncodeComplete();
 }
 
 void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
@@ -306,8 +304,7 @@ void StreamEncoderImpl::endEncode() {
   }
 
   flushOutput(true);
-  encode_complete_ = true;
-  onEncodeCompleteGuard();
+  connection_.onEncodeComplete();
   // With CONNECT or TCP tunneling, half-closing the connection is used to signal end stream.
   if (connect_request_ || is_tcp_tunneling_) {
     connection_.connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
@@ -379,15 +376,6 @@ void ResponseEncoderImpl::resetStream(StreamResetReason reason) {
   //  1) Send local reply if no response data sent yet
   //  2) Invoke the idle timeout sooner to close underlying connection
   StreamEncoderImpl::resetStream(reason);
-}
-
-void ResponseEncoderImpl::onEncodeCompleteGuard() {
-  if (encode_complete_ && envoy_stream_complete_) {
-    // Only call onEncodeComplete after both the Envoy level stream and the
-    // codec is finished as it will destroy the ActiveRequest holding the
-    // encoder.
-    connection_.onEncodeComplete();
-  }
 }
 
 void StreamEncoderImpl::readDisable(bool disable) {

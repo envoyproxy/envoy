@@ -88,12 +88,6 @@ void FakeStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
   });
 }
 
-void FakeStream::onEndstream() {
-  // Notify encoder as Http Connection Manager would so the codec
-  // knows the Envoy level stream no longer depends on it.
-  encoder_.getStream().onEnvoyStreamComplete();
-}
-
 void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) {
   std::shared_ptr<Http::ResponseHeaderMap> headers_copy(
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
@@ -111,9 +105,6 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
       }
     }
     encoder_.encodeHeaders(*headers_copy, end_stream);
-    if (end_stream) {
-      onEndstream();
-    }
   });
 }
 
@@ -128,9 +119,6 @@ void FakeStream::encodeData(absl::string_view data, bool end_stream) {
     }
     Buffer::OwnedImpl fake_data(data.data(), data.size());
     encoder_.encodeData(fake_data, end_stream);
-    if (end_stream) {
-      onEndstream();
-    }
   });
 }
 
@@ -145,9 +133,6 @@ void FakeStream::encodeData(uint64_t size, bool end_stream) {
     }
     Buffer::OwnedImpl data(std::string(size, 'a'));
     encoder_.encodeData(data, end_stream);
-    if (end_stream) {
-      onEndstream();
-    }
   });
 }
 
@@ -162,9 +147,6 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
       }
     }
     encoder_.encodeData(*data_copy, end_stream);
-    if (end_stream) {
-      onEndstream();
-    }
   });
 }
 
@@ -180,7 +162,6 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
       }
     }
     encoder_.encodeTrailers(*trailers_copy);
-    onEndstream();
   });
 }
 
