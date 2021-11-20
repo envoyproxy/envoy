@@ -5912,7 +5912,9 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName("fake_virtual_cluster"));
+  const absl::optional<std::string> virtual_cluster_name =
+      absl::optional<std::string>("fake_virtual_cluster");
+  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -5950,7 +5952,9 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName("fake_virtual_cluster"));
+  const absl::optional<std::string> virtual_cluster_name =
+      absl::optional<std::string>("fake_virtual_cluster");
+  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());

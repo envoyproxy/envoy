@@ -244,12 +244,12 @@ private:
     // Router::VirtualCluster
     // name_ and stat_name_ are two different representations for the same string, retained in
     // memory to avoid symbol-table locks that would be needed when converting on-the-fly.
-    const std::string& name() const override { return name_; }
+    const absl::optional<std::string>& name() const override { return name_; }
     Stats::StatName statName() const override { return stat_name_; }
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
-    const std::string name_;
+    const absl::optional<std::string> name_;
     const Stats::StatName stat_name_;
     Stats::ScopePtr scope_;
     mutable VirtualClusterStats stats_;
