@@ -643,6 +643,9 @@ public:
        << DUMP_MEMBER_AS(directRemoteAddress(), directRemoteAddress()->asStringView())
        << DUMP_MEMBER_AS(localAddress(), localAddress()->asStringView()) << "\n";
   }
+  absl::string_view ja3Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
+  }
 
 private:
   Network::Address::InstanceConstSharedPtr overridden_downstream_remote_address_;

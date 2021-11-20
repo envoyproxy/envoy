@@ -682,6 +682,12 @@ Supported variable names are:
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
 
+%REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+
 %UPSTREAM_METADATA(["namespace", "key", ...])%
     Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
     upstream host selected by the router. Metadata may be selected from any namespace. In general,

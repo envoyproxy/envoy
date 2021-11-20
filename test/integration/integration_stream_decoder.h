@@ -35,7 +35,7 @@ public:
   const Http::MetadataMap& metadataMap() { return *metadata_map_; }
   uint64_t keyCount(std::string key) { return duplicated_metadata_key_count_[key]; }
   uint32_t metadataMapsDecodedCount() const { return metadata_maps_decoded_count_; }
-  void waitForContinueHeaders();
+  void waitFor1xxHeaders();
   void waitForHeaders();
   // This function waits until body_ has at least size bytes in it (it might have more). clearBody()
   // can be used if the previous body data is not relevant and the test wants to wait for a specific
