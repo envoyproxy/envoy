@@ -39,7 +39,7 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:cel_value_producer",
         "@com_google_cel_cpp//eval/public/structs:cel_proto_wrapper",
-        "@com_google_cel_cpp//tools:flatbuffers_backed_impl",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
