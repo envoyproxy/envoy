@@ -236,7 +236,7 @@ private:
 
   struct VirtualClusterBase : public VirtualCluster {
   public:
-    VirtualClusterBase(absl::optional<std::string> name, Stats::StatName stat_name,
+    VirtualClusterBase(const absl::optional<std::string>& name, Stats::StatName stat_name,
                        Stats::ScopePtr&& scope, const VirtualClusterStatNames& stat_names)
         : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
           stats_(generateStats(*scope_, stat_names)) {}

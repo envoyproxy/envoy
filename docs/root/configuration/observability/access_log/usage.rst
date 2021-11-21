@@ -385,7 +385,7 @@ The following command operators are supported:
   Name of the route.
 
 %VIRTUAL_CLUSTER_NAME%
-  HTTP
+  HTTP*/gRPC
     Name of the matched Virtual Cluster (if any).
 
   TCP/UDP
