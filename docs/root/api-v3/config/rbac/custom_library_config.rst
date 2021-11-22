@@ -5,4 +5,4 @@ RBAC CEL Custom Library Config
   :glob:
   :maxdepth: 2
 
-  custom_library_config/custom_library.rst
+  custom_library_config/custom_library
