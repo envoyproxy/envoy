@@ -1,7 +1,8 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
-#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
+
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 
 namespace Envoy {
 namespace Quic {
