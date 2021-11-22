@@ -432,6 +432,7 @@ message ApplicationProtocolInput {
 }
 
 // Matches a specific port against a set of possibly overlapping port ranges.
+// TODO(kuat) Move to cncf/xds.
 message PortMatcher {
   // Specifies an optional list of port ranges and a match action.
   message PortRangeMatcher {
@@ -465,6 +466,7 @@ message PortMatcher {
 }
 
 // Matches a specific IP address against a set of possibly overlapping subnets.
+// TODO(kuat) Move to cncf/xds.
 message IPMatcher {
   // Specifies an optional list of IP address ranges and a match action.
   message IPRangeMatcher {
@@ -490,6 +492,7 @@ message IPMatcher {
 }
 
 // Matches a specific server name against of a set of possibly overlapping wildcard domains.
+// TODO(kuat) Move to cncf/xds.
 message ServerNameMatcher {
   // Specifies an optional list of wildcard domains and a match action.
   // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
