@@ -1,5 +1,7 @@
 #pragma once
 
+#include <queue>
+
 #include "envoy/event/dispatcher.h"
 
 #include "source/common/grpc/buffered_async_client.h"
@@ -25,7 +27,7 @@ public:
     }
   }
 
-  const std::map<MonotonicTime, absl::flat_hash_set<uint64_t>, std::greater<>>& deadline() {
+  const std::queue<std::pair<MonotonicTime, absl::flat_hash_set<uint64_t>>>& deadline() {
     return deadline_;
   }
 
@@ -33,21 +35,22 @@ private:
   void checkMessages() {
     const auto now = dispatcher_.timeSource().monotonicTime();
 
-    auto begin_it = deadline_.lower_bound(now);
-
-    for (auto it = begin_it; it != deadline_.end(); ++it) {
-      for (auto&& id : it->second) {
+    while (!deadline_.empty()) {
+      auto& it = deadline_.front();
+      if (it.first > now) {
+        break;
+      }
+      for (auto&& id : it.second) {
         // If the retrieved message is a PendingFlush, it means that the message
         // has timed out. A timeout is treated as an error, and the callback will
         // re-buffer the message.
         callbacks_.onError(id);
       }
+      deadline_.pop();
     }
 
-    deadline_.erase(begin_it, deadline_.end());
-
     if (!deadline_.empty()) {
-      const auto earliest_timepoint = deadline_.rbegin()->first;
+      const auto earliest_timepoint = deadline_.front().first;
       timer_->enableTimer(
           std::chrono::duration_cast<std::chrono::milliseconds>(earliest_timepoint - now));
     }
@@ -57,7 +60,7 @@ private:
   std::chrono::milliseconds message_ack_timeout_;
   BufferedAsyncClientCallbacks& callbacks_;
   Event::TimerPtr timer_;
-  std::map<MonotonicTime, absl::flat_hash_set<uint64_t>, std::greater<>> deadline_;
+  std::queue<std::pair<MonotonicTime, absl::flat_hash_set<uint64_t>>> deadline_;
 };
 } // namespace Grpc
 } // namespace Envoy

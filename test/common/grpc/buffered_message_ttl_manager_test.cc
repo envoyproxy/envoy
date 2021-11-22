@@ -50,6 +50,16 @@ TEST_F(BufferedMessageTtlManagerTest, Basic) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(ttl_manager_->deadline().size(), 0);
+
+  // Test if deadline queue is empty after queue cleared once.
+  absl::flat_hash_set<uint64_t> ids2{3};
+  EXPECT_CALL(callbacks_, onError(_)).WillOnce(Invoke([this] {
+    EXPECT_EQ(ttl_manager_->deadline().size(), 1);
+  }));
+  ttl_manager_->setDeadline(std::move(ids2));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(ttl_manager_->deadline().size(), 0);
 }
 
 } // namespace
