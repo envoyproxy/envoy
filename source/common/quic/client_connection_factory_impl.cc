@@ -1,6 +1,6 @@
 #include "source/common/quic/client_connection_factory_impl.h"
 
-#include "source/common/quic/envoy_quic_session_cache.h"
+#include "quiche/quic/core/crypto/quic_client_session_cache.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 
 namespace Envoy {
@@ -34,7 +34,7 @@ std::shared_ptr<quic::QuicCryptoClientConfig> PersistentQuicInfoImpl::cryptoConf
     client_context_ = context;
     client_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<EnvoyQuicProofVerifier>(getContext(transport_socket_factory_)),
-        std::make_unique<EnvoyQuicSessionCache>((time_source_)));
+        std::make_unique<quic::QuicClientSessionCache>());
   }
   // Return the latest client config.
   return client_config_;
