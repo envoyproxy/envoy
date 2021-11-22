@@ -971,7 +971,7 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
   auto response = std::move(encoder_decoder.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   // The continue headers should arrive immediately.
-  response->waitForContinueHeaders();
+  response->waitFor1xxHeaders();
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send the rest of the request.
@@ -994,7 +994,7 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
   }
 
   if (disconnect_after_100) {
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
     codec_client_->close();
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
     ASSERT_TRUE(fake_upstream_connection_->close());
@@ -1020,7 +1020,8 @@ void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_ups
 
 void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
                                                bool with_encoder_filter,
-                                               bool with_multiple_1xx_headers) {
+                                               bool with_multiple_1xx_headers,
+                                               absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
     config_helper_.prependFilter("name: passthrough-filter");
@@ -1044,37 +1045,39 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
+  // This case tests sending on 100-Continue headers before the client has sent all the
+  // request data.
   if (continue_before_upstream_complete) {
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
-    // This case tests sending on 100-Continue headers before the client has sent all the
-    // request data.
-    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
   }
   // Send all of the request data and wait for it to be received upstream.
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
+  // This case tests forwarding 100-Continue after the client has sent all data.
   if (!continue_before_upstream_complete) {
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
       upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
-    // This case tests forwarding 100-Continue after the client has sent all data.
-    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
   }
   // Now send the rest of the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   ASSERT(response->informationalHeaders() != nullptr);
-  EXPECT_EQ("100", response->informationalHeaders()->getStatusValue());
+  EXPECT_EQ(initial_code, response->informationalHeaders()->getStatusValue());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

@@ -142,7 +142,7 @@ MockStreamInfo::MockStreamInfo()
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
   ON_CALL(*this, upstreamTiming()).WillByDefault(ReturnRef(upstream_timing_));
-  ON_CALL(Const(*this), upstreamTiming()).WillByDefault(ReturnRef(upstream_timing_));
+  ON_CALL(Const(*this), upstreamTiming()).WillByDefault(Return(upstream_timing_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

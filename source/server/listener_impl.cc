@@ -83,12 +83,16 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
       ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort);
     }
   } else {
-    ASSERT(local_address_->type() == Network::Address::Type::Pipe);
-    // Listeners with Unix domain socket always use shared socket.
-    // TODO(mattklein123): This should be blocked at the config parsing layer instead of getting
-    // here and disabling reuse_port.
-    if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
-      bind_type_ = ListenerComponentFactory::BindType::NoReusePort;
+    if (local_address_->type() == Network::Address::Type::Pipe) {
+      // Listeners with Unix domain socket always use shared socket.
+      // TODO(mattklein123): This should be blocked at the config parsing layer instead of getting
+      // here and disabling reuse_port.
+      if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
+        bind_type_ = ListenerComponentFactory::BindType::NoReusePort;
+      }
+    } else {
+      ASSERT(local_address_->type() == Network::Address::Type::EnvoyInternal);
+      bind_type_ = ListenerComponentFactory::BindType::NoBind;
     }
   }
 
@@ -366,6 +370,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildSocketOptions();
     buildOriginalDstListenerFilter();
     buildProxyProtocolListenerFilter();
+    buildInternalListener();
   }
   if (!workers_started_) {
     // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
@@ -423,7 +428,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
   createListenerFilterFactories(socket_type);
   validateFilterChains(socket_type);
   buildFilterChains();
-
+  buildInternalListener();
   if (socket_type == Network::Socket::Type::Stream) {
     // Apply the options below only for TCP.
     buildSocketOptions();
@@ -456,6 +461,38 @@ void ListenerImpl::buildAccessLog() {
     AccessLog::InstanceSharedPtr current_access_log =
         AccessLog::AccessLogFactory::fromProto(access_log, *listener_factory_context_);
     access_logs_.push_back(current_access_log);
+  }
+}
+
+void ListenerImpl::buildInternalListener() {
+  if (config_.address().has_envoy_internal_address()) {
+    internal_listener_config_ = std::make_unique<Network::InternalListenerConfig>();
+    if (config_.has_api_listener()) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': internal address cannot be used in api listener",
+                      address_->asString()));
+    }
+    if ((config_.has_connection_balance_config() &&
+         config_.connection_balance_config().has_exact_balance()) ||
+        config_.enable_mptcp() ||
+        config_.has_enable_reuse_port() // internal listener doesn't use physical l4 port.
+        || (config_.has_freebind() && config_.freebind().value()) ||
+        config_.has_tcp_backlog_size() || config_.has_tcp_fast_open_queue_length() ||
+        (config_.has_transparent() && config_.transparent().value())) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': has unsupported tcp listener feature",
+                      address_->asString()));
+    }
+    if (!config_.socket_options().empty()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': does not support socket option",
+                                       address_->asString()));
+    }
+  } else {
+    if (config_.has_internal_listener()) {
+      throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "
+                                       "address but an internal listener config is provided",
+                                       address_->asString()));
+    }
   }
 }
 
