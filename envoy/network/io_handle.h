@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/api/io_error.h"
+#include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/file_event.h"
