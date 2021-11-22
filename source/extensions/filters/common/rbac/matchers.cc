@@ -246,11 +246,8 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
                             const StreamInfo::StreamInfo& info,
                             const CustomLibrary* custom_library) const {
   return permissions_.matches(connection, headers, info) &&
-      principals_.matches(connection, headers, info) &&
-      (expr_ == nullptr ? true : Expr::matches(*expr_,
-                                               info,
-                                               headers,
-                                               custom_library));
+         principals_.matches(connection, headers, info) &&
+         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, custom_library));
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,

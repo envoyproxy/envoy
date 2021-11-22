@@ -1,22 +1,21 @@
 #pragma once
 
-#include "source/common/protobuf/protobuf.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/common/expr/library/custom_functions.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
-#include "eval/public/cel_value.h"
 #include "eval/public/cel_function_adapter.h"
-
-#include "source/extensions/filters/common/expr/context.h"
-#include "source/extensions/filters/common/expr/library/custom_functions.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
+#include "eval/public/cel_value.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +29,7 @@ using CelFunctionRegistry = google::api::expr::runtime::CelFunctionRegistry;
 using CustomLibraryConfig = envoy::extensions::rbac::custom_library_config::v3::CustomLibraryConfig;
 
 class CustomLibrary {
- public:
+public:
   void FillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
                       const Http::RequestHeaderMap* request_headers,
@@ -44,34 +43,30 @@ class CustomLibrary {
     replace_default_library_ = replace_default_library;
   }
 
- private:
+private:
   bool replace_default_library_;
 };
 
 using CustomLibraryPtr = std::unique_ptr<CustomLibrary>;
 
 class BaseCustomLibraryFactory : public Envoy::Config::TypedFactory {
- public:
+public:
   std::string category() const override { return "envoy.rbac.custom_library_config"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{
-        new CustomLibraryConfig()};
+    return ProtobufTypes::MessagePtr{new CustomLibraryConfig()};
   }
-  virtual CustomLibraryPtr createInterface(
-      const Protobuf::Message& config,
-      ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual CustomLibraryPtr
+  createInterface(const Protobuf::Message& config,
+                  ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
 class CustomLibraryFactory : public BaseCustomLibraryFactory {
- public:
-  CustomLibraryPtr createInterface(
-      const Protobuf::Message& config,
-      ProtobufMessage::ValidationVisitor& validation_visitor) override;
+public:
+  CustomLibraryPtr createInterface(const Protobuf::Message& config,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
-  std::string name() const override {
-    return "envoy.rbac.custom_library_config.custom_library";
-  }
+  std::string name() const override { return "envoy.rbac.custom_library_config.custom_library"; }
 };
 
 } // namespace Library

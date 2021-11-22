@@ -9,13 +9,12 @@ namespace Expr {
 namespace Library {
 
 class CustomVocabularyWrapper : public BaseWrapper {
- public:
-  CustomVocabularyWrapper(Protobuf::Arena& arena,
-                          const StreamInfo::StreamInfo& info)
+public:
+  CustomVocabularyWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info)
       : arena_(arena), info_(info) {}
   absl::optional<CelValue> operator[](CelValue key) const override;
 
- private:
+private:
   Protobuf::Arena& arena_;
   const StreamInfo::StreamInfo& info_;
 };

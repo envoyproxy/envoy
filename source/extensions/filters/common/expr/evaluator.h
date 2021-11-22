@@ -9,8 +9,8 @@
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
-#include "eval/public/cel_value.h"
 #include "eval/public/cel_function_adapter.h"
+#include "eval/public/cel_value.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -39,8 +39,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena,
-                         const CustomLibrary* custom_library);
+BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_library);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.
@@ -61,8 +60,7 @@ bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers);
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers,
-             const CustomLibrary* custom_library);
+             const Http::RequestHeaderMap& headers, const CustomLibrary* custom_library);
 
 // Returns a string for a CelValue.
 std::string print(CelValue value);

@@ -7,8 +7,7 @@ namespace Common {
 namespace Expr {
 namespace Library {
 
-absl::Status ConstCelFunction::Evaluate(absl::Span<const CelValue> args,
-                                        CelValue* output,
+absl::Status ConstCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
                                         Protobuf::Arena* arena) const {
   args.size();
   arena->SpaceUsed();
