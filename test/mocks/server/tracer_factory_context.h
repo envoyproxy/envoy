@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "instance.h"
 #include "tracer_factory.h"
+#include "transport_socket_factory_context.h"
 
 namespace Envoy {
 namespace Server {
@@ -19,6 +20,8 @@ public:
   MOCK_METHOD(TransportSocketFactoryContext&, transportSocketFactoryContext, ());
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
+  testing::NiceMock<Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
 };
 } // namespace Configuration
 

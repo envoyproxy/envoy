@@ -21,7 +21,29 @@ namespace {
 
 class SkyWalkingDriverTest : public testing::Test {
 public:
-  void setupSkyWalkingDriver(const std::string& yaml_string) {
+  void setupDriver(const std::string& config) {
+    setupTraceContext();
+    TestUtility::loadFromYaml(config, config_);
+    driver_ = std::make_unique<Driver>(config_, context_);
+  }
+
+  void setupTraceContext() {
+    ON_CALL(local_info_, clusterName()).WillByDefault(ReturnRef(test_string));
+    ON_CALL(local_info_, nodeName()).WillByDefault(ReturnRef(test_string));
+
+    ON_CALL(context_.server_factory_context_, localInfo()).WillByDefault(ReturnRef(local_info_));
+    ON_CALL(context_.transport_socket_factory_context_, localInfo())
+        .WillByDefault(ReturnRef(local_info_));
+    ON_CALL(context_.transport_socket_factory_context_, mainThreadDispatcher())
+        .WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_.transport_socket_factory_context_, localInfo())
+        .WillByDefault(ReturnRef(local_info_));
+    ON_CALL(context_.transport_socket_factory_context_, stats()).WillByDefault(ReturnRef(stats_));
+    ON_CALL(context_.transport_socket_factory_context_, initManager())
+        .WillByDefault(ReturnRef(init_manager_));
+  }
+
+  void expectGrpcClientCreated() {
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
     auto mock_client = std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
     mock_stream_ptr_ = std::make_unique<NiceMock<Grpc::MockAsyncStream>>();
@@ -38,12 +60,6 @@ public:
 
     EXPECT_CALL(factory_context.thread_local_.dispatcher_, createTimer_(_))
         .WillOnce(Invoke([](Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
-
-    ON_CALL(factory_context.local_info_, clusterName()).WillByDefault(ReturnRef(test_string));
-    ON_CALL(factory_context.local_info_, nodeName()).WillByDefault(ReturnRef(test_string));
-
-    TestUtility::loadFromYaml(yaml_string, config_);
-    driver_ = std::make_unique<Driver>(config_, context_);
   }
 
 protected:
@@ -54,9 +70,15 @@ protected:
   envoy::config::trace::v3::SkyWalkingConfig config_;
   std::string test_string = "ABCDEFGHIJKLMN";
   DriverPtr driver_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
+  NiceMock<Init::MockManager> init_manager_;
 };
 
 TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
+  expectGrpcClientCreated();
+
   const std::string yaml_string = R"EOF(
   grpc_service:
     envoy_grpc:
@@ -67,7 +89,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestWithClientConfig) {
     instance_name: "FAKE_FAKE_FAKE"
     max_cache_size: 2333
   )EOF";
-  setupSkyWalkingDriver(yaml_string);
+  setupDriver(yaml_string);
 
   Tracing::Decision decision;
   decision.traced = true;
@@ -164,7 +186,7 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
       cluster_name: fake_cluster
   )EOF";
 
-  setupSkyWalkingDriver(yaml_string);
+  setupDriver(yaml_string);
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/path"}, {":method", "GET"}, {":authority", "test.com"}};
@@ -178,6 +200,46 @@ TEST_F(SkyWalkingDriverTest, SkyWalkingDriverStartSpanTestNoClientConfig) {
 
   EXPECT_EQ(test_string, span->tracingContext()->service());
   EXPECT_EQ(test_string, span->tracingContext()->serviceInstance());
+}
+
+TEST_F(SkyWalkingDriverTest, BackendTokenDeliveryViaSds) {
+  const std::string yaml_string = R"YAML(
+grpc_service:
+  envoy_grpc:
+    cluster_name: fake_cluster
+client_config:
+  service_name: "FAKE_FAKE_FAKE"
+  instance_name: "FAKE_FAKE_FAKE"
+  max_cache_size: 2333
+  backend_token_sds_config:
+    name: sw-token
+    sds_config:
+      resource_api_version: V3
+      api_config_source:
+        api_type: GRPC
+        transport_api_version: V3
+        grpc_services:
+          envoy_grpc:
+            cluster_name: xds_cluster
+  )YAML";
+  setupDriver(yaml_string);
+
+  const std::string yaml_client = R"YAML(
+name: sw-token
+generic_secret:
+  secret:
+    inline_string: "token"
+)YAML";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml_client, typed_secret);
+  const auto decoded_resources_client = TestUtility::decodeResources({typed_secret});
+
+  auto callback =
+      context_.transport_socket_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+  callback->onConfigUpdate(decoded_resources_client.refvec_, "");
+
+  EXPECT_EQ("token", driver_->threadLocalReporter()->token());
 }
 
 } // namespace

@@ -15,6 +15,8 @@ MockTracerFactoryContext::MockTracerFactoryContext() {
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
   ON_CALL(*this, messageValidationVisitor())
       .WillByDefault(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
+  ON_CALL(*this, transportSocketFactoryContext())
+      .WillByDefault(ReturnRef(transport_socket_factory_context_));
 }
 
 MockTracerFactoryContext::~MockTracerFactoryContext() = default;

@@ -36,6 +36,7 @@ public:
 
   void report(TracingContextPtr tracing_context);
   void updateToken(const std::string& token) { token_ = token; }
+  const std::string& token() { return token_; }
 
 private:
   /*

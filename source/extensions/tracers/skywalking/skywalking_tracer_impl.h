@@ -28,6 +28,9 @@ public:
   Tracing::SpanPtr startSpan(const Tracing::Config& config, Tracing::TraceContext& trace_context,
                              const std::string& operation, Envoy::SystemTime start_time,
                              const Tracing::Decision decision) override;
+  TraceSegmentReporterPtr& threadLocalReporter() {
+    return tls_.get().value().get().tracer().reporter();
+  }
 
 private:
   void loadConfig(const envoy::config::trace::v3::ClientConfig& client_config,
