@@ -4,7 +4,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-client
-    hostname: client
     ports:
       - 8001:8001
     networks:
@@ -20,7 +19,6 @@ services:
       dockerfile: Dockerfile-server
     environment:
       - HOST=backend-local-1
-    hostname: backend-local-1
     networks:
       - envoymesh
   backend-local-2:
@@ -29,7 +27,6 @@ services:
       dockerfile: Dockerfile-server
     environment:
       - HOST=backend-local-2
-    hostname: backend-local-2
     networks:
       - envoymesh
   backend-remote-1:
@@ -38,7 +35,6 @@ services:
       dockerfile: Dockerfile-server
     environment:
       - HOST=backend-remote-1
-    hostname: backend-remote-1
     networks:
       - envoymesh
   backend-remote-2:
@@ -47,7 +43,6 @@ services:
       dockerfile: Dockerfile-server
     environment:
       - HOST=backend-remote-2
-    hostname: backend-remote-2
     networks:
       - envoymesh
 

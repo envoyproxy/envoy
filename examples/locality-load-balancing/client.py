@@ -1,6 +1,6 @@
-from collections import Counter
 import sys
 import urllib.request
+from collections import Counter
 
 url, n_requests = sys.argv[1], int(sys.argv[2])
 

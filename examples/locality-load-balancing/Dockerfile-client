@@ -1,7 +1,7 @@
 FROM envoyproxy/envoy-dev:latest
-RUN apt-get update && apt-get install -y bash curl jq python3 vim iputils-ping
+RUN apt-get update && apt-get install -y bash curl python3
 
-COPY ./envoy-client.yaml /etc/envoy.yaml
+COPY ./envoy-proxy.yaml /etc/envoy.yaml
 COPY ./client.py /client.py
 
 RUN chmod go+r /etc/envoy.yaml
