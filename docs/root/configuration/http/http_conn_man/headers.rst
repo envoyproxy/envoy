@@ -368,13 +368,17 @@ A few very important notes about XFF:
 x-forwarded-host
 ----------------
 
-The *x-forwarded-host* header is a standard proxy header which indicates the original host
+The *x-forwarded-host* header is a de-facto standard proxy header which indicates the original host
 requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
-the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header is modified.
+the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header
+is modified.
 
-Envoy updates the *:authority* header if
-:ref:`host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`
-options are used and appends its original value to *x-forwarded-host* if
+Envoy updates the *:authority* header if a host rewrite option (one of
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+is used and appends its original value to *x-forwarded-host* if
 :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
 is set.
 
