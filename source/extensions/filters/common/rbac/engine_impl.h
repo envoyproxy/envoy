@@ -4,7 +4,6 @@
 
 #include "source/extensions/filters/common/rbac/engine.h"
 #include "source/extensions/filters/common/rbac/matchers.h"
-
 #include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
 
 namespace Envoy {
@@ -24,10 +23,7 @@ public:
 };
 
 using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
-
-using CustomVocabularyWrapper = Envoy::Extensions::Filters::Common::Expr::Library::CustomVocabularyWrapper;
 using CustomLibrary = Envoy::Extensions::Filters::Common::Expr::Library::CustomLibrary;
-using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
 
 enum class EnforcementMode { Enforced, Shadow };
 

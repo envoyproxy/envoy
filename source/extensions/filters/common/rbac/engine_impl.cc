@@ -4,13 +4,11 @@
 
 #include "source/common/http/header_map_impl.h"
 
-#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
-
 #include "source/common/config/utility.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "source/extensions/filters/common/expr/library/custom_library.h"
-
-#include "envoy/protobuf/message_validator.h"
+#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,13 +35,8 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
-      if (custom_library_) {
-        builder_ = Expr::createBuilder(&constant_arena_,
-                                       custom_library_.get());
-      } else {
-        builder_ = Expr::createBuilder(&constant_arena_,
-                                       nullptr);
-      }
+      builder_ = Expr::createBuilder(&constant_arena_,
+                                     custom_library_ ? custom_library_.get() : nullptr);
       break;
     }
   }

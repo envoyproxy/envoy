@@ -62,7 +62,6 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/common/protobuf",
-        "//source/extensions/filters/common/expr/library:custom_library_lib",
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",

@@ -5,7 +5,6 @@
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
-#include "source/extensions/filters/common/expr/library/custom_functions.h"
 #include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
@@ -21,7 +20,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                const CustomLibrary* custom_library) {
   auto activation = std::make_unique<Activation>();
 
-  if (custom_library && custom_library->replace_default_library_) {
+  if (custom_library && custom_library->replace_default_library()) {
     custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers, response_trailers);
   }
 
@@ -38,7 +37,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
   activation->InsertValueProducer(FilterState,
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
 
-  if (custom_library && !custom_library->replace_default_library_) {
+  if (custom_library && !custom_library->replace_default_library()) {
     custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers, response_trailers);
   }
 
@@ -46,7 +45,7 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena,
-                               const CustomLibrary* custom_library) {
+                         const CustomLibrary* custom_library) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -93,7 +92,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
-                               const CustomLibrary* custom_library) {
+                                  const CustomLibrary* custom_library) {
   auto activation =
       createActivation(arena, info, request_headers, response_headers, response_trailers, custom_library);
   auto eval_status = expr.Evaluate(*activation, &arena);
@@ -106,13 +105,7 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers) {
-  Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, nullptr);
-  if (!eval_status.has_value()) {
-    return false;
-  }
-  auto result = eval_status.value();
-  return result.IsBool() ? result.BoolOrDie() : false;
+  return matches(expr, info, headers, nullptr);
 }
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,

@@ -3,29 +3,21 @@
 #include "source/common/protobuf/protobuf.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/protobuf/message_validator.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-
-#include "source/extensions/filters/common/expr/context.h"
-#include "source/extensions/filters/common/expr/library/custom_functions.h"
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
 #include "eval/public/cel_function_adapter.h"
 
+#include "source/extensions/filters/common/expr/context.h"
+#include "source/extensions/filters/common/expr/library/custom_functions.h"
 #include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
 #include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.validate.h"
-#include "envoy/protobuf/message_validator.h"
 
-//for vocabulary, table
-//value producer name, pointer to wrapper for that value
-//for lazy functions, table
-/*
- * function name, function class definition - need the name in two places
- * eagerly evaluated functions, just add to the list
- */
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -37,21 +29,6 @@ using Activation = google::api::expr::runtime::Activation;
 using CelFunctionRegistry = google::api::expr::runtime::CelFunctionRegistry;
 using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
 
-class CustomVocabularyWrapper : public BaseWrapper {
- public:
-  CustomVocabularyWrapper(Protobuf::Arena& arena,
-                          const StreamInfo::StreamInfo& info)
-      : arena_(arena), info_(info) {
-    arena_.SpaceUsed();
-    info_.attemptCount();
-  }
-  absl::optional<CelValue> operator[](CelValue key) const override;
-
- private:
-  Protobuf::Arena& arena_;
-  const StreamInfo::StreamInfo& info_;
-};
-
 class CustomLibrary {
  public:
   void FillActivation(Activation* activation, Protobuf::Arena& arena,
@@ -61,6 +38,13 @@ class CustomLibrary {
                       const Http::ResponseTrailerMap* response_trailers) const;
 
   void RegisterFunctions(CelFunctionRegistry* registry) const;
+
+  bool replace_default_library() const { return replace_default_library_; }
+  void set_replace_default_library(bool replace_default_library) {
+    replace_default_library_ = replace_default_library;
+  }
+
+ private:
   bool replace_default_library_;
 };
 

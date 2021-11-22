@@ -1,6 +1,8 @@
-#include "source/extensions/filters/common/expr/library/custom_library.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/config/core/v3/extension.pb.validate.h"
+
+#include "source/extensions/filters/common/expr/library/custom_vocabulary.h"
+#include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,23 +10,6 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace Library {
-
-absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const {
-  if (!key.IsString()) {
-    return {};
-  }
-  auto value = key.StringOrDie().value();
-  if (value == "team") {
-    return CelValue::CreateStringView("swg");
-  } else if (value == "ip") {
-    auto upstream_local_address = info_.upstreamLocalAddress();
-    if (upstream_local_address != nullptr) {
-      return CelValue::CreateStringView(upstream_local_address->asStringView());
-    }
-  }
-
-  return {};
-}
 
 void CustomLibrary::FillActivation(Activation *activation, Protobuf::Arena& arena,
                              const StreamInfo::StreamInfo& info,
@@ -47,6 +32,7 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
     throw EnvoyException(
         absl::StrCat("failed to register lazy functions: ", status.message()));
   }
+
   //eagerly evaluated functions
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::
   CreateAndRegister(
@@ -69,7 +55,7 @@ CustomLibraryPtr CustomLibraryFactory::createInterface(
       CustomLibraryConfig>(
       custom_library_config_typed_config.typed_config(), validation_visitor);
   auto library = std::make_unique<CustomLibrary>();
-  library->replace_default_library_ = custom_library_config.replace_default_library_in_case_of_overlap();
+  library->set_replace_default_library(custom_library_config.replace_default_library_in_case_of_overlap());
   return library;
 }
 

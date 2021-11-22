@@ -10,16 +10,25 @@ envoy_extension_package()
 envoy_cc_library(
     name = "custom_functions_lib",
     srcs = ["custom_functions.cc"],
-    hdrs = [
-        "custom_functions.h",
+    hdrs = ["custom_functions.h"],
+    deps = [
+        "//source/common/protobuf",
+        "@com_google_cel_cpp//eval/public:cel_function",
+        "@com_google_cel_cpp//eval/public:cel_value",
+    ],
+)
+
+envoy_cc_library(
+    name = "custom_vocabulary_lib",
+    srcs = ["custom_vocabulary.cc"],
+    hdrs = ["custom_vocabulary.h"],
+    copts = [
+        "-Wno-unused-parameter",
+        "-Wno-unused-private-field",
     ],
     deps = [
-        "//source/common/http:utility_lib",
         "//source/common/protobuf",
-        "@com_google_cel_cpp//eval/public:builtin_func_registrar",
-        "@com_google_cel_cpp//eval/public:cel_expr_builder_factory",
-        "@com_google_cel_cpp//eval/public:cel_expression",
-        "@com_google_cel_cpp//eval/public:cel_function",
+        "//source/extensions/filters/common/expr:context_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
     ],
 )
@@ -35,8 +44,8 @@ envoy_cc_extension(
     ],
     deps = [
         ":custom_functions_lib",
+        ":custom_vocabulary_lib",
         "//envoy/registry",
-        "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:context_lib",
         "@com_google_cel_cpp//eval/public:activation",
