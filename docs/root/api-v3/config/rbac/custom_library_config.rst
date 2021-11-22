@@ -1,8 +1,8 @@
-RBAC Custom Library Config
-==========================
+RBAC CEL Custom Library Config
+==============================
 
 .. toctree::
   :glob:
   :maxdepth: 2
 
-  custom_library_config/custom_library_config.rst
+  custom_library_config/custom_library.rst

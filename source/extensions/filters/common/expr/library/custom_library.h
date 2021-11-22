@@ -15,8 +15,8 @@
 
 #include "source/extensions/filters/common/expr/context.h"
 #include "source/extensions/filters/common/expr/library/custom_functions.h"
-#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
-#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.validate.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -27,7 +27,7 @@ namespace Library {
 
 using Activation = google::api::expr::runtime::Activation;
 using CelFunctionRegistry = google::api::expr::runtime::CelFunctionRegistry;
-using CustomLibraryConfig = envoy::extensions::filters::common::expr::custom_library::v3::CustomLibraryConfig;
+using CustomLibraryConfig = envoy::extensions::rbac::custom_library_config::v3::CustomLibraryConfig;
 
 class CustomLibrary {
  public:
@@ -70,7 +70,7 @@ class CustomLibraryFactory : public BaseCustomLibraryFactory {
       ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   std::string name() const override {
-    return "envoy.expr.custom_library";
+    return "envoy.rbac.custom_library_config.custom_library";
   }
 };
 

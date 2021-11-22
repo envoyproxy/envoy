@@ -16,7 +16,7 @@ envoy_cc_library(
         ":engine_lib",
         "//envoy/stats:stats_macros",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/extensions/filters/common/expr/custom_library/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/rbac/custom_library_config/v3:pkg_cc_proto",
     ],
 )
 
@@ -65,6 +65,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/common/expr/custom_library/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/rbac/custom_library_config/v3:pkg_cc_proto",
     ],
 )

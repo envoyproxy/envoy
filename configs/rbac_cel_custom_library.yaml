@@ -39,9 +39,9 @@ static_resources:
               rules:
                 action: DENY
                 custom_library_config:
-                  name: envoy.expr.custom_library
+                  name: envoy.rbac.custom_library_config.custom_library
                   typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.common.expr.custom_library.v3.CustomLibraryConfig
+                    "@type": type.googleapis.com/envoy.extensions.rbac.custom_library_config.v3.CustomLibraryConfig
                     replace_default_library_in_case_of_overlap: false
                 policies:
 #                  "policy-rbac-deny-if-custom-team-is-swg":

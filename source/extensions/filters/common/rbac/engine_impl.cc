@@ -8,7 +8,7 @@
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/extensions/filters/common/expr/library/custom_library.h"
-#include "envoy/extensions/filters/common/expr/custom_library/v3/custom_library.pb.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
 
 namespace Envoy {
 namespace Extensions {

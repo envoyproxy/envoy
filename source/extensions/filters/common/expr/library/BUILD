@@ -55,6 +55,6 @@ envoy_cc_extension(
         "@com_google_cel_cpp//eval/public:cel_function",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/common/expr/custom_library/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/rbac/custom_library_config/v3:pkg_cc_proto",
     ],
 )

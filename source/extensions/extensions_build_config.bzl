@@ -287,7 +287,7 @@ EXTENSIONS = {
     #
     # custom library
     #
-    "envoy.expr.custom_library": "//source/extensions/filters/common/expr/library:custom_library_lib",
+    "envoy.rbac.custom_library_config.custom_library": "//source/extensions/filters/common/expr/library:custom_library_lib",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
