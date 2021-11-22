@@ -49,18 +49,25 @@ public:
                              const std::string& operation, TracingContextPtr tracing_context,
                              TracingSpanPtr parent);
 
-  /**
-   * Get reporter.
-   *
-   * @return The reference of trace segment reporter pointer.
-   */
-  TraceSegmentReporterPtr& reporter() { return reporter_; }
+  void onTokenUpdate(const std::string& token) { reporter_->updateToken(token); }
 
 private:
   TraceSegmentReporterPtr reporter_;
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;
+
+class TlsTracer : public ThreadLocal::ThreadLocalObject {
+public:
+  TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}
+  Tracer& value() {
+    ASSERT(tracer_);
+    return *tracer_;
+  }
+
+private:
+  TracerPtr tracer_;
+};
 
 class Span : public Tracing::Span {
 public:

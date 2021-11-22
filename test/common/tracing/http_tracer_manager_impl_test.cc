@@ -46,8 +46,11 @@ public:
 class HttpTracerManagerImplTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context;
   HttpTracerManagerImpl http_tracer_manager_{std::make_unique<TracerFactoryContextImpl>(
-      server_factory_context_, ProtobufMessage::getStrictValidationVisitor())};
+      server_factory_context_, transport_socket_factory_context,
+      ProtobufMessage::getStrictValidationVisitor())};
 
 private:
   SampleTracerFactory sample_tracer_factory_;
@@ -151,8 +154,11 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context;
   HttpTracerManagerImpl http_tracer_manager_{std::make_unique<TracerFactoryContextImpl>(
-      server_factory_context_, ProtobufMessage::getStrictValidationVisitor())};
+      server_factory_context_, transport_socket_factory_context,
+      ProtobufMessage::getStrictValidationVisitor())};
 
   NiceMock<Server::Configuration::MockTracerFactory> tracer_factory_{"envoy.tracers.mock"};
 

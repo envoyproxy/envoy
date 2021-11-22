@@ -35,8 +35,10 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override;
 
   void report(TracingContextPtr tracing_context);
-  void updateToken(const std::string& token) { token_ = token; }
-  const std::string& token() { return token_; }
+  void updateToken(const std::string& token) {
+    token_ = token;
+    establishNewStream();
+  }
 
 private:
   /*
