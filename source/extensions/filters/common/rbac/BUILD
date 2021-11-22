@@ -16,7 +16,6 @@ envoy_cc_library(
         ":engine_lib",
         "//envoy/stats:stats_macros",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/extensions/rbac/custom_library_config/v3:pkg_cc_proto",
     ],
 )
 
