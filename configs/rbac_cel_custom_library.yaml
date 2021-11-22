@@ -112,7 +112,7 @@ static_resources:
           - name: envoy.filters.http.router
   clusters:
   - name: admin_cluster
-    type: strict_dns
+    type: static
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: admin_cluster
