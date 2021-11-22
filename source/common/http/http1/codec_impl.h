@@ -467,10 +467,11 @@ protected:
   /**
    * An active HTTP/1.1 request.
    */
-  struct ActiveRequest {
+  struct ActiveRequest : public Event::DeferredDeletable {
     ActiveRequest(ServerConnectionImpl& connection, StreamInfo::BytesMeterSharedPtr&& bytes_meter)
         : response_encoder_(connection, std::move(bytes_meter),
                             connection.codec_settings_.stream_error_on_invalid_http_message_) {}
+    ~ActiveRequest() override = default;
 
     void dumpState(std::ostream& os, int indent_level) const;
     HeaderString request_url_;
@@ -478,7 +479,7 @@ protected:
     ResponseEncoderImpl response_encoder_;
     bool remote_complete_{};
   };
-  absl::optional<ActiveRequest>& activeRequest() { return active_request_; }
+  ActiveRequest* activeRequest() { return active_request_.get(); }
   // ConnectionImpl
   ParserStatus onMessageCompleteBase() override;
   // Add the size of the request_url to the reported header size when processing request headers.
@@ -501,7 +502,7 @@ private:
   // ConnectionImpl
   void onEncodeComplete() override;
   StreamInfo::BytesMeter& getBytesMeter() override {
-    if (active_request_.has_value()) {
+    if (active_request_) {
       return *(active_request_->response_encoder_.getStream().bytesMeter());
     }
     if (bytes_meter_before_stream_ == nullptr) {
@@ -550,7 +551,7 @@ private:
   Status checkHeaderNameForUnderscores() override;
 
   ServerConnectionCallbacks& callbacks_;
-  absl::optional<ActiveRequest> active_request_;
+  std::unique_ptr<ActiveRequest> active_request_;
   const Buffer::OwnedBufferFragmentImpl::Releasor response_buffer_releasor_;
   uint32_t outbound_responses_{};
   // This defaults to 2, which functionally disables pipelining. If any users

@@ -86,6 +86,12 @@ public:
         max_request_headers_count_, headers_with_underscores_action_);
   }
 
+  ~Http1ServerConnectionImplTest() override {
+    // Run deletion as would happen on the dispatchers to avoid inversion of
+    // lifetimes of dispatcher and connection.
+    connection_.dispatcher_.to_delete_.clear();
+  }
+
   NiceMock<Network::MockConnection> connection_;
   NiceMock<Http::MockServerConnectionCallbacks> callbacks_;
   NiceMock<Http1Settings> codec_settings_;
