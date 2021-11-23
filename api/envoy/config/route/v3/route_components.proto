@@ -617,7 +617,7 @@ message CorsPolicy {
   core.v3.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 38]
+// [#next-free-field: 39]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -981,20 +981,29 @@ message RouteAction {
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
-    // this value.
+    // this value. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     string host_rewrite_literal = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
     // option is applicable only when the destination cluster for a route is of
-    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
-    // types has no effect.
+    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster types
+    // has no effect. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     google.protobuf.BoolValue auto_host_rewrite = 7;
 
     // Indicates that during forwarding, the host header will be swapped with the content of given
     // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
-    // If header value is empty, host header is left intact.
+    // If header value is empty, host header is left intact. Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     //
     // .. attention::
     //
@@ -1010,6 +1019,10 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
     // This is useful for transitioning variable content between path segment and subdomain.
+    // Using this option will append the
+    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
+    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+    // is set.
     //
     // For example with the following config:
     //
@@ -1024,6 +1037,15 @@ message RouteAction {
     // Would rewrite the host header to `envoyproxy.io` given the path `/envoyproxy.io/some/path`.
     type.matcher.v3.RegexMatchAndSubstitute host_rewrite_path_regex = 35;
   }
+
+  // If set, then a host rewrite action (one of
+  // :ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+  // :ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+  // :ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+  // :ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+  // causes the original value of the host header, if any, to be appended to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` HTTP header.
+  bool append_x_forwarded_host = 38;
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
   // spans between the point at which the entire downstream request (i.e. end-of-stream) has been

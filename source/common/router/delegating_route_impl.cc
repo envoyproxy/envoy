@@ -126,6 +126,8 @@ bool DelegatingRouteEntry::autoHostRewrite() const {
   return base_route_->routeEntry()->autoHostRewrite();
 }
 
+bool DelegatingRouteEntry::appendXfh() const { return base_route_->routeEntry()->appendXfh(); }
+
 const MetadataMatchCriteria* DelegatingRouteEntry::metadataMatchCriteria() const {
   return base_route_->routeEntry()->metadataMatchCriteria();
 }
