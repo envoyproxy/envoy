@@ -150,5 +150,33 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekFlagReturnsFinalError) {
   EXPECT_EQ(rc.err_->getErrorCode(), Api::IoError::IoErrorCode::ConnectionReset);
 }
 
+TEST_F(Win32SocketHandleImplTest, ReadvWithPeekShouldReadFromBuffer) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  constexpr int data_length = 10;
+  std::string data(data_length, '*');
+  absl::FixedArray<iovec> peek_iov(1);
+  peek_iov[0].iov_base = static_cast<void*>(data.data());
+  peek_iov[0].iov_len = data.length();
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .WillOnce(Invoke([&](os_fd_t, const iovec* iov, int num_iov) {
+        // Gcc treats the variables as unused and this causes
+        // a compilation failure.
+        UNREFERENCED_PARAMETER(iov);
+        UNREFERENCED_PARAMETER(num_iov);
+        iov = peek_iov.begin();
+        num_iov = 1;
+        return Api::SysCallSizeResult{data_length, 0};
+      }));
+
+  absl::FixedArray<char> buf(data_length);
+  auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
+  EXPECT_EQ(rc.return_value_, data_length);
+  // Second call should not make a system call, it should
+  // read from memory.
+  rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
+  EXPECT_EQ(rc.return_value_, data_length);
+}
+
 } // namespace Network
 } // namespace Envoy
