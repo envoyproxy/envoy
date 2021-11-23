@@ -218,7 +218,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   // increment as no capacity is freed up.
   // We don't update the capacity for HTTP/3 as the stream count should only
   // increase when a MAX_STREAMS frame is received.
-  // The capacity caculated by concurrency could be negative, in this case, efficient client
+  // The capacity calculated by concurrency could be negative, in this case, effective client
   // capacity was limited by concurrency, compare client.concurrent_stream_limit_ and
   // client.numActiveStreams() directly to avoid overflow.
   if (trackStreamCapacity() && ((client.concurrent_stream_limit_ < client.numActiveStreams() + 1) ||
