@@ -1,6 +1,7 @@
 #include "source/common/common/regex.h"
 
 #include "envoy/common/exception.h"
+#include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
@@ -58,21 +59,23 @@ CompiledGoogleReMatcher::CompiledGoogleReMatcher(const std::string& regex,
 }
 
 CompiledGoogleReMatcher::CompiledGoogleReMatcher(
-    const envoy::type::matcher::v3::RegexMatcher& config)
-    : CompiledGoogleReMatcher(config.regex(), !config.google_re2().has_max_program_size()) {
+    const std::string& regex, const envoy::type::matcher::v3::RegexMatcher::GoogleRE2& config)
+    : CompiledGoogleReMatcher(regex, !config.has_max_program_size()) {
   const uint32_t regex_program_size = static_cast<uint32_t>(regex_.ProgramSize());
 
   // Check if the deprecated field max_program_size is set first, and follow the old logic if so.
-  if (config.google_re2().has_max_program_size()) {
+  if (config.has_max_program_size()) {
     const uint32_t max_program_size =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.google_re2(), max_program_size, 100);
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_program_size, 100);
     if (regex_program_size > max_program_size) {
       throw EnvoyException(fmt::format("regex '{}' RE2 program size of {} > max program size of "
                                        "{}. Increase configured max program size if necessary.",
-                                       config.regex(), regex_program_size, max_program_size));
+                                       regex, regex_program_size, max_program_size));
     }
   }
 }
+
+REGISTER_FACTORY(CompiledGoogleReMatcherFactory, CompiledMatcherFactory);
 
 std::regex Utility::parseStdRegex(const std::string& regex, std::regex::flag_type flags) {
   // TODO(zuercher): In the future, PGV (https://github.com/envoyproxy/protoc-gen-validate)
