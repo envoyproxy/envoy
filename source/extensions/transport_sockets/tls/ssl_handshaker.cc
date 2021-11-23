@@ -64,16 +64,6 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
   }
 }
 
-const std::string& SslHandshakerImpl::requestedServerName() const {
-  if (cached_sni_.empty()) {
-    auto* sni = SSL_get_servername(ssl(), TLSEXT_NAMETYPE_host_name);
-    if (sni) {
-      cached_sni_ = sni;
-    }
-  }
-  return cached_sni_;
-}
-
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

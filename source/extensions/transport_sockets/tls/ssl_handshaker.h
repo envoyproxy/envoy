@@ -47,8 +47,6 @@ public:
   // Ssl::ConnectionInfo
   bool peerCertificateValidated() const override;
 
-  const std::string& requestedServerName() const override;
-
   // ConnectionInfoImplBase
   SSL* ssl() const override { return ssl_.get(); }
 
@@ -66,7 +64,6 @@ private:
 
   Ssl::SocketState state_;
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
-  mutable std::string cached_sni_;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

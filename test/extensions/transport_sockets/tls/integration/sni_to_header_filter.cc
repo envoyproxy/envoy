@@ -20,9 +20,8 @@ public:
   }
 };
 
-constexpr char SniToHeaderFilter::name[];
-static Registry::InjectFactory<SimpleFilterConfig<SniToHeaderFilter>,
-                               Server::Configuration::NamedHttpFilterConfigFactory>
+static Registry::RegisterFactory<SimpleFilterConfig<SniToHeaderFilter>,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
 
 } // namespace Envoy

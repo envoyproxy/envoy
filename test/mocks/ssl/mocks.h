@@ -62,8 +62,8 @@ public:
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
   MOCK_METHOD(std::string, ciphersuiteString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
-  MOCK_METHOD(const std::string&, requestedServerName, (), (const));
   MOCK_METHOD(const std::string&, alpn, (), (const));
+  MOCK_METHOD(const std::string&, requestedServerName, (), (const));
 };
 
 class MockClientContext : public ClientContext {
