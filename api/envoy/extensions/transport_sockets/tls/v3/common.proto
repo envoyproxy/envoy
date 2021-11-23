@@ -149,7 +149,7 @@ message PrivateKeyProvider {
   }
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -167,6 +167,21 @@ message TlsCertificate {
   // directory for any file moves to support rotation. This currently only
   // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
+
+  // `Pkcs12` data containing TLS certificate, chain, and private key.
+  //
+  // If *pkcs12* is a filesystem path, the file will be read, but no watch will
+  // be added to the parent directory, since *pkcs12* isn't used by SDS.
+  // This field is mutually exclusive with *certificate_chain*, *private_key* and *private_key_provider*.
+  // This can't be marked as ``oneof`` due to API compatibility reasons. Setting
+  // both :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>`,
+  // :ref:`certificate_chain <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.certificate_chain>`,
+  // or :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+  // and :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`
+  // fields will result in an error. Use :ref:`password
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.password>`
+  // to specify the password to unprotect the `PKCS12` data, if necessary.
+  config.core.v3.DataSource pkcs12 = 8 [(udpa.annotations.sensitive) = true];
 
   // If specified, updates of file-based *certificate_chain* and *private_key*
   // sources will be triggered by this watch. The certificate/key pair will be

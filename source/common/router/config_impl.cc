@@ -405,7 +405,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
+      append_xfh_(route.route().append_x_forwarded_host()), cluster_name_(route.route().cluster()),
+      cluster_header_name_(route.route().cluster_header()),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
@@ -670,7 +671,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
   }
 
   if (!host_rewrite_.empty()) {
-    headers.setHost(host_rewrite_);
+    Http::Utility::updateAuthority(headers, host_rewrite_, append_xfh_);
   } else if (auto_host_rewrite_header_) {
     const auto header = headers.get(*auto_host_rewrite_header_);
     if (!header.empty()) {
@@ -678,14 +679,16 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
       // value is used.
       const absl::string_view header_value = header[0]->value().getStringView();
       if (!header_value.empty()) {
-        headers.setHost(header_value);
+        Http::Utility::updateAuthority(headers, header_value, append_xfh_);
       }
     }
   } else if (host_rewrite_path_regex_ != nullptr) {
     const std::string path(headers.getPathValue());
     absl::string_view just_path(Http::PathUtil::removeQueryAndFragment(path));
-    headers.setHost(
-        host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_));
+    Http::Utility::updateAuthority(
+        headers,
+        host_rewrite_path_regex_->replaceAll(just_path, host_rewrite_path_regex_substitution_),
+        append_xfh_);
   }
 
   // Handle path rewrite

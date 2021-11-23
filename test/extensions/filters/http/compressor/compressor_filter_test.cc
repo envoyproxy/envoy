@@ -141,8 +141,7 @@ public:
     }
     populateBuffer(buffer_content_size);
     Http::TestResponseHeaderMapImpl continue_headers;
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue,
-              filter_->encode100ContinueHeaders(continue_headers));
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));

@@ -129,12 +129,12 @@ UpstreamRequest::~UpstreamRequest() {
   }
 }
 
-void UpstreamRequest::decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) {
+void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
-  ASSERT(100 == Http::Utility::getResponseStatus(*headers));
+  ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
   addResponseHeadersSize(headers->byteSize());
-  parent_.onUpstream100ContinueHeaders(std::move(headers), *this);
+  parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
 
 void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
@@ -143,8 +143,8 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
   resetPerTryIdleTimer();
   addResponseHeadersSize(headers->byteSize());
 
-  // We drop 1xx other than 101 on the floor; 101 upgrade headers need to be passed to the client as
-  // part of the final response. 100-continue headers are handled in onUpstream100ContinueHeaders.
+  // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
+  // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
   //
   // We could in principle handle other headers here, but this might result in the double invocation
   // of decodeHeaders() (once for informational, again for non-informational), which is likely an
@@ -427,6 +427,13 @@ void UpstreamRequest::onPoolReady(
     stream_info_.protocol(protocol.value());
   }
 
+  if (info.upstreamInfo().has_value()) {
+    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+    upstream_timing_.upstream_connect_start_ = upstream_timing.upstream_connect_start_;
+    upstream_timing_.upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
+    upstream_timing_.upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
+  }
+
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   parent_.callbacks()->streamInfo().setUpstreamFilterState(
@@ -463,7 +470,8 @@ void UpstreamRequest::onPoolReady(
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstreamHeaders()->setHost(host->hostname());
+    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
+                                   parent_.routeEntry()->appendXfh());
   }
 
   if (span_ != nullptr) {

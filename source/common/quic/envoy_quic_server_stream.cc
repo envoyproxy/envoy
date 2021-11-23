@@ -39,8 +39,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   // send the correct SETTINGS.
 }
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
+  ASSERT(Http::HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 

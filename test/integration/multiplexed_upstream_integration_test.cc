@@ -111,6 +111,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, TestSchemeAndXFP) {
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -143,6 +148,16 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"trailer", "bar"}});
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+  std::string expected_alpn = upstreamProtocol() == Http::CodecType::HTTP2 ? "h2" : "h3";
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("alpn")).empty());
+  ASSERT_EQ(response->headers().get(Http::LowerCaseString("alpn"))[0]->value().getStringView(),
+            expected_alpn);
+
+  ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
+  ASSERT_FALSE(
+      response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
+  ASSERT_FALSE(
+      response->trailers()->get(Http::LowerCaseString("upstream_handshake_complete")).empty());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
@@ -284,6 +299,32 @@ TEST_P(MultiplexedUpstreamIntegrationTest, ManySimultaneousRequestsTightUpstream
   envoy::config::listener::v3::QuicProtocolOptions options;
   options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(1);
   mergeOptions(options);
+
+  manySimultaneousRequests(1024, 1024, 10);
+}
+
+TEST_P(MultiplexedUpstreamIntegrationTest, ManySimultaneousRequestsLaxUpstreamLimits) {
+  envoy::config::core::v3::Http2ProtocolOptions config;
+  config.mutable_max_concurrent_streams()->set_value(10000);
+  mergeOptions(config);
+  envoy::config::listener::v3::QuicProtocolOptions options;
+  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(10000);
+  mergeOptions(options);
+
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+          ConfigHelper::HttpProtocolOptions protocol_options;
+          protocol_options.mutable_explicit_http_config()
+              ->mutable_http3_protocol_options()
+              ->mutable_quic_protocol_options()
+              ->mutable_max_concurrent_streams()
+              ->set_value(10000);
+          ConfigHelper::setProtocolOptions(
+              *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
+        });
+  }
 
   manySimultaneousRequests(1024, 1024, 10);
 }
