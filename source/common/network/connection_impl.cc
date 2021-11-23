@@ -577,7 +577,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
-  if (ioHandle().isOpen() && events & Event::FileReadyType::Write) {
+  if (events & Event::FileReadyType::Write) {
     onWriteReady();
   }
 
