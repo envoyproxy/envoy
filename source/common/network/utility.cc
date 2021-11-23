@@ -158,8 +158,9 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
 
 } // namespace
 
-std::string Utility::formatTcpUrl(const std::string& ip_address, uint16_t port) {
-  auto address_instance = parseInternetAddressNoThrow(ip_address, port, false);
+std::string Utility::formatTcpUrl(const std::string& address, uint16_t port) {
+  auto address_instance = parseInternetAddressNoThrow(address, port, false);
+  // If the address is hostname, then address_instance could be `nullptr`.
   if ((address_instance != nullptr) &&
       (address_instance->ip()->version() == Address::IpVersion::v6)) {
     return fmt::format("tcp://[{}]:{}", ip_address, port);
