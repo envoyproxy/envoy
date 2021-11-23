@@ -274,22 +274,31 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
-  ASSERT(!on_high_watermark_called_);
-  on_high_watermark_called_ = true;
-
-  if (parent_ != nullptr) {
-    // There's too much data buffered in the upstream write buffer, so stop reading.
-    parent_->readDisableDownstream(true);
+  ENVOY_LOG_MISC(debug, "calling {}", __FUNCTION__);
+  if (above_high_watermark_counter_++ == 0) {
+    ENVOY_LOG(debug,
+              "tcp_proxy disables downstream read because upstream write buffer is now above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
+    if (parent_ != nullptr) {
+      // There's too much data buffered in the upstream write buffer, so stop reading.
+      parent_->readDisableDownstream(true);
+    }
+  } else {
+    ENVOY_LOG(debug, "tcp_proxy does not read disable downstream because upstream was above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
   }
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
-  ASSERT(on_high_watermark_called_);
-  on_high_watermark_called_ = false;
-
-  if (parent_ != nullptr) {
-    // The upstream write buffer is drained. Resume reading.
-    parent_->readDisableDownstream(false);
+  RELEASE_ASSERT(
+      above_high_watermark_counter_ != 0,
+      "onBelowWriteBufferLowWatermark is called when upstream was below high watermark.");
+  if (--above_high_watermark_counter_ == 0) {
+    ENVOY_LOG(debug, "tcp_proxy enable downstream read because upstream is now below high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
+    if (parent_ != nullptr) {
+      // The upstream write buffer is drained. Resume reading.
+      parent_->readDisableDownstream(false);
+    }
+  } else {
+    ENVOY_LOG(debug, "tcp_proxy does not reenable downstream read because upstream is still was above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
   }
 }
 

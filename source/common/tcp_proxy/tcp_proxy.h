@@ -305,7 +305,7 @@ public:
     Filter* parent_{};
     Drainer* drainer_{};
 
-    bool on_high_watermark_called_{false};
+    uint32_t above_high_watermark_counter_{0};
   };
 
   StreamInfo::StreamInfo& getStreamInfo();
