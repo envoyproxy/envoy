@@ -473,6 +473,11 @@ envoy.internal_redirect_predicates.safe_cross_scheme:
   - envoy.internal_redirect_predicates
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.io_socket.io_uring:
+  categories:
+  - envoy.io_socket
+  security_posture: unknown
+  status: wip
 envoy.io_socket.user_space:
   categories:
   - envoy.io_socket
