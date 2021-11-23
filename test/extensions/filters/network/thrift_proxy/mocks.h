@@ -10,6 +10,7 @@
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router.h"
 #include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 #include "test/mocks/network/mocks.h"
@@ -65,6 +66,7 @@ public:
   MOCK_METHOD(void, setType, (ProtocolType));
   MOCK_METHOD(bool, readMessageBegin, (Buffer::Instance & buffer, MessageMetadata& metadata));
   MOCK_METHOD(bool, readMessageEnd, (Buffer::Instance & buffer));
+  MOCK_METHOD(bool, peekReplyPayload, (Buffer::Instance & buffer, ReplyType& reply_type));
   MOCK_METHOD(bool, readStructBegin, (Buffer::Instance & buffer, std::string& name));
   MOCK_METHOD(bool, readStructEnd, (Buffer::Instance & buffer));
   MOCK_METHOD(bool, readFieldBegin,
@@ -360,8 +362,6 @@ public:
   ~MockShadowWriter() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), ());
-  MOCK_METHOD(std::string&, statPrefix, (), (const));
-  MOCK_METHOD(Stats::Scope&, scope, (), ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, (), ());
   MOCK_METHOD(absl::optional<std::reference_wrapper<ShadowRouterHandle>>, submit,
               (const std::string&, MessageMetadataSharedPtr, TransportType, ProtocolType), ());

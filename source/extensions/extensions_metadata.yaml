@@ -393,6 +393,11 @@ envoy.filters.network.zookeeper_proxy:
   - envoy.filters.network
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.thrift.header_to_metadata:
+  categories:
+  - envoy.thrift_proxy.filters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
 envoy.filters.thrift.ratelimit:
   categories:
   - envoy.thrift_proxy.filters
@@ -633,6 +638,12 @@ envoy.transport_sockets.tap:
   - envoy.transport_sockets.upstream
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.transport_sockets.tcp_stats:
+  categories:
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
 envoy.transport_sockets.tls:
   categories:
   - envoy.transport_sockets.downstream
@@ -703,4 +714,19 @@ envoy.key_value.file_based:
   categories:
   - envoy.common.key_value
   security_posture: data_plane_agnostic
+  status: alpha
+envoy.network.dns_resolver.cares:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.network.dns_resolver.apple:
+  categories:
+  - envoy.network.dns_resolver
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: stable
+envoy.rbac.matchers.upstream_ip_port:
+  categories:
+  - envoy.rbac.matchers
+  security_posture: unknown
   status: alpha

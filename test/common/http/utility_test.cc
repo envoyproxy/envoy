@@ -91,6 +91,69 @@ TEST(HttpUtility, parseQueryString) {
           "bucket%7Crq_xx%7Crq_complete%7Crq_active%7Ccx_active%29%29%7C%28server.version%29"));
 }
 
+TEST(HttpUtility, stripQueryString) {
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/?x=1&y=2")), "/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo?hello=there&good=bye")), "/foo");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?")), "/foo/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/?x=1")), "/foo/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?a=b")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar?a=b&b=c")), "/foo/bar");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1")), "/foo/bar/");
+  EXPECT_EQ(Utility::stripQueryString(HeaderString("/foo/bar/?x=1&y=2")), "/foo/bar/");
+}
+
+TEST(HttpUtility, replaceQueryString) {
+  // Replace with nothing
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams()), "/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a"), Utility::QueryParams()), "/a");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/"), Utility::QueryParams()), "/a/");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a/?y=5"), Utility::QueryParams()), "/a/");
+  // Replace with x=1
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/?x=0"), Utility::QueryParams({{"x", "1"}})),
+            "/?x=1");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/a?x=0"), Utility::QueryParams({{"x", "1"}})),
+            "/a?x=1");
+  EXPECT_EQ(
+      Utility::replaceQueryString(HeaderString("/a/?x=0"), Utility::QueryParams({{"x", "1"}})),
+      "/a/?x=1");
+  // More replacements
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo"),
+                                        Utility::QueryParams({{"x", "1"}, {"z", "3"}})),
+            "/foo?x=1&z=3");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?z=2"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo?y=9"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo?x=1&y=5");
+  // More path components
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo/bar?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=9&a=b"),
+                                        Utility::QueryParams({{"x", "1"}, {"y", "5"}})),
+            "/foo/bar?x=1&y=5");
+  EXPECT_EQ(Utility::replaceQueryString(HeaderString("/foo/bar?y=11&z=7"),
+                                        Utility::QueryParams({{"a", "b"}, {"x", "1"}, {"y", "5"}})),
+            "/foo/bar?a=b&x=1&y=5");
+}
+
 TEST(HttpUtility, getResponseStatus) {
   EXPECT_THROW(Utility::getResponseStatus(TestResponseHeaderMapImpl{}), CodecClientException);
   EXPECT_EQ(200U, Utility::getResponseStatus(TestResponseHeaderMapImpl{{":status", "200"}}));
@@ -298,6 +361,92 @@ TEST(HttpUtility, appendVia) {
     TestResponseHeaderMapImpl headers{{"via", "foo"}};
     Utility::appendVia(headers, "bar");
     EXPECT_EQ("foo, bar", headers.get_("via"));
+  }
+}
+
+TEST(HttpUtility, updateAuthority) {
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers;
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", true);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
+    Utility::updateAuthority(headers, "", false);
+    EXPECT_EQ("", headers.get_(":authority"));
+    EXPECT_EQ("", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "newhost.com", true);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "newhost.com", false);
+    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", true);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+  }
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
+    Utility::updateAuthority(headers, "dns.name", false);
+    EXPECT_EQ("dns.name", headers.get_(":authority"));
+    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
   }
 }
 
@@ -1006,6 +1155,37 @@ TEST(HttpUtility, CheckIsIpAddress) {
     EXPECT_EQ(expect_host, host_attributes.host_);
     EXPECT_EQ(expect_port, host_attributes.port_);
   }
+}
+
+TEST(HttpUtility, TestConvertCoreToRouteRetryPolicy) {
+  const std::string core_policy = R"(
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy;
+  TestUtility::loadFromYaml(core_policy, core_retry_policy);
+
+  const envoy::config::route::v3::RetryPolicy route_retry_policy =
+      Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
+                                             "5xx,gateway-error,connect-failure,reset");
+  EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
+  EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
+  EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  const std::string core_policy2 = R"(
+retry_back_off:
+  base_interval: 32s
+  max_interval: 1s
+num_retries: 10
+)";
+
+  envoy::config::core::v3::RetryPolicy core_retry_policy2;
+  TestUtility::loadFromYaml(core_policy2, core_retry_policy2);
+  EXPECT_THROW_WITH_MESSAGE(Utility::convertCoreToRouteRetryPolicy(core_retry_policy2, "5xx"),
+                            EnvoyException,
+                            "max_interval must be greater than or equal to the base_interval");
 }
 
 // Validates TE header is stripped if it contains an unsupported value

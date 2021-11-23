@@ -24,6 +24,7 @@ namespace Network {
 struct SocketOptionName {
   SocketOptionName() = default;
   SocketOptionName(const SocketOptionName&) = default;
+  SocketOptionName& operator=(const SocketOptionName&) = default;
   SocketOptionName(int level, int option, const std::string& name)
       : value_(std::make_tuple(level, option, name)) {}
 
@@ -47,8 +48,6 @@ private:
  * Interfaces for providing a socket's various addresses. This is split into a getters interface
  * and a getters + setters interface. This is so that only the getters portion can be overridden
  * in certain cases.
- * TODO(soulxu): Since there are more than address information inside the provider, this will be
- * renamed as ConnectionInfoProvider. Ref https://github.com/envoyproxy/envoy/issues/17168
  */
 class ConnectionInfoProvider {
 public:
@@ -99,6 +98,11 @@ public:
    * connection does not use SSL.
    */
   virtual Ssl::ConnectionInfoConstSharedPtr sslConnection() const PURE;
+
+  /**
+   * @return ja3 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja3Hash() const PURE;
 };
 
 class ConnectionInfoSetter : public ConnectionInfoProvider {
@@ -143,6 +147,11 @@ public:
    * @param connection_info sets the downstream ssl connection.
    */
   virtual void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
+
+  /**
+   * @param JA3 fingerprint.
+   */
+  virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
 };
 
 using ConnectionInfoSetterSharedPtr = std::shared_ptr<ConnectionInfoSetter>;
@@ -301,8 +310,18 @@ public:
     virtual absl::optional<Details>
     getOptionDetails(const Socket& socket,
                      envoy::config::core::v3::SocketOption::SocketState state) const PURE;
+
+    /**
+     * Whether the socket implementation is supported. Real implementations should typically return
+     * true. Placeholder implementations may indicate such by returning false. Note this does NOT
+     * inherently prevent an option from being applied if it's passed to socket/connection
+     * interfaces.
+     * @return Whether this is a supported socket option.
+     */
+    virtual bool isSupported() const PURE;
   };
 
+  using OptionConstPtr = std::unique_ptr<const Option>;
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
   using Options = std::vector<OptionConstSharedPtr>;
   using OptionsSharedPtr = std::shared_ptr<Options>;

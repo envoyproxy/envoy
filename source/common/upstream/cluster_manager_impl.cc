@@ -23,6 +23,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/new_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_mux/grpc_mux_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/http/async_client_impl.h"
@@ -182,11 +183,12 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds;
+      Config::ScopedResume maybe_resume_eds_leds;
       if (cm_.adsMux()) {
-        const auto type_url =
+        const auto eds_type_url =
             Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-        maybe_resume_eds = cm_.adsMux()->pause(type_url);
+        const auto leds_type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+        maybe_resume_eds_leds = cm_.adsMux()->pause({eds_type_url, leds_type_url});
       }
       initializeSecondaryClusters();
     }
@@ -338,28 +340,56 @@ ClusterManagerImpl::ClusterManagerImpl(
     if (dyn_resources.ads_config().api_type() ==
         envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxDelta>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            dyn_resources.ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::NewGrpcMuxImpl>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.DeltaAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
+      }
     } else {
       Config::Utility::checkTransportVersion(dyn_resources.ads_config());
-      ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
-          local_info,
-          Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
-                                                         dyn_resources.ads_config(), stats, false)
-              ->createUncachedRawAsyncClient(),
-          main_thread_dispatcher,
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_,
-          Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
-          bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+        ads_mux_ = std::make_shared<Config::XdsMux::GrpcMuxSotw>(
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService."
+                "StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info,
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      } else {
+        ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
+            local_info,
+            Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_,
+                                                           dyn_resources.ads_config(), stats, false)
+                ->createUncachedRawAsyncClient(),
+            main_thread_dispatcher,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+            random_, stats_,
+            Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
+            bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
+      }
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -1339,14 +1369,16 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
         cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
         cluster->statsScope(), parent.parent_.runtime_, parent.parent_.random_,
         cluster->lbSubsetInfo(), cluster->lbRingHashConfig(), cluster->lbMaglevConfig(),
-        cluster->lbLeastRequestConfig(), cluster->lbConfig());
+        cluster->lbRoundRobinConfig(), cluster->lbLeastRequestConfig(), cluster->lbConfig(),
+        parent_.thread_local_dispatcher_.timeSource());
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
       lb_ = std::make_unique<LeastRequestLoadBalancer>(
           priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
-          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig());
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::Random: {
@@ -1358,9 +1390,10 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     }
     case LoadBalancerType::RoundRobin: {
       ASSERT(lb_factory_ == nullptr);
-      lb_ = std::make_unique<RoundRobinLoadBalancer>(priority_set_, parent_.local_priority_set_,
-                                                     cluster->stats(), parent.parent_.runtime_,
-                                                     parent.parent_.random_, cluster->lbConfig());
+      lb_ = std::make_unique<RoundRobinLoadBalancer>(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbRoundRobinConfig(),
+          parent.thread_local_dispatcher_.timeSource());
       break;
     }
     case LoadBalancerType::ClusterProvided:
@@ -1660,13 +1693,11 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100)) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
-    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache;
-    if (alternate_protocol_options.has_value()) {
-      alternate_protocols_cache =
-          alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value());
-    }
+    ASSERT(alternate_protocol_options.has_value());
 #ifdef ENVOY_ENABLE_QUIC
-    // TODO(RyanTheOptimist): Plumb an actual alternate protocols cache.
+    Http::AlternateProtocolsCacheSharedPtr alternate_protocols_cache =
+        alternate_protocols_cache_manager_->getCache(alternate_protocol_options.value(),
+                                                     dispatcher);
     Envoy::Http::ConnectivityGrid::ConnectivityOptions coptions{protocols};
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,

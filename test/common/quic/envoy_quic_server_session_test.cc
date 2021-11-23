@@ -64,6 +64,8 @@ public:
     // behavior.
     return false;
   }
+
+  using EnvoyQuicServerSession::GetCryptoStream;
 };
 
 class ProofSourceDetailsSetter {
@@ -164,8 +166,7 @@ public:
                             &compressed_certs_cache_, *dispatcher_,
                             /*send_buffer_limit*/ quic::kDefaultFlowControlSendWindow * 1.5,
                             quic_stat_names_, listener_config_.listenerScope(),
-                            crypto_stream_factory_,
-                            makeOptRefFromPtr<const Network::TransportSocketFactory>(nullptr)),
+                            crypto_stream_factory_),
         stats_({ALL_HTTP3_CODEC_STATS(
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "http3."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "http3."))}) {
@@ -291,6 +292,8 @@ TEST_F(EnvoyQuicServerSessionTest, NewStreamBeforeInitializingFilter) {
 TEST_F(EnvoyQuicServerSessionTest, NewStream) {
   installReadFilter();
 
+  EXPECT_EQ(envoy_quic_session_.GetCryptoStream()->GetSsl(),
+            static_cast<const QuicSslConnectionInfo&>(*envoy_quic_session_.ssl()).ssl());
   Http::MockRequestDecoder request_decoder;
   EXPECT_CALL(http_connection_callbacks_, newStream(_, false))
       .WillOnce(testing::ReturnRef(request_decoder));

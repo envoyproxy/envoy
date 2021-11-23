@@ -17,6 +17,8 @@
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
+#include "udpa/annotations/status.pb.h"
+#include "xds/annotations/v3/status.pb.h"
 #include "yaml-cpp/yaml.h"
 
 using namespace std::chrono_literals;
@@ -238,6 +240,25 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
+  bool has_unknown_field;
+  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (status.ok()) {
+    return;
+  }
+  if (has_unknown_field) {
+    // If the parsing failure is caused by the unknown fields.
+    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                      status.ToString());
+  } else {
+    // If the error has nothing to do with unknown field.
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+  }
+}
+
+Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
+                                                        Protobuf::Message& message,
+                                                        bool& has_unknown_fileld) {
+  has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
   // Let's first try and get a clean parse when checking for unknown fields;
@@ -246,7 +267,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (strict_status.ok()) {
     // Success, no need to do any extra work.
-    return;
+    return strict_status;
   }
   // If we fail, we see if we get a clean parse when allowing unknown fields.
   // This is essentially a workaround
@@ -257,15 +278,11 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   // If we still fail with relaxed unknown field checking, the error has nothing
   // to do with unknown fields.
-  if (!relaxed_status.ok()) {
-    throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                         "): " + json);
+  if (relaxed_status.ok()) {
+    has_unknown_fileld = true;
+    return strict_status;
   }
-  // We know it's an unknown field at this point. If we're at the latest
-  // version, then it's definitely an unknown field, otherwise we try to
-  // load again at a later version.
-  validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                    strict_status.ToString());
+  return relaxed_status;
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -345,6 +362,11 @@ void checkForDeprecatedNonRepeatedEnumValue(
       message, validation_visitor);
 }
 
+constexpr absl::string_view WipWarning =
+    "API features marked as work-in-progress are not considered stable, are not covered by the "
+    "threat model, are not supported by the security team, and are subject to breaking changes. Do "
+    "not use this feature without understanding each of the previous points.";
+
 class UnexpectedFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   UnexpectedFieldProtoVisitor(ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -367,23 +389,14 @@ public:
       return nullptr;
     }
 
+    const auto& field_status = field.options().GetExtension(xds::annotations::v3::field_status);
+    if (field_status.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "field '{}' is marked as work-in-progress. {}", field.full_name(), WipWarning));
+    }
+
     // If this field is deprecated, warn or throw an error.
     if (field.options().deprecated()) {
-      if (absl::StartsWith(field.name(), "hidden_envoy_deprecated_")) {
-        // The field was marked as hidden_envoy_deprecated and an error must be thrown,
-        // unless it is part of an explicit test that needs access to the deprecated field
-        // when we enable runtime deprecation override to allow point field overrides for tests.
-        if (!runtime_ ||
-            !runtime_->snapshot().deprecatedFeatureEnabled(
-                absl::StrCat("envoy.deprecated_features:", field.full_name()), false)) {
-          const std::string fatal_error = absl::StrCat(
-              "Illegal use of hidden_envoy_deprecated_ V2 field '", field.full_name(),
-              "' from file ", filename,
-              " while using the latest V3 configuration. This field has been removed from the "
-              "current Envoy API. Please see " ENVOY_DOC_URL_VERSION_HISTORY " for details.");
-          throw ProtoValidationException(fatal_error, message);
-        }
-      }
       const std::string warning =
           absl::StrCat("Using {}deprecated option '", field.full_name(), "' from file ", filename,
                        ". This configuration will be removed from "
@@ -398,6 +411,24 @@ public:
   }
 
   void onMessage(const Protobuf::Message& message, const void*) override {
+    if (message.GetDescriptor()
+            ->options()
+            .GetExtension(xds::annotations::v3::message_status)
+            .work_in_progress()) {
+      validation_visitor_.onWorkInProgress(fmt::format(
+          "message '{}' is marked as work-in-progress. {}", message.GetTypeName(), WipWarning));
+    }
+
+    const auto& udpa_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(udpa::annotations::file_status);
+    const auto& xds_file_options =
+        message.GetDescriptor()->file()->options().GetExtension(xds::annotations::v3::file_status);
+    if (udpa_file_options.work_in_progress() || xds_file_options.work_in_progress()) {
+      validation_visitor_.onWorkInProgress(
+          fmt::format("message '{}' is contained in proto file '{}' marked as work-in-progress. {}",
+                      message.GetTypeName(), message.GetDescriptor()->file()->name(), WipWarning));
+    }
+
     // Reject unknown fields.
     const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
     if (!unknown_fields.empty()) {
@@ -405,9 +436,6 @@ public:
       for (int n = 0; n < unknown_fields.field_count(); ++n) {
         error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
-      // We use the validation visitor but have hard coded behavior below for deprecated fields.
-      // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
-      // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
       if (!error_msg.empty()) {
         validation_visitor_.onUnknownField("type " + message.GetTypeName() +
                                            " with unknown field set {" + error_msg + "}");
@@ -513,8 +541,20 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
-void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (!status.ok()) {
+    return false;
+  }
+  bool has_unknow_field;
+  status = MessageUtil::loadFromJsonNoThrow(json, dest, has_unknow_field);
+  if (status.ok() || has_unknow_field) {
+    return true;
+  }
+  return false;
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -616,9 +656,10 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
 }
 
 // To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
-bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type,
+                       bool ancestor_is_sensitive) {
   return redactOpaque(
-      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
                 const Protobuf::FieldDescriptor* field_descriptor) {
         // To unpack a `TypedStruct`, convert the struct from JSON.
@@ -636,7 +677,8 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 // Recursive helper method for MessageUtil::redact() below.
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
-      redactTypedStruct(message, ancestor_is_sensitive)) {
+      redactTypedStruct(message, "xds.type.v3.TypedStruct", ancestor_is_sensitive) ||
+      redactTypedStruct(message, "udpa.type.v1.TypedStruct", ancestor_is_sensitive)) {
     return;
   }
 
@@ -651,7 +693,25 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
-      if (field_descriptor->is_repeated()) {
+      if (field_descriptor->is_map()) {
+        // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
+        // keys.
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          Protobuf::Message* map_pair =
+              reflection->MutableRepeatedMessage(message, field_descriptor, i);
+          auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
+          if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+                            value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
+            map_pair->GetReflection()->SetString(map_pair, value_field_desc, "[redacted]");
+          } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+            redact(map_pair->GetReflection()->MutableMessage(map_pair, value_field_desc),
+                   sensitive);
+          } else if (sensitive) {
+            map_pair->GetReflection()->ClearField(map_pair, value_field_desc);
+          }
+        }
+      } else if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
           redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);

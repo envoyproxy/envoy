@@ -259,6 +259,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    bool appendXfh() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
@@ -376,10 +377,9 @@ private:
                                  }},
         Utility::LocalReplyData{is_grpc_request_, code, body, grpc_status, is_head_request_});
   }
-  // The async client won't pause if sending an Expect: 100-Continue so simply
-  // swallows any incoming encode100Continue.
-  void encode100ContinueHeaders(ResponseHeaderMapPtr&&) override {}
-  ResponseHeaderMapOptRef continueHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  // The async client won't pause if sending 1xx headers so simply swallow any.
+  void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}
+  ResponseHeaderMapOptRef informationalHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
   ResponseHeaderMapOptRef responseHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

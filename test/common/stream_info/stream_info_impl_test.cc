@@ -48,7 +48,7 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
   EXPECT_FALSE(info.lastDownstreamRxByteReceived());
-  info.onLastDownstreamRxByteReceived();
+  info.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
   std::chrono::nanoseconds dur =
       checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
@@ -72,12 +72,12 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstDownstreamTxByteSent());
-  info.onFirstDownstreamTxByteSent();
+  EXPECT_FALSE(info.downstreamTiming().firstDownstreamTxByteSent());
+  info.downstreamTiming().onFirstDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, info.firstDownstreamTxByteSent());
 
   EXPECT_FALSE(info.lastDownstreamTxByteSent());
-  info.onLastDownstreamTxByteSent();
+  info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, info.lastDownstreamTxByteSent());
 
   EXPECT_FALSE(info.requestComplete());
@@ -137,7 +137,9 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
   {
     StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
 
+    EXPECT_EQ(nullptr, stream_info.upstreamInfo());
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
+    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
 
     stream_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
@@ -146,6 +148,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.response_code_ = 200;
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
+
+    EXPECT_FALSE(stream_info.attemptCount().has_value());
+    stream_info.setAttemptCount(93);
+    ASSERT_TRUE(stream_info.attemptCount().has_value());
+    EXPECT_EQ(stream_info.attemptCount().value(), 93);
 
     EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
     stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
@@ -177,6 +184,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
+    EXPECT_EQ(nullptr, stream_info.upstreamFilterState());
     stream_info.setUpstreamFilterState(stream_info.filterState());
     EXPECT_EQ(1,
               stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
@@ -198,6 +206,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setUpstreamConnectionId(12345);
     ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
     EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
+
+    std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
+    EXPECT_NE(stream_info.upstreamInfo(), new_info);
+    stream_info.setUpstreamInfo(new_info);
+    EXPECT_EQ(stream_info.upstreamInfo(), new_info);
   }
 }
 
@@ -264,6 +277,24 @@ TEST_F(StreamInfoImplTest, Details) {
   stream_info.setResponseCodeDetails("two words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
+}
+
+TEST(UpstreamInfoImplTest, DumpState) {
+  UpstreamInfoImpl upstream_info;
+
+  {
+    std::stringstream out;
+    upstream_info.dumpState(out, 0);
+    std::string state = out.str();
+    EXPECT_THAT(state, testing::HasSubstr("upstream_connection_id_: null"));
+  }
+  upstream_info.setUpstreamConnectionId(5);
+  {
+    std::stringstream out;
+    upstream_info.dumpState(out, 0);
+    std::string state = out.str();
+    EXPECT_THAT(state, testing::HasSubstr("upstream_connection_id_: 5"));
+  }
 }
 
 } // namespace

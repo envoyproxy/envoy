@@ -74,7 +74,6 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // If we have a XRay TraceID in the headers, then we create a SpanContext to pass that trace-id
   // around if no TraceID (which means no x-ray header) then this is a brand new span.
 
-  UNREFERENCED_PARAMETER(config);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
   const auto header = trace_context.getByKey(XRayTraceHeader);
@@ -106,7 +105,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(operation_name, start_time,
+    return tracer->startSpan(config, operation_name, start_time,
                              header.has_value() ? absl::optional<XRayHeader>(xray_header)
                                                 : absl::nullopt);
   }

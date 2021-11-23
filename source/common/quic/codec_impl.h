@@ -53,6 +53,8 @@ public:
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 
+  EnvoyQuicServerSession& quicServerSession() { return quic_server_session_; }
+
 private:
   EnvoyQuicServerSession& quic_server_session_;
 };
@@ -70,8 +72,8 @@ public:
   Http::RequestEncoder& newStream(Http::ResponseDecoder& response_decoder) override;
 
   // Http::Connection
-  void goAway() override { NOT_REACHED_GCOVR_EXCL_LINE; }
-  void shutdownNotice() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void goAway() override;
+  void shutdownNotice() override {}
   void onUnderlyingConnectionAboveWriteBufferHighWatermark() override;
   void onUnderlyingConnectionBelowWriteBufferLowWatermark() override;
 

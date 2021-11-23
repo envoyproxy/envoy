@@ -52,6 +52,7 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
                              Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> match_tree)
       : delegated_callbacks_(delegated_callbacks), match_tree_(std::move(match_tree)) {}
 
+  Event::Dispatcher& dispatcher() override { return delegated_callbacks_.dispatcher(); }
   void addStreamDecoderFilter(Envoy::Http::StreamDecoderFilterSharedPtr filter) override {
     delegated_callbacks_.addStreamDecoderFilter(std::move(filter), match_tree_);
   }
@@ -88,10 +89,6 @@ struct DelegatingFactoryCallbacks : public Envoy::Http::FilterChainFactoryCallba
 Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
-
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
-    throw EnvoyException("Experimental matching API is not enabled");
-  }
 
   ASSERT(proto_config.has_extension_config());
   auto& factory =

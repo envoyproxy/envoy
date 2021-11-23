@@ -100,7 +100,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
             absl::StrCat("Failed to load trusted CA certificates from ", config_->caCertPath()));
       }
       if (has_crl) {
-        X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+        X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
+                                        ? X509_V_FLAG_CRL_CHECK
+                                        : X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
       }
       verify_mode = SSL_VERIFY_PEER;
       verify_trusted_ca_ = true;
@@ -136,8 +138,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
           X509_STORE_add_crl(store, item->crl);
         }
       }
-
-      X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+      X509_STORE_set_flags(store, config_->onlyVerifyLeafCertificateCrl()
+                                      ? X509_V_FLAG_CRL_CHECK
+                                      : X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
     }
   }
 
@@ -195,6 +198,7 @@ int DefaultCertValidator::doVerifyCertChain(
 
     if (ret <= 0) {
       stats_.fail_verify_error_.inc();
+      ENVOY_LOG(debug, "{}", Utility::getX509VerificationErrorInfo(store_ctx));
       return allow_untrusted_certificate_ ? 1 : ret;
     }
   }
@@ -277,33 +281,12 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = Utility::generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (general_name->type == GEN_DNS ? dnsNameMatch(config_san, san.c_str())
+      if (general_name->type == GEN_DNS ? Utility::dnsNameMatch(config_san, san.c_str())
                                         : config_san == san) {
         return true;
       }
     }
   }
-  return false;
-}
-
-bool DefaultCertValidator::dnsNameMatch(const absl::string_view dns_name,
-                                        const absl::string_view pattern) {
-  const std::string lower_case_dns_name = absl::AsciiStrToLower(dns_name);
-  const std::string lower_case_pattern = absl::AsciiStrToLower(pattern);
-  if (lower_case_dns_name == lower_case_pattern) {
-    return true;
-  }
-
-  size_t pattern_len = lower_case_pattern.length();
-  if (pattern_len > 1 && lower_case_pattern[0] == '*' && lower_case_pattern[1] == '.') {
-    if (lower_case_dns_name.length() > pattern_len - 1) {
-      const size_t off = lower_case_dns_name.length() - pattern_len + 1;
-      return lower_case_dns_name.substr(0, off).find('.') == std::string::npos &&
-             lower_case_dns_name.substr(off, pattern_len - 1) ==
-                 lower_case_pattern.substr(1, pattern_len - 1);
-    }
-  }
-
   return false;
 }
 
@@ -323,7 +306,7 @@ bool DefaultCertValidator::matchSubjectAltName(
       if (general_name->type == GEN_DNS &&
                   config_san_matcher.matcher().match_pattern_case() ==
                       envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
+              ? Utility::dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
               : config_san_matcher.match(san)) {
         return true;
       }

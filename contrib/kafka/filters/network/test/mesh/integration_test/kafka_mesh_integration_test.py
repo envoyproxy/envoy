@@ -15,6 +15,17 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import urllib.request
 
 
+class Message:
+    """
+    Stores data sent to Envoy / Kafka.
+    """
+
+    def __init__(self):
+        self.key = os.urandom(256)
+        self.value = os.urandom(2048)
+        self.headers = [('header_' + str(h), os.urandom(128)) for h in range(3)]
+
+
 class IntegrationTest(unittest.TestCase):
     """
     All tests in this class depend on Envoy/Zookeeper/Kafka running.
@@ -81,28 +92,36 @@ class IntegrationTest(unittest.TestCase):
 
         producer = KafkaProducer(
             bootstrap_servers=IntegrationTest.kafka_envoy_address(), api_version=(1, 0, 0))
-        offset_to_payload1 = {}
-        offset_to_payload2 = {}
+        offset_to_message1 = {}
+        offset_to_message2 = {}
         for _ in range(messages_to_send):
-            payload = bytearray(random.getrandbits(8) for _ in range(5))
+            message = Message()
             future1 = producer.send(
-                value=payload, topic=partition1.topic, partition=partition1.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition1.topic,
+                partition=partition1.partition)
             self.assertTrue(future1.get().offset >= 0)
-            offset_to_payload1[future1.get().offset] = payload
+            offset_to_message1[future1.get().offset] = message
 
             future2 = producer.send(
-                value=payload, topic=partition2.topic, partition=partition2.partition)
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition2.topic,
+                partition=partition2.partition)
             self.assertTrue(future2.get().offset >= 0)
-            offset_to_payload2[future2.get().offset] = payload
-        self.assertTrue(len(offset_to_payload1) == messages_to_send)
-        self.assertTrue(len(offset_to_payload2) == messages_to_send)
+            offset_to_message2[future2.get().offset] = message
+        self.assertTrue(len(offset_to_message1) == messages_to_send)
+        self.assertTrue(len(offset_to_message2) == messages_to_send)
         producer.close()
 
         # Check the target clusters.
         self.__verify_target_kafka_cluster(
-            IntegrationTest.kafka_cluster1_address(), partition1, offset_to_payload1, partition2)
+            IntegrationTest.kafka_cluster1_address(), partition1, offset_to_message1, partition2)
         self.__verify_target_kafka_cluster(
-            IntegrationTest.kafka_cluster2_address(), partition2, offset_to_payload2, partition1)
+            IntegrationTest.kafka_cluster2_address(), partition2, offset_to_message2, partition1)
 
         # Check if requests have been received.
         self.metrics.collect_final_metrics()
@@ -123,53 +142,64 @@ class IntegrationTest(unittest.TestCase):
             api_version=(1, 0, 0),
             linger_ms=1000,
             batch_size=100)
-        future_to_payload1 = {}
-        future_to_payload2 = {}
+        future_to_message1 = {}
+        future_to_message2 = {}
         for _ in range(messages_to_send):
-            payload = bytearray(random.getrandbits(8) for _ in range(5))
+            message = Message()
             future1 = producer.send(
-                value=payload, topic=partition1.topic, partition=partition1.partition)
-            future_to_payload1[future1] = payload
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition1.topic,
+                partition=partition1.partition)
+            future_to_message1[future1] = message
 
-            payload = bytearray(random.getrandbits(8) for _ in range(5))
+            message = Message()
             future2 = producer.send(
-                value=payload, topic=partition2.topic, partition=partition2.partition)
-            future_to_payload2[future2] = payload
+                key=message.key,
+                value=message.value,
+                headers=message.headers,
+                topic=partition2.topic,
+                partition=partition2.partition)
+            future_to_message2[future2] = message
 
-        offset_to_payload1 = {}
-        offset_to_payload2 = {}
-        for future in future_to_payload1.keys():
-            offset_to_payload1[future.get().offset] = future_to_payload1[future]
+        offset_to_message1 = {}
+        offset_to_message2 = {}
+        for future in future_to_message1.keys():
+            offset_to_message1[future.get().offset] = future_to_message1[future]
             self.assertTrue(future.get().offset >= 0)
-        for future in future_to_payload2.keys():
-            offset_to_payload2[future.get().offset] = future_to_payload2[future]
+        for future in future_to_message2.keys():
+            offset_to_message2[future.get().offset] = future_to_message2[future]
             self.assertTrue(future.get().offset >= 0)
-        self.assertTrue(len(offset_to_payload1) == messages_to_send)
-        self.assertTrue(len(offset_to_payload2) == messages_to_send)
+        self.assertTrue(len(offset_to_message1) == messages_to_send)
+        self.assertTrue(len(offset_to_message2) == messages_to_send)
         producer.close()
 
         # Check the target clusters.
         self.__verify_target_kafka_cluster(
-            IntegrationTest.kafka_cluster1_address(), partition1, offset_to_payload1, partition2)
+            IntegrationTest.kafka_cluster1_address(), partition1, offset_to_message1, partition2)
         self.__verify_target_kafka_cluster(
-            IntegrationTest.kafka_cluster2_address(), partition2, offset_to_payload2, partition1)
+            IntegrationTest.kafka_cluster2_address(), partition2, offset_to_message2, partition1)
 
         # Check if requests have been received.
         self.metrics.collect_final_metrics()
         self.metrics.assert_metric_increase('produce', 1)
 
     def __verify_target_kafka_cluster(
-            self, bootstrap_servers, partition, offset_to_payload_map, other_partition):
+            self, bootstrap_servers, partition, offset_to_message_map, other_partition):
         # Check if records were properly forwarded to the cluster.
         consumer = KafkaConsumer(bootstrap_servers=bootstrap_servers, auto_offset_reset='earliest')
         consumer.assign([partition])
         received_messages = []
-        while (len(received_messages) < len(offset_to_payload_map)):
+        while (len(received_messages) < len(offset_to_message_map)):
             poll_result = consumer.poll(timeout_ms=1000)
             received_messages += poll_result[partition]
-        self.assertTrue(len(received_messages) == len(offset_to_payload_map))
+        self.assertTrue(len(received_messages) == len(offset_to_message_map))
         for record in received_messages:
-            self.assertTrue(record.value == offset_to_payload_map[record.offset])
+            sent_message = offset_to_message_map[record.offset]
+            self.assertTrue(record.key == sent_message.key)
+            self.assertTrue(record.value == sent_message.value)
+            self.assertTrue(record.headers == sent_message.headers)
 
         # Check that no records were incorrectly routed from the "other" partition (they would have created the topics).
         self.assertTrue(other_partition.topic not in consumer.topics())

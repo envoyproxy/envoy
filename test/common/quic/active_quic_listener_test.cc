@@ -190,18 +190,19 @@ protected:
       read_filters_.push_back(std::move(read_filter));
       // A Sequence must be used to allow multiple EXPECT_CALL().WillOnce()
       // calls for the same object.
-      EXPECT_CALL(*filter_chain_, transportSocketFactory())
-          .InSequence(seq)
-          .WillOnce(ReturnRef(transport_socket_factory_));
       EXPECT_CALL(*filter_chain_, networkFilterFactories())
           .InSequence(seq)
           .WillOnce(ReturnRef(filter_factories_.back()));
+      EXPECT_CALL(*filter_chain_, transportSocketFactory())
+          .InSequence(seq)
+          .WillOnce(ReturnRef(transport_socket_factory_));
     }
   }
 
   void sendCHLO(quic::QuicConnectionId connection_id) {
-    client_sockets_.push_back(std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram,
-                                                                    local_address_, nullptr));
+    client_sockets_.push_back(
+        std::make_unique<Network::SocketImpl>(Network::Socket::Type::Datagram, local_address_,
+                                              nullptr, Network::SocketCreationOptions{}));
     Buffer::OwnedImpl payload =
         generateChloPacketToSend(quic_version_, quic_config_, connection_id);
     Buffer::RawSliceVector slice = payload.getRawSlices();
@@ -217,7 +218,7 @@ protected:
     // no packet is received when the event loop is running.
     // TODO(ggreenway): make tests more reliable, and handle packet loss during the tests, possibly
     // by retransmitting on a timer.
-    ::usleep(1000);
+    ::usleep(1000); // NO_CHECK_FORMAT(real_time)
 #endif
   }
 

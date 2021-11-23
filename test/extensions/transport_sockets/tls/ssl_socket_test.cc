@@ -279,6 +279,13 @@ public:
   }
   const std::string& notExpectedClientStats() const { return not_expected_client_stats_; }
 
+  TestUtilOptions& setExpectedVerifyErrorCode(int code) {
+    expected_verify_error_code_ = code;
+    return *this;
+  }
+
+  int expectedVerifyErrorCode() const { return expected_verify_error_code_; }
+
 private:
   const std::string client_ctx_yaml_;
   const std::string server_ctx_yaml_;
@@ -303,6 +310,7 @@ private:
   std::string expected_transport_failure_reason_contains_;
   std::string not_expected_client_stats_;
   std::string expected_sni_;
+  int expected_verify_error_code_{-1};
 };
 
 void testUtil(const TestUtilOptions& options) {
@@ -363,7 +371,7 @@ void testUtil(const TestUtilOptions& options) {
       client_ssl_socket_factory.createTransportSocket(nullptr), nullptr);
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         server_connection = dispatcher->createServerConnection(
@@ -506,7 +514,12 @@ void testUtil(const TestUtilOptions& options) {
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
   }
 
-  dispatcher->run(Event::Dispatcher::RunType::Block);
+  if (options.expectedVerifyErrorCode() != -1) {
+    EXPECT_LOG_CONTAINS("debug", X509_verify_cert_error_string(options.expectedVerifyErrorCode()),
+                        dispatcher->run(Event::Dispatcher::RunType::Block));
+  } else {
+    dispatcher->run(Event::Dispatcher::RunType::Block);
+  }
 
   if (!options.expectedServerStats().empty()) {
     EXPECT_EQ(1UL, server_stats_store.counter(options.expectedServerStats()).value());
@@ -669,6 +682,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, server_names);
+  EXPECT_FALSE(server_ssl_socket_factory.usesProxyProtocolOptions());
 
   Event::DispatcherPtr dispatcher(server_api->allocateDispatcher("test_thread"));
   auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
@@ -705,7 +719,7 @@ void testUtilV2(const TestUtilOptionsV2& options) {
 
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
         std::string sni = options.transportSocketOptions() != nullptr &&
@@ -713,9 +727,11 @@ void testUtilV2(const TestUtilOptionsV2& options) {
                               ? options.transportSocketOptions()->serverNameOverride().value()
                               : options.clientCtxProto().sni();
         socket->setRequestedServerName(sni);
+        Network::TransportSocketPtr transport_socket =
+            server_ssl_socket_factory.createTransportSocket(nullptr);
+        EXPECT_FALSE(transport_socket->startSecureTransport());
         server_connection = dispatcher->createServerConnection(
-            std::move(socket), server_ssl_socket_factory.createTransportSocket(nullptr),
-            stream_info);
+            std::move(socket), std::move(transport_socket), stream_info);
         server_connection->addConnectionCallbacks(server_connection_callbacks);
       }));
 
@@ -1528,7 +1544,8 @@ TEST_P(SslSocketTest, FailedClientAuthCaVerification) {
 )EOF";
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
 }
 
 TEST_P(SslSocketTest, FailedClientAuthSanVerificationNoClientCert) {
@@ -1927,7 +1944,8 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
                                                    TEST_SAN_URI_CERT_256_HASH, "\"");
 
   TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY));
 }
 
 TEST_P(SslSocketTest, CertificatesWithPassword) {
@@ -1973,6 +1991,84 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_256_HASH));
+
+  // Works even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(test_options);
+}
+
+TEST_P(SslSocketTest, Pkcs12CertificatesWithPassword) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+
+  server_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12"));
+  server_cert->mutable_password()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"));
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
+      server_validation_ctx =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(TEST_PASSWORD_PROTECTED_CERT_256_HASH);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12"));
+  client_cert->mutable_password()->set_inline_string(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+          "{{ test_rundir "
+          "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt")));
+
+  TestUtilOptionsV2 test_options(listener, client, true, GetParam());
+  testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+                 .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_256_HASH));
+
+  // Works even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(test_options);
+}
+
+TEST_P(SslSocketTest, Pkcs12CertificatesWithoutPassword) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+
+  server_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"));
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
+      server_validation_ctx =
+          tls_context.mutable_common_tls_context()->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(TEST_SAN_DNS3_CERT_256_HASH);
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"));
+
+  TestUtilOptionsV2 test_options(listener, client, true, GetParam());
+  testUtilV2(test_options.setExpectedServerCertDigest(TEST_SAN_DNS3_CERT_256_HASH));
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -4382,7 +4478,8 @@ TEST_P(SslSocketTest, RevokedCertificate) {
 )EOF";
 
   TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -4424,7 +4521,8 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
 )EOF";
 
   TestUtilOptions revoked_test_options(revoked_client_ctx_yaml, server_ctx_yaml, false, GetParam());
-  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // This should succeed, since the cert isn't revoked.
   const std::string successful_client_ctx_yaml = R"EOF(
@@ -4513,17 +4611,20 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificate) {
   // Ensure that incomplete crl chains fail with revoked certificates.
   TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
                                                   incomplete_server_ctx_yaml, false, GetParam());
-  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that incomplete crl chains fail with unrevoked certificates.
   TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                     incomplete_server_ctx_yaml, false, GetParam());
-  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
 
   // Ensure that complete crl chains fail with revoked certificates.
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
                                                 false, GetParam());
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
@@ -4596,22 +4697,104 @@ TEST_P(SslSocketTest, RevokedIntermediateCertificateCRLInTrustedCA) {
   // Ensure that incomplete crl chains fail with revoked certificates.
   TestUtilOptions incomplete_revoked_test_options(revoked_client_ctx_yaml,
                                                   incomplete_server_ctx_yaml, false, GetParam());
-  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(incomplete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that incomplete crl chains fail with unrevoked certificates.
   TestUtilOptions incomplete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                     incomplete_server_ctx_yaml, false, GetParam());
-  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(incomplete_unrevoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_UNABLE_TO_GET_CRL));
 
   // Ensure that complete crl chains fail with revoked certificates.
   TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, complete_server_ctx_yaml,
                                                 false, GetParam());
-  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error"));
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 
   // Ensure that complete crl chains succeed with unrevoked certificates.
   TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
                                                   complete_server_ctx_yaml, true, GetParam());
   testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, NotRevokedLeafCertificateOnlyLeafCRLValidation) {
+  // The test checks that revoked certificate will makes the validation success even if we set
+  // only_verify_leaf_cert_crl to true.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits (But this test will succeed):
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+      only_verify_leaf_cert_crl: true
+)EOF";
+
+  // This should succeed, since the certificate has not been revoked.
+  const std::string unrevoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns4_key.pem"
+)EOF";
+
+  TestUtilOptions complete_unrevoked_test_options(unrevoked_client_ctx_yaml,
+                                                  incomplete_server_ctx_yaml, true, GetParam());
+  testUtil(complete_unrevoked_test_options.setExpectedSerialNumber(TEST_SAN_DNS4_CERT_SERIAL));
+}
+
+TEST_P(SslSocketTest, RevokedLeafCertificateOnlyLeafCRLValidation) {
+  // The test checks that revoked certificate will makes the validation fails even if we set
+  // only_verify_leaf_cert_crl to true.
+  //
+  // Trust chain contains:
+  //  - Root authority certificate (i.e., ca_cert.pem)
+  //  - Intermediate authority certificate (i.e., intermediate_ca_cert.pem)
+  //  - Intermediate authority certificate revocation list (i.e., intermediate_ca_cert.crl)
+  //
+  // Trust chain omits (But this test will succeed):
+  //  - Root authority certificate revocation list (i.e., ca_cert.crl)
+  const std::string incomplete_server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/intermediate_ca_cert_chain_with_crl.pem"
+      only_verify_leaf_cert_crl: true
+)EOF";
+
+  // This should fail, since the certificate has been revoked.
+  const std::string revoked_client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_key.pem"
+)EOF";
+
+  TestUtilOptions complete_revoked_test_options(revoked_client_ctx_yaml, incomplete_server_ctx_yaml,
+                                                false, GetParam());
+  testUtil(complete_revoked_test_options.setExpectedServerStats("ssl.fail_verify_error")
+               .setExpectedVerifyErrorCode(X509_V_ERR_CERT_REVOKED));
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {

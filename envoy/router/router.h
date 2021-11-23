@@ -871,6 +871,11 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
+   * @return bool true if the x-forwarded-host header should be updated.
+   */
+  virtual bool appendXfh() const PURE;
+
+  /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
    * selecting an upstream host
    */
@@ -1299,7 +1304,6 @@ public:
   virtual void readDisable(bool disable) PURE;
   /**
    * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
    */
   virtual void resetStream() PURE;
 
@@ -1308,6 +1312,11 @@ public:
    * @param the account to assign the generic upstream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;
