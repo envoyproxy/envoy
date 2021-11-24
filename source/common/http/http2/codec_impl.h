@@ -240,7 +240,10 @@ protected:
     // submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
     virtual bool useDeferredReset() const PURE;
     virtual StreamDecoder& decoder() PURE;
-    virtual HeaderMap& headers() PURE;
+    virtual HeaderMap* headers() PURE;
+    virtual HeaderMap* trailers() PURE;
+    // Returns the header map we're currently building.
+    virtual HeaderMap& currentHeaderMap() PURE;
     virtual void allocTrailers() PURE;
     virtual HeaderMapPtr cloneTrailers(const HeaderMap& trailers) PURE;
 
@@ -359,7 +362,7 @@ protected:
     ClientStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit,
                      ResponseDecoder& response_decoder)
         : StreamImpl(parent, buffer_limit), response_decoder_(response_decoder),
-          headers_or_trailers_(ResponseHeaderMapImpl::create()) {}
+          headers_(ResponseHeaderMapImpl::create()) {}
 
     // Http::MultiplexedStreamImplBase
     // Client streams do not need a flush timer because we currently assume that any failure
@@ -372,20 +375,27 @@ protected:
     StreamDecoder& decoder() override { return response_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
-    HeaderMap& headers() override {
-      if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+    HeaderMap* headers() override { return headers_.get(); }
+    HeaderMap* trailers() override { return trailers_.get(); }
+    HeaderMap& currentHeaderMap() override {
+      if (decode_headers_called_) {
+        ASSERT(trailers_ != nullptr);
+        return *trailers_;
       } else {
-        return *absl::get<ResponseTrailerMapPtr>(headers_or_trailers_);
+        ASSERT(headers_ != nullptr);
+        return *headers_;
       }
     }
     void allocTrailers() override {
       // If we are waiting for informational headers, make a new response header map, otherwise
       // we are about to receive trailers. The codec makes sure this is the only valid sequence.
       if (received_noninformational_headers_) {
-        headers_or_trailers_.emplace<ResponseTrailerMapPtr>(ResponseTrailerMapImpl::create());
+        trailers_ = ResponseTrailerMapImpl::create();
       } else {
-        headers_or_trailers_.emplace<ResponseHeaderMapPtr>(ResponseHeaderMapImpl::create());
+        // If we're getting new response headers, reset that we might have
+        // called decodeHeaders() as we'll need to make another call.
+        decode_headers_called_ = false;
+        headers_ = ResponseHeaderMapImpl::create();
       }
     }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
@@ -402,8 +412,10 @@ protected:
     // ScopeTrackedObject
     void dumpState(std::ostream& os, int indent_level) const override;
 
+    bool decode_headers_called_{false};
     ResponseDecoder& response_decoder_;
-    absl::variant<ResponseHeaderMapPtr, ResponseTrailerMapPtr> headers_or_trailers_;
+    ResponseHeaderMapPtr headers_;
+    ResponseTrailerMapPtr trailers_;
     std::string upgrade_type_;
   };
 
@@ -414,7 +426,7 @@ protected:
    */
   struct ServerStreamImpl : public StreamImpl, public ResponseEncoder {
     ServerStreamImpl(ConnectionImpl& parent, uint32_t buffer_limit)
-        : StreamImpl(parent, buffer_limit), headers_or_trailers_(RequestHeaderMapImpl::create()) {}
+        : StreamImpl(parent, buffer_limit), headers_(RequestHeaderMapImpl::create()) {}
 
     // StreamImpl
     void destroy() override;
@@ -426,16 +438,18 @@ protected:
     StreamDecoder& decoder() override { return *request_decoder_; }
     void decodeHeaders() override;
     void decodeTrailers() override;
-    HeaderMap& headers() override {
-      if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-        return *absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+    HeaderMap* headers() override { return headers_.get(); }
+    HeaderMap* trailers() override { return trailers_.get(); }
+    HeaderMap& currentHeaderMap() override {
+      if (decode_headers_called_) {
+        ASSERT(trailers_ != nullptr);
+        return *trailers_;
       } else {
-        return *absl::get<RequestTrailerMapPtr>(headers_or_trailers_);
+        ASSERT(headers_ != nullptr);
+        return *headers_;
       }
     }
-    void allocTrailers() override {
-      headers_or_trailers_.emplace<RequestTrailerMapPtr>(RequestTrailerMapImpl::create());
-    }
+    void allocTrailers() override { trailers_ = RequestTrailerMapImpl::create(); }
     HeaderMapPtr cloneTrailers(const HeaderMap& trailers) override {
       return createHeaderMap<ResponseTrailerMapImpl>(trailers);
     }
@@ -452,7 +466,9 @@ protected:
     void dumpState(std::ostream& os, int indent_level) const override;
 
     RequestDecoder* request_decoder_{};
-    absl::variant<RequestHeaderMapPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    RequestHeaderMapPtr headers_;
+    RequestTrailerMapPtr trailers_;
+    bool decode_headers_called_{false};
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;

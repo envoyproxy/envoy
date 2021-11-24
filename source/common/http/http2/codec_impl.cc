@@ -388,7 +388,8 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+  decode_headers_called_ = true;
+  auto& headers = headers_;
   const uint64_t status = Http::Utility::getResponseStatus(*headers);
 
   if (!upgrade_type_.empty() && headers->Status()) {
@@ -409,12 +410,14 @@ void ConnectionImpl::ClientStreamImpl::decodeHeaders() {
 }
 
 void ConnectionImpl::ClientStreamImpl::decodeTrailers() {
-  response_decoder_.decodeTrailers(
-      std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
+  ASSERT(trailers_ != nullptr);
+  response_decoder_.decodeTrailers(std::move(trailers_));
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
-  auto& headers = absl::get<RequestHeaderMapPtr>(headers_or_trailers_);
+  decode_headers_called_ = true;
+  ASSERT(headers_ != nullptr);
+  auto& headers = headers_;
   if (Http::Utility::isH2UpgradeRequest(*headers)) {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
@@ -422,8 +425,8 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
-  request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  ASSERT(trailers_ != nullptr);
+  request_decoder_->decodeTrailers(std::move(trailers_));
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -442,7 +445,7 @@ void ConnectionImpl::StreamImpl::pendingSendBufferLowWatermark() {
 
 void ConnectionImpl::StreamImpl::saveHeader(HeaderString&& name, HeaderString&& value) {
   if (!Utility::reconstituteCrumbledCookies(name, value, cookies_)) {
-    headers().addViaMove(std::move(name), std::move(value));
+    currentHeaderMap().addViaMove(std::move(name), std::move(value));
   }
 }
 
@@ -1033,7 +1036,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
-      stream->headers().addViaMove(std::move(key), std::move(stream->cookies_));
+      stream->currentHeaderMap().addViaMove(std::move(key), std::move(stream->cookies_));
     }
 
     switch (frame->headers.cat) {
@@ -1355,8 +1358,8 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
 
   stream->saveHeader(std::move(name), std::move(value));
 
-  if (stream->headers().byteSize() > max_headers_kb_ * 1024 ||
-      stream->headers().size() > max_headers_count_) {
+  if (stream->currentHeaderMap().byteSize() > max_headers_kb_ * 1024 ||
+      stream->currentHeaderMap().size() > max_headers_count_) {
     stream->setDetails(Http2ResponseCodeDetails::get().too_many_headers);
     stats_.header_overflow_.inc();
     // This will cause the library to reset/close the stream.
@@ -1841,11 +1844,8 @@ void ConnectionImpl::ClientStreamImpl::dumpState(std::ostream& os, int indent_le
   StreamImpl::dumpState(os, indent_level);
 
   // Dump header map
-  if (absl::holds_alternative<ResponseHeaderMapPtr>(headers_or_trailers_)) {
-    DUMP_DETAILS(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_));
-  } else {
-    DUMP_DETAILS(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_));
-  }
+  DUMP_DETAILS(headers_);
+  DUMP_DETAILS(trailers_);
 }
 
 void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_level) const {
@@ -1853,11 +1853,8 @@ void ConnectionImpl::ServerStreamImpl::dumpState(std::ostream& os, int indent_le
   StreamImpl::dumpState(os, indent_level);
 
   // Dump header map
-  if (absl::holds_alternative<RequestHeaderMapPtr>(headers_or_trailers_)) {
-    DUMP_DETAILS(absl::get<RequestHeaderMapPtr>(headers_or_trailers_));
-  } else {
-    DUMP_DETAILS(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
-  }
+  DUMP_DETAILS(headers_);
+  DUMP_DETAILS(trailers_);
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
