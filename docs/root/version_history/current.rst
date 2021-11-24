@@ -21,7 +21,6 @@ Minor Behavior Changes
 * json: switching from rapidjson to nlohmann/json. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.remove_legacy_json`` to false.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
 * quic: add back the support for IETF draft 29 which is guarded via ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29``. It is off by default so Envoy only supports RFCv1 without flipping this runtime guard explicitly. Draft 29 is not recommended for use.
-* http: when envoy run out of ``max_requests_per_connection``, it will send an HTTP/2 "shutdown nofitication" (GOAWAY frame with max stream ID) and go to a default grace period of 5000 milliseconds (5 seconds) if ``drain_timeout`` is not specified. During this grace period, envoy will continue to accept new streams. After the grace period, a final GOAWAY is sent and envoy will start refusing new streams. However before bugfix, during the grace period, every time a new stream is received, old envoy will always send a "shutdown notification" and restart drain again which actually causes the grace period to be extended and is no longer equal to ``drain_timeout``.
 
 Bug Fixes
 ---------
