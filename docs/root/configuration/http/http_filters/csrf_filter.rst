@@ -20,7 +20,8 @@ There are many ways to mitigate CSRF, some of which have been outlined in the
 This filter employs a stateless mitigation pattern known as origin verification.
 
 This pattern relies on two pieces of information used in determining if
-a request originated from the same host.
+a request originated from the same host:
+
 * The origin that caused the user agent to issue the request (source origin).
 * The origin that the request is going to (target origin).
 
