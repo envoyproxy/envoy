@@ -2,6 +2,8 @@
 
 #include "envoy/common/exception.h"
 
+#include "source/extensions/filters/common/expr/library/custom_library.h"
+
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
 
@@ -14,8 +16,15 @@ namespace Expr {
 ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                                const Http::RequestHeaderMap* request_headers,
                                const Http::ResponseHeaderMap* response_headers,
-                               const Http::ResponseTrailerMap* response_trailers) {
+                               const Http::ResponseTrailerMap* response_trailers,
+                               CustomLibrary* custom_library) {
   auto activation = std::make_unique<Activation>();
+
+  if (custom_library && custom_library->replace_default_library()) {
+    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers,
+                                   response_trailers);
+  }
+
   activation->InsertValueProducer(Request,
                                   std::make_unique<RequestWrapper>(arena, request_headers, info));
   activation->InsertValueProducer(Response, std::make_unique<ResponseWrapper>(
@@ -28,10 +37,16 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
                                   std::make_unique<MetadataProducer>(info.dynamicMetadata()));
   activation->InsertValueProducer(FilterState,
                                   std::make_unique<FilterStateWrapper>(info.filterState()));
+
+  if (custom_library && !custom_library->replace_default_library()) {
+    custom_library->FillActivation(activation.get(), arena, info, request_headers, response_headers,
+                                   response_trailers);
+  }
+
   return activation;
 }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena) {
+BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_library) {
   google::api::expr::runtime::InterpreterOptions options;
 
   // Security-oriented defaults
@@ -55,6 +70,11 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
     throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
+
+  if (custom_library) {
+    custom_library->RegisterFunctions(builder->GetRegistry());
+  }
+
   return builder;
 }
 
@@ -72,9 +92,10 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const StreamInfo::StreamInfo& info,
                                   const Http::RequestHeaderMap* request_headers,
                                   const Http::ResponseHeaderMap* response_headers,
-                                  const Http::ResponseTrailerMap* response_trailers) {
-  auto activation =
-      createActivation(arena, info, request_headers, response_headers, response_trailers);
+                                  const Http::ResponseTrailerMap* response_trailers,
+                                  CustomLibrary* custom_library) {
+  auto activation = createActivation(arena, info, request_headers, response_headers,
+                                     response_trailers, custom_library);
   auto eval_status = expr.Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
@@ -85,8 +106,13 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
 
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::RequestHeaderMap& headers) {
+  return matches(expr, info, headers, nullptr);
+}
+
+bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
+             const Http::RequestHeaderMap& headers, CustomLibrary* custom_library) {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr);
+  auto eval_status = Expr::evaluate(expr, arena, info, &headers, nullptr, nullptr, custom_library);
   if (!eval_status.has_value()) {
     return false;
   }

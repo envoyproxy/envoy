@@ -6,6 +6,8 @@
 #include "source/common/config/utility.h"
 #include "source/extensions/filters/common/rbac/matcher_extension.h"
 
+#include "source/extensions/filters/common/expr/library/custom_library.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -239,6 +241,15 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
          (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
+}
+
+bool PolicyMatcher::matches(const Network::Connection& connection,
+                            const Envoy::Http::RequestHeaderMap& headers,
+                            const StreamInfo::StreamInfo& info,
+                            CustomLibrary* custom_library) const {
+  return permissions_.matches(connection, headers, info) &&
+         principals_.matches(connection, headers, info) &&
+         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers, custom_library));
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,

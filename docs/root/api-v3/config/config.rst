@@ -34,3 +34,4 @@ Extensions
   formatter/formatter
   contrib/contrib
   rbac/matchers
+  rbac/custom_library_config

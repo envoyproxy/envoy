@@ -35,7 +35,7 @@ public:
                           const StreamInfo::StreamInfo& info) const override {
     ProtobufWkt::Arena arena;
     const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, info,
-                                                        &headers, nullptr, nullptr);
+                                                        &headers, nullptr, nullptr, nullptr);
     if (!result.has_value() || result.value().IsError()) {
       // If result is an error and if skip_if_error is true skip this descriptor,
       // while calling rate limiting service. If skip_if_error is false, do not call rate limiting
@@ -86,7 +86,7 @@ RateLimit::DescriptorProducerPtr ExprDescriptorFactory::createDescriptorProducer
 
 Filters::Common::Expr::Builder& ExprDescriptorFactory::getOrCreateBuilder() {
   if (expr_builder_ == nullptr) {
-    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr);
+    expr_builder_ = Filters::Common::Expr::createBuilder(nullptr, nullptr);
   }
   return *expr_builder_;
 }

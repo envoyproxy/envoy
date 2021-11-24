@@ -19,7 +19,7 @@ namespace {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
   // Create builder without constant folding.
-  static Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+  static Expr::BuilderPtr builder = Expr::createBuilder(nullptr, nullptr);
   std::unique_ptr<TestStreamInfo> stream_info;
 
   try {
@@ -44,7 +44,7 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
     // Evaluate the CEL expression.
     Protobuf::Arena arena;
     Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
-                   &response_trailers);
+                   &response_trailers, nullptr);
   } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());
   }
