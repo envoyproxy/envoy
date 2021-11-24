@@ -9,6 +9,7 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -268,7 +269,26 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
-// [#next-free-field: 15]
+// Matcher for subject alternative names, to match both type and value of the SAN.
+message SubjectAltNameMatcher {
+  // Indicates the choice of GeneralName as defined in section 4.2.1.5 of RFC 5280 to match
+  // against.
+  enum SanType {
+    SAN_TYPE_UNSPECIFIED = 0;
+    EMAIL = 1;
+    DNS = 2;
+    URI = 3;
+    IP_ADDRESS = 4;
+  }
+
+  // Specification of type of SAN. Note that the default enum value is an invalid choice.
+  SanType san_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // Matcher for SAN value.
+  type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
+}
+
+// [#next-free-field: 16]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -298,8 +318,8 @@ message CertificateValidationContext {
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
-  // :ref:`match_subject_alt_names
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
+  // :ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
@@ -406,6 +426,8 @@ message CertificateValidationContext {
 
   // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matchers.
+  // The matching uses "any" semantics, that is to say, the SAN is verified if at least one matcher is
+  // matched.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`.
@@ -414,15 +436,22 @@ message CertificateValidationContext {
   //
   // .. code-block:: yaml
   //
-  //  match_subject_alt_names:
-  //    exact: "api.example.com"
+  //  match_typed_subject_alt_names:
+  //  - san_type: DNS
+  //    matcher:
+  //      exact: "api.example.com"
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
+  repeated SubjectAltNameMatcher match_typed_subject_alt_names = 15;
+
+  // This field is deprecated in favor of ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
