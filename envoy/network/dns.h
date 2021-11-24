@@ -102,7 +102,7 @@ public:
    * @return if non-null, a handle that can be used to cancel the resolution.
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery* query(const std::string& dns_name, DnsResourceType resource_type);
+  virtual ActiveDnsQuery* query(const std::string& dns_name, DnsResourceType resource_type) PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
