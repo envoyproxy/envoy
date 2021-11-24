@@ -35,6 +35,9 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  ActiveDnsQuery* query(const std::string&, DnsResourceType) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   friend class DnsResolverImplPeer;
@@ -99,6 +102,33 @@ private:
     // In the dual_resolution case __any__ ARES_SUCCESS reply will result in a
     // ResolutionStatus::Success callback.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
+  };
+
+  // TODO(Shikugawa): implement DnsResolverImpl::query
+  //  - lookup
+  //  - handle timeout
+  class PendingQuery : public ActiveDnsQuery {
+  public:
+    using SrvResolveCb = std::function<void(Network::DnsResolver::ResolutionStatus,
+                                            std::list<Network::DnsSrvResponse>&&)>;
+
+    PendingQuery(SrvResolveCb cb, ares_channel channel, const std::string& dns_name,
+                 DnsResourceType resource_type)
+        : cb_(cb), channel_(channel), dns_name_(dns_name), resource_type_(resource_type) {}
+
+    void cancel(CancelReason) override { cancelled_ = true; }
+
+    void callback(int status, int timeouts, unsigned char* buf, int len);
+
+    void start();
+
+    const SrvResolveCb cb_;
+    const ares_channel channel_;
+    const std::string dns_name_;
+    const DnsResourceType resource_type_;
+    bool cancelled_{false};
+    DnsResolver::ResolutionStatus status_{DnsResolver::ResolutionStatus::Failure};
+    std::list<DnsSrvResponse> resp_;
   };
 
   struct AresOptions {

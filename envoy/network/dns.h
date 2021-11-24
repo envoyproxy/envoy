@@ -46,7 +46,22 @@ struct DnsResponse {
   const std::chrono::seconds ttl_;
 };
 
+/**
+ * DNS SRV record response.
+ */
+struct DnsSrvResponse {
+  DnsSrvResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
+      : host_(host), port_(port), priority_(priority), weight_(weight) {}
+
+  const std::string host_;
+  const uint16_t port_;
+  const uint16_t priority_;
+  const uint16_t weight_;
+};
+
 enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
+
+enum class DnsResourceType : uint8_t { SRV = 33 };
 
 /**
  * An asynchronous DNS resolver.
@@ -77,6 +92,17 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
+
+  /**
+   * Initiate an async DNS query. This function is used for querying specific type of DNS record.
+   * Currently, it supports only SRV record resolution. When looking up A/AAAA record,
+   * we should use DnsResolver::resolve.
+   * @param dns_name supplies the DNS name to lookup.
+   * @param resource_type the DNS resource type.
+   * @return if non-null, a handle that can be used to cancel the resolution.
+   *         This is only valid until the invocation of callback or ~DnsResolver().
+   */
+  virtual ActiveDnsQuery* query(const std::string& dns_name, DnsResourceType resource_type);
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "envoy/common/platform.h"
 #include "envoy/registry/registry.h"
@@ -353,6 +354,56 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
       [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
         static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts, addrinfo);
+      },
+      this);
+}
+
+void DnsResolverImpl::PendingQuery::callback(int status, int timeouts, unsigned char* buf,
+                                             int len) {
+  if (resource_type_ != DnsResourceType::SRV) {
+    ENVOY_LOG(debug, "DNS resource type {} is not supported", resource_type_);
+    return;
+  }
+
+  if (status != ARES_SUCCESS) {
+    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+    return;
+  }
+
+  if (timeouts > 0) {
+    ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
+  }
+
+  struct ares_srv_reply* record = nullptr;
+  int rc = ares_parse_srv_reply(buf, len, &record);
+  if (rc != ARES_SUCCESS || !record) {
+    ENVOY_LOG(debug, "failed to parse SRV record.");
+    return;
+  }
+
+  while (record) {
+    resp_.emplace_back(
+        DnsSrvResponse(record->host, record->port, record->priority, record->weight));
+    record = record->next;
+  }
+
+  status_ = ResolutionStatus::Success;
+
+  if (!cancelled_) {
+    cb_(status_, std::move(resp_));
+  }
+
+  ares_free_data(record);
+  delete this;
+}
+
+void DnsResolverImpl::PendingQuery::start() {
+  ares_query(
+      channel_, dns_name_.c_str(), 1 /* C_IN */,
+      static_cast<std::underlying_type<DnsResourceType>::type>(resource_type_),
+      [](void* arg, int status, int timeouts, unsigned char* buf, int len) {
+        static_cast<PendingQuery*>(arg)->callback(status, timeouts, buf, len);
       },
       this);
 }

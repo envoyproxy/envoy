@@ -17,6 +17,9 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  ActiveDnsQuery* query(const std::string&, DnsResourceType) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 } // namespace Network
