@@ -19,9 +19,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
-RouteEntryImpl::RouteEntryImpl(
-    const envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction& route_action,
-    Envoy::Server::Configuration::ServerFactoryContext& context)
+RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
+                               Envoy::Server::Configuration::ServerFactoryContext& context)
     : cluster_name_(route_action.cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route_action, timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       metadata_(route_action.metadata()) {
@@ -43,18 +42,15 @@ RouteEntryImpl::RouteEntryImpl(
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
     const Protobuf::Message& config, RouteActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  const auto& route_action = MessageUtil::downcastAndValidate<
-      const envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction&>(
-      config, validation_visitor);
+  const auto& route_action =
+      MessageUtil::downcastAndValidate<const ProtoRouteAction&>(config, validation_visitor);
   auto route = std::make_shared<RouteEntryImpl>(route_action, context.factory_context);
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
-RouteMatcherImpl::RouteMatcherImpl(
-    const envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteConfiguration&
-        route_config,
-    Envoy::Server::Configuration::FactoryContext& context)
+RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
+                                   Envoy::Server::Configuration::FactoryContext& context)
     : name_(route_config.name()) {
 
   RouteActionValidationVisitor validation_visitor;

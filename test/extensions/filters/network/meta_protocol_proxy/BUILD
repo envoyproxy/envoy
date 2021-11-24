@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         ":fake_codec_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/meta_protocol_proxy:route_lib",
+        "//test/extensions/filters/network/meta_protocol_proxy/mocks:route_matcher_mocks",
         "//test/extensions/filters/network/meta_protocol_proxy/mocks:stream_filter_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",

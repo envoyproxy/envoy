@@ -21,6 +21,8 @@ namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
 using ProtoRouteAction = envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction;
+using ProtoRouteConfiguration =
+    envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteConfiguration;
 
 class RouteEntryImpl : public RouteEntry {
 public:
@@ -56,12 +58,12 @@ struct RouteActionContext {
 // Action used with the matching tree to specify route to use for an incoming stream.
 class RouteMatchAction : public Matcher::ActionBase<ProtoRouteAction> {
 public:
-  explicit RouteMatchAction(RouteEntryImplConstSharedPtr route) : route_(std::move(route)) {}
+  explicit RouteMatchAction(RouteEntryConstSharedPtr route) : route_(std::move(route)) {}
 
-  RouteEntryImplConstSharedPtr route() const { return route_; }
+  RouteEntryConstSharedPtr route() const { return route_; }
 
 private:
-  const RouteEntryImplConstSharedPtr route_;
+  RouteEntryConstSharedPtr route_;
 };
 
 class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<Request> {
@@ -78,21 +80,20 @@ public:
   Matcher::ActionFactoryCb
   createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
                         ProtobufMessage::ValidationVisitor& validation_visitor) override;
-  std::string name() const override { return "route"; }
+  std::string name() const override { return "envoy.matching.action.meta_protocol.route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction>();
+    return std::make_unique<ProtoRouteAction>();
   }
 };
 
 class RouteMatcherImpl : public RouteMatcher, Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  RouteMatcherImpl(
-      const envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteConfiguration&
-          route_config,
-      Envoy::Server::Configuration::FactoryContext& context);
+  RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
+                   Envoy::Server::Configuration::FactoryContext& context);
 
   RouteEntryConstSharedPtr routeEntry(const Request& request) const override;
+
+  absl::string_view name() { return name_; }
 
 private:
   std::string name_;

@@ -26,7 +26,7 @@ public:
   Matcher::DataInputGetResult get(const Request& data) const override {
     Matcher::DataInputGetResult result;
     result.data_availability_ = Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
-    result.data_.emplace(data.authority());
+    result.data_.emplace(data.host());
     return result;
   }
 };

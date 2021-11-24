@@ -73,13 +73,13 @@ public:
   virtual absl::string_view protocol() const PURE;
 
   /**
-   * Get request authority.
+   * Get request host.
    *
-   * @return The authority of meta protocol request. It generally consists of the host and an
+   * @return The host of meta protocol request. It generally consists of the host and an
    * optional user information and an optional port. For different application protocols, the
    * meaning of the return value may be different.
    */
-  virtual absl::string_view authority() const PURE;
+  virtual absl::string_view host() const PURE;
 
   /**
    * Get request path.

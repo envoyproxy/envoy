@@ -38,7 +38,7 @@ public:
  * factory. The message format of this protocol is shown below.
  *
  * Fake request message format:
- *   <INT Message Size><Protocol>|<Authority>|<PATH>|<METHOD>|<key>:<value>;*
+ *   <INT Message Size><Protocol>|<host>|<PATH>|<METHOD>|<key>:<value>;*
  * Fake response message format:
      <INT Message Size><INT Status><Protocol>|<Status Detail>|<key>:<value>;*
  */
@@ -47,12 +47,12 @@ public:
   class FakeRequest : public FakeStreamBase<Request> {
   public:
     absl::string_view protocol() const override { return protocol_; }
-    absl::string_view authority() const override { return authority_; }
+    absl::string_view host() const override { return host_; }
     absl::string_view path() const override { return path_; }
     absl::string_view method() const override { return method_; }
 
     std::string protocol_;
-    std::string authority_;
+    std::string host_;
     std::string path_;
     std::string method_;
   };
@@ -84,7 +84,7 @@ public:
 
       auto request = std::make_unique<FakeRequest>();
       request->protocol_ = std::string(result[0]);
-      request->authority_ = std::string(result[1]);
+      request->host_ = std::string(result[1]);
       request->path_ = std::string(result[2]);
       request->method_ = std::string(result[3]);
       for (absl::string_view pair_str : absl::StrSplit(result[4], ';')) {
@@ -201,7 +201,7 @@ public:
 
       std::string body;
       body.reserve(512);
-      body = typed_request->protocol_ + "|" + typed_request->authority_ + "|" +
+      body = typed_request->protocol_ + "|" + typed_request->host_ + "|" +
              typed_request->path_ + "|" + typed_request->method_ + "|";
       for (const auto& pair : typed_request->data_) {
         body += pair.first + ":" + pair.second + ";";

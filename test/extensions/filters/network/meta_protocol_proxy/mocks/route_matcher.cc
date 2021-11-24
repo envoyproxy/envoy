@@ -9,11 +9,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
-MockRouteEntry::MockRouteEntry() : typed_metadata_(metadata_) {
+MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
-  ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
-  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
 }
 
 MockRouteMatcher::MockRouteMatcher() {
