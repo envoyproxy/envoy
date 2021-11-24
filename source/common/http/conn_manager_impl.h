@@ -163,7 +163,7 @@ private:
                               public FilterManagerCallbacks {
     ActiveStream(ConnectionManagerImpl& connection_manager, uint32_t buffer_limit,
                  Buffer::BufferMemoryAccountSharedPtr account);
-    ~ActiveStream();
+    ~ActiveStream() final;
     void completeRequest();
 
     const Network::Connection* connection();
