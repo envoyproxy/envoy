@@ -152,7 +152,7 @@ InstanceImpl::~InstanceImpl() {
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
-    // Stop tracing and read the trace data.
+    // Stop tracing and flush the trace data.
     perfetto::TrackEvent::Flush();
     tracing_session_->StopBlocking();
     close(tracing_fd_);
