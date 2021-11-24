@@ -7,10 +7,6 @@
 #include <memory>
 #include <string>
 
-#ifdef ENVOY_PERFETTO
-#include <fstream>
-#endif
-
 #include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
@@ -159,12 +155,7 @@ InstanceImpl::~InstanceImpl() {
     // Stop tracing and read the trace data.
     perfetto::TrackEvent::Flush();
     tracing_session_->StopBlocking();
-    std::vector<char> trace_data(tracing_session_->ReadTraceBlocking());
-
-    std::ofstream output;
-    output.open("envoy.pftrace", std::ios::out | std::ios::binary);
-    output.write(&trace_data[0], trace_data.size());
-    output.close();
+    close(tracing_fd_);
   }
 #endif
 }
@@ -410,8 +401,15 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   auto* ds_cfg = cfg.add_data_sources()->mutable_config();
   ds_cfg->set_name("track_event");
 
+  const std::string pftrace_path =
+      PROTOBUF_GET_STRING_OR_DEFAULT(bootstrap_, perf_tracing_file_path, "envoy.pftrace");
   tracing_session_ = perfetto::Tracing::NewTrace();
-  tracing_session_->Setup(cfg);
+  tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+  if (tracing_fd_ == -1) {
+    throw EnvoyException(
+        fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
+  }
+  tracing_session_->Setup(cfg, tracing_fd_);
   tracing_session_->StartBlocking();
 #endif
 

@@ -113,6 +113,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-03",
         cpe = "N/A",
     ),
+    # This dependency is built only when performance tracing is enabled with the
+    # option --define=perf_tracing=enabled. It's never built for releases.
     com_github_google_perfetto = dict(
         project_name = "Perfetto",
         project_desc = "Perfetto Tracing SDK",

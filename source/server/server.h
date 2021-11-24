@@ -403,6 +403,7 @@ private:
 
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};
+  os_fd_t tracing_fd_{INVALID_HANDLE};
 #endif
 };
 
