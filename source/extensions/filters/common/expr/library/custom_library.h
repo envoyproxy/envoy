@@ -36,8 +36,7 @@ class CustomLibrary {
 public:
   CustomLibrary(const bool replace_default_library)
       : replace_default_library_(replace_default_library) {}
-  void FillActivation(Activation* activation,
-                      Protobuf::Arena& arena,
+  void FillActivation(Activation* activation, Protobuf::Arena& arena,
                       const StreamInfo::StreamInfo& info,
                       const Http::RequestHeaderMap* request_headers,
                       const Http::ResponseHeaderMap* response_headers,
@@ -63,8 +62,9 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new CustomLibraryConfig()};
   }
-  virtual CustomLibraryPtr createLibrary(const Protobuf::Message& config,
-                                         ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual CustomLibraryPtr
+  createLibrary(const Protobuf::Message& config,
+                ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 };
 
 class CustomLibraryFactory : public BaseCustomLibraryFactory {

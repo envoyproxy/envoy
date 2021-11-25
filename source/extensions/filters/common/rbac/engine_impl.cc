@@ -24,17 +24,14 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   // guard expression builder by presence of a condition in policies
 
   if (rules.has_custom_library_config()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<BaseCustomLibraryFactory>(
-            rules.custom_library_config());
-    custom_library_ =
-        factory.createLibrary(rules.custom_library_config(),
-                              validation_visitor);
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<BaseCustomLibraryFactory>(
+        rules.custom_library_config());
+    custom_library_ = factory.createLibrary(rules.custom_library_config(), validation_visitor);
   } else {
     custom_library_ = nullptr;
   }
 
-  for (const auto& policy: rules.policies()) {
+  for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_ =
           Expr::createBuilder(&constant_arena_, custom_library_ ? custom_library_.get() : nullptr);

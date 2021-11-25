@@ -25,7 +25,7 @@ absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, Cel
 CelValue GetNextInt(Protobuf::Arena* arena, int64_t i) {
   // using arena so that it will not be unused
   arena->SpaceUsed();
-  return CelValue::CreateInt64(i+1);
+  return CelValue::CreateInt64(i + 1);
 }
 
 } // namespace Library

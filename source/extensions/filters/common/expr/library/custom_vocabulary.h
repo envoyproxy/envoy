@@ -10,8 +10,7 @@ namespace Library {
 
 class CustomVocabularyWrapper : public BaseWrapper {
 public:
-  CustomVocabularyWrapper(Protobuf::Arena& arena,
-                          const StreamInfo::StreamInfo& info,
+  CustomVocabularyWrapper(Protobuf::Arena& arena, const StreamInfo::StreamInfo& info,
                           const Http::RequestHeaderMap* request_headers,
                           const Http::ResponseHeaderMap* response_headers,
                           const Http::ResponseTrailerMap* response_trailers)

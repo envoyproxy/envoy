@@ -14,7 +14,6 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
-
 #include "source/extensions/filters/common/expr/library/custom_library.h"
 
 namespace Envoy {
@@ -225,7 +224,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
-             const StreamInfo::StreamInfo&, CustomLibrary* custom_library) const;
+               const StreamInfo::StreamInfo&, CustomLibrary* custom_library) const;
 
 private:
   const OrMatcher permissions_;

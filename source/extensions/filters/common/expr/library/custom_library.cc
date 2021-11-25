@@ -21,22 +21,19 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
   response_headers_ = response_headers;
   response_trailers_ = response_trailers;
   // words
-  activation->InsertValueProducer(CustomVocabularyName,
-                                  std::make_unique<CustomVocabularyWrapper>(arena,
-                                                                            info,
-                                                                            request_headers,
-                                                                            response_headers,
-                                                                            response_trailers));
+  activation->InsertValueProducer(
+      CustomVocabularyName, std::make_unique<CustomVocabularyWrapper>(
+                                arena, info, request_headers, response_headers, response_trailers));
   // functions
-  absl::Status status = activation->InsertFunction(
-      std::make_unique<GetDoubleCelFunction>(LazyEvalFuncGetDoubleName));
+  absl::Status status =
+      activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncGetDoubleName));
 }
 
 void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   absl::Status status;
   // lazily evaluated functions
-  status =
-      registry->RegisterLazyFunction(GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncGetDoubleName));
+  status = registry->RegisterLazyFunction(
+      GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncGetDoubleName));
   if (!status.ok()) {
     throw EnvoyException(absl::StrCat("failed to register lazy functions: ", status.message()));
   }
@@ -44,8 +41,7 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   // eagerly evaluated functions
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
       EagerEvalFuncGetNextIntName, false,
-      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetNextInt(arena, i); },
-      registry);
+      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetNextInt(arena, i); }, registry);
   if (!status.ok()) {
     throw EnvoyException(
         absl::StrCat("failed to register eagerly evaluated functions: ", status.message()));

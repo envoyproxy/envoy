@@ -18,7 +18,8 @@ using CelValue = google::api::expr::runtime::CelValue;
 
 class GetDoubleCelFunction : public CelFunction {
 public:
-  explicit GetDoubleCelFunction(absl::string_view name) : CelFunction({std::string(name), false, {}}) {}
+  explicit GetDoubleCelFunction(absl::string_view name)
+      : CelFunction({std::string(name), false, {}}) {}
   explicit GetDoubleCelFunction(const CelFunctionDescriptor& desc) : CelFunction(desc) {}
 
   static CelFunctionDescriptor CreateDescriptor(absl::string_view name) {

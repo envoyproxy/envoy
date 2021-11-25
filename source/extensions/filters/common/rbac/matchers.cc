@@ -4,9 +4,8 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/filters/common/rbac/matcher_extension.h"
-
 #include "source/extensions/filters/common/expr/library/custom_library.h"
+#include "source/extensions/filters/common/rbac/matcher_extension.h"
 
 namespace Envoy {
 namespace Extensions {
