@@ -6206,7 +6206,8 @@ TEST_F(RouterTest, InvalidUpstream) {
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");
-  EXPECT_ENVOY_BUG(router_.decodeHeaders(headers, false), "envoy bug failure: factory != nullptr.");
+  EXPECT_ENVOY_BUG(router_.decodeHeaders(headers, false),
+                   "envoy bug failure: custom_factory != nullptr.");
 
   router_.onDestroy();
 }
