@@ -31,7 +31,11 @@ IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
       socket_v6only_(socket_v6only), domain_(domain) {}
 
-IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {}
+IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
+  if (SOCKET_VALID(fd_)) {
+    IoUringSocketHandleImpl::close();
+  }
+}
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
