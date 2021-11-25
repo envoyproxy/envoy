@@ -17,7 +17,6 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
                                    const Http::RequestHeaderMap* request_headers,
                                    const Http::ResponseHeaderMap* response_headers,
                                    const Http::ResponseTrailerMap* response_trailers) {
-
   request_headers_ = request_headers;
   response_headers_ = response_headers;
   response_trailers_ = response_trailers;
@@ -34,7 +33,6 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
 }
 
 void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
-  std::cout << std::endl << "*************** RegisterFunctions" << std::endl;
   absl::Status status;
   // lazily evaluated functions
   status =
@@ -57,7 +55,6 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
 CustomLibraryPtr
 CustomLibraryFactory::createLibrary(const Protobuf::Message& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
-  std::cout << "********** CustomLibraryFactory::createLibrary" << std::endl;
   const auto& typed_config =
       MessageUtil::downcastAndValidate<const envoy::config::core::v3::TypedExtensionConfig&>(
           config, validation_visitor);

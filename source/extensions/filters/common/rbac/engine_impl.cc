@@ -41,6 +41,11 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
       break;
     }
   }
+
+  for (const auto& policy : rules.policies()) {
+    policies_.emplace(policy.first, std::make_unique<PolicyMatcher>(policy.second, builder_.get(),
+                                                                    validation_visitor));
+  }
 }
 
 bool RoleBasedAccessControlEngineImpl::handleAction(const Network::Connection& connection,
