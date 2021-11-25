@@ -29,23 +29,28 @@ IoUringImpl::IoUringImpl(const uint32_t io_uring_size, const bool use_submission
 IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
 
 os_fd_t IoUringImpl::registerEventfd() {
-  ASSERT(!is_eventfd_registered_);
-  os_fd_t event_fd = eventfd(0, 0);
-  int res = io_uring_register_eventfd(&ring_, event_fd);
+  ASSERT(!isEventfdRegistered());
+  event_fd_ = eventfd(0, 0);
+  int res = io_uring_register_eventfd(&ring_, event_fd_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to register eventfd: {}", errorDetails(-res)));
-  is_eventfd_registered_ = true;
-  return event_fd;
+  return event_fd_;
 }
 
 void IoUringImpl::unregisterEventfd() {
   int res = io_uring_unregister_eventfd(&ring_);
   RELEASE_ASSERT(res == 0, fmt::format("unable to unregister eventfd: {}", errorDetails(-res)));
-  is_eventfd_registered_ = false;
+  SET_SOCKET_INVALID(event_fd_);
 }
 
-bool IoUringImpl::isEventfdRegistered() const { return is_eventfd_registered_; }
+bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); }
 
 void IoUringImpl::forEveryCompletion(std::function<void(Request&, int32_t)> completion_cb) {
+  ASSERT(SOCKET_VALID(event_fd_));
+
+  eventfd_t v;
+  int ret = eventfd_read(event_fd_, &v);
+  RELEASE_ASSERT(ret == 0, "unable to drain eventfd");
+
   unsigned count = io_uring_peek_batch_cqe(&ring_, cqes_.data(), io_uring_size_);
 
   for (unsigned i = 0; i < count; ++i) {

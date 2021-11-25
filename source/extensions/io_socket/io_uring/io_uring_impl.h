@@ -42,7 +42,7 @@ private:
   const uint32_t io_uring_size_;
   struct io_uring ring_;
   std::vector<struct io_uring_cqe*> cqes_;
-  bool is_eventfd_registered_{false};
+  os_fd_t event_fd_{INVALID_SOCKET};
 };
 
 } // namespace IoUring

@@ -1,7 +1,5 @@
 #include "source/extensions/io_socket/io_uring/io_handle_impl.h"
 
-#include <sys/eventfd.h>
-
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
@@ -329,7 +327,6 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
   IoUring& uring = io_uring_factory_.getOrCreateUring();
-  drainFileEvent();
   uring.forEveryCompletion(
       [this](Request& req, int32_t result) { onRequestCompletion(req, result); });
   uring.submit();
@@ -341,21 +338,12 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
                                                            uint32_t events) {
   ASSERT(file_event_ == nullptr, "Attempting to initialize two `file_event_` for the same "
                                  "file descriptor. This is not allowed.");
-  ASSERT(!SOCKET_VALID(event_fd_));
 
   cb_ = std::move(cb);
   IoUring& uring = io_uring_factory_.getOrCreateUring();
-  event_fd_ = uring.registerEventfd();
+  const os_fd_t event_fd = uring.registerEventfd();
   file_event_ = dispatcher.createFileEvent(
-      event_fd_, [this](uint32_t) { onFileEvent(); }, trigger, events);
-}
-
-void IoUringSocketHandleImpl::FileEventAdapter::drainFileEvent() {
-  ASSERT(SOCKET_VALID(event_fd_));
-
-  eventfd_t v;
-  int ret = eventfd_read(event_fd_, &v);
-  RELEASE_ASSERT(ret == 0, "unable to drain eventfd");
+      event_fd, [this](uint32_t) { onFileEvent(); }, trigger, events);
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest() {

@@ -79,7 +79,6 @@ private:
     void addAcceptRequest();
 
   private:
-    void drainFileEvent();
     void onFileEvent();
     void onRequestCompletion(const Request& req, int32_t result);
 
@@ -88,7 +87,6 @@ private:
     os_fd_t fd_;
     Event::FileReadyCb cb_;
     Event::FileEventPtr file_event_{nullptr};
-    os_fd_t event_fd_{INVALID_SOCKET};
     os_fd_t connection_fd_{INVALID_SOCKET};
     bool is_accept_added_{false};
     struct sockaddr remote_addr_;
