@@ -93,7 +93,7 @@ static_resources:
 #                            - const_expr:
 #                                int64_value: 1
 #                        - const_expr:
-#                            int64_value: 1
+#                            int64_value: 2
 #                    permissions:
 #                    - any: true
 #                    principals:
