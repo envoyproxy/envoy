@@ -64,40 +64,40 @@ static_resources:
                     - any: true
                     principals:
                     - any: true
-                  "policy-rbac-deny-if-GetDouble-2-equals-4":
-                    # deny if GetDouble(2) == 4
-                    condition:
-                      call_expr:
-                        function: _==_
-                        args:
-                        - call_expr:
-                            function: GetDouble
-                            args:
-                            - const_expr:
-                                int64_value: 2
-                        - const_expr:
-                            int64_value: 4
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
-                  "policy-deny-if-GetNextInt-is-2":
-                    # deny if GetNextInt(1) == 2
-                    condition:
-                      call_expr:
-                        function: _==_
-                        args:
-                        - call_expr:
-                            function: GetNextInt
-                            args:
-                            - const_expr:
-                                int64_value: 1
-                        - const_expr:
-                            int64_value: 1
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
+#                  "policy-rbac-deny-if-GetDouble-2-equals-4":
+#                    # deny if GetDouble(2) == 4
+#                    condition:
+#                      call_expr:
+#                        function: _==_
+#                        args:
+#                        - call_expr:
+#                            function: GetDouble
+#                            args:
+#                            - const_expr:
+#                                int64_value: 2
+#                        - const_expr:
+#                            int64_value: 4
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-deny-if-GetNextInt-is-2":
+#                    # deny if GetNextInt(1) == 2
+#                    condition:
+#                      call_expr:
+#                        function: _==_
+#                        args:
+#                        - call_expr:
+#                            function: GetNextInt
+#                            args:
+#                            - const_expr:
+#                                int64_value: 1
+#                        - const_expr:
+#                            int64_value: 1
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
 #                  "policy-rbac-deny-if-ip-is-localhost":
 #                    # deny if custom[ip].equals("127.0.0.1")
 #                    condition:

@@ -104,26 +104,26 @@ static_resources:
 #                    - any: true
 #                    principals:
 #                    - any: true
-                  "policy-deny-if-header-user-agent-is-chrome":
-                    # deny if request.headers[user-agent].contains("Chrome")
-                    condition:
-                      call_expr:
-                        function: contains
-                        args:
-                        - select_expr:
-                            operand:
-                              select_expr:
-                                operand:
-                                  ident_expr:
-                                    name: request
-                                field: headers
-                            field: user-agent
-                        - const_expr:
-                            string_value: Chrome
-                    permissions:
-                    - any: true
-                    principals:
-                    - any: true
+#                  "policy-deny-if-header-user-agent-is-chrome":
+#                    # deny if request.headers[user-agent].contains("Chrome")
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              select_expr:
+#                                operand:
+#                                  ident_expr:
+#                                    name: request
+#                                field: headers
+#                            field: user-agent
+#                        - const_expr:
+#                            string_value: Chrome
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
                   "policy-deny-if-header-user-agent-is-curl":
                     # deny if request.headers[user-agent] == "curl"
                     condition:
