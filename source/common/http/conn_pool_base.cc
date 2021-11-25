@@ -122,6 +122,9 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
     concurrent_stream_limit_ = settings.maxConcurrentStreams().value();
     int64_t delta = old_unused_capacity - currentUnusedCapacity();
+    if (state() == ActiveClient::State::READY && currentUnusedCapacity() <= 0) {
+      parent_.transitionActiveClientState(*this, ActiveClient::State::BUSY);
+    }
     parent_.decrClusterStreamCapacity(delta);
     ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
     negative_capacity_ += delta;

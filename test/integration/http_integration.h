@@ -248,11 +248,12 @@ protected:
   void testRetryAttemptCountHeader();
   void testGrpcRetry();
 
-  void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,
-                                    const std::string& via = "", bool disconnect_after_100 = false);
+  void testEnvoyHandling1xx(bool additional_continue_from_upstream = false,
+                            const std::string& via = "", bool disconnect_after_100 = false);
   void testEnvoyProxying1xx(bool continue_before_upstream_complete = false,
                             bool with_encoder_filter = false,
-                            bool with_multiple_1xx_headers = false);
+                            bool with_multiple_1xx_headers = false,
+                            absl::string_view initial_code = "100");
   void simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                            uint32_t response1_bytes, uint32_t response2_bytes);
 

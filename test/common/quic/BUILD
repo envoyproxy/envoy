@@ -55,6 +55,20 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_filter_manager_connection_impl_test",
+    srcs = ["quic_filter_manager_connection_impl_test.cc"],
+    tags = ["nofips"],
+    deps = [
+        "//source/common/quic:quic_filter_manager_connection_lib",
+        "//test/common/quic:quic_test_utils_for_envoy_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "quic_stat_names_test",
     srcs = ["quic_stat_names_test.cc"],
     tags = ["nofips"],
@@ -63,16 +77,6 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    name = "envoy_quic_session_cache_test",
-    srcs = ["envoy_quic_session_cache_test.cc"],
-    external_deps = ["quiche_quic_platform"],
-    tags = ["nofips"],
-    deps = [
-        "//source/common/quic:envoy_quic_session_cache_lib",
     ],
 )
 
