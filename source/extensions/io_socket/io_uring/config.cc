@@ -16,8 +16,8 @@ namespace IoUring {
 
 namespace {
 
-const uint32_t DefaultReadBufferSize = 8192;
-const uint32_t DefaultIoUringSize = 300;
+constexpr uint32_t kDefaultReadBufferSize = 8192;
+constexpr uint32_t kDefaultIoUringSize = 300;
 
 } // namespace
 
@@ -103,10 +103,10 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
       const envoy::extensions::network::socket_interface::v3::IoUringSocketInterface&>(
       message, context.messageValidationContext().staticValidationVisitor());
   read_buffer_size_ =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, read_buffer_size, DefaultReadBufferSize);
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, read_buffer_size, kDefaultReadBufferSize);
 #if defined(__linux__)
   io_uring_factory_ = std::make_unique<const IoUringFactoryImpl>(
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, io_uring_size, DefaultIoUringSize),
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, io_uring_size, kDefaultIoUringSize),
       config.use_submission_queue_polling());
 #endif
   return std::make_unique<Network::SocketInterfaceExtension>(*this);
