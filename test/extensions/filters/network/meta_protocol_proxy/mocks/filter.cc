@@ -1,4 +1,4 @@
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/stream_filter.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
 
 #include "source/common/protobuf/protobuf.h"
 

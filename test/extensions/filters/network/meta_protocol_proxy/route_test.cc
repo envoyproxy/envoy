@@ -3,8 +3,8 @@
 #include "source/extensions/filters/network/meta_protocol_proxy/match.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/stream_filter.h"
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route_matcher.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/registry.h"
 #include "test/mocks/server/factory_context.h"
@@ -28,16 +28,6 @@ public:
   class RouteConfig : public RouteSpecificFilterConfig {};
 
   void initialize(const std::string& yaml_config) {
-    Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
-    ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
-        .WillByDefault(
-            Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-                          ProtobufMessage::ValidationVisitor&) {
-              auto route_config = std::make_shared<RouteConfig>();
-              route_config_map_.emplace(filter_config_.name(), route_config);
-              return route_config;
-            }));
-
     ProtoRouteAction proto_config;
     TestUtility::loadFromYaml(yaml_config, proto_config);
 
@@ -100,6 +90,16 @@ TEST_F(RouteEntryImplTest, RouteMetadata) {
  * verifies that the proto per filter config can be loaded correctly.
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
+  Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
+  ON_CALL(filter_config_, createRouteSpecificFilterConfig(_, _, _))
+      .WillByDefault(
+          Invoke([this](const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+                        ProtobufMessage::ValidationVisitor&) {
+            auto route_config = std::make_shared<RouteConfig>();
+            route_config_map_.emplace(filter_config_.name(), route_config);
+            return route_config;
+          }));
+
   const std::string yaml_config = R"EOF(
     cluster: cluster_0
     per_filter_config:

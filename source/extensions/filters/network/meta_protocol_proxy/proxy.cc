@@ -18,8 +18,7 @@ namespace MetaProtocolProxy {
 CodecFactoryPtr FilterConfig::codecFactoryFromProto(
     const envoy::config::core::v3::TypedExtensionConfig& codec_config,
     Envoy::Server::Configuration::FactoryContext& context) {
-  auto& factory =
-      Config::Utility::getAndCheckFactoryByName<CodecFactoryConfig>(codec_config.name());
+  auto& factory = Config::Utility::getAndCheckFactory<CodecFactoryConfig>(codec_config);
 
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(codec_config.typed_config(),
@@ -46,8 +45,7 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
                                        terminal_filter_name));
     }
 
-    auto& factory =
-        Config::Utility::getAndCheckFactoryByName<NamedFilterConfigFactory>(filter.name());
+    auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
     Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),

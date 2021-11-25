@@ -1,4 +1,4 @@
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route_matcher.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
 
 using testing::_;
 using testing::Return;

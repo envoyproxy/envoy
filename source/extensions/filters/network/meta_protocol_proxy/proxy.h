@@ -63,10 +63,6 @@ public:
 
   const CodecFactory& codecFactory() { return *codec_factory_; }
 
-private:
-  friend class ActiveStream;
-  friend class Filter;
-
   static CodecFactoryPtr
   codecFactoryFromProto(const envoy::config::core::v3::TypedExtensionConfig& codec_config,
                         Server::Configuration::FactoryContext& context);
@@ -77,6 +73,10 @@ private:
   static std::vector<FilterFactoryCb> filtersFactoryFromProto(
       const ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>& filters,
       const std::string stats_prefix, Server::Configuration::FactoryContext& context);
+
+private:
+  friend class ActiveStream;
+  friend class Filter;
 
   const std::string stat_prefix_;
 

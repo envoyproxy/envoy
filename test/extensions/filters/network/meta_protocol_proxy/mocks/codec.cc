@@ -1,4 +1,4 @@
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec_factory.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"
 
 #include <memory>
 
