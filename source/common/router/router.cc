@@ -689,7 +689,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 std::unique_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
   static GenericConnPoolFactory* DefaultConnPoolFactory =
-      Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
+      Envoy::Config::Utility::getFactoryByName<GenericConnPoolFactory>(
           "envoy.filters.connection_pools.http.generic");
   ASSERT(DefaultConnPoolFactory != nullptr);
 
