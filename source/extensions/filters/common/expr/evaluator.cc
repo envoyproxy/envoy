@@ -49,7 +49,6 @@ ActivationPtr createActivation(Protobuf::Arena& arena, const StreamInfo::StreamI
 BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_library) {
   google::api::expr::runtime::InterpreterOptions options;
 
-  std::cout << std::endl << "**************** createBuilder " << std::endl;
   // Security-oriented defaults
   options.enable_comprehension = false;
   options.enable_regex = true;
@@ -95,7 +94,6 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
                                   const Http::ResponseHeaderMap* response_headers,
                                   const Http::ResponseTrailerMap* response_trailers,
                                   CustomLibrary* custom_library) {
-  std::cout << std::endl << "**************** evaluate " << std::endl;
   auto activation = createActivation(arena, info, request_headers, response_headers,
                                      response_trailers, custom_library);
   auto eval_status = expr.Evaluate(*activation, &arena);
