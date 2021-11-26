@@ -705,16 +705,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["build"],
         release_date = "2021-10-22",
     ),
-    six = dict(
-        project_name = "Six",
-        project_desc = "Python 2 and 3 compatibility library",
-        project_url = "https://github.com/benjaminp/six",
-        version = "1.12.0",
-        sha256 = "0ce7aef70d066b8dda6425c670d00c25579c3daad8108b3e3d41bef26003c852",
-        urls = ["https://github.com/benjaminp/six/archive/{version}.tar.gz"],
-        release_date = "2018-12-10",
-        use_category = ["other"],
-    ),
     org_llvm_llvm = dict(
         # When changing this, you must re-generate the list of llvm libs
         # see `bazel/foreign_cc/BUILD` for further information.
