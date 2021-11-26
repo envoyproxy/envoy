@@ -259,6 +259,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
+    bool appendXfh() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
