@@ -237,9 +237,7 @@ bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::Req
 bool PolicyMatcher::matches(const Network::Connection& connection,
                             const Envoy::Http::RequestHeaderMap& headers,
                             const StreamInfo::StreamInfo& info) const {
-  return permissions_.matches(connection, headers, info) &&
-         principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
+  return matches(connection, headers, info, nullptr);
 }
 
 bool PolicyMatcher::matches(const Network::Connection& connection,

@@ -9,6 +9,19 @@ namespace Common {
 namespace Expr {
 namespace Library {
 
+absl::Status GetProductCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                             Protobuf::Arena* arena) const {
+  // using arena so that it will not be unused
+  arena->SpaceUsed();
+  if (args[0].type() == CelValue::Type::kInt64 && args[1].type() == CelValue::Type::kInt64) {
+    int64_t value = args[0].Int64OrDie() * args[1].Int64OrDie();
+    *output = CelValue::CreateInt64(value);
+    return absl::OkStatus();
+  }
+  *output = CelValue::CreateInt64(-1);
+  return absl::InvalidArgumentError("expected int argument for function GetProduct");
+}
+
 absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
                                             Protobuf::Arena* arena) const {
   // using arena so that it will not be unused
@@ -20,6 +33,16 @@ absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, Cel
   }
   *output = CelValue::CreateInt64(-1);
   return absl::InvalidArgumentError("expected int argument for function GetDouble");
+}
+
+absl::Status Get99CelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
+                                        Protobuf::Arena* arena) const {
+  // using arena so that it will not be unused
+  arena->SpaceUsed();
+  args.size();
+
+  *output = CelValue::CreateInt64(99);
+  return absl::OkStatus();
 }
 
 CelValue GetNextInt(Protobuf::Arena* arena, int64_t i) {

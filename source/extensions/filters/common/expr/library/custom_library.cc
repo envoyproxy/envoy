@@ -24,9 +24,23 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
   activation->InsertValueProducer(
       CustomVocabularyName, std::make_unique<CustomVocabularyWrapper>(
                                 arena, info, request_headers, response_headers, response_trailers));
+
   // functions
   absl::Status status =
       activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncGetDoubleName));
+  if (!status.ok()) {
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+  }
+  status = activation->InsertFunction(
+      std::make_unique<GetProductCelFunction>(absl::string_view("GetProduct")));
+  if (!status.ok()) {
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+  }
+  status =
+      activation->InsertFunction(std::make_unique<Get99CelFunction>(absl::string_view("Get99")));
+  if (!status.ok()) {
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+  }
 }
 
 void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
@@ -35,7 +49,17 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   status = registry->RegisterLazyFunction(
       GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncGetDoubleName));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy functions: ", status.message()));
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+  }
+  status = registry->RegisterLazyFunction(
+      GetProductCelFunction::CreateDescriptor(absl::string_view("GetProduct")));
+  if (!status.ok()) {
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+  }
+  status = registry->RegisterLazyFunction(
+      Get99CelFunction::CreateDescriptor(absl::string_view("Get99")));
+  if (!status.ok()) {
+    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
   }
 
   // eagerly evaluated functions

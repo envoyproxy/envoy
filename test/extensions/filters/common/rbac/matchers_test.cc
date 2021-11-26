@@ -423,7 +423,7 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
-  Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+  Expr::BuilderPtr builder = Expr::createBuilder(nullptr, nullptr);
 
   RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor());
 

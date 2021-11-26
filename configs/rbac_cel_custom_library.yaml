@@ -47,36 +47,69 @@ static_resources:
                     "@type": type.googleapis.com/envoy.extensions.rbac.custom_library_config.v3.CustomLibraryConfig
                     replace_default_library_in_case_of_overlap: true
                 policies:
-                  "policy-rbac-deny-if-custom-team-is-swg":
-                    # deny if custom[team].equals("swg")
+#                  "policy-rbac-deny-if-custom-team-is-swg":
+#                    # deny if custom[team].equals("swg")
+#                    condition:
+#                      call_expr:
+#                        function: contains
+#                        args:
+#                        - select_expr:
+#                            operand:
+#                              ident_expr:
+#                                name: custom
+#                            field: team
+#                        - const_expr:
+#                            string_value: swg
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+                  "policy-rbac-deny-if-GetDouble-2-equals-4":
+                    # deny if GetDouble(2) == 4
                     condition:
                       call_expr:
-                        function: contains
+                        function: _==_
                         args:
-                        - select_expr:
-                            operand:
-                              ident_expr:
-                                name: custom
-                            field: team
+                        - call_expr:
+                            function: GetDouble
+                            args:
+                            - const_expr:
+                                int64_value: 2
                         - const_expr:
-                            string_value: swg
+                            int64_value: 4
                     permissions:
                     - any: true
                     principals:
                     - any: true
-#                  "policy-rbac-deny-if-GetDouble-2-equals-4":
-#                    # deny if GetDouble(2) == 4
+#                  "policy-rbac-deny-if-GetProduct-2-times-4-equals-4":
+#                    # deny if GetProduct(2,4) == 8
 #                    condition:
 #                      call_expr:
 #                        function: _==_
 #                        args:
 #                        - call_expr:
-#                            function: GetDouble
+#                            function: GetProduct
 #                            args:
 #                            - const_expr:
 #                                int64_value: 2
+#                            - const_expr:
+#                                int64_value: 4
 #                        - const_expr:
-#                            int64_value: 4
+#                            int64_value: 8
+#                    permissions:
+#                    - any: true
+#                    principals:
+#                    - any: true
+#                  "policy-rbac-deny-if-Get99-equals-99":
+#                    # deny if Get99() == 99
+#                    condition:
+#                      call_expr:
+#                        function: _==_
+#                        args:
+#                        - call_expr:
+#                            function: Get99
+#                        - const_expr:
+#                            int64_value: 99
 #                    permissions:
 #                    - any: true
 #                    principals:
