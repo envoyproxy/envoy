@@ -64,8 +64,8 @@ static_resources:
 #                    - any: true
 #                    principals:
 #                    - any: true
-                  "policy-rbac-deny-if-receiver-type-GetSquareOf-4-equals-16":
-                    # deny if GetSquareOf(4) == 16
+                  "policy-rbac-deny-if-receiver-style-GetSquareOf-4-equals-16":
+                    # deny if 4.GetSquareOf == 16
                     condition:
                       call_expr:
                         function: _==_
