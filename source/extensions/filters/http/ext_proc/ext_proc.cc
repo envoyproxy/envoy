@@ -609,8 +609,9 @@ void Filter::sendImmediateResponse(const ImmediateResponse& response) {
 
   sent_immediate_response_ = true;
   ENVOY_LOG(debug, "Sending local reply with status code {}", status_code);
+  const auto details = StringUtil::replaceAllEmptySpace(response.details());
   encoder_callbacks_->sendLocalReply(static_cast<Http::Code>(status_code), response.body(),
-                                     mutate_headers, grpc_status, response.details());
+                                     mutate_headers, grpc_status, details);
 }
 
 static ProcessingMode allDisabledMode() {

@@ -127,6 +127,35 @@ TEST(StringUtil, atoull) {
   EXPECT_EQ(18446744073709551615U, out);
 }
 
+TEST(StringUtil, hasEmptySpace) {
+  EXPECT_FALSE(StringUtil::hasEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\t789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\n789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\r789"));
+
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233 \t\f789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\v\n\r789"));
+  EXPECT_TRUE(StringUtil::hasEmptySpace("1233\f\v\n789"));
+}
+
+TEST(StringUtil, replaceAllEmptySpace) {
+  EXPECT_EQ("1234567890_-+=][|\"&*^%$#@!",
+            StringUtil::replaceAllEmptySpace("1234567890_-+=][|\"&*^%$#@!"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233 789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\t789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\f789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\v789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\n789"));
+  EXPECT_EQ("1233_789", StringUtil::replaceAllEmptySpace("1233\r789"));
+
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233 \t\f789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\v\n\r789"));
+  EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\f\v\n789"));
+}
+
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;

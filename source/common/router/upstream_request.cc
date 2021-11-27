@@ -511,7 +511,7 @@ void UpstreamRequest::onPoolReady(
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError);
     const std::string details =
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
-                     "{", status.message(), "}");
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
     parent_.callbacks()->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                         absl::nullopt, details);
     return;
