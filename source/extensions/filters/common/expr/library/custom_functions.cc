@@ -45,6 +45,12 @@ absl::Status Get99CelFunction::Evaluate(absl::Span<const CelValue> args, CelValu
   return absl::OkStatus();
 }
 
+CelValue GetSquareOf(Protobuf::Arena* arena, int64_t i) {
+  // using arena so that it will not be unused
+  arena->SpaceUsed();
+  return CelValue::CreateInt64(i * i);
+}
+
 CelValue GetNextInt(Protobuf::Arena* arena, int64_t i) {
   // using arena so that it will not be unused
   arena->SpaceUsed();

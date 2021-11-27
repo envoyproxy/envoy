@@ -57,6 +57,8 @@ public:
                         Protobuf::Arena* arena) const override;
 };
 
+CelValue GetSquareOf(Protobuf::Arena* arena, int64_t i);
+
 CelValue GetNextInt(Protobuf::Arena* arena, int64_t i);
 
 } // namespace Library
