@@ -91,9 +91,6 @@ protected:
                          bool end_stream, bool bodiless_request);
   void encodeTrailersBase(const HeaderMap& headers);
 
-  static const std::string CRLF;
-  static const std::string LAST_CHUNK;
-
   Buffer::BufferMemoryAccountSharedPtr buffer_memory_account_;
   ConnectionImpl& connection_;
   uint32_t read_disable_calls_{};
@@ -105,15 +102,6 @@ protected:
   bool is_response_to_connect_request_ : 1;
 
 private:
-  /**
-   * Called to encode an individual header.
-   * @param key supplies the header to encode.
-   * @param key_size supplies the byte size of the key.
-   * @param value supplies the value to encode.
-   * @param value_size supplies the byte size of the value.
-   */
-  void encodeHeader(const char* key, uint32_t key_size, const char* value, uint32_t value_size);
-
   /**
    * Called to encode an individual header.
    * @param key supplies the header to encode as a string_view.
@@ -198,6 +186,81 @@ private:
 };
 
 /**
+ * Helper class for fine grained buffer write. This class can be used to speed up some scenarios
+ * where small pieces of data are frequently written to the buffer, such as the encoding of HTTP
+ * Headers.
+ */
+class FineGrainedBufferWriteHelper {
+public:
+  static constexpr uint64_t DefaultReservationSize = 4096;
+
+  FineGrainedBufferWriteHelper(Buffer::Instance& buffer) : buffer_(buffer) {}
+
+  void writeToBuffer(const char* data, uint64_t size) {
+    ASSERT(remaining() >= size);
+    memcpy(current_pos_, data, size); // NOLINT(safe-memcpy)
+    current_pos_ += size;
+  }
+  void writeToBuffer(absl::string_view data) { writeToBuffer(data.data(), data.size()); }
+  void writeToBuffer(char c) {
+    ASSERT(remaining() >= 1);
+    *current_pos_ = c;
+    current_pos_++;
+  }
+
+  void reserveBuffer(uint64_t size) {
+    ASSERT(size > 0);
+
+    if (reservation_ == nullptr) {
+      initializeReservation(size);
+      return;
+    }
+
+    if (remaining() >= size) {
+      return;
+    }
+
+    commitToBuffer();
+    initializeReservation(size);
+  }
+
+  void commitToBuffer() {
+    if (hasFilled() > 0) {
+      ASSERT(reservation_ != nullptr);
+      reservation_->commit(hasFilled());
+      reservation_ = nullptr;
+      raw_slice_ = {nullptr, 0};
+      current_pos_ = nullptr;
+    }
+  }
+
+private:
+  uint64_t remaining() { return raw_slice_.len_ - hasFilled(); }
+
+  uint64_t hasFilled() {
+    ASSERT(current_pos_ != nullptr);
+    ASSERT(current_pos_ >= static_cast<char*>(raw_slice_.mem_));
+    return current_pos_ - (static_cast<char*>(raw_slice_.mem_));
+  }
+
+  void initializeReservation(uint64_t size) {
+    reservation_ = std::make_unique<Buffer::ReservationSingleSlice>(
+        buffer_.reserveSingleSlice(std::max(DefaultReservationSize, size)));
+
+    raw_slice_ = reservation_->slice();
+
+    ASSERT(raw_slice_.mem_ != nullptr);
+    current_pos_ = static_cast<char*>(raw_slice_.mem_);
+  }
+
+  Buffer::Instance& buffer_;
+
+  std::unique_ptr<Buffer::ReservationSingleSlice> reservation_;
+  Buffer::RawSlice raw_slice_;
+  char* current_pos_{};
+};
+
+/**
  * Base class for HTTP/1.1 client and server connections.
  * Handles the callbacks of http_parser with its own base routine and then
  * virtual dispatches to its subclasses.
@@ -231,13 +294,9 @@ public:
    */
   uint64_t flushOutput(bool end_encode = false);
 
-  void addToBuffer(absl::string_view data);
-  void addCharToBuffer(char c);
-  void addIntToBuffer(uint64_t i);
   Buffer::Instance& buffer() { return *output_buffer_; }
-  uint64_t bufferRemainingSize();
-  void copyToBuffer(const char* data, uint64_t length);
-  void reserveBuffer(uint64_t size);
+  FineGrainedBufferWriteHelper& bufferHelper() { return output_buffer_helper_; }
+
   void readDisable(bool disable) {
     if (connection_.state() == Network::Connection::State::Open) {
       connection_.readDisable(disable);
@@ -449,6 +508,9 @@ private:
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
+
+  // Output buffer helper to speed up buffer write.
+  FineGrainedBufferWriteHelper output_buffer_helper_;
 };
 
 /**
