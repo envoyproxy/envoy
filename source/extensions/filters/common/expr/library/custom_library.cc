@@ -72,7 +72,8 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   }
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
       absl::string_view("GetSquareOf"), true,
-      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetSquareOf(arena, i); }, registry);
+      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetSquareOf(arena, i); },
+      registry);
   if (!status.ok()) {
     throw EnvoyException(
         absl::StrCat("failed to register eagerly evaluated functions: ", status.message()));
