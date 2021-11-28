@@ -730,3 +730,8 @@ envoy.rbac.matchers.upstream_ip_port:
   - envoy.rbac.matchers
   security_posture: unknown
   status: alpha
+envoy.rbac.custom_library_config.custom_library:
+  categories:
+  - envoy.rbac.custom_library_config
+  security_posture: unknown
+  status: alpha

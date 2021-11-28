@@ -53,8 +53,3 @@ envoy.bootstrap.vcl:
   - envoy.bootstrap
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
-envoy.rbac.custom_library_config.custom_library:
-  categories:
-  - envoy.rbac.custom_library_config
-  security_posture: unknown
-  status: alpha
