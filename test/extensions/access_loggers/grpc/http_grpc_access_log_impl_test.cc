@@ -118,6 +118,7 @@ public:
   void expectLogRequestMethod(const std::string& request_method) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.start_time_ = SystemTime(1h);
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", request_method},
