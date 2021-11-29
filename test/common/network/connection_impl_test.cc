@@ -2989,6 +2989,9 @@ protected:
   StrictMock<MockConnectionCallbacks> client_callbacks_;
 };
 
+// The internal address is passed to Envoy by EDS. If this Envoy instance is configured as internal
+// address disabled, the EDS subscription should reject the config before dispatcher attempt to
+// establish connection to such address.
 TEST_F(InternalClientConnectionImplTest,
        CannotCreateConnectionToInternalAddressWithInternalAddressEnabled) {
   auto scoped_runtime_guard = std::make_unique<TestScopedRuntime>();
@@ -2999,14 +3002,14 @@ TEST_F(InternalClientConnectionImplTest,
       "envoy.extensions.network.socket_interface.default_socket_interface");
   Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::EnvoyInternalInstance>("listener_0", sock_interface);
-  // Not implemented yet.
+
   ASSERT_DEATH(
       {
         ClientConnectionPtr connection =
             dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                 Network::Test::createRawBufferSocket(), nullptr);
       },
-      "panic: not implemented");
+      "");
 }
 
 } // namespace

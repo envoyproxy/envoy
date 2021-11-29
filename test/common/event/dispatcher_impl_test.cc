@@ -1578,7 +1578,7 @@ TEST_F(DispatcherConnectionTest, CreateEnvoyInternalConnectionWhenFactoryNotExis
           std::make_shared<Network::Address::EnvoyInternalInstance>("listener_internal_address"),
           Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
           nullptr),
-      "not implemented");
+      "");
 }
 
 } // namespace

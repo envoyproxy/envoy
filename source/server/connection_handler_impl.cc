@@ -281,13 +281,5 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
              : absl::nullopt;
 }
 
-// Network::InternalManager
-Network::InternalListenerCallbacksOptRef ConnectionHandlerImpl::findByAddress(
-    const Network::Address::InstanceConstSharedPtr& listen_address) {
-  // TODO(lambdai): lookup the internal listene when #18104 is merged.
-  UNREFERENCED_PARAMETER(listen_address);
-  return Network::InternalListenerCallbacksOptRef();
-}
-
 } // namespace Server
 } // namespace Envoy

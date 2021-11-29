@@ -45,7 +45,7 @@ public:
   Network::Address::EnvoyInternalInstance listener_addr{"listener_internal_address"};
 };
 
-class MockInternalListenerCallbacks : public Network::InternalListenerCallbacks {
+class MockInternalListener : public Network::InternalListener {
 public:
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr &&));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
@@ -53,7 +53,7 @@ public:
 
 class MockInternalListenerManger : public Network::InternalListenerManager {
 public:
-  MOCK_METHOD(Network::InternalListenerCallbacksOptRef, findByAddress,
+  MOCK_METHOD(Network::InternalListenerOptRef, findByAddress,
               (const Network::Address::InstanceConstSharedPtr&));
 };
 
@@ -74,7 +74,7 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
   dispatcher_->registerInternalListenerManager(internal_listener_manager);
 
   EXPECT_CALL(internal_listener_manager, findByAddress(_))
-      .WillOnce(testing::Return(Network::InternalListenerCallbacksOptRef()));
+      .WillOnce(testing::Return(Network::InternalListenerOptRef()));
 
   auto client_conn = dispatcher_->createClientConnection(
       std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
@@ -93,9 +93,8 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
 TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
   MockInternalListenerManger internal_listener_manager;
   dispatcher_->registerInternalListenerManager(internal_listener_manager);
-  MockInternalListenerCallbacks internal_listener;
-  Network::InternalListenerCallbacksOptRef internal_listener_opt = absl::make_optional(
-      std::reference_wrapper<Network::InternalListenerCallbacks>(internal_listener));
+  MockInternalListener internal_listener;
+  Network::InternalListenerOptRef internal_listener_opt{internal_listener};
 
   EXPECT_CALL(internal_listener_manager, findByAddress(_))
       .WillOnce(testing::Return(internal_listener_opt));

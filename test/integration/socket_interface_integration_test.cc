@@ -89,7 +89,8 @@ TEST_P(SocketInterfaceIntegrationTest, AddressWithSocketInterface) {
   client_->close(Network::ConnectionCloseType::FlushWrite);
 }
 
-// Test that connecting to internal address will crash.
+// Test that connecting to internal address will crash if the user space socket extension is not
+// linked.
 TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   BaseIntegrationTest::initialize();
 
@@ -103,7 +104,7 @@ TEST_P(SocketInterfaceIntegrationTest, InternalAddressWithSocketInterface) {
   ASSERT_DEATH(client_ = dispatcher_->createClientConnection(
                    address, Network::Address::InstanceConstSharedPtr(),
                    Network::Test::createRawBufferSocket(), nullptr),
-               "panic: not implemented");
+               "" /* Nullptr dereference */);
 }
 
 // Test that recv from internal address will crash.

@@ -34,7 +34,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     io_handle_server->close();
     return client_conn;
   }
-  
+
   // The request internal listener may not exist.
   auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
   if (!internal_listener.has_value()) {
@@ -44,7 +44,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
 
   auto accepted_socket = std::make_unique<Network::AcceptedSocketImpl>(std::move(io_handle_server),
                                                                        address, source_address);
-  internal_listener->get().onAccept(std::move(accepted_socket));
+  internal_listener->onAccept(std::move(accepted_socket));
   return client_conn;
 }
 
