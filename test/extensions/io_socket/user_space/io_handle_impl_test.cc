@@ -1056,6 +1056,24 @@ TEST_F(IoHandleImplTest, ActivateEvent) {
   ASSERT_TRUE(schedulable_cb_->enabled());
 }
 
+// This is a compatibility test for Envoy Connection. When a connection is destroyed, the Envoy
+// connection may close the underlying handle but not destroy that io handle. Meanwhile, the
+// Connection object does not expect any further event be invoked because the connection in destroy
+// pending state can not support read/write.
+TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
+  testing::MockFunction<void()> check;
+  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { check.Call(); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  EXPECT_FALSE(schedulable_cb_->enabled());
+  io_handle_->activateFileEvents(Event::FileReadyType::Read);
+  EXPECT_TRUE(schedulable_cb_->enabled());
+
+  EXPECT_CALL(check, Call()).Times(0);
+  io_handle_->close();
+}
+
 TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->activateFileEvents(Event::FileReadyType::Read),
