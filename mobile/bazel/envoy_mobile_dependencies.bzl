@@ -111,5 +111,6 @@ def python_dependencies():
     #     requirements = ":dev_requirements.txt",
     # )
     pip_install(
-        requirements = ":requirements.txt",
+        requirements = "//third_party/python:requirements.txt",
+        timeout = 1000,
     )
