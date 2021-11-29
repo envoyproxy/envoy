@@ -200,9 +200,9 @@ public:
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
       const std::string& warning = fmt::format(
           "V2 (and AUTO) xDS transport protocol versions are deprecated in {}. "
-          "The v2 xDS major version is deprecated and disabled by default. Support for v2 will be "
-          "removed from Envoy at the start of Q1 2021. You may make use of v2 in Q4 2020 by "
-          "following the advice in https://www.envoyproxy.io/docs/envoy/latest/faq/api/transition.",
+          "The v2 xDS major version has been removed and is no longer supported. "
+          "You may be missing explicit V3 configuration of the transport API version, "
+          "see the advice in https://www.envoyproxy.io/docs/envoy/v1.19.1/faq/api/envoy_v3.",
           api_config_source.DebugString());
       ENVOY_LOG_MISC(warn, warning);
       throw DeprecatedMajorVersionException(warning);
