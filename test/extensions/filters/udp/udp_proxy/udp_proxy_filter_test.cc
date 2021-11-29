@@ -803,7 +803,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
@@ -845,7 +858,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingFirstInvalidHost) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
@@ -863,7 +889,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingSecondInvalidHost) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
@@ -889,7 +928,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveHostSessions) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
@@ -917,7 +969,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveCluster) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
@@ -954,7 +1019,20 @@ TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingCannotCreateConnection) {
 
   setup(R"EOF(
 stat_prefix: foo
-cluster: fake_cluster
+matcher:
+  matcher_tree:
+    input:
+      name: source-ip
+      typed_config:
+        '@type': type.googleapis.com/envoy.type.matcher.v3.SourceIpMatchInput
+    exact_match_map:
+      map:
+        "10.0.0.1":
+          action:
+            name: route
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
+              cluster: fake_cluster
 use_per_packet_load_balancing: true
   )EOF");
 
