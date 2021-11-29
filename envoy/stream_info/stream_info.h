@@ -358,13 +358,6 @@ public:
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
-  /**
-   * Sets the upstream timing information for this stream. This is useful for
-   * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins".
-   */
-  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
-
   /*
    * @return the upstream timing for this stream
    * */
@@ -452,11 +445,6 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param host the selected upstream host for the request.
-   */
-  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  /**
    * @param std::string name denotes the name of the route.
    */
   virtual void setRouteName(absl::string_view name) PURE;
@@ -517,13 +505,6 @@ public:
    * request.
    */
   virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
-
-  /**
-   * Sets the upstream timing information for this stream. This is useful for
-   * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins".
-   */
-  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
 
   /**
    * Sets the upstream information for this stream.
@@ -628,13 +609,6 @@ public:
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
 
   /**
-   * @param upstream_local_address sets the local address of the upstream connection. Note that it
-   * can be different than the local address of the downstream connection.
-   */
-  virtual void setUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
-
-  /**
    * @return the upstream local address.
    */
   virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
@@ -653,12 +627,6 @@ public:
    * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @param connection_info sets the upstream ssl connection.
-   */
-  virtual void
-  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
 
   /**
    * @return the upstream SSL connection. This will be nullptr if the upstream
@@ -701,12 +669,6 @@ public:
    * @return pointer to filter state to be used by upstream connections.
    */
   virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
-  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
-  /**
-   * @param failure_reason the upstream transport failure reason.
-   */
-  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
 
   /**
    * @return const std::string& the upstream transport failure reason, e.g. certificate validation
@@ -767,11 +729,6 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
-
-  /**
-   * @param connection ID of the upstream connection.
-   */
-  virtual void setUpstreamConnectionId(uint64_t id) PURE;
 
   /**
    * @return the ID of the upstream connection, or absl::nullopt if not available.

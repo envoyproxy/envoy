@@ -361,10 +361,6 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -396,10 +392,6 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1006,10 +998,6 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamConnectionFailure));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1265,10 +1253,6 @@ TEST_F(RouterTest, UpstreamTimeout) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 
@@ -1902,10 +1886,6 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 
@@ -1974,11 +1954,6 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
-
   per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_idle_timeout_, enableTimer(std::chrono::milliseconds(3000), _));
   EXPECT_EQ(0U,
@@ -2041,11 +2016,6 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeoutSuccess) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
-
   per_try_idle_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*per_try_idle_timeout_, enableTimer(std::chrono::milliseconds(3000), _));
   EXPECT_EQ(0U,
@@ -2083,11 +2053,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
-
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -2149,11 +2114,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutDelayedPoolReady) {
 
   // Per try timeout starts when onPoolReady is called.
   expectPerTryTimerCreate();
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
-
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   pool_callbacks->onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
@@ -2197,11 +2157,6 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 
   response_timeout_ = new Event::MockTimer(&callbacks_.dispatcher_);
   EXPECT_CALL(*response_timeout_, enableTimer(_, _));
-
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-internal", "true"},
                                          {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
@@ -2548,7 +2503,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   response_decoder3->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
-  EXPECT_EQ(333U, callbacks_.stream_info_.upstream_connection_id_);
+  EXPECT_EQ(333U, callbacks_.stream_info_.upstreamConnectionId());
 
   // TODO: Verify hedge stats here once they are implemented.
 }
@@ -3430,10 +3385,6 @@ TEST_F(RouterTest, RetryNoneHealthy) {
           }));
 
   expectResponseTimerCreate();
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -5162,16 +5113,15 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.advanceTimeWait(std::chrono::milliseconds(43));
 
-  // Confirm we still have no upstream timing data. It won't be set until after the
-  // stream has ended.
-  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
+  // Upstream timing data is now available live.
+  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
+  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
   EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
 
   response_decoder->decodeData(data, true);
 
-  // Now these should be set.
+  // Now all these should be set.
   EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
   EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
   EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
@@ -5230,14 +5180,9 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
             return nullptr;
           }));
 
-  // Check that upstream timing is not set when a retry will occur.
   Http::ResponseHeaderMapPtr bad_response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
   response_decoder->decodeHeaders(std::move(bad_response_headers), true);
-  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
 
   router_.retry_state_->callback_();
   EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
@@ -5998,10 +5943,6 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
         return Http::okStatus();
       }));
 
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.route_->route_entry_, appendXfh()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
@@ -6038,10 +5979,6 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
         return Http::okStatus();
       }));
 
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(false));
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,

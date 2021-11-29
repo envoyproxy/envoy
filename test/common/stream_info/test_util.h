@@ -25,6 +25,7 @@ public:
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
     end_time_ = now + std::chrono::milliseconds(3);
+    setUpstreamInfo(std::make_shared<Envoy::StreamInfo::UpstreamInfoImpl>());
   }
 
   SystemTime startTime() const override { return start_time_; }

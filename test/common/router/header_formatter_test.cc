@@ -106,7 +106,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  stream_info.host_.reset();
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
 }
 

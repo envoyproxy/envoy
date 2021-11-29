@@ -1093,8 +1093,9 @@ TEST_F(TcpProxyTest, AccessDownstreamAndUpstreamProperties) {
   raiseEventUpstreamConnected(0);
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().downstreamAddressProvider().sslConnection(),
             filter_callbacks_.connection().ssl());
-  EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamLocalAddress(),
-            upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress());
+  EXPECT_EQ(
+      filter_callbacks_.connection().streamInfo().upstreamLocalAddress().get(),
+      upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().localAddress().get());
   EXPECT_EQ(filter_callbacks_.connection().streamInfo().upstreamSslConnection(),
             upstream_connections_.at(0)->streamInfo().downstreamAddressProvider().sslConnection());
 }

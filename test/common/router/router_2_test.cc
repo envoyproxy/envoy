@@ -280,10 +280,6 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
           }));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRemoteReset));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillRepeatedly(Invoke([&](const Upstream::HostDescriptionConstSharedPtr& host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -728,10 +724,6 @@ TEST_F(RouterTestSupressGRPCStatsEnabled, ExcludeTimeoutHttpStats) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 
@@ -793,10 +785,6 @@ TEST_F(RouterTestSupressGRPCStatsDisabled, IncludeHttpTimeoutStats) {
                                   upstream_stream_info_, Http::Protocol::Http10);
             return nullptr;
           }));
-  EXPECT_CALL(callbacks_.stream_info_, onUpstreamHostSelected(_))
-      .WillOnce(Invoke([&](const Upstream::HostDescriptionConstSharedPtr host) -> void {
-        EXPECT_EQ(host_address_, host->address());
-      }));
 
   expectResponseTimerCreate();
 

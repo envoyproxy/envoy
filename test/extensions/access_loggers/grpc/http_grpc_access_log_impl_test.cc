@@ -117,7 +117,6 @@ public:
 
   void expectLogRequestMethod(const std::string& request_method) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
     stream_info.start_time_ = SystemTime(1h);
 
     Http::TestRequestHeaderMapImpl request_headers{
@@ -175,7 +174,7 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
     stream_info.start_time_monotonic_ = MonotonicTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = 2ms;
@@ -231,7 +230,7 @@ response: {}
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
     stream_info.last_downstream_tx_byte_sent_ = std::chrono::nanoseconds(2000000);
 
@@ -264,14 +263,14 @@ response: {}
     stream_info.start_time_ = SystemTime(1h);
 
     stream_info.last_downstream_rx_byte_received_ = 2ms;
-    stream_info.first_upstream_tx_byte_sent_ = 4ms;
-    stream_info.last_upstream_tx_byte_sent_ = 6ms;
-    stream_info.first_upstream_rx_byte_received_ = 8ms;
-    stream_info.last_upstream_rx_byte_received_ = 10ms;
+    EXPECT_CALL(stream_info, firstUpstreamTxByteSent()).WillOnce(Return(4ms));
+    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillOnce(Return(6ms));
+    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillOnce(Return(8ms));
+    EXPECT_CALL(stream_info, lastUpstreamRxByteReceived()).WillOnce(Return(10ms));
     stream_info.first_downstream_tx_byte_sent_ = 12ms;
     stream_info.last_downstream_tx_byte_sent_ = 14ms;
 
-    stream_info.setUpstreamLocalAddress(
+    stream_info.upstream_info_->setUpstreamLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("10.0.0.2"));
     stream_info.protocol_ = Http::Protocol::Http10;
     stream_info.addBytesReceived(10);
@@ -363,9 +362,9 @@ response:
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
-    stream_info.upstream_transport_failure_reason_ = "TLS error";
+    stream_info.upstream_info_->setUpstreamTransportFailureReason("TLS error");
 
     Http::TestRequestHeaderMapImpl request_headers{
         {":method", "WHACKADOO"},
@@ -398,7 +397,7 @@ response: {}
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -465,7 +464,7 @@ response: {}
   // TLSv1.2
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -515,7 +514,7 @@ response: {}
   // TLSv1.1
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -565,7 +564,7 @@ response: {}
   // TLSv1
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -615,7 +614,7 @@ response: {}
   // Unknown TLS version (TLSv1.4)
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -685,7 +684,7 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
 
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
-    stream_info.host_ = nullptr;
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info.start_time_ = SystemTime(1h);
 
     Http::TestRequestHeaderMapImpl request_headers{

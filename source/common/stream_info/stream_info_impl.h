@@ -47,9 +47,6 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
     return upstream_ssl_info_;
   }
-  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
-    upstream_timing_ = upstream_timing;
-  }
   UpstreamTiming& upstreamTiming() override { return upstream_timing_; }
   const UpstreamTiming& upstreamTiming() const override { return upstream_timing_; }
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
@@ -135,11 +132,6 @@ struct StreamInfoImpl : public StreamInfo {
     }
   }
 
-  void setUpstreamConnectionId(uint64_t id) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamConnectionId(id);
-  }
-
   absl::optional<uint64_t> upstreamConnectionId() const override {
     if (!upstream_info_) {
       return absl::nullopt;
@@ -154,13 +146,10 @@ struct StreamInfoImpl : public StreamInfo {
     return duration(downstream_timing_.value().lastDownstreamRxByteReceived());
   }
 
-  void setUpstreamTiming(const UpstreamTiming& upstream_timing) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamTiming(upstream_timing);
-  }
-
   void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override { upstream_info_ = info; }
+
   std::shared_ptr<UpstreamInfo> upstreamInfo() override { return upstream_info_; }
+
   OptRef<const UpstreamInfo> upstreamInfo() const override {
     if (!upstream_info_) {
       return {};
@@ -274,11 +263,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t responseFlags() const override { return response_flags_; }
 
-  void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamHost(host);
-  }
-
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const override {
     if (!upstream_info_) {
       return nullptr;
@@ -291,12 +275,6 @@ struct StreamInfoImpl : public StreamInfo {
   }
 
   const std::string& getRouteName() const override { return route_name_; }
-
-  void setUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& upstream_local_address) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamLocalAddress(upstream_local_address);
-  }
 
   const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
     if (!upstream_info_) {
@@ -311,11 +289,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
-  }
-
-  void setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& connection_info) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamSslConnection(connection_info);
   }
 
   Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
@@ -339,15 +312,6 @@ struct StreamInfoImpl : public StreamInfo {
       return legacy_upstream_filter_state_;
     }
     return upstream_info_->upstreamFilterState();
-  }
-  void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) override {
-    maybeCreateUpstreamInfo();
-    return upstream_info_->setUpstreamFilterState(filter_state);
-  }
-
-  void setUpstreamTransportFailureReason(absl::string_view failure_reason) override {
-    maybeCreateUpstreamInfo();
-    upstream_info_->setUpstreamTransportFailureReason(failure_reason);
   }
 
   const std::string& upstreamTransportFailureReason() const override {
