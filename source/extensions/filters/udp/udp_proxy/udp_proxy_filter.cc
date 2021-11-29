@@ -28,7 +28,6 @@ void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster)
   ASSERT((!cluster_infos_.contains(cluster_name)) ||
          &cluster_infos_[cluster_name]->cluster_ != &cluster);
 
-  cluster_infos_.emplace(cluster_name, std::make_shared<ClusterInfo>(*this, cluster));
   if (config_->usingPerPacketLoadBalancing()) {
     cluster_infos_.emplace(cluster_name,
                            std::make_unique<PerPacketLoadBalancingClusterInfo>(*this, cluster));

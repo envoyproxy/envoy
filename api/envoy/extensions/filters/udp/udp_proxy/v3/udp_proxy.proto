@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -61,7 +61,7 @@ message UdpProxyConfig {
     ];
 
     // The match tree to use when resolving route actions for incoming requests.
-    xds.type.matcher.v3.Matcher matcher = 7
+    xds.type.matcher.v3.Matcher matcher = 8
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
 
