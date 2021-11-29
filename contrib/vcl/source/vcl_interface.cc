@@ -77,6 +77,11 @@ void onMqSocketEvents(uint32_t flags) {
       vcl_handle->cb(evts);
     }
   }
+
+  // There might be more unhandled events, so program drain
+  if (max_events == 0) {
+    vclInterfaceDrainEvents();
+  }
 }
 
 } // namespace

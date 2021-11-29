@@ -241,6 +241,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(
           stream_info.protocol());
     };
+  } else if (field_name == "REQUESTED_SERVER_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) -> std::string {
+      return std::string(stream_info.downstreamAddressProvider().requestedServerName());
+    };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return stream_info.downstreamAddressProvider().remoteAddress()->asString();

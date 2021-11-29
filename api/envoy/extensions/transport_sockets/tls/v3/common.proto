@@ -9,6 +9,7 @@ import "envoy/type/matcher/v3/string.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
@@ -149,7 +150,7 @@ message PrivateKeyProvider {
   }
 }
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -167,6 +168,21 @@ message TlsCertificate {
   // directory for any file moves to support rotation. This currently only
   // applies to dynamic secrets, when the *TlsCertificate* is delivered via SDS.
   config.core.v3.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
+
+  // `Pkcs12` data containing TLS certificate, chain, and private key.
+  //
+  // If *pkcs12* is a filesystem path, the file will be read, but no watch will
+  // be added to the parent directory, since *pkcs12* isn't used by SDS.
+  // This field is mutually exclusive with *certificate_chain*, *private_key* and *private_key_provider*.
+  // This can't be marked as ``oneof`` due to API compatibility reasons. Setting
+  // both :ref:`private_key <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key>`,
+  // :ref:`certificate_chain <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.certificate_chain>`,
+  // or :ref:`private_key_provider <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.private_key_provider>`
+  // and :ref:`pkcs12 <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.pkcs12>`
+  // fields will result in an error. Use :ref:`password
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.TlsCertificate.password>`
+  // to specify the password to unprotect the `PKCS12` data, if necessary.
+  config.core.v3.DataSource pkcs12 = 8 [(udpa.annotations.sensitive) = true];
 
   // If specified, updates of file-based *certificate_chain* and *private_key*
   // sources will be triggered by this watch. The certificate/key pair will be
@@ -253,7 +269,26 @@ message CertificateProviderPluginInstance {
   string certificate_name = 2;
 }
 
-// [#next-free-field: 14]
+// Matcher for subject alternative names, to match both type and value of the SAN.
+message SubjectAltNameMatcher {
+  // Indicates the choice of GeneralName as defined in section 4.2.1.5 of RFC 5280 to match
+  // against.
+  enum SanType {
+    SAN_TYPE_UNSPECIFIED = 0;
+    EMAIL = 1;
+    DNS = 2;
+    URI = 3;
+    IP_ADDRESS = 4;
+  }
+
+  // Specification of type of SAN. Note that the default enum value is an invalid choice.
+  SanType san_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // Matcher for SAN value.
+  type.matcher.v3.StringMatcher matcher = 2 [(validate.rules).message = {required: true}];
+}
+
+// [#next-free-field: 16]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
@@ -283,8 +318,8 @@ message CertificateValidationContext {
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.verify_certificate_hash>`, or
-  // :ref:`match_subject_alt_names
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_subject_alt_names>`) is also
+  // :ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`) is also
   // specified.
   //
   // It can optionally contain certificate revocation lists, in which case Envoy will verify
@@ -292,6 +327,9 @@ message CertificateValidationContext {
   // that if a CRL is provided for any certificate authority in a trust chain, a CRL must be
   // provided for all certificate authorities in that chain. Failure to do so will result in
   // verification failure for both revoked and unrevoked certificates from that chain.
+  // The behavior of requiring all certificates to contain CRLs if any do can be altered by
+  // setting :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>`
+  // true. If set to true, only the final certificate in the chain undergoes CRL verification.
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
@@ -388,6 +426,8 @@ message CertificateValidationContext {
 
   // An optional list of Subject Alternative name matchers. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified matchers.
+  // The matching uses "any" semantics, that is to say, the SAN is verified if at least one matcher is
+  // matched.
   //
   // When a certificate has wildcard DNS SAN entries, to match a specific client, it should be
   // configured with exact match type in the :ref:`string matcher <envoy_v3_api_msg_type.matcher.v3.StringMatcher>`.
@@ -396,15 +436,22 @@ message CertificateValidationContext {
   //
   // .. code-block:: yaml
   //
-  //  match_subject_alt_names:
-  //    exact: "api.example.com"
+  //  match_typed_subject_alt_names:
+  //  - san_type: DNS
+  //    matcher:
+  //      exact: "api.example.com"
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.trusted_ca>`.
-  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9;
+  repeated SubjectAltNameMatcher match_typed_subject_alt_names = 15;
+
+  // This field is deprecated in favor of ref:`match_typed_subject_alt_names
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`
+  repeated type.matcher.v3.StringMatcher match_subject_alt_names = 9
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] Must present signed certificate time-stamp.
   google.protobuf.BoolValue require_signed_certificate_timestamp = 6;
@@ -417,7 +464,9 @@ message CertificateValidationContext {
   // for any certificate authority in a trust chain, a CRL must be provided
   // for all certificate authorities in that chain. Failure to do so will
   // result in verification failure for both revoked and unrevoked certificates
-  // from that chain.
+  // from that chain. This default behavior can be altered by setting
+  // :ref:`only_verify_leaf_cert_crl <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.only_verify_leaf_cert_crl>` to
+  // true.
   config.core.v3.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.
@@ -433,4 +482,8 @@ message CertificateValidationContext {
   // Refer to the documentation for the specified validator. If you do not want a custom validation algorithm, do not set this field.
   // [#extension-category: envoy.tls.cert_validator]
   config.core.v3.TypedExtensionConfig custom_validator_config = 12;
+
+  // If this option is set to true, only the certificate at the end of the
+  // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
+  bool only_verify_leaf_cert_crl = 14;
 }

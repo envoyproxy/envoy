@@ -58,8 +58,10 @@ TcpUpstream::onDownstreamEvent(Network::ConnectionEvent event) {
 }
 
 HttpUpstream::HttpUpstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                           const TunnelingConfig& config)
-    : config_(config), response_decoder_(*this), upstream_callbacks_(callbacks) {
+                           const TunnelingConfig& config,
+                           const StreamInfo::StreamInfo& downstream_info)
+    : config_(config), downstream_info_(downstream_info), response_decoder_(*this),
+      upstream_callbacks_(callbacks) {
   header_parser_ = Envoy::Router::HeaderParser::configure(config_.headers_to_add());
 }
 
@@ -195,7 +197,8 @@ HttpConnPool::HttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                            Upstream::LoadBalancerContext* context, const TunnelingConfig& config,
                            Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks,
                            Http::CodecType type)
-    : config_(config), type_(type), upstream_callbacks_(upstream_callbacks) {
+    : config_(config), type_(type), upstream_callbacks_(upstream_callbacks),
+      downstream_info_(context->downstreamConnection()->streamInfo()) {
   absl::optional<Http::Protocol> protocol;
   if (type_ == Http::CodecType::HTTP3) {
     protocol = Http::Protocol::Http3;
@@ -217,9 +220,9 @@ HttpConnPool::~HttpConnPool() {
 void HttpConnPool::newStream(GenericConnectionPoolCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (type_ == Http::CodecType::HTTP1) {
-    upstream_ = std::make_unique<Http1Upstream>(upstream_callbacks_, config_);
+    upstream_ = std::make_unique<Http1Upstream>(upstream_callbacks_, config_, downstream_info_);
   } else {
-    upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_);
+    upstream_ = std::make_unique<Http2Upstream>(upstream_callbacks_, config_, downstream_info_);
   }
   Tcp::ConnectionPool::Cancellable* handle =
       conn_pool_data_.value().newStream(upstream_->responseDecoder(), *this);
@@ -251,8 +254,9 @@ void HttpConnPool::onGenericPoolReady(Upstream::HostDescriptionConstSharedPtr& h
 }
 
 Http2Upstream::Http2Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config)
-    : HttpUpstream(callbacks, config) {}
+                             const TunnelingConfig& config,
+                             const StreamInfo::StreamInfo& downstream_info)
+    : HttpUpstream(callbacks, config, downstream_info) {}
 
 bool Http2Upstream::isValidResponse(const Http::ResponseHeaderMap& headers) {
   if (Http::Utility::getResponseStatus(headers) != 200) {
@@ -279,15 +283,16 @@ void Http2Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
                           Http::Headers::get().ProtocolValues.Bytestream);
   }
 
-  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
+  header_parser_->evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());
 }
 
 Http1Upstream::Http1Upstream(Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
-                             const TunnelingConfig& config)
-    : HttpUpstream(callbacks, config) {}
+                             const TunnelingConfig& config,
+                             const StreamInfo::StreamInfo& downstream_info)
+    : HttpUpstream(callbacks, config, downstream_info) {}
 
 void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool) {
   request_encoder_ = &request_encoder;
@@ -305,7 +310,7 @@ void Http1Upstream::setRequestEncoder(Http::RequestEncoder& request_encoder, boo
     headers->addReference(Http::Headers::get().Path, "/");
   }
 
-  header_parser_->evaluateHeaders(*headers, nullptr /*stream_info*/);
+  header_parser_->evaluateHeaders(*headers, downstream_info_);
   const auto status = request_encoder_->encodeHeaders(*headers, false);
   // Encoding can only fail on missing required request headers.
   ASSERT(status.ok());

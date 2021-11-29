@@ -200,7 +200,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), true, packets_dropped_);
+        *this, dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.
@@ -215,6 +215,14 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
                      err->getErrorDetails());
     }
   }
+}
+
+void EnvoyQuicClientConnection::setNumPtosForPortMigration(uint32_t num_ptos_for_path_degrading) {
+  if (num_ptos_for_path_degrading < 1) {
+    return;
+  }
+  migrate_port_on_path_degrading_ = true;
+  sent_packet_manager().set_num_ptos_for_path_degrading(num_ptos_for_path_degrading);
 }
 
 EnvoyQuicClientConnection::EnvoyQuicPathValidationContext::EnvoyQuicPathValidationContext(

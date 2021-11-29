@@ -115,10 +115,6 @@ def _python_deps():
         name = "com_github_twitter_common_finagle_thrift",
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
-    external_http_archive(
-        name = "six",
-        build_file = "@com_google_protobuf//third_party:six.BUILD",
-    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -813,10 +809,15 @@ def _com_github_google_quiche():
         name = "com_github_google_quiche",
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
+        patches = ["@envoy//bazel/external:quiche.patch"],
     )
     native.bind(
         name = "quiche_common_platform",
         actual = "@com_github_google_quiche//:quiche_common_platform",
+    )
+    native.bind(
+        name = "quiche_http2_adapter",
+        actual = "@com_github_google_quiche//:http2_adapter",
     )
     native.bind(
         name = "quiche_http2_platform",

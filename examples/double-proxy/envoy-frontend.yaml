@@ -36,7 +36,9 @@ static_resources:
             private_key:
               filename: certs/clientkey.pem
           validation_context:
-            match_subject_alt_names:
-            - exact: proxy-postgres-backend.example.com
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: proxy-postgres-backend.example.com
             trusted_ca:
               filename: certs/cacert.pem

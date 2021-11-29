@@ -769,8 +769,8 @@ its keys can only be *string* or *numeric*.
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
     request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
-      auth: headers:get("authorization"),
-      token: headers:get("x-request-token"),
+      auth = headers:get("authorization"),
+      token = headers:get("x-request-token"),
     })
   end
 

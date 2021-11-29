@@ -84,7 +84,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
-  void sendDiscoveryRequest(const std::string& type_url);
+  void sendDiscoveryRequest(absl::string_view type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,

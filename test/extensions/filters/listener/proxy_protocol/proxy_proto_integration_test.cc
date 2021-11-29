@@ -1,4 +1,4 @@
-#include "test/integration/proxy_proto_integration_test.h"
+#include "test/extensions/filters/listener/proxy_protocol/proxy_proto_integration_test.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"

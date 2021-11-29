@@ -378,7 +378,7 @@ The following command operators are supported:
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
-    * **UMSDR**: The upstream request reached to max stream duration.
+    * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
 
 %ROUTE_NAME%
@@ -506,7 +506,7 @@ The following command operators are supported:
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
     can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
@@ -541,7 +541,7 @@ The following command operators are supported:
   HTTP
     :ref:`Upstream cluster Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. The data
     will be logged as a JSON string. For example, for the following dynamic metadata:
 

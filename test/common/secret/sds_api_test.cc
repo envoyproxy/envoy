@@ -665,7 +665,10 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   dynamic_cvc->set_allow_expired_certificate(false);
   dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
-  dynamic_cvc->add_match_subject_alt_names()->set_exact("second san");
+  auto* san_matcher = dynamic_cvc->add_match_typed_subject_alt_names();
+  san_matcher->mutable_matcher()->set_exact("second san");
+  san_matcher->set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
   const std::string dynamic_verify_certificate_spki =
       "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
   dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
@@ -681,7 +684,10 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext default_cvc;
   default_cvc.set_allow_expired_certificate(true);
   default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
-  default_cvc.add_match_subject_alt_names()->set_exact("first san");
+  san_matcher = default_cvc.add_match_typed_subject_alt_names();
+  san_matcher->mutable_matcher()->set_exact("first san");
+  san_matcher->set_san_type(
+      envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS);
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext merged_cvc =
       default_cvc;
@@ -697,8 +703,12 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
   EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
-  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].exact());
-  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].exact());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[1].san_type());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());

@@ -240,6 +240,25 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
+  bool has_unknown_field;
+  auto status = loadFromJsonNoThrow(json, message, has_unknown_field);
+  if (status.ok()) {
+    return;
+  }
+  if (has_unknown_field) {
+    // If the parsing failure is caused by the unknown fields.
+    validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                      status.ToString());
+  } else {
+    // If the error has nothing to do with unknown field.
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+  }
+}
+
+Protobuf::util::Status MessageUtil::loadFromJsonNoThrow(const std::string& json,
+                                                        Protobuf::Message& message,
+                                                        bool& has_unknown_fileld) {
+  has_unknown_fileld = false;
   Protobuf::util::JsonParseOptions options;
   options.case_insensitive_enum_parsing = true;
   // Let's first try and get a clean parse when checking for unknown fields;
@@ -248,7 +267,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (strict_status.ok()) {
     // Success, no need to do any extra work.
-    return;
+    return strict_status;
   }
   // If we fail, we see if we get a clean parse when allowing unknown fields.
   // This is essentially a workaround
@@ -259,15 +278,11 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
   // If we still fail with relaxed unknown field checking, the error has nothing
   // to do with unknown fields.
-  if (!relaxed_status.ok()) {
-    throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                         "): " + json);
+  if (relaxed_status.ok()) {
+    has_unknown_fileld = true;
+    return strict_status;
   }
-  // We know it's an unknown field at this point. If we're at the latest
-  // version, then it's definitely an unknown field, otherwise we try to
-  // load again at a later version.
-  validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                    strict_status.ToString());
+  return relaxed_status;
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
@@ -526,8 +541,20 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
-void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
-  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (!status.ok()) {
+    return false;
+  }
+  bool has_unknow_field;
+  status = MessageUtil::loadFromJsonNoThrow(json, dest, has_unknow_field);
+  if (status.ok() || has_unknow_field) {
+    return true;
+  }
+  return false;
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
