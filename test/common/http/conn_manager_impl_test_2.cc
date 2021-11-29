@@ -349,6 +349,35 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationNoCodec) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_max_duration_reached_.value());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/19045
+TEST_F(HttpConnectionManagerImplTest, MaxRequests) {
+  max_requests_per_connection_ = 1;
+  codec_->protocol_ = Protocol::Http2;
+  setup(false, "");
+
+  Event::MockTimer* drain_timer = setUpTimer();
+  EXPECT_CALL(*drain_timer, enableTimer(_, _));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
+    conn_manager_->newStream(response_encoder_);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(*codec_, goAway());
+  EXPECT_CALL(*codec_, shutdownNotice());
+  EXPECT_CALL(*drain_timer, disableTimer());
+
+  // Kick off two requests.
+  Buffer::OwnedImpl fake_input("hello");
+  conn_manager_->onData(fake_input, false);
+  conn_manager_->onData(fake_input, false);
+  drain_timer->invokeCallback();
+
+  EXPECT_EQ(2U, stats_.named_.downstream_cx_max_requests_reached_.value());
+
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   max_connection_duration_ = (std::chrono::milliseconds(10));
   Event::MockTimer* connection_duration_timer = setUpTimer();

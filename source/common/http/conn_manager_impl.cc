@@ -296,7 +296,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
       new_stream->state_.saw_connection_close_ = true;
       // Prevent erroneous debug log of closing due to incoming connection close header.
       drain_state_ = DrainState::Closing;
-    } else {
+    } else if (drain_state_ == DrainState::NotDraining) {
       startDrainSequence();
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
