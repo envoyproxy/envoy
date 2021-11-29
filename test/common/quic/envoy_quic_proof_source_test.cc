@@ -58,7 +58,8 @@ public:
     ON_CALL(cert_validation_ctx_config_, certificateRevocationListPath())
         .WillByDefault(ReturnRef(path_string));
     const std::vector<std::string> empty_string_list;
-    const std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers;
+    const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
+        san_matchers;
     ON_CALL(cert_validation_ctx_config_, subjectAltNameMatchers())
         .WillByDefault(ReturnRef(san_matchers));
     ON_CALL(cert_validation_ctx_config_, verifyCertificateHashList())

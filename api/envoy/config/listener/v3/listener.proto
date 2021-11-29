@@ -35,7 +35,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 31]
+// [#next-free-field: 32]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -318,4 +318,8 @@ message Listener {
   // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
   // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
   bool enable_mptcp = 30;
+
+  // Whether the listener should limit connections based upon the value of
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
+  bool ignore_global_conn_limit = 31;
 }

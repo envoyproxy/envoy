@@ -56,8 +56,6 @@ typed_config:
     HttpIntegrationTest::initialize();
   }
 
-  void TearDown() override { fake_upstream_connection_.reset(); }
-
 protected:
   Http::CodecType upstream_protocol_;
 };

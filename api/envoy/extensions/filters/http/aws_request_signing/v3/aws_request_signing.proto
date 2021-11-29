@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.aws_request_signing.v3;
 
+import "envoy/type/matcher/v3/string.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -16,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_request_signing]
 
 // Top level configuration for the AWS request signing filter.
+// [#next-free-field: 6]
 message AwsRequestSigning {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_request_signing.v2alpha.AwsRequestSigning";
@@ -48,4 +51,15 @@ message AwsRequestSigning {
   // to calculate the payload hash. Not all services support this option. See the `S3
   // <https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html>`_ policy for details.
   bool use_unsigned_payload = 4;
+
+  // A list of request header string matchers that will be excluded from signing. The excluded header can be matched by
+  // any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
+  //
+  // Example:
+  // match_excluded_headers:
+  // - prefix: x-envoy
+  // - exact: foo
+  // - exact: bar
+  // When applied, all headers that start with "x-envoy" and headers "foo" and "bar" will not be signed.
+  repeated type.matcher.v3.StringMatcher match_excluded_headers = 5;
 }

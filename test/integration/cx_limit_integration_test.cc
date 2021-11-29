@@ -31,8 +31,23 @@ public:
                                       std::to_string(num_conns));
   }
 
-  void setGlobalLimit(std::string&& num_conns) {
-    config_helper_.addRuntimeOverride("overload.global_downstream_max_connections", num_conns);
+  void setGlobalLimit(const uint32_t num_conns) {
+    config_helper_.addRuntimeOverride("overload.global_downstream_max_connections",
+                                      std::to_string(num_conns));
+  }
+
+  void setGlobalLimitOptOut() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      listener->set_ignore_global_conn_limit(true);
+    });
+  }
+
+  void setAdminGlobalLimitOptOut() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* admin = bootstrap.mutable_admin();
+      admin->set_ignore_global_conn_limit(true);
+    });
   }
 
   void initialize() override { BaseIntegrationTest::initialize(); }
@@ -95,9 +110,6 @@ public:
     ASSERT_TRUE(tcp_clients.back()->connected());
 
     const bool isV4 = (version_ == Network::Address::IpVersion::v4);
-    auto local_address = isV4 ? Network::Utility::getCanonicalIpv4LoopbackAddress()
-                              : Network::Utility::getIpv6LoopbackAddress();
-
     const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
 
     test_server_->waitForCounterEq(counter_prefix + check_stat, 1);
@@ -145,7 +157,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimit) {
     // Includes twice the number of connections expected because the tracking is performed via a
     // static variable and the fake upstream has a listener. This causes upstream connections to the
     // fake upstream to also be tracked as part of the global downstream connection tracking.
-    setGlobalLimit("4");
+    setGlobalLimit(4);
     initialize();
   };
 
@@ -154,14 +166,125 @@ TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimit) {
 
 TEST_P(ConnectionLimitIntegrationTest, TestBothLimits) {
   std::function<void()> init_func = [this]() {
+    // Includes twice the number of connections expected because the tracking is performed via a
+    // static variable and the fake upstream has a listener. This causes upstream connections to the
+    // fake upstream to also be tracked as part of the global downstream connection tracking.
+    setGlobalLimit(4);
     // Setting the listener limit to a much higher value and making sure the right stat gets
     // incremented when both limits are set.
-    setGlobalLimit("4");
     setListenerLimit(100);
     initialize();
   };
 
   doTest(init_func, "downstream_global_cx_overflow");
+}
+
+TEST_P(ConnectionLimitIntegrationTest, TestGlobalLimitOptOut) {
+  // Includes 4 connections because the tracking is performed regardless of whether a specific
+  // listener has opted out. Since the fake upstream has a listener, we need to keep value at 4 so
+  // it can accept connections. (2 downstream listener conns + 2 upstream listener conns)
+  setGlobalLimit(4);
+  setGlobalLimitOptOut();
+  setAdminGlobalLimitOptOut();
+  setListenerLimit(100);
+  initialize();
+
+  std::vector<IntegrationTcpClientPtr> tcp_clients;
+  std::vector<FakeRawConnectionPtr> raw_conns;
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+  ASSERT_TRUE(tcp_clients.back()->connected());
+
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+  ASSERT_TRUE(tcp_clients.back()->connected());
+
+  // 3rd connection should fail, not because listener_0 hit a limit, but because the
+  // upstream listener hit a limit (5 conns would exist when it goes to accept, so it rejects it).
+  // We can see that listener_0 didn't hit any limits because it's downstream_global_cx_overflow
+  // stat is still at 0, in contrast with the TestGlobalLimit test where it is 1
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
+  tcp_clients.back()->waitForDisconnect();
+
+  // Get rid of the client that failed to connect.
+  tcp_clients.back()->close();
+  tcp_clients.pop_back();
+
+  // admin connections should succeed
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("admin")));
+  raw_conns.emplace_back();
+  ASSERT_TRUE(tcp_clients.back()->connected());
+
+  const bool isV4 = (version_ == Network::Address::IpVersion::v4);
+  const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
+
+  // listener_0 does not hit any connection limits
+  test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 0);
+  test_server_->waitForCounterEq("listener.admin.downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq("listener.admin.downstream_cx_overflow", 0);
+
+  for (auto& tcp_client : tcp_clients) {
+    tcp_client->close();
+  }
+
+  tcp_clients.clear();
+  raw_conns.clear();
+}
+
+TEST_P(ConnectionLimitIntegrationTest, TestListenerLimitWithGlobalOptOut) {
+  // Includes 4 connections because the tracking is performed regardless of whether a specific
+  // listener has opted out. Since the fake upstream has a listener, we need to keep value at 4 so
+  // it can accept connections. (2 downstream listener conns + 2 upstream listener conns)
+  setGlobalLimit(4);
+  setGlobalLimitOptOut();
+  // Only allow 2 connections for the listener even though it has opted out of the global connection
+  // limit
+  setListenerLimit(2);
+  initialize();
+
+  std::vector<IntegrationTcpClientPtr> tcp_clients;
+  std::vector<FakeRawConnectionPtr> raw_conns;
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+  ASSERT_TRUE(tcp_clients.back()->connected());
+
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(raw_conns.back()));
+  ASSERT_TRUE(tcp_clients.back()->connected());
+
+  // 3rd connection should fail because we've hit the listener connection limit, not because
+  // we've hit a global limit
+  tcp_clients.emplace_back(makeTcpConnection(lookupPort("listener_0")));
+  raw_conns.emplace_back();
+  ASSERT_FALSE(
+      fake_upstreams_[0]->waitForRawConnection(raw_conns.back(), std::chrono::milliseconds(500)));
+  tcp_clients.back()->waitForDisconnect();
+
+  // Get rid of the client that failed to connect.
+  tcp_clients.back()->close();
+  tcp_clients.pop_back();
+
+  const bool isV4 = (version_ == Network::Address::IpVersion::v4);
+  const std::string counter_prefix = (isV4 ? "listener.127.0.0.1_0." : "listener.[__1]_0.");
+
+  // listener_0 does hits the listener connection limit
+  test_server_->waitForCounterEq(counter_prefix + "downstream_global_cx_overflow", 0);
+  test_server_->waitForCounterEq(counter_prefix + "downstream_cx_overflow", 1);
+
+  for (auto& tcp_client : tcp_clients) {
+    tcp_client->close();
+  }
+
+  tcp_clients.clear();
+  raw_conns.clear();
 }
 
 } // namespace

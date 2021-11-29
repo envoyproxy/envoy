@@ -32,6 +32,7 @@ envoy_cc_extension(
     deps = [
         ":aws_request_signing_filter_lib",
         "//envoy/registry",
+        "//source/common/common:matchers_lib",
         "//source/extensions/common/aws:credentials_provider_impl_lib",
         "//source/extensions/common/aws:signer_impl_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

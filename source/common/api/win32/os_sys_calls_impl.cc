@@ -409,5 +409,19 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
   return {false, WSAEOPNOTSUPP};
 }
 
+bool OsSysCallsImpl::supportsGetifaddrs() const {
+  if (alternate_getifaddrs_.has_value()) {
+    return true;
+  }
+  return false;
+}
+
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+  if (alternate_getifaddrs_.has_value()) {
+    return alternate_getifaddrs_.value()(interfaces);
+  }
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
 } // namespace Api
 } // namespace Envoy

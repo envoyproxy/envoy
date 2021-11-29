@@ -18,6 +18,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -147,9 +148,9 @@ int DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
   const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config = config_;
   if (cert_validation_config != nullptr) {
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
-      for (const envoy::type::matcher::v3::StringMatcher& matcher :
+      for (const envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
+        subject_alt_name_matchers_.emplace_back(createStringSanMatcher(matcher));
       }
       verify_mode = verify_mode_validation_context;
     }
@@ -221,8 +222,8 @@ int DefaultCertValidator::doVerifyCertChain(
 
   // If `trusted_ca` exists, it is already verified in the code above. Thus, we just need to make
   // sure the verification for other validation context configurations doesn't fail (i.e. either
-  // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure other
-  // configurations are verified and the verification succeed.
+  // `NotValidated` or `Validated`). If `trusted_ca` doesn't exist, we will need to make sure
+  // other configurations are verified and the verification succeed.
   int validation_status = verify_trusted_ca_
                               ? validated != Envoy::Ssl::ClientValidationStatus::Failed
                               : validated == Envoy::Ssl::ClientValidationStatus::Validated;
@@ -232,8 +233,7 @@ int DefaultCertValidator::doVerifyCertChain(
 
 Envoy::Ssl::ClientValidationStatus DefaultCertValidator::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
-        subject_alt_name_matchers) {
+    const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   Envoy::Ssl::ClientValidationStatus validated = Envoy::Ssl::ClientValidationStatus::NotValidated;
 
   if (!verify_san_list.empty()) {
@@ -291,23 +291,15 @@ bool DefaultCertValidator::verifySubjectAltName(X509* cert,
 }
 
 bool DefaultCertValidator::matchSubjectAltName(
-    X509* cert,
-    const std::vector<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>&
-        subject_alt_name_matchers) {
+    X509* cert, const std::vector<SanMatcherPtr>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
     return false;
   }
-  for (const GENERAL_NAME* general_name : san_names.get()) {
-    const std::string san = Utility::generalNameAsString(general_name);
-    for (auto& config_san_matcher : subject_alt_name_matchers) {
-      // For DNS SAN, if the StringMatcher type is exact, we have to follow DNS matching semantics.
-      if (general_name->type == GEN_DNS &&
-                  config_san_matcher.matcher().match_pattern_case() ==
-                      envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact
-              ? Utility::dnsNameMatch(config_san_matcher.matcher().exact(), absl::string_view(san))
-              : config_san_matcher.match(san)) {
+  for (const auto& config_san_matcher : subject_alt_name_matchers) {
+    for (const GENERAL_NAME* general_name : san_names.get()) {
+      if (config_san_matcher->match(general_name)) {
         return true;
       }
     }

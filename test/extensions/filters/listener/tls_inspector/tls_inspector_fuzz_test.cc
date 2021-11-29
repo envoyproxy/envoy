@@ -23,9 +23,9 @@ DEFINE_PROTO_FUZZER(
 
   if (input.max_size() == 0) {
     // If max_size not set, use default constructor
-    cfg = std::make_shared<Config>(store);
+    cfg = std::make_shared<Config>(store, input.config());
   } else {
-    cfg = std::make_shared<Config>(store, input.max_size());
+    cfg = std::make_shared<Config>(store, input.config(), input.max_size());
   }
 
   auto filter = std::make_unique<Filter>(std::move(cfg));

@@ -527,9 +527,9 @@ TEST_P(Http2CodecImplTest, MultipleContinueHeaders) {
   response_encoder_->encodeHeaders(response_headers, true);
 };
 
-// 101/102 headers etc. are passed to the response encoder (who is responsibly for deciding to
+// 104 headers etc. are passed to the response encoder (who is responsibly for deciding to
 // upgrade, ignore, etc.).
-TEST_P(Http2CodecImplTest, 1xxNonContinueHeaders) {
+TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -537,7 +537,7 @@ TEST_P(Http2CodecImplTest, 1xxNonContinueHeaders) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
 
-  TestResponseHeaderMapImpl other_headers{{":status", "102"}};
+  TestResponseHeaderMapImpl other_headers{{":status", "104"}};
   EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
   response_encoder_->encodeHeaders(other_headers, false);
 };
