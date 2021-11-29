@@ -102,7 +102,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 }
 
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
-  ASSERT(key.size() > 0);
+  ASSERT(!key.empty());
 
   const uint64_t header_size = key.size() + value.size() + 4;
 
@@ -441,8 +441,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
-  const HeaderEntry* path = headers.Path();
-  const HeaderEntry* host = headers.Host();
+  const HeaderEntry* path = headers.Path(); // NOLINT(clang-analyzer-core.CallAndMessage)
+  const HeaderEntry* host = headers.Host(); // NOLINT(clang-analyzer-core.CallAndMessage)
   bool is_connect = HeaderUtility::isConnect(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
@@ -468,8 +468,10 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   conn_buffer_helper.writeToBuffer(' ');
 
   if (is_connect) {
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     conn_buffer_helper.writeToBuffer(host->value().getStringView());
   } else {
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     conn_buffer_helper.writeToBuffer(path->value().getStringView());
   }
   conn_buffer_helper.writeToBuffer(REQUEST_POSTFIX);
