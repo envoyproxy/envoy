@@ -133,7 +133,7 @@ public:
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
 
   /**
-   * Set predicates for filtering stats to be flushed to sinks.
+   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
    * Note that if the sink predicates object is set, we do not send non-sink stats over to the
    * child process during hot restart. This will result in the admin stats console being wrong
    * during hot restart.

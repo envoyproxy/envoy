@@ -49,7 +49,7 @@ public:
 };
 
 /**
- * A class to define predicates to filter stats for flushing to sinks.
+ * A class to define predicates to filter counters, gauges and text readouts for flushing to sinks.
  */
 class SinkPredicates {
 public:
