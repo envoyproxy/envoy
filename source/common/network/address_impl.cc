@@ -127,6 +127,7 @@ absl::string_view addressType(const Network::Address::InstanceConstSharedPtr& ad
   case Network::Address::Type::EnvoyInternal:
     return "EnvoyInternal";
   }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 };
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface)
