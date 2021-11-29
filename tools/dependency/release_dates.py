@@ -211,7 +211,7 @@ def get_tagged_release_date(repo, metadata_version, github_release):
         latest = ''
         print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
 
-    if latest and github_release.version <= latest.tag_name:
+    if latest:
         release = repo.get_release(github_release.version)
         return release.published_at
     else:
