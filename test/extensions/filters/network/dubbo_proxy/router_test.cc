@@ -97,6 +97,58 @@ public:
     context_.cluster_manager_.initializeThreadLocalClusters({"cluster"});
   }
 
+  void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
+    ProtobufWkt::Struct request_struct;
+    ProtobufWkt::Value val;
+
+    // Populate metadata like StreamInfo.setDynamicMetadata() would.
+    auto& fields_map = *request_struct.mutable_fields();
+    val.set_string_value("v3.1");
+    fields_map["version"] = val;
+    val.set_string_value("devel");
+    fields_map["stage"] = val;
+    val.set_string_value("1");
+    fields_map["xkey_in_request"] = val;
+    (*callbacks_.stream_info_.metadata_
+          .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+        request_struct;
+
+    // Populate route entry's metadata which will be overridden.
+    val.set_string_value("v3.0");
+    fields_map = *request_struct.mutable_fields();
+    fields_map["version"] = val;
+    fields_map.erase("xkey_in_request");
+    Envoy::Router::MetadataMatchCriteriaImpl route_entry_matches(request_struct);
+
+    if (route_entry_has_match) {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(&route_entry_matches));
+    } else {
+      ON_CALL(route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+    }
+
+    auto match = router_->metadataMatchCriteria()->metadataMatchCriteria();
+
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
+    // below matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+    it++;
+
+    //"key_in_request" was only set by the request
+    EXPECT_EQ((*it)->name(), "xkey_in_request");
+    EXPECT_EQ((*it)->value().value().string_value(), "1");
+  }
+
   void initializeRouter() {
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
@@ -399,6 +451,20 @@ TEST_F(DubboRouterTest, NoCluster) {
         EXPECT_FALSE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->onMessageDecoded(metadata_, message_context_));
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequest) {
+  initializeRouter();
+  initializeMetadata(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(true);
+}
+
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
+  initializeRouter();
+  initializeMetadata(MessageType::Request);
+
+  verifyMetadataMatchCriteriaFromRequest(false);
 }
 
 TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
