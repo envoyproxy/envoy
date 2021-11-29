@@ -27,6 +27,7 @@ Bug Fixes
 
 * ext_authz: fix the ext_authz network filter to correctly set response flag and code details to ``UAEX`` when a connection is denied.
 * listener: fixed the crash when updating listeners that do not bind to port.
+* tcp: fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.
 * thrift_proxy: fix the thrift_proxy connection manager to correctly report success/error response metrics when performing :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
 
 Removed Config or Runtime
