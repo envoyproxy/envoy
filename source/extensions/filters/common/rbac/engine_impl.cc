@@ -33,8 +33,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
-      builder_ =
-          Expr::createBuilder(&constant_arena_, custom_library_.get());
+      builder_ = Expr::createBuilder(&constant_arena_, custom_library_.get());
       break;
     }
   }

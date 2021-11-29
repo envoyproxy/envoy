@@ -19,9 +19,8 @@ public:
                           const Http::RequestHeaderMap* request_headers,
                           const Http::ResponseHeaderMap* response_headers,
                           const Http::ResponseTrailerMap* response_trailers)
-      : arena_(arena), info_(info),
-      request_headers_(request_headers), response_headers_(response_headers),
-      response_trailers_(response_trailers) {}
+      : arena_(arena), info_(info), request_headers_(request_headers),
+        response_headers_(response_headers), response_trailers_(response_trailers) {}
 
   absl::optional<CelValue> operator[](CelValue key) const override;
   const Http::RequestHeaderMap* request_headers() { return request_headers_; }
