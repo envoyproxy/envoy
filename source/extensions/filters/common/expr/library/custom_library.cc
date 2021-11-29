@@ -27,11 +27,11 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
   request_headers_ = request_headers;
   response_headers_ = response_headers;
   response_trailers_ = response_trailers;
-  // words
+  // vocabulary
   activation->InsertValueProducer(
       CustomVocabularyName, std::make_unique<CustomVocabularyWrapper>(
                                 arena, info, request_headers, response_headers, response_trailers));
-  // functions
+  // Lazily evaluated functions only
   absl::Status status;
   status =
       activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));

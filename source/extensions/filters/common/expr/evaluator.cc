@@ -71,6 +71,9 @@ BuilderPtr createBuilder(Protobuf::Arena* arena, const CustomLibrary* custom_lib
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
 
+  // In the event of overlap between custom functions and CEL built-in functions,
+  // precedence will always be given to the CEL built-in functions.
+  // This is why custom_library->replace_default_library() is not referenced here.
   if (custom_library) {
     custom_library->RegisterFunctions(builder->GetRegistry());
   }

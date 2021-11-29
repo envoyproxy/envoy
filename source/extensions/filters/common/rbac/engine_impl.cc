@@ -34,7 +34,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_ =
-          Expr::createBuilder(&constant_arena_, custom_library_ ? custom_library_.get() : nullptr);
+          Expr::createBuilder(&constant_arena_, custom_library_.get());
       break;
     }
   }
@@ -85,8 +85,7 @@ bool RoleBasedAccessControlEngineImpl::checkPolicyMatch(
   bool matched = false;
 
   for (const auto& policy : policies_) {
-    if (policy.second->matches(connection, headers, info,
-                               (custom_library_) ? custom_library_.get() : nullptr)) {
+    if (policy.second->matches(connection, headers, info, custom_library_.get())) {
       matched = true;
       if (effective_policy_id != nullptr) {
         *effective_policy_id = policy.first;
