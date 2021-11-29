@@ -163,9 +163,9 @@ std::string Utility::formatTcpUrl(const std::string& address, uint16_t port) {
   // If the address is hostname, then address_instance could be `nullptr`.
   if ((address_instance != nullptr) &&
       (address_instance->ip()->version() == Address::IpVersion::v6)) {
-    return fmt::format("tcp://[{}]:{}", ip_address, port);
+    return fmt::format("tcp://[{}]:{}", address, port);
   } else {
-    return fmt::format("tcp://{}:{}", ip_address, port);
+    return fmt::format("tcp://{}:{}", address, port);
   }
 }
 
