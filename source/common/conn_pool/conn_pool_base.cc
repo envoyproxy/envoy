@@ -166,7 +166,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
                                             AttachContext& context) {
   ASSERT(client.state() == Envoy::ConnectionPool::ActiveClient::State::READY);
 
-  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
+  if (enforceMaxRequests() && !host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);

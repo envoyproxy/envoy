@@ -19,6 +19,7 @@ Bug Fixes
 * listener: fix a crash when updating any listener that does not bind to port.
 * listener: listener add can reuse the listener socket of a draining filter chain listener and fix the request lost.
 * mac: fix crash on startup on macOS 12 by changing the default allocator.
+* tcp: fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.
 
 Removed Config or Runtime
 -------------------------
