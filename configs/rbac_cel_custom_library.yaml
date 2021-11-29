@@ -47,8 +47,8 @@ static_resources:
                     "@type": type.googleapis.com/envoy.extensions.rbac.custom_library_config.v3.CustomLibraryConfig
                     replace_default_library_in_case_of_overlap: true
                 policies:
-#                  "policy-rbac-deny-if-custom-team-is-swg":
-#                    # deny if custom[team].equals("swg")
+#                  "policy-rbac-deny-if-custom-team-is-spirit":
+#                    # deny if custom[team].equals("spirit")
 #                    condition:
 #                      call_expr:
 #                        function: contains
@@ -59,7 +59,7 @@ static_resources:
 #                                name: custom
 #                            field: team
 #                        - const_expr:
-#                            string_value: swg
+#                            string_value: spirit
 #                    permissions:
 #                    - any: true
 #                    principals:

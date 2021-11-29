@@ -18,7 +18,7 @@ absl::optional<CelValue> CustomVocabularyWrapper::operator[](CelValue key) const
   }
   auto value = key.StringOrDie().value();
   if (value == "team") {
-    return CelValue::CreateStringView("swg");
+    return CelValue::CreateStringView("spirit");
   } else if (value == "ip") {
     auto upstream_local_address = info_.upstreamLocalAddress();
     if (upstream_local_address != nullptr) {
