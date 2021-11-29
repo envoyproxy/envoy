@@ -447,6 +447,26 @@ TEST_F(TcpProxyTest, UpstreamConnectTimeout) {
   EXPECT_EQ(access_log_data_, "UF,URX");
 }
 
+TEST_F(TcpProxyTest, UpstreamConnectionHighWatermark) {
+  setup(1);
+
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("world");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+  upstream_connections_.at(0)->runHighWatermarkCallbacks();
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(TcpProxyTest, UpstreamClusterNotFound) {
   setup(0, accessLogConfig("%RESPONSE_FLAGS%"));
 

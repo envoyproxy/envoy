@@ -274,16 +274,23 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
-  ENVOY_LOG_MISC(debug, "calling {}", __FUNCTION__);
   if (above_high_watermark_counter_++ == 0) {
-    ENVOY_LOG(debug,
-              "tcp_proxy disables downstream read because upstream write buffer is now above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
     if (parent_ != nullptr) {
+      ENVOY_CONN_LOG(
+          trace,
+          "tcp_proxy disables downstream read because upstream write buffer is now above high "
+          "watermark. above_high_watermark_counter_ = {}",
+          *parent_->downstreamConnection(), above_high_watermark_counter_);
       // There's too much data buffered in the upstream write buffer, so stop reading.
       parent_->readDisableDownstream(true);
     }
   } else {
-    ENVOY_LOG(debug, "tcp_proxy does not read disable downstream because upstream was above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
+    if (parent_ != nullptr) {
+      ENVOY_CONN_LOG(trace,
+                     "tcp_proxy does not read disable downstream because upstream was above high "
+                     "watermark. above_high_watermark_counter_ = {}",
+                     *parent_->downstreamConnection(), above_high_watermark_counter_);
+    }
   }
 }
 
@@ -292,13 +299,23 @@ void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
       above_high_watermark_counter_ != 0,
       "onBelowWriteBufferLowWatermark is called when upstream was below high watermark.");
   if (--above_high_watermark_counter_ == 0) {
-    ENVOY_LOG(debug, "tcp_proxy enable downstream read because upstream is now below high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
     if (parent_ != nullptr) {
+      ENVOY_CONN_LOG(
+          trace,
+          "tcp_proxy enables downstream read because upstream is now below high watermark. "
+          "above_high_watermark_counter_ = {}",
+          *parent_->downstreamConnection(), above_high_watermark_counter_);
       // The upstream write buffer is drained. Resume reading.
       parent_->readDisableDownstream(false);
     }
   } else {
-    ENVOY_LOG(debug, "tcp_proxy does not reenable downstream read because upstream is still was above high watermark. above_high_watermark_counter_ = {}", above_high_watermark_counter_);
+    if (parent_ != nullptr) {
+      ENVOY_CONN_LOG(
+          trace,
+          "tcp_proxy does not reenable downstream read because upstream is still was above "
+          "high watermark. above_high_watermark_counter_ = {}",
+          *parent_->downstreamConnection(), above_high_watermark_counter_);
+    }
   }
 }
 

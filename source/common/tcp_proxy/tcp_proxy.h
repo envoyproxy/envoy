@@ -305,6 +305,11 @@ public:
     Filter* parent_{};
     Drainer* drainer_{};
 
+    // above high watermark maybe called from different sources. In the case that upstream is h2 or
+    // h3 tunnel where streams can be multiplexed in an upstream connection, the upstream http
+    // stream buffer can be over high watermark. The upstream http connection can be over high
+    // watermark independently. In either case, the downstream read should be disabled. This counter
+    // is used so that least read disable is propagated to downstream.
     uint32_t above_high_watermark_counter_{0};
   };
 
