@@ -8,6 +8,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
@@ -48,34 +49,35 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_LE(pre_start, start) << "Start time was lower than expected";
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
-  EXPECT_FALSE(info.lastDownstreamRxByteReceived());
+  TimingUtility timing(info);
+  EXPECT_FALSE(timing.lastDownstreamRxByteReceived());
   info.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
   std::chrono::nanoseconds dur =
-      checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
+      checkDuration(std::chrono::nanoseconds{0}, timing.lastDownstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstUpstreamTxByteSent());
+  EXPECT_FALSE(timing.firstUpstreamTxByteSent());
   upstream_timing.onFirstUpstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.firstUpstreamTxByteSent());
+  dur = checkDuration(dur, timing.firstUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastUpstreamTxByteSent());
+  EXPECT_FALSE(timing.lastUpstreamTxByteSent());
   upstream_timing.onLastUpstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.lastUpstreamTxByteSent());
+  dur = checkDuration(dur, timing.lastUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.firstUpstreamRxByteReceived());
+  EXPECT_FALSE(timing.firstUpstreamRxByteReceived());
   upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
-  dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
+  dur = checkDuration(dur, timing.firstUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.lastUpstreamRxByteReceived());
+  EXPECT_FALSE(timing.lastUpstreamRxByteReceived());
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
-  dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
+  dur = checkDuration(dur, timing.lastUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.downstreamTiming().firstDownstreamTxByteSent());
+  EXPECT_FALSE(timing.firstDownstreamTxByteSent());
   info.downstreamTiming().onFirstDownstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.firstDownstreamTxByteSent());
+  dur = checkDuration(dur, timing.firstDownstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastDownstreamTxByteSent());
+  EXPECT_FALSE(timing.lastDownstreamTxByteSent());
   info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.lastDownstreamTxByteSent());
+  dur = checkDuration(dur, timing.lastDownstreamTxByteSent());
 
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();

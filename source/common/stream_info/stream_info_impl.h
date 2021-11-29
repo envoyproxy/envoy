@@ -139,13 +139,6 @@ struct StreamInfoImpl : public StreamInfo {
     return upstream_info_->upstreamConnectionId();
   }
 
-  absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().lastDownstreamRxByteReceived());
-  }
-
   void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override { upstream_info_ = info; }
 
   std::shared_ptr<UpstreamInfo> upstreamInfo() override { return upstream_info_; }
@@ -159,48 +152,6 @@ struct StreamInfoImpl : public StreamInfo {
   UpstreamTiming& upstreamTiming() override {
     maybeCreateUpstreamInfo();
     return upstream_info_->upstreamTiming();
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().first_upstream_rx_byte_received_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return duration(upstream_info_->upstreamTiming().last_upstream_rx_byte_received_);
-  }
-
-  absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().firstDownstreamTxByteSent());
-  }
-
-  absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
-    if (!downstream_timing_.has_value()) {
-      return absl::nullopt;
-    }
-    return duration(downstream_timing_.value().lastDownstreamTxByteSent());
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -217,6 +168,12 @@ struct StreamInfoImpl : public StreamInfo {
       downstream_timing_ = DownstreamTiming();
     }
     return downstream_timing_.value();
+  }
+  OptRef<const DownstreamTiming> downstreamTiming() const override {
+    if (!downstream_timing_.has_value()) {
+      return {};
+    }
+    return {*downstream_timing_};
   }
 
   void addBytesReceived(uint64_t bytes_received) override { bytes_received_ += bytes_received; }

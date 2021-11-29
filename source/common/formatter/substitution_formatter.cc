@@ -689,23 +689,27 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastDownstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.lastDownstreamRxByteReceived();
         });
   } else if (field_name == "REQUEST_TX_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastUpstreamTxByteSent();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.lastUpstreamTxByteSent();
         });
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.firstUpstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.firstUpstreamRxByteReceived();
         });
   } else if (field_name == "RESPONSE_TX_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          auto downstream = stream_info.lastDownstreamTxByteSent();
-          auto upstream = stream_info.firstUpstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          auto downstream = timing.lastDownstreamTxByteSent();
+          auto upstream = timing.firstUpstreamRxByteReceived();
 
           absl::optional<std::chrono::nanoseconds> result;
           if (downstream && upstream) {

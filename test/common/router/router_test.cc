@@ -27,6 +27,7 @@
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
+#include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/upstream_impl.h"
 
@@ -5093,10 +5094,7 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
 
   StreamInfo::StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(stream_info));
-  EXPECT_FALSE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_FALSE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+  EXPECT_EQ(nullptr, stream_info.upstreamInfo());
 
   Http::TestRequestHeaderMapImpl headers{};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -5110,29 +5108,32 @@ TEST_F(RouterTest, UpstreamTimingSingleRequest) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.advanceTimeWait(std::chrono::milliseconds(43));
 
   // Upstream timing data is now available live.
-  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+  ASSERT_NE(nullptr, stream_info.upstreamInfo());
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_FALSE(upstream_timing.last_upstream_rx_byte_received_.has_value());
 
   response_decoder->decodeData(data, true);
 
   // Now all these should be set.
-  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamRxByteReceived().has_value());
+  EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_rx_byte_received_.has_value());
 
   // Timings should match our sleep() calls.
-  EXPECT_EQ(stream_info.lastUpstreamRxByteReceived().value() -
-                stream_info.firstUpstreamRxByteReceived().value(),
+  EXPECT_EQ(upstream_timing.last_upstream_rx_byte_received_.value() -
+                upstream_timing.first_upstream_rx_byte_received_.value(),
             std::chrono::milliseconds(43));
-  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() -
-                stream_info.firstUpstreamTxByteSent().value(),
+  EXPECT_EQ(upstream_timing.last_upstream_tx_byte_sent_.value() -
+                upstream_timing.first_upstream_tx_byte_sent_.value(),
             std::chrono::milliseconds(32));
 }
 
@@ -5182,6 +5183,7 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   Http::ResponseHeaderMapPtr bad_response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(bad_response_headers), true);
 
   router_.retry_state_->callback_();
@@ -5196,25 +5198,26 @@ TEST_F(RouterTest, UpstreamTimingRetry) {
 
   response_decoder->decodeData(data, true);
 
-  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamRxByteReceived().has_value());
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_rx_byte_received_.has_value());
 
-  EXPECT_EQ(stream_info.lastUpstreamRxByteReceived().value() -
-                stream_info.firstUpstreamRxByteReceived().value(),
+  EXPECT_EQ(upstream_timing.last_upstream_rx_byte_received_.value() -
+                upstream_timing.first_upstream_rx_byte_received_.value(),
             std::chrono::milliseconds(153));
 
   // Time spent in upstream tx is 0 because we're using simulated time and
   // don't have a good way to insert a "sleep" there, but values being present
   // and equal to the time the retry was sent is good enough of a test.
-  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() -
-                stream_info.firstUpstreamTxByteSent().value(),
+  StreamInfo::TimingUtility timing(stream_info);
+  EXPECT_EQ(timing.lastUpstreamTxByteSent().value() - timing.firstUpstreamTxByteSent().value(),
             std::chrono::milliseconds(0));
-  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value() +
+  EXPECT_EQ(timing.lastUpstreamTxByteSent().value() +
                 stream_info.startTimeMonotonic().time_since_epoch(),
             retry_time.time_since_epoch());
-  EXPECT_EQ(stream_info.firstUpstreamTxByteSent().value() +
+  EXPECT_EQ(timing.firstUpstreamTxByteSent().value() +
                 stream_info.startTimeMonotonic().time_since_epoch(),
             retry_time.time_since_epoch());
 }
@@ -5244,7 +5247,8 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "50"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
-  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived().has_value());
+  auto& upstream_timing = stream_info.upstreamInfo()->upstreamTiming();
+  EXPECT_FALSE(upstream_timing.last_upstream_rx_byte_received_.has_value());
 
   test_time_.advanceTimeWait(std::chrono::milliseconds(13));
   Buffer::OwnedImpl data;
@@ -5256,19 +5260,21 @@ TEST_F(RouterTest, UpstreamTimingTimeout) {
 
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
   response_decoder->decodeHeaders(std::move(response_headers), false);
 
   test_time_.advanceTimeWait(std::chrono::milliseconds(99));
   response_timeout_->invokeCallback();
 
-  EXPECT_TRUE(stream_info.firstUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.lastUpstreamTxByteSent().has_value());
-  EXPECT_TRUE(stream_info.firstUpstreamRxByteReceived().has_value());
-  EXPECT_FALSE(stream_info.lastUpstreamRxByteReceived()
-                   .has_value()); // False because no end_stream was seen.
-  EXPECT_EQ(stream_info.firstUpstreamTxByteSent().value(), std::chrono::milliseconds(10));
-  EXPECT_EQ(stream_info.lastUpstreamTxByteSent().value(), std::chrono::milliseconds(23));
-  EXPECT_EQ(stream_info.firstUpstreamRxByteReceived().value(), std::chrono::milliseconds(56));
+  EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  // False because no end_stream was seen.
+  EXPECT_FALSE(upstream_timing.last_upstream_rx_byte_received_.has_value());
+  StreamInfo::TimingUtility timing(stream_info);
+  EXPECT_EQ(timing.firstUpstreamTxByteSent().value(), std::chrono::milliseconds(10));
+  EXPECT_EQ(timing.lastUpstreamTxByteSent().value(), std::chrono::milliseconds(23));
+  EXPECT_EQ(timing.firstUpstreamRxByteReceived().value(), std::chrono::milliseconds(56));
 }
 
 TEST(RouterFilterUtilityTest, FinalHedgingParamsHedgeOnPerTryTimeout) {

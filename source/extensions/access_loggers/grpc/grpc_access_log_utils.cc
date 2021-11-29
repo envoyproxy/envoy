@@ -5,6 +5,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/network/utility.h"
+#include "source/common/stream_info/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -201,43 +202,44 @@ void Utility::extractCommonAccessLogProperties(
               stream_info.startTime().time_since_epoch())
               .count()));
 
-  absl::optional<std::chrono::nanoseconds> dur = stream_info.lastDownstreamRxByteReceived();
+  StreamInfo::TimingUtility timing(stream_info);
+  absl::optional<std::chrono::nanoseconds> dur = timing.lastDownstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamTxByteSent();
+  dur = timing.firstUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamTxByteSent();
+  dur = timing.lastUpstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstUpstreamRxByteReceived();
+  dur = timing.firstUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_first_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastUpstreamRxByteReceived();
+  dur = timing.lastUpstreamRxByteReceived();
   if (dur) {
     common_access_log.mutable_time_to_last_upstream_rx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.firstDownstreamTxByteSent();
+  dur = timing.firstDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_first_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  dur = stream_info.lastDownstreamTxByteSent();
+  dur = timing.lastDownstreamTxByteSent();
   if (dur) {
     common_access_log.mutable_time_to_last_downstream_tx_byte()->MergeFrom(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));

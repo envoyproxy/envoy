@@ -14,16 +14,6 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace StreamInfo {
-namespace {
-absl::optional<std::chrono::nanoseconds> duration(absl::optional<MonotonicTime> time,
-                                                  MonotonicTime start_time_monotonic) {
-  if (!time) {
-    return {};
-  }
-
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value() - start_time_monotonic);
-}
-} // namespace
 
 MockStreamInfo::MockStreamInfo()
     : start_time_(ts_.systemTime()),
@@ -50,35 +40,18 @@ MockStreamInfo::MockStreamInfo()
       }));
   ON_CALL(*this, startTime()).WillByDefault(ReturnPointee(&start_time_));
   ON_CALL(*this, startTimeMonotonic()).WillByDefault(ReturnPointee(&start_time_monotonic_));
-  ON_CALL(*this, lastDownstreamRxByteReceived())
-      .WillByDefault(ReturnPointee(&last_downstream_rx_byte_received_));
-  ON_CALL(*this, firstUpstreamTxByteSent()).WillByDefault(Invoke([this]() {
-    return duration(upstream_info_->upstreamTiming().first_upstream_tx_byte_sent_,
-                    start_time_monotonic_);
-  }));
-  ON_CALL(*this, lastUpstreamTxByteSent()).WillByDefault(Invoke([this]() {
-    return duration(upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_,
-                    start_time_monotonic_);
-  }));
-  ON_CALL(*this, firstUpstreamRxByteReceived()).WillByDefault(Invoke([this]() {
-    return duration(upstream_info_->upstreamTiming().first_upstream_rx_byte_received_,
-                    start_time_monotonic_);
-  }));
-  ON_CALL(*this, lastUpstreamRxByteReceived()).WillByDefault(Invoke([this]() {
-    return duration(upstream_info_->upstreamTiming().last_upstream_rx_byte_received_,
-                    start_time_monotonic_);
-  }));
-  ON_CALL(*this, firstDownstreamTxByteSent())
-      .WillByDefault(ReturnPointee(&first_downstream_tx_byte_sent_));
-  ON_CALL(*this, lastDownstreamTxByteSent())
-      .WillByDefault(ReturnPointee(&last_downstream_tx_byte_sent_));
   ON_CALL(*this, requestComplete()).WillByDefault(ReturnPointee(&end_time_));
   ON_CALL(*this, onRequestComplete()).WillByDefault(Invoke([this]() {
     end_time_ = absl::make_optional<std::chrono::nanoseconds>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
   }));
-  ON_CALL(*this, downstreamTiming()).WillByDefault(ReturnRef(downstream_timing_));
+  ON_CALL(*this, downstreamTiming()).WillByDefault(Invoke([this]() -> DownstreamTiming& {
+    return downstream_timing_;
+  }));
+  ON_CALL(Const(*this), downstreamTiming())
+      .WillByDefault(
+          Invoke([this]() -> OptRef<const DownstreamTiming> { return downstream_timing_; }));
   ON_CALL(*this, upstreamInfo()).WillByDefault(Invoke([this]() { return upstream_info_; }));
   ON_CALL(testing::Const(*this), upstreamInfo()).WillByDefault(Invoke([this]() {
     return OptRef<const UpstreamInfo>(*upstream_info_);

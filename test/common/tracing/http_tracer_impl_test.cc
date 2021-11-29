@@ -274,13 +274,19 @@ TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
 
   const absl::optional<std::chrono::nanoseconds> nanoseconds = std::chrono::nanoseconds{10};
-  EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastUpstreamRxByteReceived()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, firstDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
-  EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(nanoseconds));
+  const MonotonicTime time = MonotonicTime(nanoseconds.value());
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(MonotonicTime(std::chrono::nanoseconds(10))));
+  auto& timing = stream_info.upstream_info_->upstreamTiming();
+  timing.first_upstream_tx_byte_sent_ = time;
+  timing.last_upstream_tx_byte_sent_ = time;
+  timing.first_upstream_rx_byte_received_ = time;
+  timing.last_upstream_rx_byte_received_ = time;
+  stream_info.downstream_timing_.onFirstDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   const auto log_timestamp =
       start_timestamp + std::chrono::duration_cast<SystemTime::duration>(*nanoseconds);

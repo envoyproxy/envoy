@@ -501,12 +501,6 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
-   * @return the duration between the last byte of the request was received and the start of the
-   * request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
-
-  /**
    * Sets the upstream information for this stream.
    */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
@@ -525,43 +519,6 @@ public:
   virtual UpstreamTiming& upstreamTiming() PURE;
 
   /**
-   * @return the duration between the first byte of the request was sent upstream and the start of
-   * the request. There may be a considerable delta between lastDownstreamByteReceived and this
-   * value due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the request was sent upstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the first byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
-  /**
-   * @return the duration between the first byte of the response is sent downstream and the start of
-   * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
-   * due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is sent downstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
-
-  /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
@@ -577,6 +534,7 @@ public:
    * @return the downstream timing information.
    */
   virtual DownstreamTiming& downstreamTiming() PURE;
+  virtual OptRef<const DownstreamTiming> downstreamTiming() const PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.

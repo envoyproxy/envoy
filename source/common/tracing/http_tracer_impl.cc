@@ -95,39 +95,40 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
 
 static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {
   const auto start_time = stream_info.startTime();
-  if (stream_info.lastDownstreamRxByteReceived()) {
+  StreamInfo::TimingUtility timing(stream_info);
+  if (timing.lastDownstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastDownstreamRxByteReceived()),
+                              *timing.lastDownstreamRxByteReceived()),
              Tracing::Logs::get().LastDownstreamRxByteReceived);
   }
-  if (stream_info.firstUpstreamTxByteSent()) {
+  if (timing.firstUpstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstUpstreamTxByteSent()),
+                              *timing.firstUpstreamTxByteSent()),
              Tracing::Logs::get().FirstUpstreamTxByteSent);
   }
-  if (stream_info.lastUpstreamTxByteSent()) {
-    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastUpstreamTxByteSent()),
+  if (timing.lastUpstreamTxByteSent()) {
+    span.log(start_time +
+                 std::chrono::duration_cast<SystemTime::duration>(*timing.lastUpstreamTxByteSent()),
              Tracing::Logs::get().LastUpstreamTxByteSent);
   }
-  if (stream_info.firstUpstreamRxByteReceived()) {
+  if (timing.firstUpstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstUpstreamRxByteReceived()),
+                              *timing.firstUpstreamRxByteReceived()),
              Tracing::Logs::get().FirstUpstreamRxByteReceived);
   }
-  if (stream_info.lastUpstreamRxByteReceived()) {
+  if (timing.lastUpstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastUpstreamRxByteReceived()),
+                              *timing.lastUpstreamRxByteReceived()),
              Tracing::Logs::get().LastUpstreamRxByteReceived);
   }
-  if (stream_info.firstDownstreamTxByteSent()) {
+  if (timing.firstDownstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstDownstreamTxByteSent()),
+                              *timing.firstDownstreamTxByteSent()),
              Tracing::Logs::get().FirstDownstreamTxByteSent);
   }
-  if (stream_info.lastDownstreamTxByteSent()) {
+  if (timing.lastDownstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastDownstreamTxByteSent()),
+                              *timing.lastDownstreamTxByteSent()),
              Tracing::Logs::get().LastDownstreamTxByteSent);
   }
 }
