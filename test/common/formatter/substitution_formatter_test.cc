@@ -764,8 +764,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
-    EXPECT_EQ("-", upstream_format.format(request_headers, response_headers, response_trailers,
-                                          stream_info, body));
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
   }
 
   {

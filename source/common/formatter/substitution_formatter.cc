@@ -956,12 +956,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         });
   } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> virtual_cluster_name = stream_info.virtualClusterName();
-          if (virtual_cluster_name.has_value()) {
-            return virtual_cluster_name.value();
-          }
-          return DefaultUnspecifiedValueString;
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          return stream_info.virtualClusterName();
         });
   } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
