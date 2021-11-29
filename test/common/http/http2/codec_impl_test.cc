@@ -1581,13 +1581,22 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   // updates to be sent, and the client to flush all queued data.
   // For bonus corner case coverage, remove callback2 in the middle of runLowWatermarkCallbacks()
   // and ensure it is not called.
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).WillOnce(Invoke([&]() -> void {
     request_encoder_->getStream().removeCallbacks(callbacks2);
   }));
   EXPECT_CALL(callbacks2, onBelowWriteBufferLowWatermark()).Times(0);
   EXPECT_CALL(callbacks3, onBelowWriteBufferLowWatermark());
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
   server_->getStream(1)->readDisable(false);
   driveToCompletion();
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+  process_buffered_data_callback->invokeCallback();
+
   EXPECT_EQ(0, client_->getStream(1)->pending_send_data_->length());
   EXPECT_EQ(0, TestUtility::findGauge(client_stats_store_, "http2.pending_send_bytes")->value());
   // The extra 1 byte sent won't trigger another window update, so the final window should be the
@@ -1879,9 +1888,6 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   EXPECT_EQ(initial_stream_window, server_->getStream(1)->bufferLimit());
   EXPECT_EQ(initial_stream_window, client_->getStream(1)->bufferLimit());
 
-  auto* violation_callback =
-      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
-
   // One large write gets broken into smaller frames.
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AnyNumber());
   Buffer::OwnedImpl long_data(std::string(initial_stream_window / 2, 'a'));
@@ -1901,7 +1907,15 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   }
   driveToCompletion();
 
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
   EXPECT_FALSE(violation_callback->enabled_);
+
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
 
   // Now unblock the server's stream. This will cause the bytes to be consumed, 2 flow control
   // updates to be sent, and overflow outbound frame queue.
@@ -1909,6 +1923,7 @@ TEST_P(Http2CodecImplFlowControlTest, WindowUpdateOnReadResumingFlood) {
   driveToCompletion();
 
   EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush));
   violation_callback->invokeCallback();
 
@@ -3255,6 +3270,47 @@ TEST_P(Http2CodecImplTest, ConnectTest) {
   EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::ConnectError, _));
   response_encoder_->getStream().resetStream(StreamResetReason::ConnectError);
   driveToCompletion();
+}
+
+TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTrailers) {
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  // Force the stream to buffer data at the receiving codec.
+  server_->getStream(1)->readDisable(true);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  request_encoder_->encodeData(body, false);
+  driveToCompletion();
+
+  // Now re-enable the stream, and try dispatching trailers to the server.
+  // It should buffer those trailers until the buffered data is processed
+  // from the callback below.
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+  EXPECT_FALSE(process_buffered_data_callback->enabled_);
+
+  server_->getStream(1)->readDisable(false);
+
+  EXPECT_TRUE(process_buffered_data_callback->enabled_);
+
+  // Trailers should be buffered by the codec since there is unprocessed body.
+  // Hence we shouldn't invoke decodeTrailers yet.
+  EXPECT_CALL(request_decoder_, decodeTrailers_(_)).Times(0);
+  request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
+  driveToCompletion();
+
+  // Now invoke the deferred processing callback.
+  {
+    InSequence seq;
+    EXPECT_CALL(request_decoder_, decodeData(_, false));
+    EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+    process_buffered_data_callback->invokeCallback();
+  }
 }
 
 class TestNghttp2SessionFactory;

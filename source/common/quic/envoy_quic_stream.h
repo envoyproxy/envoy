@@ -75,7 +75,8 @@ public:
   void removeCallbacks(Http::StreamCallbacks& callbacks) override {
     removeCallbacksHelper(callbacks);
   }
-  uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
+  uint32_t bufferLimit() const override { return send_buffer_simulation_.highWatermark(); }
+  const Buffer::Instance* streamReceivedBodyBuffer() const override { return nullptr; }
   const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
     return connection()->connectionInfoProvider().localAddress();
   }

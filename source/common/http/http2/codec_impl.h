@@ -255,7 +255,10 @@ protected:
     void removeCallbacks(StreamCallbacks& callbacks) override { removeCallbacksHelper(callbacks); }
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return pending_recv_data_->highWatermark(); }
+    uint32_t bufferLimit() const override { return pending_recv_data_->highWatermark(); }
+    const Buffer::Instance* streamReceivedBodyBuffer() const override {
+      return pending_recv_data_.get();
+    }
     const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
       return parent_.connection_.connectionInfoProvider().localAddress();
     }
@@ -299,6 +302,9 @@ protected:
     // to the decoder_.
     virtual void decodeHeaders() PURE;
     virtual void decodeTrailers() PURE;
+    bool maybeDeferDecodeTrailers();
+    // Consumes any decoded data, buffering if backed up.
+    void decodeData();
 
     // Get MetadataEncoder for this stream.
     MetadataEncoder& getMetadataEncoderOld();
@@ -312,6 +318,9 @@ protected:
 
     void encodeDataHelper(Buffer::Instance& data, bool end_stream,
                           bool skip_encoding_empty_trailers);
+    // Called from either process_buffered_data_callback_, or when the stream is
+    // being destroyed.
+    void processBufferedData(bool stream_being_destroyed = false);
 
     const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
     ConnectionImpl& parent_;
@@ -324,8 +333,11 @@ protected:
     // Note that in current implementation the watermark callbacks of the pending_recv_data_ are
     // never called. The watermark value is set to the size of the stream window. As a result this
     // watermark can never overflow because the peer can never send more bytes than the stream
-    // window without triggering protocol error and this buffer is drained after each DATA frame was
-    // dispatched through the filter chain. See source/docs/flow_control.md for more information.
+    // window without triggering protocol error. This buffer is drained after each DATA frame was
+    // dispatched through the filter chain unless
+    // envoy.reloadable_features.defer_processing_backedup_streams is enabled,
+    // in which case this buffer may accumulate data.
+    // See source/docs/flow_control.md for more information.
     Buffer::InstancePtr pending_recv_data_;
     Buffer::InstancePtr pending_send_data_;
     HeaderMapPtr pending_trailers_to_encode_;
@@ -342,6 +354,41 @@ protected:
     bool pending_send_buffer_high_watermark_called_ : 1;
     bool reset_due_to_messaging_error_ : 1;
     absl::string_view details_;
+
+    /**
+     * Tracks events for a stream that is backed up. e.g. headers pending,
+     * trailers, data, etc.
+     */
+    struct BackedUpStreamManager {
+
+      /**
+       * Which decode call should next be called since it was deferred.
+       */
+      // TODO(kbaichoo): We might need to add support for metadata.
+      enum class Stage {
+        Body,     // We've buffered body
+        Trailers, // We've buffered trailers
+      };
+
+      // Returns the next stage of stream data to process that was deferred.
+      absl::optional<Stage> getNextStage();
+
+      bool body_buffered_{false};
+      bool trailers_buffered_{false};
+      // We either will get the end stream bit via header, data or trailers.
+      // If want to track when we see the end stream in order to determine when
+      // to pass it along when buffering it.
+      bool data_end_stream_{false};
+      // Set to true when the stream is being deleted. This is used currently in
+      // the Upstream -> Downstream cases to ensure the data gets processed if
+      // the upstream stream is being deleted.
+      // TODO(kbaichoo): perhaps we can achieve this in another way, e.g. defer
+      // the onStreamClose.
+      bool flush_all_data_{false};
+    };
+
+    BackedUpStreamManager stream_manager_;
+    Event::SchedulableCallbackPtr process_buffered_data_callback_;
 
   protected:
     // Http::MultiplexedStreamImplBase

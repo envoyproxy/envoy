@@ -18,7 +18,8 @@ public:
   MOCK_METHOD(void, resetStream, (StreamResetReason reason));
   MOCK_METHOD(void, readDisable, (bool disable));
   MOCK_METHOD(void, setWriteBufferWatermarks, (uint32_t));
-  MOCK_METHOD(uint32_t, bufferLimit, ());
+  MOCK_METHOD(uint32_t, bufferLimit, (), (const));
+  MOCK_METHOD(const Buffer::Instance*, streamReceivedBodyBuffer, (), (const));
   MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, connectionLocalAddress, ());
   MOCK_METHOD(void, setFlushTimeout, (std::chrono::milliseconds timeout));
   MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr));

@@ -374,6 +374,9 @@ void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance&
 }
 
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
+const Buffer::Instance* ActiveStreamDecoderFilter::streamReceivedBodyBuffer() const {
+  return parent_.filter_manager_callbacks_.streamReceivedBodyBuffer();
+}
 const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
   return parent_.buffered_request_data_.get();
 }
@@ -625,6 +628,7 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     }
     // If the filter pointed by entry has stopped for all frame types, return now.
     if (handleDataIfStopAll(**entry, data, state_.decoder_filters_streaming_)) {
+      std::cerr << "handleDataIfStopAll" << std::endl;
       return;
     }
     // If end_stream_ is marked for a filter, the data is not for this filter and filters after.

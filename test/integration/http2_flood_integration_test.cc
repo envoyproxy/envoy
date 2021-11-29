@@ -591,6 +591,15 @@ TEST_P(Http2FloodMitigationTest, Trailers) {
 // Verify flood detection by the WINDOW_UPDATE frame when a decoder filter is resuming reading from
 // the downstream via DecoderFilterBelowWriteBufferLowWatermark.
 TEST_P(Http2FloodMitigationTest, WindowUpdateOnLowWatermarkFlood) {
+  // This test depends on data flowing through a backed up stream eagerly (e.g. the
+  // backpressure-filter triggers above watermark when it receives headers from
+  // the downstream, and only goes below watermark if the response body has
+  // passed through the filter.). With defer processing of backed up streams however
+  // the data won't be eagerly processed as the stream is backed up.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.defer_processing_backedup_streams")) {
+    return;
+  }
   config_helper_.prependFilter(R"EOF(
   name: backpressure-filter
   )EOF");
