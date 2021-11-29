@@ -35,6 +35,11 @@ public:
     return MultiplexedActiveClientBase::newStreamEncoder(response_decoder);
   }
 
+  uint32_t effectiveConcurrentStreamLimit() const override {
+    return std::min<int64_t>(MultiplexedActiveClientBase::effectiveConcurrentStreamLimit(),
+                             quiche_capacity_);
+  }
+
   // Overload the default capacity calculations to return the quic capacity
   // (modified by any stream limits in Envoy config)
   int64_t currentUnusedCapacity() const override {
@@ -54,10 +59,18 @@ public:
     quiche_capacity_ = new_quiche_capacity;
     uint64_t new_capacity = currentUnusedCapacity();
 
-    if (new_capacity < old_capacity) {
-      parent_.decrClusterStreamCapacity(old_capacity - new_capacity);
-    } else if (old_capacity < new_capacity) {
-      parent_.incrClusterStreamCapacity(new_capacity - old_capacity);
+    if (connect_timer_) {
+      if (new_capacity < old_capacity) {
+        parent_.decrConnectingAndConnectedStreamCapacity(old_capacity - new_capacity);
+      } else if (old_capacity < new_capacity) {
+        parent_.incrConnectingAndConnectedStreamCapacity(new_capacity - old_capacity);
+      }
+    } else {
+      if (new_capacity < old_capacity) {
+        parent_.decrClusterStreamCapacity(old_capacity - new_capacity);
+      } else if (old_capacity < new_capacity) {
+        parent_.incrClusterStreamCapacity(new_capacity - old_capacity);
+      }
     }
   }
 

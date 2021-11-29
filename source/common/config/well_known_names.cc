@@ -7,6 +7,8 @@ namespace Config {
 
 namespace {
 
+const absl::string_view TAG_VALUE_REGEX = R"([^\.]+)";
+
 // To allow for more readable regular expressions to be declared below, and to
 // reduce duplication, define a few common pattern substitutions for regex
 // segments.
@@ -18,13 +20,22 @@ std::string expandRegex(const std::string& regex) {
               // underscores.
               {"<CIPHER>", R"([\w-]+)"},
               // A generic name can contain any character except dots.
-              {"<NAME>", R"([^\.]+)"},
+              {"<TAG_VALUE>", TAG_VALUE_REGEX},
               // Route names may contain dots in addition to alphanumerics and
               // dashes with underscores.
               {"<ROUTE_CONFIG_NAME>", R"([\w-\.]+)"}});
 }
 
+const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcher, absl::StrCat("^", TAG_VALUE_REGEX, "$"),
+                         false);
+}
+
 } // namespace
+
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name) {
+  return validTagValueRegex().match(name);
+}
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched
@@ -53,22 +64,25 @@ TagNameValues::TagNameValues() {
   addRe2(RESPONSE_CODE_CLASS, R"(_rq_((\d))xx$)", "_rq_");
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
-  addRe2(DYNAMO_PARTITION_ID,
-         R"(^http\.<NAME>\.dynamodb\.table\.<NAME>\.capacity\.<NAME>(\.__partition_id=(\w{7}))$)",
-         ".dynamodb.table.");
+  addRe2(
+      DYNAMO_PARTITION_ID,
+      R"(^http\.<TAG_VALUE>\.dynamodb\.table\.<TAG_VALUE>\.capacity\.<TAG_VALUE>(\.__partition_id=(\w{7}))$)",
+      ".dynamodb.table.");
 
   // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)* or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
-  addRe2(DYNAMO_OPERATION,
-         R"(^http\.<NAME>\.dynamodb.(?:operation|table\.<NAME>\.capacity)(\.(<NAME>))(?:\.|$))",
-         ".dynamodb.");
+  addRe2(
+      DYNAMO_OPERATION,
+      R"(^http\.<TAG_VALUE>\.dynamodb.(?:operation|table\.<TAG_VALUE>\.capacity)(\.(<TAG_VALUE>))(?:\.|$))",
+      ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
   addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**");
 
   // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRe2(DYNAMO_TABLE, R"(^http\.<NAME>\.dynamodb.(?:table|error)\.((<NAME>)\.))", ".dynamodb.");
+  addRe2(DYNAMO_TABLE, R"(^http\.<TAG_VALUE>\.dynamodb.(?:table|error)\.((<TAG_VALUE>)\.))",
+         ".dynamodb.");
 
   // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
   addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
@@ -92,7 +106,8 @@ TagNameValues::TagNameValues() {
   addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.cipher(\.(<CIPHER>))$)");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<NAME>\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
+  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<TAG_VALUE>\.ssl\.ciphers(\.(<CIPHER>))$)",
+         ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
   addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**");
@@ -115,7 +130,7 @@ TagNameValues::TagNameValues() {
   // listener.[<address>.]http.(<stat_prefix>.)*
   // The <address> part can be anything here (.*?) for the sake of a simpler
   // internal state of the regex which performs better.
-  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<NAME>)\.))", ".http.");
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
 
   // http.(<stat_prefix>.)*
   addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
@@ -132,7 +147,7 @@ TagNameValues::TagNameValues() {
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
   // Note: <route_config_name> can contain dots thus we have to maintain full
   // match.
-  addRe2(RDS_ROUTE_CONFIG, R"(^http\.<NAME>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
+  addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
   // listener_manager.(worker_<id>.)*
   addRe2(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");

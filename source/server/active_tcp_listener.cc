@@ -17,7 +17,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
     : OwnedActiveStreamListenerBase(parent, parent.dispatcher(),
                                     parent.dispatcher().createListener(
                                         config.listenSocketFactory().getListenSocket(worker_index),
-                                        *this, config.bindToPort()),
+                                        *this, config.bindToPort(), config.ignoreGlobalConnLimit()),
                                     config),
       tcp_conn_handler_(parent) {
   config.connectionBalancer().registerHandler(*this);

@@ -36,6 +36,7 @@ public:
   AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
   AsyncStream(const AsyncStream& other) = default;
+  AsyncStream& operator=(const AsyncStream&) = default;
   void sendMessage(const Protobuf::Message& request, bool end_stream) {
     Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }

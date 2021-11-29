@@ -13,7 +13,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/filesystem/posix:95.5"
 "source/common/http:96.3"
 "source/common/http/http2:96.4"
-"source/common/json:90.1"
+"source/common/json:89.8"
 "source/common/matcher:94.0"
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:90.7"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
@@ -72,7 +72,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/tracers/zipkin:96.1"
 "source/extensions/transport_sockets:95.3"
 "source/extensions/transport_sockets/tls:94.5"
-"source/extensions/transport_sockets/tls/cert_validator:95.8"
+"source/extensions/transport_sockets/tls/cert_validator:95.7"
 "source/extensions/transport_sockets/tls/ocsp:96.5"
 "source/extensions/transport_sockets/tls/private_key:77.8"
 "source/extensions/wasm_runtime/wamr:0.0" # Not enabled in coverage build

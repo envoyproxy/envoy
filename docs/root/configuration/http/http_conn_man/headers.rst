@@ -363,6 +363,25 @@ A few very important notes about XFF:
      XFF is parsed to determine if a request is internal. In this scenario, do not forward XFF and
      allow Envoy to generate a new one with a single internal origin IP.
 
+.. _config_http_conn_man_headers_x-forwarded-host:
+
+x-forwarded-host
+----------------
+
+The *x-forwarded-host* header is a de-facto standard proxy header which indicates the original host
+requested by the client in the *:authority* (*host* in HTTP1) header. A compliant proxy *appends*
+the original value of the *:authority* header to *x-forwarded-host* only if the *:authority* header
+is modified.
+
+Envoy updates the *:authority* header if a host rewrite option (one of
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`, or
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`)
+is used and appends its original value to *x-forwarded-host* if
+:ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+is set.
+
 .. _config_http_conn_man_headers_x-forwarded-proto:
 
 x-forwarded-proto
@@ -681,6 +700,12 @@ Supported variable names are:
 %PROTOCOL%
     The original protocol which is already added by Envoy as a
     :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>` request header.
+
+%REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
 
 %UPSTREAM_METADATA(["namespace", "key", ...])%
     Populates the header with :ref:`EDS endpoint metadata <envoy_v3_api_field_config.endpoint.v3.LbEndpoint.metadata>` from the
