@@ -116,6 +116,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
+  optmask |= ARES_OPT_SOCK_STATE_CB;
 
   ENVOY_LOG_MISC(error, "resolvers {}, use dns fallback {}", resolvers_vector_.size(),
                  use_resolvers_as_fallback_);
@@ -123,8 +124,9 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
     ENVOY_LOG_MISC(error, "using resolvers as fallback {}", resolvers_vector_.size());
     options->nservers = resolvers_vector_.size();
     options->servers = &resolvers_vector_[0];
+    optmask |= ARES_OPT_SERVERS;
   }
-  ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
+  ares_init_options(&channel_, options, optmask);
 
   // Ensure that the channel points to custom resolvers, if they exist.
   if (resolvers_csv_.has_value() && !use_resolvers_as_fallback_) {
