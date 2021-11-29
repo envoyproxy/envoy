@@ -7,12 +7,33 @@
 namespace Envoy {
 namespace {
 
+struct TestParams {
+  Network::Address::IpVersion ip_version;
+  bool forward_reason_phrase;
+};
+
+std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
+  return fmt::format("{}_{}", p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                              p.param.forward_reason_phrase ? "enabled" : "disabled");
+}
+
+std::vector<TestParams> getTestsParams() {
+  std::vector<TestParams> ret;
+
+  for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
+    ret.push_back(TestParams{ip_version, true});
+    ret.push_back(TestParams{ip_version, false});
+  }
+
+  return ret;
+}
+
 class PreserveCaseFormatterReasonPhraseIntegrationTest
-    : public testing::TestWithParam<Network::Address::IpVersion>,
+    : public testing::TestWithParam<TestParams>,
       public HttpIntegrationTest {
 public:
   PreserveCaseFormatterReasonPhraseIntegrationTest()
-      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
 
   void SetUp() override {
     setDownstreamProtocol(Http::CodecType::HTTP1);
@@ -31,7 +52,8 @@ public:
 
         auto config =
             TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                       PreserveCaseFormatterConfig>("forward_reason_phrase: true");
+                                       PreserveCaseFormatterConfig>(fmt::format("forward_reason_phrase: {}",
+                                            GetParam().forward_reason_phrase ? "true": "false"));
         typed_extension_config->mutable_typed_config()->PackFrom(config);
 
         ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
@@ -43,11 +65,10 @@ public:
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, PreserveCaseFormatterReasonPhraseIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(CaseFormatter, PreserveCaseFormatterReasonPhraseIntegrationTest,
+                         testing::ValuesIn(getTestsParams()), testParamsToString);
 
-TEST_P(PreserveCaseFormatterReasonPhraseIntegrationTest, VerifyReasonPhrase) {
+TEST_P(PreserveCaseFormatterReasonPhraseIntegrationTest, VerifyReasonPhraseEnabled) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
@@ -60,8 +81,9 @@ TEST_P(PreserveCaseFormatterReasonPhraseIntegrationTest, VerifyReasonPhrase) {
   auto response = "HTTP/1.1 503 Slow Down\r\ncontent-length: 0\r\n\r\n";
   ASSERT_TRUE(upstream_connection->write(response));
 
+  auto expected_reason_phrase = GetParam().forward_reason_phrase ? "Slow Down" : "Service Unavailable";
   // Verify that the downstream response has proper reason phrase
-  tcp_client->waitForData("HTTP/1.1 503 Slow Down", false);
+  tcp_client->waitForData(fmt::format("HTTP/1.1 503 {}", expected_reason_phrase), false);
 
   tcp_client->close();
 }

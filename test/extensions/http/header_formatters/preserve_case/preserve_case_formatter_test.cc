@@ -22,12 +22,20 @@ TEST(PreserveCaseFormatterTest, All) {
   EXPECT_EQ("baz", formatter.format("baz"));
 }
 
-TEST(PreserveCaseFormatterTest, ReasonPhrase) {
+TEST(PreserveCaseFormatterTest, ReasonPhraseEnabled) {
   PreserveCaseHeaderFormatter formatter(true);
 
   formatter.setReasonPhrase(absl::string_view("Slow Down"));
 
   EXPECT_EQ("Slow Down", formatter.getReasonPhrase());
+}
+
+TEST(PreserveCaseFormatterTest, ReasonPhraseDisabled) {
+  PreserveCaseHeaderFormatter formatter(false);
+
+  formatter.setReasonPhrase(absl::string_view("Slow Down"));
+
+  EXPECT_TRUE(formatter.getReasonPhrase().empty());
 }
 
 } // namespace PreserveCase
