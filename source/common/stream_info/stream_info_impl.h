@@ -468,7 +468,6 @@ private:
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr legacy_upstream_local_address_;
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
-  std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
