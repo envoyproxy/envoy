@@ -923,8 +923,10 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
             private_key:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"
           validation_context:
-            match_subject_alt_names:
-              exact : "spiffe://lyft.com/testclient"
+            match_typed_subject_alt_names:
+            - san_type: URI
+              matcher:
+                exact: "spiffe://lyft.com/testclient"
 )EOF";
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
@@ -1096,6 +1098,32 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
                           EnvoyException, error_msg);
 }
 
+// Validate that 1024-bit RSA certificates are rejected from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  pkcs12:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_rsa_1024_certkey.p12"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+
+  std::string error_msg("Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
+                        "only RSA certificates "
+#ifdef BORINGSSL_FIPS
+                        "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+#else
+                        "with 2048-bit or larger keys are supported"
+#endif
+  );
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException, error_msg);
+}
+
 // Validate that 3072-bit RSA certificates load successfully.
 TEST_F(ClientContextConfigImplTest, RSA3072Cert) {
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
@@ -1169,6 +1197,25 @@ TEST_F(ClientContextConfigImplTest, NonP256EcdsaCert) {
                           EnvoyException,
                           "Failed to load certificate chain from .*selfsigned_ecdsa_p384_cert.pem, "
                           "only P-256 ECDSA certificates are supported");
+}
+
+// Validate that non-P256 ECDSA certs are rejected loaded from `pkcs12`.
+TEST_F(ClientContextConfigImplTest, NonP256EcdsaPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_certificate_yaml = R"EOF(
+  pkcs12:
+    filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p384_certkey.p12"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            *tls_context.mutable_common_tls_context()->add_tls_certificates());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(
+      manager.createSslClientContext(store, client_context_config, nullptr), EnvoyException,
+      "Failed to load certificate chain from .*selfsigned_ecdsa_p384_certkey.p12, "
+      "only P-256 ECDSA certificates are supported");
 }
 
 // Multiple TLS certificates are not yet supported.
@@ -1341,6 +1388,99 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(password_file)),
             client_context_config.tlsCertificates()[0].get().password());
+}
+
+// Validate that client context config with password-protected TLS certificates loaded from
+// `PKCS12` is created successfully.
+TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  tls_certificate->mutable_pkcs12()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12"));
+  tls_certificate->mutable_password()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"));
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  factory_context_.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+
+  const std::string cert_p12 =
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_p12)),
+            client_context_config.tlsCertificates()[0].get().pkcs12());
+  const std::string password_file =
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(password_file)),
+            client_context_config.tlsCertificates()[0].get().password());
+}
+
+// Validate that not supplying the incorrect passphrase for password-protected `PKCS12`
+// triggers a failure loading the private key.
+TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  const std::string pkcs12_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12");
+  tls_certificate->mutable_pkcs12()->set_filename(pkcs12_path);
+  tls_certificate->mutable_password()->set_inline_string("WrongPassword");
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  factory_context_.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException, absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
+}
+
+// Validate that not supplying a passphrase for password-protected `PKCS12`
+// triggers a failure loading the private key.
+TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  secret_config.set_name("abc.com");
+
+  auto* tls_certificate = secret_config.mutable_tls_certificate();
+  const std::string pkcs12_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/transport_sockets/tls/test_data/password_protected_certkey.p12");
+  tls_certificate->mutable_pkcs12()->set_filename(pkcs12_path);
+  // Don't supply the password.
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+
+  factory_context_.secretManager().addStaticSecret(secret_config);
+  ClientContextConfigImpl client_context_config(tls_context, factory_context_);
+
+  Event::SimulatedTimeSystem time_system;
+  ContextManagerImpl manager(time_system);
+  Stats::IsolatedStoreImpl store;
+  EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config, nullptr),
+                          EnvoyException, absl::StrCat("Failed to load pkcs12 from ", pkcs12_path));
 }
 
 // Validate that not supplying a passphrase for password-protected TLS certificates
@@ -1767,6 +1907,91 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureBothKeyAndMethod)
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
       "Certificate configuration can't have both private_key and private_key_provider");
+}
+
+// Test that we don't allow specification of both typed and untyped matchers for
+// sans.
+TEST_F(ServerContextConfigImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  const std::string yaml =
+      R"EOF(
+      common_tls_context:
+        validation_context:
+          trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+          allow_expired_certificate: true
+          match_typed_subject_alt_names:
+          - san_type: DNS
+            matcher:
+              exact: "foo.example"
+          match_subject_alt_names:
+            exact: "foo.example"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "SAN-based verification using both match_typed_subject_alt_names and "
+      "the deprecated match_subject_alt_names is not allowed");
+}
+
+TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndMethod) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  NiceMock<Ssl::MockContextManager> context_manager;
+  NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
+  auto private_key_method_provider_ptr =
+      std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - pkcs12:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"
+      private_key_provider:
+        provider_name: mock_provider
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            test_value: 100
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "Certificate configuration can't have both pkcs12 and private_key_provider");
+}
+
+TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndKey) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - pkcs12:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"
+      private_key:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "Certificate configuration can't have both pkcs12 and private_key");
+}
+
+TEST_F(ServerContextConfigImplTest, Pkcs12LoadFailureBothPkcs12AndCertChain) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/selfsigned_cert.pem"
+      pkcs12:
+        filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns3_certkeychain.p12"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_THROW_WITH_MESSAGE(
+      ServerContextConfigImpl server_context_config(tls_context, factory_context_), EnvoyException,
+      "Certificate configuration can't have both pkcs12 and certificate_chain");
 }
 
 // Subclass ContextImpl so we can instantiate directly from tests, despite the

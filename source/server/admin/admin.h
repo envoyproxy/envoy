@@ -68,7 +68,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& profile_path, Server::Instance& server);
+  AdminImpl(const std::string& profile_path, Server::Instance& server,
+            bool ignore_global_conn_limit);
 
   Http::Code runCallback(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
@@ -230,7 +231,6 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void validateConfig(const envoy::config::route::v3::RouteConfiguration&) const override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                    std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -341,7 +341,7 @@ private:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
-          init_manager_(nullptr) {}
+          init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -360,6 +360,9 @@ private:
     Network::UdpListenerConfigOptRef udpListenerConfig() override {
       return Network::UdpListenerConfigOptRef();
     }
+    Network::InternalListenerConfigOptRef internalListenerConfig() override {
+      return Network::InternalListenerConfigOptRef();
+    }
     envoy::config::core::v3::TrafficDirection direction() const override {
       return envoy::config::core::v3::UNSPECIFIED;
     }
@@ -370,6 +373,7 @@ private:
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -381,6 +385,7 @@ private:
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
+    const bool ignore_global_conn_limit_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -453,6 +458,7 @@ private:
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
+  const bool ignore_global_conn_limit_;
 };
 
 } // namespace Server

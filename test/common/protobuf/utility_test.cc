@@ -1486,14 +1486,14 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
-// Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
+// Test the jsonConvertValue in both success and failure modes.
 TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
   {
     envoy::config::bootstrap::v3::Bootstrap source;
     source.set_flags_path("foo");
     ProtobufWkt::Value tmp;
     envoy::config::bootstrap::v3::Bootstrap dest;
-    MessageUtil::jsonConvertValue(source, tmp);
+    EXPECT_TRUE(MessageUtil::jsonConvertValue(source, tmp));
     TestUtility::jsonConvert(tmp, dest);
     EXPECT_EQ("foo", dest.flags_path());
   }
@@ -1502,11 +1502,18 @@ TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
     ProtobufWkt::StringValue source;
     source.set_value("foo");
     ProtobufWkt::Value dest;
-    MessageUtil::jsonConvertValue(source, dest);
+    EXPECT_TRUE(MessageUtil::jsonConvertValue(source, dest));
 
     ProtobufWkt::Value expected;
     expected.set_string_value("foo");
     EXPECT_THAT(dest, ProtoEq(expected));
+  }
+
+  {
+    ProtobufWkt::Duration source;
+    source.set_seconds(-281474976710656);
+    ProtobufWkt::Value dest;
+    EXPECT_FALSE(MessageUtil::jsonConvertValue(source, dest));
   }
 }
 
