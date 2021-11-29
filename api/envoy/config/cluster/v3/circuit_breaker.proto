@@ -59,10 +59,12 @@ message CircuitBreakers {
 
     // The maximum number of pending requests that Envoy will allow to the
     // upstream cluster. If not specified, the default is 1024.
+    // This limit is applied as a connection limit for non-HTTP traffic.
     google.protobuf.UInt32Value max_pending_requests = 3;
 
     // The maximum number of parallel requests that Envoy will make to the
     // upstream cluster. If not specified, the default is 1024.
+    // This limit does not apply to non-HTTP traffic.
     google.protobuf.UInt32Value max_requests = 4;
 
     // The maximum number of parallel retries that Envoy will allow to the

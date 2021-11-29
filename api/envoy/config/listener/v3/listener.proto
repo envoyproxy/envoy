@@ -137,12 +137,12 @@ message Listener {
   // If specified, all :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must
   // have a non-empty :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` and empty :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
   // [#not-implemented-hide:]
-  repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 31;
+  repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
 
   // Defines the discovery service configuration for filter chains indexed by the filter chain name.
   // The set of filter chain names must be disjoint from the filter chain names in the field :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>`.
   // [#not-implemented-hide:]
-  map<string, core.v3.ExtensionConfigSource> filter_chain_discovery = 32;
+  map<string, core.v3.ExtensionConfigSource> filter_chain_discovery = 33;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to
@@ -343,4 +343,8 @@ message Listener {
   // Enable MPTCP (multi-path TCP) on this listener. Clients will be allowed to establish
   // MPTCP connections. Non-MPTCP clients will fall back to regular TCP.
   bool enable_mptcp = 30;
+
+  // Whether the listener should limit connections based upon the value of
+  // :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`.
+  bool ignore_global_conn_limit = 31;
 }

@@ -871,6 +871,11 @@ public:
   virtual bool autoHostRewrite() const PURE;
 
   /**
+   * @return bool true if the x-forwarded-host header should be updated.
+   */
+  virtual bool appendXfh() const PURE;
+
+  /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
    * selecting an upstream host
    */
