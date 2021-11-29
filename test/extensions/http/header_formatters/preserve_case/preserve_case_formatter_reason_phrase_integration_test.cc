@@ -13,8 +13,9 @@ struct TestParams {
 };
 
 std::string testParamsToString(const ::testing::TestParamInfo<TestParams>& p) {
-  return fmt::format("{}_{}", p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                              p.param.forward_reason_phrase ? "enabled" : "disabled");
+  return fmt::format("{}_{}",
+                     p.param.ip_version == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+                     p.param.forward_reason_phrase ? "enabled" : "disabled");
 }
 
 std::vector<TestParams> getTestsParams() {
@@ -28,9 +29,8 @@ std::vector<TestParams> getTestsParams() {
   return ret;
 }
 
-class PreserveCaseFormatterReasonPhraseIntegrationTest
-    : public testing::TestWithParam<TestParams>,
-      public HttpIntegrationTest {
+class PreserveCaseFormatterReasonPhraseIntegrationTest : public testing::TestWithParam<TestParams>,
+                                                         public HttpIntegrationTest {
 public:
   PreserveCaseFormatterReasonPhraseIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam().ip_version) {}
@@ -52,8 +52,8 @@ public:
 
         auto config =
             TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                       PreserveCaseFormatterConfig>(fmt::format("forward_reason_phrase: {}",
-                                            GetParam().forward_reason_phrase ? "true": "false"));
+                                       PreserveCaseFormatterConfig>(fmt::format(
+                "forward_reason_phrase: {}", GetParam().forward_reason_phrase ? "true": "false"));
         typed_extension_config->mutable_typed_config()->PackFrom(config);
 
         ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
@@ -81,7 +81,8 @@ TEST_P(PreserveCaseFormatterReasonPhraseIntegrationTest, VerifyReasonPhraseEnabl
   auto response = "HTTP/1.1 503 Slow Down\r\ncontent-length: 0\r\n\r\n";
   ASSERT_TRUE(upstream_connection->write(response));
 
-  auto expected_reason_phrase = GetParam().forward_reason_phrase ? "Slow Down" : "Service Unavailable";
+  auto expected_reason_phrase =
+      GetParam().forward_reason_phrase ? "Slow Down" : "Service Unavailable";
   // Verify that the downstream response has proper reason phrase
   tcp_client->waitForData(fmt::format("HTTP/1.1 503 {}", expected_reason_phrase), false);
 
