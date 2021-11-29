@@ -1,5 +1,7 @@
 #include "source/extensions/filters/common/expr/library/custom_functions.h"
 
+#include "source/common/protobuf/protobuf.h"
+
 #include "eval/public/cel_value.h"
 
 namespace Envoy {
@@ -19,7 +21,7 @@ absl::Status GetProductCelFunction::Evaluate(absl::Span<const CelValue> args, Ce
     return absl::OkStatus();
   }
   *output = CelValue::CreateInt64(-1);
-  return absl::InvalidArgumentError("expected int argument for function GetProduct");
+  return absl::InvalidArgumentError("expected integer arguments for function GetProduct");
 }
 
 absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,
@@ -32,7 +34,7 @@ absl::Status GetDoubleCelFunction::Evaluate(absl::Span<const CelValue> args, Cel
     return absl::OkStatus();
   }
   *output = CelValue::CreateInt64(-1);
-  return absl::InvalidArgumentError("expected int argument for function GetDouble");
+  return absl::InvalidArgumentError("expected integer argument for function GetDouble");
 }
 
 absl::Status Get99CelFunction::Evaluate(absl::Span<const CelValue> args, CelValue* output,

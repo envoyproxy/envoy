@@ -9,7 +9,6 @@
 
 #include "eval/public/activation.h"
 #include "eval/public/cel_expression.h"
-#include "eval/public/cel_function_adapter.h"
 #include "eval/public/cel_value.h"
 
 namespace Envoy {

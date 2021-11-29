@@ -1,9 +1,14 @@
 #include "source/extensions/filters/common/expr/library/custom_library.h"
 
 #include "envoy/config/core/v3/extension.pb.validate.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
+#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/filters/common/expr/library/custom_vocabulary.h"
+
+#include "eval/public/cel_function_adapter.h"
+#include "eval/public/cel_value.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,6 +16,8 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 namespace Library {
+
+void ThrowException(absl::string_view function_name, absl::Status status);
 
 void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& arena,
                                    const StreamInfo::StreamInfo& info,
@@ -24,22 +31,21 @@ void CustomLibrary::FillActivation(Activation* activation, Protobuf::Arena& aren
   activation->InsertValueProducer(
       CustomVocabularyName, std::make_unique<CustomVocabularyWrapper>(
                                 arena, info, request_headers, response_headers, response_trailers));
-
   // functions
-  absl::Status status =
-      activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncGetDoubleName));
+  absl::Status status;
+  status =
+      activation->InsertFunction(std::make_unique<GetDoubleCelFunction>(LazyEvalFuncNameGetDouble));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGetDouble, status);
   }
   status = activation->InsertFunction(
-      std::make_unique<GetProductCelFunction>(absl::string_view("GetProduct")));
+      std::make_unique<GetProductCelFunction>(LazyEvalFuncNameGetProduct));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGetProduct, status);
   }
-  status =
-      activation->InsertFunction(std::make_unique<Get99CelFunction>(absl::string_view("Get99")));
+  status = activation->InsertFunction(std::make_unique<Get99CelFunction>(LazyEvalFuncNameGet99));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGet99, status);
   }
 }
 
@@ -47,36 +53,31 @@ void CustomLibrary::RegisterFunctions(CelFunctionRegistry* registry) const {
   absl::Status status;
   // lazily evaluated functions
   status = registry->RegisterLazyFunction(
-      GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncGetDoubleName));
+      GetDoubleCelFunction::CreateDescriptor(LazyEvalFuncNameGetDouble));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGetDouble, status);
   }
   status = registry->RegisterLazyFunction(
-      GetProductCelFunction::CreateDescriptor(absl::string_view("GetProduct")));
+      GetProductCelFunction::CreateDescriptor(LazyEvalFuncNameGetProduct));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGetProduct, status);
   }
-  status = registry->RegisterLazyFunction(
-      Get99CelFunction::CreateDescriptor(absl::string_view("Get99")));
+  status =
+      registry->RegisterLazyFunction(Get99CelFunction::CreateDescriptor(LazyEvalFuncNameGet99));
   if (!status.ok()) {
-    throw EnvoyException(absl::StrCat("failed to register lazy function: ", status.message()));
+    ThrowException(LazyEvalFuncNameGet99, status);
   }
 
   // eagerly evaluated functions
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      EagerEvalFuncGetNextIntName, false,
-      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetNextInt(arena, i); }, registry);
+      EagerEvalFuncNameGetNextInt, false, GetNextInt, registry);
   if (!status.ok()) {
-    throw EnvoyException(
-        absl::StrCat("failed to register eagerly evaluated functions: ", status.message()));
+    ThrowException(EagerEvalFuncNameGetNextInt, status);
   }
   status = google::api::expr::runtime::FunctionAdapter<CelValue, int64_t>::CreateAndRegister(
-      absl::string_view("GetSquareOf"), true,
-      [](Protobuf::Arena* arena, int64_t i) -> CelValue { return GetSquareOf(arena, i); },
-      registry);
+      EagerEvalFuncNameGetSquareOf, true, GetSquareOf, registry);
   if (!status.ok()) {
-    throw EnvoyException(
-        absl::StrCat("failed to register eagerly evaluated functions: ", status.message()));
+    ThrowException(EagerEvalFuncNameGetSquareOf, status);
   }
 }
 
@@ -91,6 +92,11 @@ CustomLibraryFactory::createLibrary(const Protobuf::Message& config,
   auto custom_library = std::make_unique<CustomLibrary>(
       custom_library_config.replace_default_library_in_case_of_overlap());
   return custom_library;
+}
+
+void ThrowException(absl::string_view function_name, absl::Status status) {
+  throw EnvoyException(
+      fmt::format("failed to register function '{}': {}", function_name, status.message()));
 }
 
 REGISTER_FACTORY(CustomLibraryFactory, BaseCustomLibraryFactory);

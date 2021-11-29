@@ -14,7 +14,7 @@ namespace Library {
 
 using google::api::expr::runtime::CelFunction;
 using google::api::expr::runtime::CelFunctionDescriptor;
-using CelValue = google::api::expr::runtime::CelValue;
+using google::api::expr::runtime::CelValue;
 
 class GetProductCelFunction : public CelFunction {
 public:

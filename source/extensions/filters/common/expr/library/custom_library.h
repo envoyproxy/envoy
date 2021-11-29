@@ -3,7 +3,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.h"
-#include "envoy/extensions/rbac/custom_library_config/v3/custom_library.pb.validate.h"
 #include "envoy/protobuf/message_validator.h"
 
 #include "source/common/protobuf/protobuf.h"
@@ -11,11 +10,8 @@
 #include "source/extensions/filters/common/expr/library/custom_functions.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 #include "eval/public/activation.h"
-#include "eval/public/cel_expression.h"
-#include "eval/public/cel_function_adapter.h"
-#include "eval/public/cel_value.h"
+#include "eval/public/cel_function_registry.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,13 +20,16 @@ namespace Common {
 namespace Expr {
 namespace Library {
 
-using Activation = google::api::expr::runtime::Activation;
-using CelFunctionRegistry = google::api::expr::runtime::CelFunctionRegistry;
-using CustomLibraryConfig = envoy::extensions::rbac::custom_library_config::v3::CustomLibraryConfig;
+using envoy::extensions::rbac::custom_library_config::v3::CustomLibraryConfig;
+using google::api::expr::runtime::Activation;
+using google::api::expr::runtime::CelFunctionRegistry;
 
 constexpr absl::string_view CustomVocabularyName = "custom";
-constexpr absl::string_view LazyEvalFuncGetDoubleName = "GetDouble";
-constexpr absl::string_view EagerEvalFuncGetNextIntName = "GetNextInt";
+constexpr absl::string_view LazyEvalFuncNameGetDouble = "GetDouble";
+constexpr absl::string_view LazyEvalFuncNameGetProduct = "GetProduct";
+constexpr absl::string_view LazyEvalFuncNameGet99 = "Get99";
+constexpr absl::string_view EagerEvalFuncNameGetNextInt = "GetNextInt";
+constexpr absl::string_view EagerEvalFuncNameGetSquareOf = "GetSquareOf";
 
 class CustomLibrary {
 public:

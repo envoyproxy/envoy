@@ -1,7 +1,9 @@
 #include "source/extensions/filters/common/expr/library/custom_vocabulary.h"
 
 #include "source/common/http/utility.h"
-#include "source/common/protobuf/protobuf.h"
+
+#include "absl/types/optional.h"
+#include "eval/public/cel_value.h"
 
 namespace Envoy {
 namespace Extensions {
