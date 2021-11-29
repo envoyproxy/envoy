@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
-#include "envoy/network/client_connection_manager.h"
+#include "envoy/network/client_connection_factory.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/common/logger.h"
@@ -18,7 +18,7 @@ namespace UserSpace {
 class InternalClientConnectionFactory : public Network::ClientConnectionFactory,
                                         Logger::Loggable<Logger::Id::connection> {
 public:
-  ~InternalClientConnectionFactory() = default;
+  ~InternalClientConnectionFactory() override = default;
   std::string name() const override { return "EnvoyInternal"; }
   Network::ClientConnectionPtr
   createClientConnection(Event::Dispatcher& dispatcher,

@@ -9,7 +9,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/overload/v3/overload.pb.h"
-#include "envoy/network/client_connection_manager.h"
+#include "envoy/network/client_connection_factory.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 

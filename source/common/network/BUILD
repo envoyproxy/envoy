@@ -120,7 +120,7 @@ envoy_cc_library(
     ],
     deps = [
         ":address_lib",
-        "//envoy/network:client_connection_manager",
+        "//envoy/network:client_connection_factory",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",

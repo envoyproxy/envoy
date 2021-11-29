@@ -39,7 +39,7 @@ envoy_cc_library(
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
-        "//envoy/network:client_connection_manager",
+        "//envoy/network:client_connection_factory",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_interface",
         "//source/common/common:assert_lib",

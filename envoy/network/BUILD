@@ -29,8 +29,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "client_connection_manager",
-    hdrs = ["client_connection_manager.h"],
+    name = "client_connection_factory",
+    hdrs = ["client_connection_factory.h"],
     deps = [
         ":address_interface",
         ":connection_interface",

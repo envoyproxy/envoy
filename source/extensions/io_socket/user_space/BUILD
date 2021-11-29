@@ -69,7 +69,7 @@ envoy_cc_library(
     ],
     deps = [
         ":io_handle_impl_lib",
-        "//envoy/network:client_connection_manager",
+        "//envoy/network:client_connection_factory",
         "//envoy/network:connection_interface",
         "//envoy/registry",
         "//source/common/network:connection_lib",
