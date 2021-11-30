@@ -213,18 +213,18 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
-  // If the effective client capacity was limited by concurrency, increase connecting capacity.
-  // If the effective client capacity was limited by max total streams, this will not result in an
-  // increment as no capacity is freed up.
-  // We don't update the capacity for HTTP/3 as the stream count should only
-  // increase when a MAX_STREAMS frame is received.
-  // The capacity calculated by concurrency could be negative, in this case, effective client
-  // capacity was limited by concurrency, compare client.concurrent_stream_limit_ and
-  // client.numActiveStreams() directly to avoid overflow.
-  if (trackStreamCapacity() && ((client.concurrent_stream_limit_ < client.numActiveStreams() + 1) ||
-                                (client.remaining_streams_ > client.concurrent_stream_limit_ -
-                                                                 client.numActiveStreams() - 1))) {
-    state_.incrConnectingAndConnectedStreamCapacity(1);
+  // We don't update the capacity for HTTP/3 as the stream count should only.
+  if (trackStreamCapacity()) {
+    // If the effective client capacity was limited by concurrency, increase connecting capacity.
+    bool limited_by_concurrency =
+        client.remaining_streams_ > client.concurrent_stream_limit_ - client.numActiveStreams() - 1;
+    // The capacity calculated by concurrency could be negative (maybe explicitly call out SETTINGS
+    // frame), in this case, effective client capacity was still limited by concurrency, compare
+    // client.concurrent_stream_limit_ and client.numActiveStreams() directly to avoid overflow.
+    bool negative_capacity = client.concurrent_stream_limit_ < client.numActiveStreams() + 1;
+    if (negative_capacity || limited_by_concurrency) {
+      state_.incrConnectingAndConnectedStreamCapacity(1);
+    }
   }
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
