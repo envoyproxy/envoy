@@ -656,6 +656,19 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
 
+  if (config.tlsRootCACertificate() != nullptr) {
+    bssl::UniquePtr<BIO> bio(
+        BIO_new_mem_buf(const_cast<char*>(config.tlsRootCACertificate()->cert().data()),
+                        config.tlsRootCACertificate()->cert().size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    root_ca_cert_.reset(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+
+    bio.reset(BIO_new_mem_buf(const_cast<char*>(config.tlsRootCACertificate()->privateKey().data()),
+                              config.tlsRootCACertificate()->privateKey().size()));
+    RELEASE_ASSERT(bio != nullptr, "");
+    root_ca_key_.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  }
+
   // Compute the session context ID hash. We use all the certificate identities,
   // since we should have a common ID for session resumption no matter what cert
   // is used. We do this early because it can throw an EnvoyException.

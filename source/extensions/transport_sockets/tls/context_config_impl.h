@@ -12,6 +12,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
+#include "source/common/ssl/tls_root_ca_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,6 +27,11 @@ public:
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
+
+  const Envoy::Ssl::TlsRootCACertificateConfig* tlsRootCACertificate() const override {
+    return tls_root_ca_certificate_config_.get();
+  }
+
   // TODO(htuch): This needs to be made const again and/or zero copy and/or callers fixed.
   std::vector<std::reference_wrapper<const Envoy::Ssl::TlsCertificateConfig>>
   tlsCertificates() const override {
@@ -79,6 +85,7 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
 
+  Ssl::TlsRootCACertificateConfigPtr tls_root_ca_certificate_config_;
   std::vector<Ssl::TlsCertificateConfigImpl> tls_certificate_configs_;
   Ssl::CertificateValidationContextConfigPtr validation_context_config_;
   // If certificate validation context type is combined_validation_context. default_cvc_

@@ -124,7 +124,7 @@ message DownstreamTlsContext {
 }
 
 // TLS context shared by both client and server TLS contexts.
-// [#next-free-field: 15]
+// [#next-free-field: 16]
 message CommonTlsContext {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
@@ -244,6 +244,12 @@ message CommonTlsContext {
   // and *tls_certificate_provider_instance* may be used.
   // [#not-implemented-hide:]
   CertificateProviderPluginInstance tls_certificate_provider_instance = 14;
+
+  // RootCA certificates for generating TLS certs inside Envoy
+  //
+  // Only one of *tls_certificates*, *tls_certificate_sds_secret_configs*,
+  // *tls_certificate_provider_instance* and *tls_root_ca_certificate* may be used.
+  TlsRootCACertificate tls_root_ca_certificate = 15;
 
   // Certificate provider for fetching TLS certificates.
   // [#not-implemented-hide:]

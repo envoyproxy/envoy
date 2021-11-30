@@ -23,6 +23,8 @@ AWS
 BACKTRACE
 BSON
 BPF
+CSR
+FILETYPE
 Repick
 btree
 CAS
@@ -130,6 +132,7 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+certpair
 dereferencing
 dnsresolvers
 guarddog
@@ -970,6 +973,7 @@ prepends
 preresolve
 preresolved
 prev
+privatekey
 probabilistically
 proc
 profiler

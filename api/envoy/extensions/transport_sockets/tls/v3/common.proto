@@ -487,3 +487,13 @@ message CertificateValidationContext {
   // certificate chain will be subject to validation by :ref:`CRL <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.crl>`.
   bool only_verify_leaf_cert_crl = 14;
 }
+
+// [#next-free-field: 3]
+message TlsRootCACertificate {
+
+  // RootCA cert
+  config.core.v3.DataSource cert = 1;
+
+  // RootCA key
+  config.core.v3.DataSource private_key = 2;
+}

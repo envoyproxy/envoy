@@ -13,6 +13,9 @@
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
+#include "openssl/evp.h"
+#include "openssl/pem.h"
+#include "openssl/rsa.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Network::PostIoAction;
@@ -62,6 +65,77 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
   }
 }
 
+void SslSocket::mimicServerCert(absl::string_view host) {
+  // Generate key pair
+  EVP_PKEY* key = EVP_PKEY_new();
+  X509* crt = X509_new();
+
+  // 1. generate private key and corresponding CSR
+  X509_REQ* req = X509_REQ_new();
+  BIGNUM* bne = BN_new();
+  BN_set_word(bne, RSA_F4);
+  RSA* rsa = RSA_new();
+  RSA_generate_key_ex(rsa, 2048, bne, NULL);
+  X509_REQ_set_version(req, 0);
+
+  X509_NAME* x509_name = X509_REQ_get_subject_name(req);
+  const char* szCommon = host.data();
+  X509_NAME_add_entry_by_txt(x509_name, "CN", MBSTRING_ASC,
+                             reinterpret_cast<const unsigned char*>(szCommon), -1, -1, 0);
+
+  EVP_PKEY_assign_RSA(key, rsa);
+  X509_REQ_set_pubkey(req, key);
+  X509_REQ_sign(req, key, EVP_sha1()); // return x509_req->signature->length
+
+  // 2. generate signed key pair
+  X509_set_version(crt, 2);
+  std::string prefix = "DNS:";
+  std::string subAltName = prefix + host.data();
+  X509_EXTENSION* ext = X509V3_EXT_nconf_nid(NULL, NULL, NID_subject_alt_name, subAltName.c_str());
+  X509_add_ext(crt, ext, -1);
+  X509_set_issuer_name(crt, X509_get_subject_name(ctx_->getRootCACert().get()));
+  X509_gmtime_adj(X509_get_notBefore(crt), 0);
+  X509_gmtime_adj(X509_get_notAfter(crt), 2 * 365 * 24 * 3600);
+  X509_set_subject_name(crt, X509_REQ_get_subject_name(req));
+  EVP_PKEY* req_pubkey = X509_REQ_get_pubkey(req);
+  X509_set_pubkey(crt, req_pubkey);
+  X509_sign(crt, ctx_->getRootCAKey().get(), EVP_sha256());
+
+  SSL_use_certificate(rawSsl(), crt);
+  SSL_use_PrivateKey(rawSsl(), key);
+  ENVOY_CONN_LOG(trace, "SslSocket::mimicServerCert: requested server name: {}",
+                 callbacks_->connection(), host);
+
+  DynamicCertPair certpair;
+  certpair.cert_ = *crt;
+  certpair.key_ = *key;
+  ctx_->cacheDynamicCertPair(host, certpair);
+}
+
+bool SslSocket::useCachedDynamicCert(absl::string_view host) {
+  DynamicCertPair* certpair = new DynamicCertPair();
+  if (ctx_->getCachedDynamicCertPair(host, certpair)) {
+    X509* crt = &(certpair->cert_);
+    EVP_PKEY* key = &(certpair->key_);
+    SSL_use_certificate(rawSsl(), crt);
+    SSL_use_PrivateKey(rawSsl(), key);
+    /*
+    BIO *bio = BIO_new(BIO_s_mem());;
+    char *pem = NULL;
+    PEM_write_bio_X509(bio, &certpair->cert_);
+    pem = static_cast<char *>(malloc(bio->num_write + 1));
+    memset(pem, 0, bio->num_write + 1);
+    BIO_read(bio, pem, bio->num_write);
+    ENVOY_CONN_LOG(trace, "SslSocket::useCachedDynamicCert: cert: {}", callbacks_->connection(),
+    pem);
+    */
+    ENVOY_CONN_LOG(trace, "SslSocket::useCachedDynamicCert: requested server name: {}",
+                   callbacks_->connection(), host);
+    return true;
+  }
+  return false;
+}
+
 void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!callbacks_);
   callbacks_ = &callbacks;
@@ -72,6 +146,13 @@ void SslSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& c
     provider->registerPrivateKeyMethod(rawSsl(), *this, callbacks_->connection().dispatcher());
   }
 
+  absl::string_view host = callbacks_->connection().requestedServerName();
+  if (!host.empty() && ctx_->getRootCACert() != nullptr && ctx_->getRootCAKey() != nullptr) {
+    ENVOY_CONN_LOG(trace, "requested server name: {}", callbacks_->connection(), host);
+    if (!useCachedDynamicCert(host)) {
+      mimicServerCert(host);
+    }
+  }
   // Use custom BIO that reads from/writes to IoHandle
   BIO* bio = BIO_new_io_handle(&callbacks_->ioHandle());
   SSL_set_bio(rawSsl(), bio, bio);
@@ -97,7 +178,12 @@ SslSocket::ReadResult SslSocket::sslReadIntoSlice(Buffer::RawSlice& slice) {
 
   return result;
 }
-
+/*
+void updateSslCtx() {
+  SSL_CTX_use_certificate(ssl_ctx_.get(), SSL_CTX_get0_certificate(ssl_ctx_.get()));
+  SSL_CTX_use_PrivateKey(ssl_ctx_.get(), SSL_CTX_get0_privatekey(ssl_ctx_.get()));
+}
+*/
 Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
   if (info_->state() != Ssl::SocketState::HandshakeComplete &&
       info_->state() != Ssl::SocketState::ShutdownSent) {
@@ -228,6 +314,7 @@ Network::IoResult SslSocket::doWrite(Buffer::Instance& write_buffer, bool end_st
   ASSERT(info_->state() != Ssl::SocketState::ShutdownSent || write_buffer.length() == 0);
   if (info_->state() != Ssl::SocketState::HandshakeComplete &&
       info_->state() != Ssl::SocketState::ShutdownSent) {
+    ENVOY_CONN_LOG(trace, "ssl state: {}", callbacks_->connection(), info_->state());
     PostIoAction action = doHandshake();
     if (action == PostIoAction::Close || info_->state() != Ssl::SocketState::HandshakeComplete) {
       return {action, 0, false};

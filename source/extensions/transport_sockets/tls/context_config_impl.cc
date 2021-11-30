@@ -236,6 +236,11 @@ ContextConfigImpl::ContextConfigImpl(
         factory_context.messageValidationVisitor());
   }
   capabilities_ = handshaker_factory->capabilities();
+  if (config.has_tls_root_ca_certificate()) {
+    capabilities_.provides_certificates = true;
+    tls_root_ca_certificate_config_ = std::make_unique<Envoy::Ssl::TlsRootCACertificateConfigImpl>(
+        config.tls_root_ca_certificate(), api_);
+  }
   sslctx_cb_ = handshaker_factory->sslctxCb(handshaker_factory_context);
 }
 

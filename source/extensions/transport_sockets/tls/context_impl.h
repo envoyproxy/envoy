@@ -34,6 +34,11 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+struct DynamicCertPair {
+  X509 cert_;
+  EVP_PKEY key_;
+};
+
 struct TlsContext {
   // Each certificate specified for the context has its own SSL_CTX. `SSL_CTXs`
   // are identical with the exception of certificate material, and can be
@@ -87,6 +92,16 @@ public:
   std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> getPrivateKeyMethodProviders();
 
   bool verifyCertChain(X509& leaf_cert, STACK_OF(X509) & intermediates, std::string& error_details);
+
+  virtual bssl::UniquePtr<X509> getRootCACert() { return nullptr; };
+  virtual bssl::UniquePtr<EVP_PKEY> getRootCAKey() { return nullptr; };
+  virtual void cacheDynamicCertPair(absl::string_view /*host*/, DynamicCertPair /*certpair*/) {
+    return;
+  };
+  virtual bool getCachedDynamicCertPair(absl::string_view /* host */,
+                                        DynamicCertPair* /*certpair*/) {
+    return false;
+  };
 
 protected:
   ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -164,6 +179,20 @@ public:
   // ClientHello details. This is made public for use by custom TLS extensions who want to
   // manually create and use this as a client hello callback.
   enum ssl_select_cert_result_t selectTlsContext(const SSL_CLIENT_HELLO* ssl_client_hello);
+  bssl::UniquePtr<X509> getRootCACert() { return bssl::UpRef(root_ca_cert_); };
+  bssl::UniquePtr<EVP_PKEY> getRootCAKey() { return bssl::UpRef(root_ca_key_); };
+  void cacheDynamicCertPair(absl::string_view host, DynamicCertPair certpair) {
+    cached_dynamic_cert_pairs_[host] = certpair;
+  };
+  bool getCachedDynamicCertPair(absl::string_view host, DynamicCertPair* certpair) {
+    std::map<absl::string_view, DynamicCertPair>::iterator iter;
+    iter = cached_dynamic_cert_pairs_.find(host);
+    if (iter != cached_dynamic_cert_pairs_.end()) {
+      *certpair = iter->second;
+      return true;
+    }
+    return false;
+  };
 
 private:
   using SessionContextID = std::array<uint8_t, SSL_MAX_SSL_SESSION_ID_LENGTH>;
@@ -180,6 +209,9 @@ private:
 
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
+  bssl::UniquePtr<X509> root_ca_cert_;
+  bssl::UniquePtr<EVP_PKEY> root_ca_key_;
+  std::map<absl::string_view, DynamicCertPair> cached_dynamic_cert_pairs_;
 };
 
 } // namespace Tls

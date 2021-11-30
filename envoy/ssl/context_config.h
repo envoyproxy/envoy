@@ -10,6 +10,7 @@
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/ssl/tls_root_ca_certificate_config.h"
 
 #include "absl/types/optional.h"
 
@@ -39,6 +40,11 @@ public:
    * The ':' delimited list of supported ECDH curves.
    */
   virtual const std::string& ecdhCurves() const PURE;
+
+  /**
+   * @return TlsRootCACertificate the root CA certificate
+   */
+  virtual const TlsRootCACertificateConfig* tlsRootCACertificate() const PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<const TlsCertificateConfig>> TLS
