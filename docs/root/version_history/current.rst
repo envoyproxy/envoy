@@ -26,6 +26,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * ext_authz: fix the ext_authz network filter to correctly set response flag and code details to ``UAEX`` when a connection is denied.
+* hcm: stop processing the response if encoding it has caused downstream reset. The fix is guarded by ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding``.
 * listener: fixed the crash when updating listeners that do not bind to port.
 * tcp: fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.
 * thrift_proxy: fix the thrift_proxy connection manager to correctly report success/error response metrics when performing :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
