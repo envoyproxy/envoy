@@ -1531,6 +1531,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().Overload);
   }
+  filter_manager_.onDownstreamReset();
 
   connection_manager_.doDeferredStreamDestroy(*this);
 }
