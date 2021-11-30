@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.config.common.mutation_rules.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.common.mutation_rules.v3";
+option java_outer_classname = "MutationRulesProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// The HeaderMutationRules structure specifies what headers may be
+// manipulated by a processing filter. By default, all mutations are possible.
+// Various rules may be specified in order to restrict what a processing filter
+// can do. This structure is used by the External Processing Filter to make
+// it possible to restrict what an external processing server can do.
+message HeaderMutationRules {
+  // Prevent modification of headers that could affect routing decisions. This includes
+  // "host", ":authority", ":scheme", and ":method".
+  bool disallow_routing = 1;
+
+  // Prevent modification of envoy-internal headers. These typically start with
+  // "x-envoy" but this prefix may be overridden elsewhere.
+  bool disallow_envoy = 2;
+
+  // Prevent modification of any system header, defined as a header that
+  // starts with a ":" character.
+  bool disallow_system = 3;
+
+  // Prevent modification of any header at all. For the ext_proc filter, this means
+  // that a processing server may still choose to reject the entire request.
+  bool disallow_all = 4;
+}
