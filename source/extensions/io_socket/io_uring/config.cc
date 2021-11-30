@@ -1,5 +1,6 @@
 #include "source/extensions/io_socket/io_uring/config.h"
 
+#include "envoy/common/platform.h"
 #include "envoy/extensions/network/socket_interface/v3/io_uring_socket_interface.pb.validate.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
