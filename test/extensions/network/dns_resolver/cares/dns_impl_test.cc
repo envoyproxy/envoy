@@ -396,6 +396,44 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   ares_free_data(resolvers);
 }
 
+TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
+  char addr4str[INET_ADDRSTRLEN];
+  // we pick a port that isn't 53 as the default resolve.conf might be
+  // set to point to localhost.
+  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.set_use_resolvers_as_fallback(true);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+
+  // Given that the local machine will have a working conf in resolve.conf the resolver will not
+  // use the fallback given.
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_NE(resolvers->udp_port, 54);
+  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  ares_free_data(resolvers);
+}
+
 TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
