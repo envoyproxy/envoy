@@ -48,13 +48,19 @@ public interface EnvoyHTTPCallbacks {
    *                      count for an error. This is different from 0, which intentionally conveys
    *                      that the action was _not_ executed.
    * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel,  contains final internal HTTP stream metrics, context, and other
+   *     details.
    */
-  void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel);
+  void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel,
+               EnvoyFinalStreamIntel finalStreamIntel);
 
   /**
    * Called when the async HTTP stream is canceled.
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel,  contains final internal HTTP stream metrics, context, and other
+   *     details.
    */
-  void onCancel(EnvoyStreamIntel streamIntel);
+  void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
   /**
    * Callback signature which notify when there is buffer available for request body upload.
@@ -66,4 +72,12 @@ public interface EnvoyHTTPCallbacks {
    * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
    */
   void onSendWindowAvailable(EnvoyStreamIntel streamIntel);
+
+  /**
+   * Called once after the final data for the stream has been received.
+   *
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel,  contains final internal HTTP stream metrics.
+   */
+  void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 }

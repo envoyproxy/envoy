@@ -154,7 +154,7 @@ TEST(MainInterfaceTest, BasicStream) {
       nullptr /* on_metadata */,
       nullptr /* on_trailers */,
       nullptr /* on_error */,
-      [](envoy_stream_intel, void* context) -> void* {
+      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void* {
         auto* on_complete_notification = static_cast<absl::Notification*>(context);
         on_complete_notification->Notify();
         return nullptr;
@@ -249,20 +249,20 @@ TEST(MainInterfaceTest, ResetStream) {
       engine_cbs_context.on_engine_running.WaitForNotificationWithTimeout(absl::Seconds(10)));
 
   absl::Notification on_cancel_notification;
-  envoy_http_callbacks stream_cbs{nullptr /* on_headers */,
-                                  nullptr /* on_data */,
-                                  nullptr /* on_metadata */,
-                                  nullptr /* on_trailers */,
-                                  nullptr /* on_error */,
-                                  nullptr /* on_complete */,
-                                  [](envoy_stream_intel, void* context) -> void* {
-                                    auto* on_cancel_notification =
-                                        static_cast<absl::Notification*>(context);
-                                    on_cancel_notification->Notify();
-                                    return nullptr;
-                                  } /* on_cancel */,
-                                  nullptr /* on_send_window_available */,
-                                  &on_cancel_notification /* context */};
+  envoy_http_callbacks stream_cbs{
+      nullptr /* on_headers */,
+      nullptr /* on_data */,
+      nullptr /* on_metadata */,
+      nullptr /* on_trailers */,
+      nullptr /* on_error */,
+      nullptr /* on_complete */,
+      [](envoy_stream_intel, envoy_final_stream_intel, void* context) -> void* {
+        auto* on_cancel_notification = static_cast<absl::Notification*>(context);
+        on_cancel_notification->Notify();
+        return nullptr;
+      } /* on_cancel */,
+      nullptr /* on_send_window_available */,
+      &on_cancel_notification /* context */};
 
   envoy_stream_t stream = init_stream(0);
 

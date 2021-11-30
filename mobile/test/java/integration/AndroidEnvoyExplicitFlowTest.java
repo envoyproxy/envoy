@@ -393,12 +393,12 @@ public class AndroidEnvoyExplicitFlowTest {
               latch.countDown();
               return null;
             })
-            .setOnError((error, ignored) -> {
+            .setOnError((error, ignored, also_ignored) -> {
               response.get().setEnvoyError(error);
               latch.countDown();
               return null;
             })
-            .setOnCancel((ignored) -> {
+            .setOnCancel((ignored, also_ignored) -> {
               response.get().setCancelled();
               latch.countDown();
               return null;

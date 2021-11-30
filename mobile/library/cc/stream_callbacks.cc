@@ -50,7 +50,8 @@ void* c_on_trailers(envoy_headers metadata, envoy_stream_intel, void* context) {
   return context;
 }
 
-void* c_on_error(envoy_error raw_error, envoy_stream_intel, void* context) {
+void* c_on_error(envoy_error raw_error, envoy_stream_intel, envoy_final_stream_intel,
+                 void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_error.has_value()) {
@@ -65,7 +66,7 @@ void* c_on_error(envoy_error raw_error, envoy_stream_intel, void* context) {
   return nullptr;
 }
 
-void* c_on_complete(envoy_stream_intel, void* context) {
+void* c_on_complete(envoy_stream_intel, envoy_final_stream_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_complete.has_value()) {
@@ -76,7 +77,7 @@ void* c_on_complete(envoy_stream_intel, void* context) {
   return nullptr;
 }
 
-void* c_on_cancel(envoy_stream_intel, void* context) {
+void* c_on_cancel(envoy_stream_intel, envoy_final_stream_intel, void* context) {
   auto stream_callbacks_ptr = static_cast<StreamCallbacksSharedPtr*>(context);
   auto stream_callbacks = *stream_callbacks_ptr;
   if (stream_callbacks->on_cancel.has_value()) {

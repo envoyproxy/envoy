@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel
 import java.nio.ByteBuffer
 
@@ -16,6 +17,22 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
     override fun getAttemptCount(): Long { return 0 }
   }
 
+  private val mockFinalStreamIntel = object : EnvoyFinalStreamIntel {
+    override fun getRequestStartMs(): Long { return 0 }
+    override fun getDnsStartMs(): Long { return 0 }
+    override fun getDnsEndMs(): Long { return 0 }
+    override fun getConnectStartMs(): Long { return 0 }
+    override fun getConnectEndMs(): Long { return 0 }
+    override fun getSslStartMs(): Long { return 0 }
+    override fun getSslEndMs(): Long { return 0 }
+    override fun getSendingStartMs(): Long { return 0 }
+    override fun getSendingEndMs(): Long { return 0 }
+    override fun getResponseStartMs(): Long { return 0 }
+    override fun getRequestEndMs(): Long { return 0 }
+    override fun getSocketReused(): Boolean { return false }
+    override fun getSentByteCount(): Long { return 0 }
+    override fun getReceivedByteCount(): Long { return 0 }
+  }
   /**
    * Closure that will be called when request headers are sent.
    */
@@ -88,7 +105,7 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * Simulate the stream receiving a cancellation signal from Envoy.
    */
   fun receiveCancel() {
-    mockStream.callbacks.onCancel(mockStreamIntel)
+    mockStream.callbacks.onCancel(mockStreamIntel, mockFinalStreamIntel)
   }
 
   /**
@@ -97,6 +114,6 @@ class MockStream internal constructor(underlyingStream: MockEnvoyHTTPStream) : S
    * @param error The error to receive.
    */
   fun receiveError(error: EnvoyError) {
-    mockStream.callbacks.onError(error.errorCode, error.message, error.attemptCount ?: 0, mockStreamIntel)
+    mockStream.callbacks.onError(error.errorCode, error.message, error.attemptCount ?: 0, mockStreamIntel, mockFinalStreamIntel)
   }
 }

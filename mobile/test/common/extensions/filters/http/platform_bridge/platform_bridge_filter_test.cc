@@ -676,7 +676,7 @@ TEST_F(PlatformBridgeFilterTest, BasicError) {
     release_envoy_data(c_data);
     return {kEnvoyFilterDataStatusStopIterationNoBuffer, envoy_nodata, nullptr};
   };
-  platform_filter.on_error = [](envoy_error c_error, envoy_stream_intel,
+  platform_filter.on_error = [](envoy_error c_error, envoy_stream_intel, envoy_final_stream_intel,
                                 const void* context) -> void {
     filter_invocations* invocations = static_cast<filter_invocations*>(const_cast<void*>(context));
     invocations->on_error_calls++;

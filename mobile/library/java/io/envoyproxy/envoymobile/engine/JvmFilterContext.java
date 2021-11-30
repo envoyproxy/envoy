@@ -211,22 +211,40 @@ class JvmFilterContext {
    * @param message,      the error message.
    * @param attemptCount, the number of times an operation was attempted before firing this error.
    * @param streamIntel,  internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel,  final internal HTTP stream metrics, context, and other details.
    * @return Object,      not used in HTTP filters.
    */
-  public Object onError(int errorCode, byte[] message, int attemptCount, long[] streamIntel) {
+  public Object onError(int errorCode, byte[] message, int attemptCount, long[] streamIntel,
+                        long[] finalStreamIntel) {
     String errorMessage = new String(message);
-    filter.onError(errorCode, errorMessage, attemptCount, new EnvoyStreamIntelImpl(streamIntel));
+    filter.onError(errorCode, errorMessage, attemptCount, new EnvoyStreamIntelImpl(streamIntel),
+                   new EnvoyFinalStreamIntelImpl(finalStreamIntel));
     return null;
   }
 
   /**
    * Dispatches cancellation notice up to the platform.
    *
-   * @param streamIntel, internal HTTP stream metrics, context, and other details.
+   * @param streamIntel,  internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel, final internal HTTP stream metrics, context, and other details.
    * @return Object,     not used in HTTP filters.
    */
-  public Object onCancel(long[] streamIntel) {
-    filter.onCancel(new EnvoyStreamIntelImpl(streamIntel));
+  public Object onCancel(long[] streamIntel, long[] finalStreamIntel) {
+    filter.onCancel(new EnvoyStreamIntelImpl(streamIntel),
+                    new EnvoyFinalStreamIntelImpl(finalStreamIntel));
+    return null;
+  }
+
+  /**
+   * Dispatches stream completion notice up to the platform.
+   *
+   * @param streamIntel,  internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel, final internal HTTP stream metrics, context, and other details.
+   * @return Object,     not used in HTTP filters.
+   */
+  public Object onComplete(long[] streamIntel, long[] finalStreamIntel) {
+    filter.onComplete(new EnvoyStreamIntelImpl(streamIntel),
+                      new EnvoyFinalStreamIntelImpl(finalStreamIntel));
     return null;
   }
 
