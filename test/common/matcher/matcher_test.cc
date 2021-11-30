@@ -17,6 +17,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/matcher.pb.validate.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -75,6 +76,29 @@ matcher_tree:
   EXPECT_CALL(validation_visitor_,
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"))
       .Times(2);
+  auto match_tree = factory_.create(matcher);
+
+  const auto result = match_tree()->match(TestData());
+  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
+  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+}
+
+TEST_F(MatcherTest, TestAnyMatcher) {
+  const std::string yaml = R"EOF(
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: match!!
+  )EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
   auto match_tree = factory_.create(matcher);
 
   const auto result = match_tree()->match(TestData());
