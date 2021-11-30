@@ -31,8 +31,11 @@ public:
   MOCK_METHOD(MonotonicTime, startTimeMonotonic, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastDownstreamRxByteReceived, (), (const));
   MOCK_METHOD(void, setUpstreamTiming, (const UpstreamTiming&));
+  MOCK_METHOD(void, setUpstreamInfo, (std::shared_ptr<UpstreamInfo>));
+  MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
+  MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
   MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
-  MOCK_METHOD(const UpstreamTiming&, upstreamTiming, (), (const));
+  MOCK_METHOD(OptRef<const UpstreamTiming>, upstreamTiming, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, firstUpstreamTxByteSent, (), (const));
   MOCK_METHOD(void, onFirstUpstreamTxByteSent, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, lastUpstreamTxByteSent, (), (const));
@@ -51,7 +54,10 @@ public:
   MOCK_METHOD(void, addWireBytesReceived, (uint64_t));
   MOCK_METHOD(uint64_t, wireBytesReceived, (), (const));
   MOCK_METHOD(void, setRouteName, (absl::string_view route_name));
+  MOCK_METHOD(void, setVirtualClusterName,
+              (const absl::optional<std::string>& virtual_cluster_name));
   MOCK_METHOD(const std::string&, getRouteName, (), (const));
+  MOCK_METHOD(const absl::optional<std::string>&, virtualClusterName, (), (const));
   MOCK_METHOD(absl::optional<Http::Protocol>, protocol, (), (const));
   MOCK_METHOD(void, protocol, (Http::Protocol protocol));
   MOCK_METHOD(absl::optional<uint32_t>, responseCode, (), (const));
@@ -142,6 +148,7 @@ public:
   std::string filter_chain_name_;
   absl::optional<uint64_t> upstream_connection_id_;
   absl::optional<uint32_t> attempt_count_;
+  absl::optional<std::string> virtual_cluster_name_;
   DownstreamTiming downstream_timing_;
 };
 

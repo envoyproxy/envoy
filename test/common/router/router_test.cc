@@ -5912,6 +5912,9 @@ TEST_F(RouterTest, CanaryStatusTrue) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
+  const absl::optional<std::string> virtual_cluster_name =
+      absl::optional<std::string>("fake_virtual_cluster");
+  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -5949,6 +5952,9 @@ TEST_F(RouterTest, CanaryStatusFalse) {
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-alt-stat-name", "alt_stat"},
                                          {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
+  const absl::optional<std::string> virtual_cluster_name =
+      absl::optional<std::string>("fake_virtual_cluster");
+  EXPECT_CALL(callbacks_.stream_info_, setVirtualClusterName(virtual_cluster_name));
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
@@ -5977,6 +5983,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   Http::TestRequestHeaderMapImpl outgoing_headers;
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
   outgoing_headers.setHost(cm_.thread_local_cluster_.conn_pool_.host_->hostname_);
+  outgoing_headers.setForwardedHost(req_host);
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -6002,6 +6009,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
         EXPECT_EQ(host_address_, host->address());
       }));
   EXPECT_CALL(callbacks_.route_->route_entry_, autoHostRewrite()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_.route_->route_entry_, appendXfh()).WillOnce(Return(true));
   router_.decodeHeaders(incoming_headers, true);
   EXPECT_EQ(1U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());

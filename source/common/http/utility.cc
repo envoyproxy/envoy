@@ -387,6 +387,14 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
   headers.appendVia(via, ", ");
 }
 
+void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
+                              const bool append_xfh) {
+  if (append_xfh && !headers.getHostValue().empty()) {
+    headers.appendForwardedHost(headers.getHostValue(), ",");
+  }
+  headers.setHost(hostname);
+}
+
 std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
