@@ -18,7 +18,7 @@ class FileEventImpl : public FileEvent, ImplBase {
 public:
   FileEventImpl(DispatcherImpl& dispatcher, os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                 uint32_t events);
-  ~FileEventImpl() { activation_cb_->cancel(); }
+  ~FileEventImpl() override { activation_cb_->cancel(); }
 
   // Event::FileEvent
   void activate(uint32_t events) override;
