@@ -398,7 +398,7 @@ protected:
       if (flags.test(primary_ip_value)) {
         primary_1_array.push_back(createStringField(flags.test(primary_ip_type), "127.0.0.1"));
       } else {
-        primary_1_array.push_back(createStringField(flags.test(primary_ip_type), "bad ip foo"));
+        primary_1_array.push_back(createStringField(flags.test(primary_ip_type), ""));
       }
       // Port field.
       primary_1_array.push_back(createIntegerField(flags.test(primary_port_type), 22120));
@@ -412,7 +412,7 @@ protected:
             createStringField(replica_flags.test(replica_ip_type), "127.0.0.2"));
       } else {
         replica_1_array.push_back(
-            createStringField(replica_flags.test(replica_ip_type), "bad ip bar"));
+            createStringField(replica_flags.test(replica_ip_type), ""));
       }
       // Port field.
       replica_1_array.push_back(createIntegerField(replica_flags.test(replica_port_type), 22120));
@@ -661,6 +661,28 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
   cluster_->initialize([&]() -> void { initialized_.ready(); });
 
   expectHealthyHosts(std::get<3>(GetParam()));
+}
+
+TEST_F(RedisClusterTest, PrimaryAddressAsHostname) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica_resolved_addresses{"127.0.1.2"};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com",
+                          resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() -> void { initialized_.ready(); });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                          primary_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                          replica_resolved_addresses);
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
 }
 
 TEST_F(RedisClusterTest, EmptyDnsResponse) {
