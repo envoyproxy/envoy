@@ -236,7 +236,7 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time,
     if (global_timeout > 0) {
       if (elapsed_time >= global_timeout) {
         // We are out of time, but 0 would be an infinite timeout. So instead we send a 1ms timeout
-        // and assume the timer will fire to end the request soon.
+        // and assume the timers armed by onRequestComplete() will fire very soon.
         expected_timeout = 1;
       } else {
         expected_timeout = std::min(expected_timeout, global_timeout - elapsed_time);
@@ -1724,9 +1724,15 @@ void Filter::doRetry() {
           "envoy.reloadable_features.update_expected_rq_timeout_on_retry")) {
     // If not enabled, then it will re-use the previous headers (if any.)
 
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    std::chrono::milliseconds elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+    // The request timeouts only account for time elapsed since the downstream request completed
+    // which might not have happened yet (in which case zero time has elapsed.)
+    std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
+
+    if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+      Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+      elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+    }
 
     FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
                                      *downstream_headers_, !config_.suppress_envoy_headers_,
