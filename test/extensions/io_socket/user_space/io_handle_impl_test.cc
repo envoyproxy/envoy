@@ -1061,18 +1061,25 @@ TEST_F(IoHandleImplTest, ActivateEvent) {
 // Connection object does not expect any further event be invoked because the connection in destroy
 // pending state can not support read/write.
 TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
-  testing::MockFunction<void()> check;
-  schedulable_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  testing::MockFunction<void()> check_event_cb;
+  testing::MockFunction<void()> check_schedulable_cb_destroyed;
+
+  schedulable_cb_ =
+      new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, &check_schedulable_cb_destroyed);
   io_handle_->initializeFileEvent(
-      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { check.Call(); },
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { check_event_cb.Call(); },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
   EXPECT_FALSE(schedulable_cb_->enabled());
   io_handle_->activateFileEvents(Event::FileReadyType::Read);
   EXPECT_TRUE(schedulable_cb_->enabled());
 
-  EXPECT_CALL(check, Call()).Times(0);
-  io_handle_->close();
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  {
+    EXPECT_CALL(check_event_cb, Call()).Times(0);
+    EXPECT_CALL(check_schedulable_cb_destroyed, Call());
+    io_handle_->close();
+    // Verify that the schedulable_cb is destroyed along with close(), not later.
+    testing::Mock::VerifyAndClearExpectations(&check_schedulable_cb_destroyed);
+  }
 }
 
 TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
