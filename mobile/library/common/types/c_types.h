@@ -141,7 +141,8 @@ typedef struct {
 } envoy_error;
 
 /**
- * Contains internal HTTP stream metrics, context, and other details.
+ * Contains internal HTTP stream metrics, context, and other details which are
+ * sent with most callbacks.
  *
  * Note these values may change over the lifecycle of a stream.
  */
@@ -153,6 +154,44 @@ typedef struct {
   // The number of internal attempts to carry out a request/operation. 0 if not present.
   uint64_t attempt_count;
 } envoy_stream_intel;
+
+/**
+ * Contains internal HTTP stream metrics which sent at stream end.
+ */
+typedef struct {
+  // The time the request started, in ms since the epoch.
+  uint64_t request_start_ms;
+  // The time the DNS resolution for this request started, in ms since the epoch.
+  uint64_t dns_start_ms;
+  // The time the DNS resolution for this request completed, in ms since the epoch.
+  uint64_t dns_end_ms;
+  // The time the upstream connection started, in ms since the epoch.
+  // This may not be set if socket_reused is false.
+  uint64_t connect_start_ms;
+  // The time the upstream connection completed, in ms since the epoch.
+  // This may not be set if socket_reused is false.
+  uint64_t connect_end_ms;
+  // The time the SSL handshake started, in ms since the epoch.
+  // This may not be set if socket_reused is false.
+  uint64_t ssl_start_ms;
+  // The time the SSL handshake completed, in ms since the epoch.
+  // This may not be set if socket_reused is false.
+  uint64_t ssl_end_ms;
+  // The time the first byte of the request was sent upstream, in ms since the epoch.
+  uint64_t sending_start_ms;
+  // The time the last byte of the request was sent upstream, in ms since the epoch.
+  uint64_t sending_end_ms;
+  // The time the first byte of the response was received, in ms since the epoch.
+  uint64_t response_start_ms;
+  // The time the last byte of the request was received, in ms since the epoch.
+  uint64_t request_end_ms;
+  // True if the upstream socket had been used previously.
+  uint64_t socket_reused;
+  // The number of bytes sent upstream.
+  uint64_t sent_byte_count;
+  // The number of bytes received from upstream.
+  uint64_t received_byte_count;
+} envoy_final_stream_intel;
 
 #ifdef __cplusplus
 extern "C" { // utility functions
@@ -298,12 +337,13 @@ typedef void* (*envoy_on_trailers_f)(envoy_headers trailers, envoy_stream_intel 
  *
  * @param envoy_error, the error received/caused by the async HTTP stream.
  * @param stream_intel, contains internal stream metrics, context, and other details.
+ * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
  */
 typedef void* (*envoy_on_error_f)(envoy_error error, envoy_stream_intel stream_intel,
-                                  void* context);
+                                  envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Callback signature for when an HTTP stream bi-directionally completes without error.
@@ -311,11 +351,13 @@ typedef void* (*envoy_on_error_f)(envoy_error error, envoy_stream_intel stream_i
  * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
  *
  * @param stream_intel, contains internal stream metrics, context, and other details.
+ * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_complete_f)(envoy_stream_intel stream_intel, void* context);
+typedef void* (*envoy_on_complete_f)(envoy_stream_intel stream_intel,
+                                     envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Callback signature for when an HTTP stream is cancelled.
@@ -323,11 +365,13 @@ typedef void* (*envoy_on_complete_f)(envoy_stream_intel stream_intel, void* cont
  * This is a TERMINAL callback. Exactly one terminal callback will be called per stream.
  *
  * @param stream_intel, contains internal stream metrics, context, and other details.
+ * @param final_stream_intel, contains final internal stream metrics, context, and other details.
  * @param context, contains the necessary state to carry out platform-specific dispatch and
  * execution.
  * @return void*, return context (may be unused).
  */
-typedef void* (*envoy_on_cancel_f)(envoy_stream_intel stream_intel, void* context);
+typedef void* (*envoy_on_cancel_f)(envoy_stream_intel stream_intel,
+                                   envoy_final_stream_intel final_stream_intel, void* context);
 
 /**
  * Called when the envoy engine is exiting.

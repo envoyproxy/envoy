@@ -18,6 +18,29 @@
 
 namespace Envoy {
 namespace Http {
+namespace {
+
+void setFromOptional(uint64_t& to_set, const absl::optional<MonotonicTime>& time) {
+  if (time.has_value()) {
+    to_set = std::chrono::duration_cast<std::chrono::milliseconds>(time.value().time_since_epoch())
+                 .count();
+  }
+}
+
+void setFromOptional(long& to_set, absl::optional<std::chrono::nanoseconds> time, long offset) {
+  if (time.has_value()) {
+    to_set = offset + std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+  }
+}
+
+void setFromOptional(long& to_set, const absl::optional<MonotonicTime>& time) {
+  if (time.has_value()) {
+    to_set = std::chrono::duration_cast<std::chrono::milliseconds>(time.value().time_since_epoch())
+                 .count();
+  }
+}
+
+} // namespace
 
 /**
  * IMPORTANT: stream closure semantics in envoy mobile depends on the fact that the HCM fires a
@@ -160,6 +183,29 @@ void Client::DirectStreamCallbacks::sendTrailersToBridge(const ResponseTrailerMa
   onComplete();
 }
 
+void Client::DirectStreamCallbacks::setFinalStreamIntel(envoy_final_stream_intel& final_intel) {
+  memset(&final_intel, 0, sizeof(envoy_final_stream_intel));
+
+  final_intel.request_start_ms = direct_stream_.latency_info_.request_start_ms;
+  if (direct_stream_.latency_info_.upstream_info_) {
+    const StreamInfo::UpstreamTiming& timing =
+        direct_stream_.latency_info_.upstream_info_->upstreamTiming();
+    setFromOptional(final_intel.sending_start_ms, timing.first_upstream_tx_byte_sent_);
+    setFromOptional(final_intel.sending_end_ms, timing.last_upstream_tx_byte_sent_);
+    setFromOptional(final_intel.response_start_ms, timing.first_upstream_rx_byte_received_);
+    setFromOptional(final_intel.connect_start_ms, timing.upstream_connect_start_);
+    setFromOptional(final_intel.connect_end_ms, timing.upstream_connect_complete_);
+    setFromOptional(final_intel.ssl_start_ms, timing.upstream_connect_complete_);
+    setFromOptional(final_intel.ssl_end_ms, timing.upstream_handshake_complete_);
+  }
+  final_intel.dns_start_ms = direct_stream_.latency_info_.dns_start_ms;
+  final_intel.dns_end_ms = direct_stream_.latency_info_.dns_end_ms;
+  final_intel.request_end_ms = direct_stream_.latency_info_.request_end_ms;
+  final_intel.socket_reused = 0; // TODO(alyssawilk) set.
+  final_intel.sent_byte_count = direct_stream_.latency_info_.sent_byte_count;
+  final_intel.received_byte_count = direct_stream_.latency_info_.received_byte_count;
+}
+
 void Client::DirectStreamCallbacks::resumeData(int32_t bytes_to_send) {
   ASSERT(explicit_flow_control_);
   ASSERT(bytes_to_send > 0);
@@ -209,7 +255,10 @@ void Client::DirectStreamCallbacks::onComplete() {
   } else {
     http_client_.stats().stream_failure_.inc();
   }
-  bridge_callbacks_.on_complete(streamIntel(), bridge_callbacks_.context);
+
+  envoy_final_stream_intel final_intel;
+  setFinalStreamIntel(final_intel);
+  bridge_callbacks_.on_complete(streamIntel(), final_intel, bridge_callbacks_.context);
 }
 
 void Client::DirectStreamCallbacks::onError() {
@@ -236,7 +285,9 @@ void Client::DirectStreamCallbacks::onError() {
             direct_stream_.stream_handle_);
   http_client_.stats().stream_failure_.inc();
 
-  bridge_callbacks_.on_error(error_.value(), streamIntel(), bridge_callbacks_.context);
+  envoy_final_stream_intel final_intel;
+  setFinalStreamIntel(final_intel);
+  bridge_callbacks_.on_error(error_.value(), streamIntel(), final_intel, bridge_callbacks_.context);
 }
 
 void Client::DirectStreamCallbacks::onSendWindowAvailable() {
@@ -246,9 +297,12 @@ void Client::DirectStreamCallbacks::onSendWindowAvailable() {
 
 void Client::DirectStreamCallbacks::onCancel() {
   ScopeTrackerScopeState scope(&direct_stream_, http_client_.scopeTracker());
+
   ENVOY_LOG(debug, "[S{}] dispatching to platform cancel stream", direct_stream_.stream_handle_);
   http_client_.stats().stream_cancel_.inc();
-  bridge_callbacks_.on_cancel(streamIntel(), bridge_callbacks_.context);
+  envoy_final_stream_intel final_intel;
+  setFinalStreamIntel(final_intel);
+  bridge_callbacks_.on_cancel(streamIntel(), final_intel, bridge_callbacks_.context);
 }
 
 void Client::DirectStreamCallbacks::onHasBufferedData() {
@@ -274,6 +328,29 @@ void Client::DirectStream::saveLatestStreamIntel() {
   stream_intel_.connection_id = info.upstreamConnectionId().value_or(-1);
   stream_intel_.stream_id = static_cast<uint64_t>(stream_handle_);
   stream_intel_.attempt_count = info.attemptCount().value_or(0);
+  saveFinalStreamIntel();
+}
+
+void Client::DirectStream::saveFinalStreamIntel() {
+  const auto& info = request_decoder_->streamInfo();
+  latency_info_.request_start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                       info.startTimeMonotonic().time_since_epoch())
+                                       .count();
+  latency_info_.sent_byte_count = info.bytesSent();
+  latency_info_.received_byte_count = info.bytesReceived();
+  setFromOptional(latency_info_.request_end_ms, info.lastDownstreamRxByteReceived(),
+                  latency_info_.request_start_ms);
+  setFromOptional(latency_info_.dns_start_ms,
+                  request_decoder_->streamInfo().downstreamTiming().getValue(
+                      "envoy.dynamic_forward_proxy.dns_start_ms"));
+  setFromOptional(latency_info_.dns_end_ms,
+                  request_decoder_->streamInfo().downstreamTiming().getValue(
+                      "envoy.dynamic_forward_proxy.dns_end_ms"));
+  // TODO(alyssawilk) sort out why upstream info is problematic for cronvoy tests.
+  return;
+  if (info.upstreamInfo().has_value()) {
+    latency_info_.upstream_info_ = request_decoder_->streamInfo().upstreamInfo();
+  }
 }
 
 envoy_error Client::DirectStreamCallbacks::streamError() {
@@ -309,6 +386,7 @@ void Client::DirectStream::resetStream(StreamResetReason reason) {
   // This seems in line with other codec implementations, and so the assumption is that this is in
   // line with upstream expectations.
   // TODO(goaway): explore an upstream fix to get the HCM to clean up ActiveStream itself.
+  saveFinalStreamIntel();
   runResetCallbacks(reason);
   if (!parent_.getStream(stream_handle_, GetStreamFilters::ALLOW_FOR_ALL_STREAMS)) {
     // We don't assert here, because Envoy will issue a stream reset if a stream closes remotely

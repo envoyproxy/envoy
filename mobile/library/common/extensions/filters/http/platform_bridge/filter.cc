@@ -152,7 +152,8 @@ void PlatformBridgeFilter::onDestroy() {
   // If the filter chain is destroyed before a response is received, treat as cancellation.
   if (!response_filter_base_->state_.stream_complete_ && platform_filter_.on_cancel) {
     ENVOY_LOG(trace, "PlatformBridgeFilter({})->on_cancel", filter_name_);
-    platform_filter_.on_cancel(streamIntel(), platform_filter_.instance_context);
+    platform_filter_.on_cancel(streamIntel(), finalStreamIntel(),
+                               platform_filter_.instance_context);
   }
 
   // Allow nullptr as no-op only if nothing was initialized.
@@ -181,10 +182,19 @@ Http::LocalErrorStatus PlatformBridgeFilter::onLocalReply(const LocalReplyData& 
     envoy_data error_message = Data::Utility::copyToBridgeData(reply.details_);
     int32_t attempts = static_cast<int32_t>(info.attemptCount().value_or(0));
     platform_filter_.on_error({error_code, error_message, attempts}, streamIntel(),
-                              platform_filter_.instance_context);
+                              finalStreamIntel(), platform_filter_.instance_context);
   }
 
   return Http::LocalErrorStatus::ContinueAndResetStream;
+}
+
+envoy_final_stream_intel PlatformBridgeFilter::finalStreamIntel() {
+  RELEASE_ASSERT(decoder_callbacks_, "StreamInfo accessed before filter callbacks are set");
+  // FIXME: Stream handle cannot currently be set from the filter context.
+  envoy_final_stream_intel final_stream_intel;
+  memset(&final_stream_intel, 0, sizeof(final_stream_intel));
+  // TODO(alyssawilk) set stream intel from a shared helper function.
+  return final_stream_intel;
 }
 
 envoy_stream_intel PlatformBridgeFilter::streamIntel() {
@@ -463,7 +473,7 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
 
   if (platform_filter_.on_error) {
     platform_filter_.on_error({error_code, error_message, attempt_count}, streamIntel(),
-                              platform_filter_.instance_context);
+                              finalStreamIntel(), platform_filter_.instance_context);
   } else {
     release_envoy_data(error_message);
   }

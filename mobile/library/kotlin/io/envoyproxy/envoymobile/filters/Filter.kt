@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile
 
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterCallbacks
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
@@ -99,15 +100,21 @@ internal class EnvoyHTTPFilterAdapter(
     return arrayOf(0, trailers)
   }
 
-  override fun onError(errorCode: Int, message: String, attemptCount: Int, streamIntel: EnvoyStreamIntel) {
+  override fun onError(errorCode: Int, message: String, attemptCount: Int, streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), StreamIntel(streamIntel))
+      responseFilter.onError(EnvoyError(errorCode, message, attemptCount), StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
     }
   }
 
-  override fun onCancel(streamIntel: EnvoyStreamIntel) {
+  override fun onCancel(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
     (filter as? ResponseFilter)?.let { responseFilter ->
-      responseFilter.onCancel(StreamIntel(streamIntel))
+      responseFilter.onCancel(StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
+    }
+  }
+
+  override fun onComplete(streamIntel: EnvoyStreamIntel, finalStreamIntel: EnvoyFinalStreamIntel) {
+    (filter as? ResponseFilter)?.let { responseFilter ->
+      responseFilter.onComplete(StreamIntel(streamIntel), FinalStreamIntel(finalStreamIntel))
     }
   }
 

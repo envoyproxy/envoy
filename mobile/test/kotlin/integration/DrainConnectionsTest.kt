@@ -85,7 +85,7 @@ class DrainConnectionsTest {
         resultEndStream1 = endStream
         headersExpectation.countDown()
       }
-      .setOnError { _, _ -> fail("Unexpected error") }
+      .setOnError { _, _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 
@@ -101,7 +101,7 @@ class DrainConnectionsTest {
         resultEndStream2 = endStream
         headersExpectation.countDown()
       }
-      .setOnError { _, _ -> fail("Unexpected error") }
+      .setOnError { _, _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 

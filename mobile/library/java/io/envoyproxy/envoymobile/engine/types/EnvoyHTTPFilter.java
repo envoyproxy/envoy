@@ -110,13 +110,27 @@ public interface EnvoyHTTPFilter {
    *                      count for an error. This is different from 0, which intentionally conveys
    *                      that the action was _not_ executed.
    * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel,  contains final internal HTTP stream metrics, context, and other
+   *     details.
    */
-  void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel);
+  void onError(int errorCode, String message, int attemptCount, EnvoyStreamIntel streamIntel,
+               EnvoyFinalStreamIntel finalStreamIntel);
 
   /**
    * Called when the async HTTP stream is canceled.
    *
-   * @param streamIntel, contains internal HTTP stream metrics, context, and other details.
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel, contains final internal HTTP stream metrics, context, and other
+   *     details.
    */
-  void onCancel(EnvoyStreamIntel streamIntel);
+  void onCancel(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalSteamIntel);
+
+  /**
+   * Called when the async HTTP stream is complete.
+   *
+   * @param streamIntel,  contains internal HTTP stream metrics, context, and other details.
+   * @param finalStreamIntel, contains final internal HTTP stream metrics, context, and other
+   *     details.
+   */
+  void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalSteamIntel);
 }

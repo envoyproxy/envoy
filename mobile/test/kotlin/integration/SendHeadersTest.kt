@@ -85,7 +85,7 @@ class SendHeadersTest {
         resultEndStream = endStream
         headersExpectation.countDown()
       }
-      .setOnError { _, _ -> fail("Unexpected error") }
+      .setOnError { _, _, _ -> fail("Unexpected error") }
       .start()
       .sendHeaders(requestHeaders, true)
 

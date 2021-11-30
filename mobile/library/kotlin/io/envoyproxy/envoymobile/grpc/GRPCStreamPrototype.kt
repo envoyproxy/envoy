@@ -89,7 +89,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnError(
-    closure: (error: EnvoyError, streamIntel: StreamIntel) -> Unit
+    closure: (error: EnvoyError, streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnError(closure)
     return this
@@ -103,7 +103,7 @@ class GRPCStreamPrototype(
    * @return This stream, for chaining syntax.
    */
   fun setOnCancel(
-    closure: (streamIntel: StreamIntel) -> Unit
+    closure: (streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) -> Unit
   ): GRPCStreamPrototype {
     underlyingStream.setOnCancel(closure)
     return this

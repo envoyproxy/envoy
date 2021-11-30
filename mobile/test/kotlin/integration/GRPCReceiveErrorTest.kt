@@ -6,6 +6,7 @@ import io.envoyproxy.envoymobile.EnvoyError
 import io.envoyproxy.envoymobile.FilterDataStatus
 import io.envoyproxy.envoymobile.FilterHeadersStatus
 import io.envoyproxy.envoymobile.FilterTrailersStatus
+import io.envoyproxy.envoymobile.FinalStreamIntel
 import io.envoyproxy.envoymobile.GRPCClient
 import io.envoyproxy.envoymobile.GRPCRequestHeadersBuilder
 import io.envoyproxy.envoymobile.ResponseFilter
@@ -95,11 +96,12 @@ class GRPCReceiveErrorTest {
       return FilterTrailersStatus.Continue(trailers)
     }
 
-    override fun onError(error: EnvoyError, streamIntel: StreamIntel) {
+    override fun onError(error: EnvoyError, streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
       receivedError.countDown()
     }
+    override fun onComplete(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {}
 
-    override fun onCancel(streamIntel: StreamIntel) {
+    override fun onCancel(streamIntel: StreamIntel, finalStreamIntel: FinalStreamIntel) {
       notCancelled.countDown()
     }
   }
@@ -124,10 +126,12 @@ class GRPCReceiveErrorTest {
       .newGRPCStreamPrototype()
       .setOnResponseHeaders { _, _, _ -> }
       .setOnResponseMessage { _, _ -> }
-      .setOnError { _, _ ->
+      .setOnError { _, _, _ ->
         callbackReceivedError.countDown()
       }
-      .setOnCancel { fail("Unexpected call to onCancel response callback") }
+      .setOnCancel { _, _ ->
+        fail("Unexpected call to onCancel response callback")
+      }
       .start()
       .sendHeaders(requestHeader, false)
       .sendMessage(ByteBuffer.wrap(ByteArray(5)))
