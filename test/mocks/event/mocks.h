@@ -225,7 +225,7 @@ public:
 
 class MockSchedulableCallback : public SchedulableCallback {
 public:
-  MockSchedulableCallback(MockDispatcher* dispatcher);
+  MockSchedulableCallback(MockDispatcher* dispatcher, testing::MockFunction<void()>* destroy_cb = nullptr);
   ~MockSchedulableCallback() override;
 
   void invokeCallback() {
@@ -245,6 +245,7 @@ public:
 
 private:
   std::function<void()> callback_;
+  testing::MockFunction<void()>* destroy_cb_{nullptr};
 };
 
 class MockSignalEvent : public SignalEvent {
