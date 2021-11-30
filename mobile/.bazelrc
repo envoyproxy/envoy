@@ -29,6 +29,9 @@ build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
 build --copt -Wno-deprecated-declarations
 
+# Enable source map for debugging in IDEs
+build:dbg --copt="-fdebug-compilation-dir" --copt="/proc/self/cwd"
+
 # Default flags for builds targeting iOS
 # Manual stamping is necessary in order to get versioning information in the iOS
 # static framework.
