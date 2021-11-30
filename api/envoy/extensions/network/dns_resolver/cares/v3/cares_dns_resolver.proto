@@ -26,7 +26,7 @@ message CaresDnsResolverConfig {
   // If true use the resolvers listed in the resolvers field only if c-ares is unable to obtain a
   // nameserver from the network interface or the system's settings (e.g., /etc/resolv.conf).
   // Otherwise, the resolvers listed in the resolvers list will override the default system
-  // resolvers.
+  // resolvers. Only IPv4 addresses are used if set to true.
   // Defaults to false.
   bool use_resolvers_as_fallback = 3;
 
