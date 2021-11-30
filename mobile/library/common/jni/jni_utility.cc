@@ -113,11 +113,28 @@ jobject native_map_to_map(JNIEnv* env, envoy_map map) {
 }
 
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data) {
-  size_t data_length = static_cast<size_t>(env->GetDirectBufferCapacity(j_data));
-  return buffer_to_native_data(env, j_data, data_length);
+  // Returns -1 if the buffer is not a direct buffer.
+  jlong data_length = env->GetDirectBufferCapacity(j_data);
+
+  if (data_length < 0) {
+    jclass jcls_ByteBuffer = env->FindClass("java/nio/ByteBuffer");
+    // We skip checking hasArray() because only direct ByteBuffers or array-backed ByteBuffers
+    // are supported. We will crash here if this is an invalid buffer, but guards may be
+    // implemented in the JVM layer.
+    jmethodID jmid_array = env->GetMethodID(jcls_ByteBuffer, "array", "()[B");
+    jbyteArray array = static_cast<jbyteArray>(env->CallObjectMethod(j_data, jmid_array));
+    env->DeleteLocalRef(jcls_ByteBuffer);
+
+    envoy_data native_data = array_to_native_data(env, array);
+    env->DeleteLocalRef(array);
+    return native_data;
+  }
+
+  return buffer_to_native_data(env, j_data, static_cast<size_t>(data_length));
 }
 
 envoy_data buffer_to_native_data(JNIEnv* env, jobject j_data, size_t data_length) {
+  // Returns nullptr if the buffer is not a direct buffer.
   uint8_t* direct_address = static_cast<uint8_t*>(env->GetDirectBufferAddress(j_data));
 
   if (direct_address == nullptr) {
