@@ -12,7 +12,7 @@ namespace Network {
 class ClientConnectionFactory : public Config::UntypedFactory {
 public:
   ClientConnectionFactory() = default;
-  virtual ~ClientConnectionFactory() = default;
+  virtual ~ClientConnectionFactory() override = default;
 
   // Config::UntypedFactory
   std::string category() const override { return "network.connection"; }
