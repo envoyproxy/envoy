@@ -78,6 +78,7 @@ public:
   // See https://tools.ietf.org/html/rfc7541#appendix-A for static header indexes
   enum class StaticHeaderIndex : uint8_t {
     Unknown,
+    Authority = 1,
     MethodGet = 2,
     MethodPost = 3,
     Path = 4,
@@ -89,7 +90,6 @@ public:
     Status404 = 13,
     Status500 = 14,
     SchemeHttps = 7,
-    Host = 38,
   };
 
   enum class ErrorCode : uint8_t {

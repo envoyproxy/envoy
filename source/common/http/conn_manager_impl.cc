@@ -260,6 +260,13 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   read_callbacks_->connection().dispatcher().deferredDelete(stream.removeFromList(streams_));
 
+  // The response_encoder should never be dangling (unless we're destroying a
+  // stream we are recreating) as the codec level stream will either outlive the
+  // ActiveStream, or be alive in deferred deletion queue at this point.
+  if (stream.response_encoder_) {
+    stream.response_encoder_->getStream().removeCallbacks(stream);
+  }
+
   if (connection_idle_timer_ && streams_.empty()) {
     connection_idle_timer_->enableTimer(config_.idleTimeout().value());
   }
@@ -289,7 +296,7 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
       new_stream->state_.saw_connection_close_ = true;
       // Prevent erroneous debug log of closing due to incoming connection close header.
       drain_state_ = DrainState::Closing;
-    } else {
+    } else if (drain_state_ == DrainState::NotDraining) {
       startDrainSequence();
     }
     ENVOY_CONN_LOG(debug, "max requests per connection reached", read_callbacks_->connection());
@@ -1463,7 +1470,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
                    headers);
 
   // Now actually encode via the codec.
-  filter_manager_.streamInfo().onFirstDownstreamTxByteSent();
+  filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
+      connection_manager_.time_source_);
   response_encoder_->encodeHeaders(headers, end_stream);
 }
 

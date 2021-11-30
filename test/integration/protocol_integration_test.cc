@@ -617,7 +617,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
@@ -640,7 +640,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamByte
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyUpstreamBytesCount) {
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
@@ -685,7 +685,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   config_helper_.addFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   initialize();
@@ -751,7 +751,7 @@ TEST_P(ProtocolIntegrationTest, Retry) {
     cluster.mutable_track_cluster_stats()->set_request_response_sizes(true);
   });
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -1339,6 +1339,14 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate1xx) { testEnvoyProxying1xx(fal
 // Multiple 1xx after the request completes.
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
   testEnvoyProxying1xx(false, false, true);
+}
+
+TEST_P(ProtocolIntegrationTest, EnvoyProxying102) {
+  testEnvoyProxying1xx(false, false, false, "102");
+}
+
+TEST_P(ProtocolIntegrationTest, EnvoyProxying103) {
+  testEnvoyProxying1xx(false, false, false, "103");
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
@@ -3233,7 +3241,7 @@ TEST_P(ProtocolIntegrationTest, HeaderOnlyBytesCountUpstream) {
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(0, 0, false);
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(251, 38, 219, 18),
                                      BytesCountExpectation(168, 13, 168, 13));
@@ -3256,7 +3264,7 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountUpstream) {
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
   expectUpstreamBytesSentAndReceived(BytesCountExpectation(371, 158, 228, 27),
                                      BytesCountExpectation(277, 122, 168, 13));
@@ -3268,10 +3276,69 @@ TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountDownstream) {
     return;
   }
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   testRouterRequestAndResponseWithBody(100, 100, false);
   expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 231, 114, 84),
                                        BytesCountExpectation(177, 173, 68, 64));
+}
+
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseDownstream) {
+  // We only care about the downstream protocol.
+  if (upstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const int request_size = 100;
+  const int response_size = 100;
+
+  // Send first request on the connection
+  auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_one.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(177, 137, 68, 28), 0);
+
+  // Reuse connection, send the second request on the connection.
+  auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  checkSimpleRequestSuccess(request_size, response_size, response_two.get());
+  expectDownstreamBytesSentAndReceived(BytesCountExpectation(244, 182, 114, 38),
+                                       BytesCountExpectation(148, 137, 15, 27), 1);
+}
+
+TEST_P(ProtocolIntegrationTest, HeaderAndBodyWireBytesCountReuseUpstream) {
+  // We only care about the upstream protocol.
+  if (downstreamProtocol() != Http::CodecType::HTTP2) {
+    return;
+  }
+
+  useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto second_client = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const int request_size = 100;
+  const int response_size = 100;
+
+  // Send to the same upstream from the two clients.
+  auto response_one = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
+                                     BytesCountExpectation(223, 122, 114, 13), 0);
+
+  // Swap clients so the other connection is used to send the request.
+  std::swap(codec_client_, second_client);
+  auto response_two = sendRequestAndWaitForResponse(default_request_headers_, request_size,
+                                                    default_response_headers_, response_size, 0);
+  expectUpstreamBytesSentAndReceived(BytesCountExpectation(298, 158, 156, 27),
+                                     BytesCountExpectation(167, 119, 58, 10), 1);
+  second_client->close();
 }
 
 TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
@@ -3280,7 +3347,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountUpstream) {
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
@@ -3296,7 +3363,7 @@ TEST_P(ProtocolIntegrationTest, TrailersWireBytesCountDownstream) {
     return;
   }
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
@@ -3312,7 +3379,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
@@ -3326,7 +3393,7 @@ TEST_P(ProtocolIntegrationTest, DownstreamDisconnectBeforeRequestCompleteWireByt
     return;
   }
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
 
   testRouterDownstreamDisconnectBeforeRequestComplete(nullptr);
 
@@ -3340,7 +3407,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeRequestCompleteWireBytes
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
 
   testRouterUpstreamDisconnectBeforeRequestComplete();
 
@@ -3354,7 +3421,7 @@ TEST_P(ProtocolIntegrationTest, UpstreamDisconnectBeforeResponseCompleteWireByte
     return;
   }
   useAccessLog("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
-               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%UPSTREAM_HEADER_BYTES_SENT% %UPSTREAM_HEADER_BYTES_RECEIVED%");
 
   testRouterUpstreamDisconnectBeforeResponseComplete();
 
@@ -3368,7 +3435,7 @@ TEST_P(DownstreamProtocolIntegrationTest, BadRequest) {
     return;
   }
   useAccessLog("%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED% "
-               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%\n");
+               "%DOWNSTREAM_HEADER_BYTES_SENT% %DOWNSTREAM_HEADER_BYTES_RECEIVED%");
   initialize();
   std::string response;
   std::string full_request(100, '\r');

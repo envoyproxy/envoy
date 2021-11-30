@@ -166,7 +166,7 @@ void ConnPoolImplBase::attachStreamToClient(Envoy::ConnectionPool::ActiveClient&
                                             AttachContext& context) {
   ASSERT(client.state() == Envoy::ConnectionPool::ActiveClient::State::READY);
 
-  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
+  if (enforceMaxRequests() && !host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max streams overflow");
     onPoolFailure(client.real_host_description_, absl::string_view(),
                   ConnectionPool::PoolFailureReason::Overflow, context);
@@ -228,7 +228,7 @@ void ConnPoolImplBase::onStreamClosed(Envoy::ConnectionPool::ActiveClient& clien
   if (client.state() == ActiveClient::State::DRAINING && client.numActiveStreams() == 0) {
     // Close out the draining client if we no longer have active streams.
     client.close();
-  } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() != 0) {
+  } else if (client.state() == ActiveClient::State::BUSY && client.currentUnusedCapacity() > 0) {
     transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_stream) {
       onUpstreamReady();

@@ -31,7 +31,8 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -60,9 +61,14 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
+              "No connection socket.");
     return network_connection_->connectionSocket()->connectionInfoProvider();
   }
   Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    if (!network_connection_ || !network_connection_->connectionSocket()) {
+      return nullptr;
+    }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>

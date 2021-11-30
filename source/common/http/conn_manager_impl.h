@@ -222,9 +222,9 @@ private:
       ASSERT(!request_trailers_);
       request_trailers_ = std::move(request_trailers);
     }
-    void setContinueHeaders(Http::ResponseHeaderMapPtr&& continue_headers) override {
-      ASSERT(!continue_headers_);
-      continue_headers_ = std::move(continue_headers);
+    void setInformationalHeaders(Http::ResponseHeaderMapPtr&& informational_headers) override {
+      ASSERT(!informational_headers_);
+      informational_headers_ = std::move(informational_headers);
     }
     void setResponseHeaders(Http::ResponseHeaderMapPtr&& response_headers) override {
       // We'll overwrite the headers in the case where we fail the stream after upstream headers
@@ -242,8 +242,8 @@ private:
     Http::RequestTrailerMapOptRef requestTrailers() override {
       return makeOptRefFromPtr(request_trailers_.get());
     }
-    Http::ResponseHeaderMapOptRef continueHeaders() override {
-      return makeOptRefFromPtr(continue_headers_.get());
+    Http::ResponseHeaderMapOptRef informationalHeaders() override {
+      return makeOptRefFromPtr(informational_headers_.get());
     }
     Http::ResponseHeaderMapOptRef responseHeaders() override {
       return makeOptRefFromPtr(response_headers_.get());
@@ -255,7 +255,8 @@ private:
     void endStream() override {
       ASSERT(!state_.codec_saw_local_complete_);
       state_.codec_saw_local_complete_ = true;
-      filter_manager_.streamInfo().onLastDownstreamTxByteSent();
+      filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+          connection_manager_.time_source_);
       request_response_timespan_->complete();
       connection_manager_.doEndStream(*this);
     }
@@ -353,7 +354,7 @@ private:
     RequestHeaderMapPtr request_headers_;
     RequestTrailerMapPtr request_trailers_;
 
-    ResponseHeaderMapPtr continue_headers_;
+    ResponseHeaderMapPtr informational_headers_;
     ResponseHeaderMapPtr response_headers_;
     ResponseTrailerMapPtr response_trailers_;
 

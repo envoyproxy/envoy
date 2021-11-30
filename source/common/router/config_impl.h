@@ -572,6 +572,7 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
+  bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -726,6 +727,7 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
+    bool appendXfh() const override { return parent_->appendXfh(); }
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
@@ -882,6 +884,7 @@ private:
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
+  const bool append_xfh_;
   const std::string cluster_name_;
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
