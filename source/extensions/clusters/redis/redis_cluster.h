@@ -242,7 +242,10 @@ private:
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     Network::Address::InstanceConstSharedPtr
-    ProcessCluster(const NetworkFilters::Common::Redis::RespValue& value);
+    processClusterByIP(const NetworkFilters::Common::Redis::RespValue& value);
+    bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
+    void resolveClusterHostnames(ClusterSlotsPtr&& slots);
+    void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool emptyResponse);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
