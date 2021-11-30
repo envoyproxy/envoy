@@ -82,6 +82,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:cluster_real_priority_set_mocks",
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
+        "//test/mocks/upstream:eds_subscription_factory_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:od_cds_api_mocks",
@@ -152,6 +153,7 @@ envoy_cc_test(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:eds_subscription_factory_mocks",
         "//test/mocks/upstream:health_checker_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -186,6 +188,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:instance_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:eds_subscription_factory_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -198,6 +201,23 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "eds_speed_test_benchmark_test",
     benchmark_binary = "eds_speed_test",
+)
+
+envoy_cc_test(
+    name = "eds_subscription_factory_test",
+    srcs = ["eds_subscription_factory_test.cc"],
+    deps = [
+        "//source/common/upstream:eds_subscription_factory_lib",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/config:custom_config_validators_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+    ],
 )
 
 envoy_cc_test(

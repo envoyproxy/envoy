@@ -36,6 +36,7 @@
 #include "test/mocks/upstream/cluster_real_priority_set.h"
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/mocks/upstream/cluster_update_callbacks_handle.h"
+#include "test/mocks/upstream/eds_subscription_factory.h"
 #include "test/mocks/upstream/health_check_event_logger.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/host_set.h"

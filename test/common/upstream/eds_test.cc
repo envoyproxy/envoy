@@ -21,6 +21,7 @@
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/eds_subscription_factory.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
@@ -130,9 +131,9 @@ public:
         eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
-        singleton_manager_, tls_, validation_visitor_, *api_, options_, access_log_manager_);
-    cluster_ = std::make_shared<EdsClusterImpl>(server_context_, eds_cluster_, runtime_.loader(),
-                                                factory_context, std::move(scope), false);
+        singleton_manager_, tls_, validation_visitor_, *api_, options_);
+    cluster_ = std::make_shared<EdsClusterImpl>(eds_cluster_, runtime_, factory_context,
+                                                std::move(scope), false, eds_subscription_factory_);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = cm_.subscription_factory_.callbacks_;
   }
@@ -168,6 +169,7 @@ public:
   Api::ApiPtr api_;
   Server::MockOptions options_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  NiceMock<MockEdsSubscriptionFactory> eds_subscription_factory_;
 };
 
 class EdsWithHealthCheckUpdateTest : public EdsTest {

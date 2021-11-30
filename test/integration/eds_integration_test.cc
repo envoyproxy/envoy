@@ -437,5 +437,431 @@ TEST_P(EdsIntegrationTest, StatsReadyFilter) {
   cleanupUpstreamAndDownstream();
 }
 
+class EdsOverGrpcIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                   public HttpIntegrationTest {
+protected:
+  struct FakeUpstreamInfo {
+    FakeHttpConnectionPtr connection_;
+    FakeUpstream* upstream_{};
+    absl::flat_hash_map<std::string, FakeStreamPtr> stream_by_resource_name_;
+    static constexpr char default_stream_name[] = "default";
+    // Used for cases where only a single stream is needed.
+    FakeStreamPtr& defaultStream() { return stream_by_resource_name_[default_stream_name]; }
+  };
+
+  EdsOverGrpcIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion()),
+        codec_client_type_(envoy::type::v3::HTTP2) {
+    use_lds_ = true;
+  }
+
+  void TearDown() override {
+    resetConnections();
+    cleanUpXdsConnection();
+  }
+
+  void resetConnections() {
+    // First disconnect upstream connections to avoid FIN messages causing unexpected
+    // disconnects on the fake servers.
+    for (auto& host_upstream_info : hosts_upstreams_info_) {
+      resetFakeUpstreamInfo(host_upstream_info);
+    }
+  }
+
+  // A helper function to set the endpoints health status.
+  void setEndpointsHealthStatus(
+      const absl::flat_hash_set<uint32_t>& endpoints_idxs,
+      envoy::config::core::v3::HealthStatus health_status, absl::string_view collection_prefix,
+      absl::flat_hash_map<std::string, envoy::config::endpoint::v3::LbEndpoint>&
+          updated_endpoints) {
+    for (const auto endpoint_idx : endpoints_idxs) {
+      const std::string endpoint_name = absl::StrCat(collection_prefix, "endpoint", endpoint_idx);
+      envoy::config::endpoint::v3::LbEndpoint endpoint;
+      // Shift fake_upstreams_ by 1 (due to EDS fake upstream).
+      setUpstreamAddress(endpoint_idx + 1, endpoint);
+      endpoint.set_health_status(health_status);
+      updated_endpoints.emplace(endpoint_name, endpoint);
+    }
+  }
+
+  void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
+                    uint32_t degraded_endpoints, bool remaining_unhealthy = true,
+                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
+                    bool await_update = true) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("cluster_0");
+    if (overprovisioning_factor.has_value()) {
+      cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
+          overprovisioning_factor.value());
+    }
+    auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+    locality_lb_endpoints->set_priority(1);
+    for (uint32_t i = 0; i < total_endpoints; ++i) {
+      auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+      // Skip EDS upstream.
+      setUpstreamAddress(i + 1, *endpoint);
+      // First N endpoints are degraded, next M are healthy and the remaining endpoints are
+      // unhealthy or unknown depending on remaining_unhealthy.
+      if (i < degraded_endpoints) {
+        endpoint->set_health_status(envoy::config::core::v3::DEGRADED);
+      } else if (i >= healthy_endpoints + degraded_endpoints) {
+        endpoint->set_health_status(remaining_unhealthy ? envoy::config::core::v3::UNHEALTHY
+                                                        : envoy::config::core::v3::UNKNOWN);
+      }
+    }
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
+        {cluster_load_assignment}, {}, std::to_string(eds_version_++));
+    if (await_update) {
+      // Receive EDS ack.
+      EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, true));
+    }
+  }
+
+  void createUpstreams() override {
+    // Add EDS upstream.
+    addFakeUpstream(Http::CodecType::HTTP2);
+    HttpIntegrationTest::createUpstreams();
+    hosts_upstreams_info_.reserve(fake_upstreams_count_);
+    // Skip the first fake upstream as it is reserved for EDS.
+    for (size_t i = 1; i < fake_upstreams_.size(); ++i) {
+      FakeUpstreamInfo host_info;
+      host_info.upstream_ = &(*fake_upstreams_[i]);
+      hosts_upstreams_info_.emplace_back(std::move(host_info));
+    }
+  }
+
+  void initializeTest(bool http_active_hc, uint32_t num_clusters_to_add) {
+    setUpstreamCount(4);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    config_helper_.addConfigModifier([this, http_active_hc, num_clusters_to_add](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add a static EDS cluster.
+      auto* eds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      eds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      eds_cluster->set_name("eds_cluster");
+      eds_cluster->mutable_load_assignment()->set_cluster_name("eds_cluster");
+      ConfigHelper::setHttp2(*eds_cluster);
+      // Remove the static cluster (cluster_0) and set up CDS.
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
+      bootstrap.mutable_static_resources()->mutable_clusters()->erase(
+          bootstrap.mutable_static_resources()->mutable_clusters()->begin());
+      std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add;
+      for (uint32_t i = 0; i < num_clusters_to_add + 1; ++i) {
+        envoy::config::cluster::v3::Cluster cluster;
+        cluster_.set_name("cluster_" + std::to_string(i));
+        cluster_.set_type(envoy::config::cluster::v3::Cluster::EDS);
+        cluster_.mutable_connect_timeout()->CopyFrom(
+            Protobuf::util::TimeUtil::SecondsToDuration(5));
+        auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
+        eds_cluster_config->mutable_eds_config()->set_resource_api_version(
+            envoy::config::core::v3::ApiVersion::V3);
+        auto* api_config_source =
+            eds_cluster_config->mutable_eds_config()->mutable_api_config_source();
+        api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+        api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+        auto* grpc_service = api_config_source->add_grpc_services();
+        setGrpcService(*grpc_service, "eds_cluster", fake_upstreams_[0]->localAddress());
+        if (http_active_hc) {
+          auto* health_check = cluster_.add_health_checks();
+          health_check->mutable_timeout()->set_seconds(30);
+          // TODO(mattklein123): Consider using simulated time here.
+          health_check->mutable_interval()->CopyFrom(
+              Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+          health_check->mutable_no_traffic_interval()->CopyFrom(
+              Protobuf::util::TimeUtil::MillisecondsToDuration(100));
+          health_check->mutable_unhealthy_threshold()->set_value(1);
+          health_check->mutable_healthy_threshold()->set_value(1);
+          health_check->mutable_http_health_check()->set_path("/healthcheck");
+          health_check->mutable_http_health_check()->set_codec_client_type(codec_client_type_);
+        }
+        clusters_to_add_.push_back(cluster);
+      }
+      cds_helper_.setCds({cluster_});
+    });
+    // Set validate_clusters to false to allow us to reference a CDS cluster.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+    // Add the assignment and localities.
+    cluster_load_assignment_.set_cluster_name("cluster_0");
+    acceptXdsConnection();
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+                                        {"cluster_0"}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment_},
+        {cluster_load_assignment_}, {}, std::to_string(eds_version_++));
+    // Receive EDS ack.
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
+                                        std::to_string(eds_version_ - 1), {}, {}, {}, true));
+    // Wait for our statically specified listener to become ready, and register its port in the
+    // test framework's downstream listener port map.
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
+  }
+
+  void acceptXdsConnection() {
+    AssertionResult result = // xds_connection_ is filled with the new FakeHttpConnection.
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+  }
+
+  void resetFakeUpstreamInfo(FakeUpstreamInfo& upstream_info) {
+    if (upstream_info.connection_ == nullptr || upstream_info.upstream_ == nullptr) {
+      upstream_info.upstream_ = nullptr;
+      return;
+    }
+    AssertionResult result = upstream_info.connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = upstream_info.connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
+    upstream_info.connection_.reset();
+    upstream_info.upstream_ = nullptr;
+  }
+
+  void waitForHealthCheck(uint32_t upstream_info_idx) {
+    auto& host_info = hosts_upstreams_info_[upstream_info_idx];
+    if (host_info.connection_ == nullptr) {
+      ASSERT_TRUE(host_info.upstream_->waitForHttpConnection(*dispatcher_, host_info.connection_));
+    }
+    ASSERT_TRUE(host_info.connection_->waitForNewStream(*dispatcher_, host_info.defaultStream()));
+    ASSERT_TRUE(host_info.defaultStream()->waitForEndStream(*dispatcher_));
+
+    EXPECT_EQ(host_info.defaultStream()->headers().getPathValue(), "/healthcheck");
+    EXPECT_EQ(host_info.defaultStream()->headers().getMethodValue(), "GET");
+  }
+
+  void setEndpointsInPriorities(uint32_t first_priority, uint32_t second_priority,
+                                bool await_update = true) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("cluster_0");
+    {
+      for (uint32_t i = 0; i < first_priority; ++i) {
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        setUpstreamAddress(i, *endpoint);
+      }
+    }
+    {
+      for (uint32_t i = first_priority; i < first_priority + second_priority; ++i) {
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        locality_lb_endpoints->set_priority(1);
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        setUpstreamAddress(i, *endpoint);
+      }
+    }
+
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TypeUrl::get().ClusterLoadAssignment, {cluster_load_assignment},
+        {cluster_load_assignment}, {}, std::to_string(eds_version_++));
+
+    if (await_update) {
+      // Receive EDS ack.
+      EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment,
+                                          std::to_string(eds_version_ - 1), {}, {}, {}, true));
+    }
+  }
+
+  void initializeTest(bool http_active_hc) { initializeTest(http_active_hc, 0); }
+
+  envoy::type::v3::CodecClientType codec_client_type_{};
+  CdsHelper cds_helper_;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
+  envoy::config::cluster::v3::Cluster cluster_;
+  std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add_;
+  std::vector<FakeUpstreamInfo> hosts_upstreams_info_;
+  uint32_t eds_version_{};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EdsOverGrpcIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+// Validates that endpoints can be added and then moved to other priorities without causing crashes.
+// Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
+TEST_P(EdsOverGrpcIntegrationTest, Http2UpdatePriorities) {
+  initializeTest(true);
+  setEndpointsInPriorities(2, 2);
+  setEndpointsInPriorities(4, 0);
+  setEndpointsInPriorities(0, 4);
+}
+
+// Verify that a host stabilized via active health checking which is first removed from EDS and
+// then fails health checking is removed.
+TEST_P(EdsOverGrpcIntegrationTest, RemoveAfterHcFail) {
+  initializeTest(true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Wait for the first HC and verify the host is healthy.
+  waitForHealthCheck(0);
+  hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 1);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  // Clear out the host and verify the host is still healthy.
+  setEndpoints(0, 0, 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Fail HC and verify the host is gone.
+  waitForHealthCheck(0);
+  hosts_upstreams_info_[0].defaultStream()->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "503"}, {"connection", "close"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_healthy", 0);
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+}
+
+// Verifies that endpoints are ignored until health checked when configured to.
+TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingSuccessfulHc) {
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  // Endpoints are initially excluded.
+  initializeTest(true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
+// Verifies that endpoints are ignored until health checked when configured to when the first
+// health check fails.
+TEST_P(EdsOverGrpcIntegrationTest, EndpointWarmingFailedHc) {
+  cluster_.mutable_common_lb_config()->set_ignore_new_hosts_until_first_hc(true);
+  // Endpoints are initially excluded.
+  initializeTest(true);
+  setEndpoints(1, 0, 0, false);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_excluded")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  // Wait for the first HC and verify the host is healthy and that it is no longer being excluded.
+  // The other endpoint should still be excluded.
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_excluded", 0);
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+}
+
+// Validate that health status updates are consumed from EDS.
+TEST_P(EdsOverGrpcIntegrationTest, HealthUpdate) {
+  initializeTest(false);
+  // Initial state, no cluster members.
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Drop to 0/2 healthy endpoints.
+  setEndpoints(2, 0, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Increase to 1/2 healthy endpoints.
+  setEndpoints(2, 1, 0);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Add host and modify health to 2/3 healthy endpoints.
+  setEndpoints(3, 2, 0);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Modify health to 2/3 healthy and 1/3 degraded.
+  setEndpoints(3, 2, 1);
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.membership_change")->value());
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_degraded")->value());
+}
+
+// Validate that overprovisioning_factor update are picked up by Envoy.
+TEST_P(EdsOverGrpcIntegrationTest, OverprovisioningFactorUpdate) {
+  initializeTest(false);
+  // Default overprovisioning factor.
+  setEndpoints(4, 4, 0);
+  auto get_and_compare = [this](const uint32_t expected_factor) {
+    const auto& cluster_map = test_server_->server().clusterManager().clusters();
+    EXPECT_EQ(2, cluster_map.active_clusters_.size());
+    EXPECT_EQ(1, cluster_map.active_clusters_.count("cluster_0"));
+    const auto& cluster_ref = cluster_map.active_clusters_.find("cluster_0")->second;
+    const auto& hostset_per_priority = cluster_ref.get().prioritySet().hostSetsPerPriority();
+    EXPECT_EQ(2, hostset_per_priority.size());
+    const Envoy::Upstream::HostSetPtr& host_set = hostset_per_priority[0];
+    EXPECT_EQ(expected_factor, host_set->overprovisioningFactor());
+  };
+  get_and_compare(Envoy::Upstream::kDefaultOverProvisioningFactor);
+  // Use new overprovisioning factor 200.
+  setEndpoints(4, 4, 0, true, 200);
+  get_and_compare(200);
+}
+
+// Verifies that EDS update only triggers member update callbacks once per update.
+TEST_P(EdsOverGrpcIntegrationTest, BatchMemberUpdateCb) {
+  initializeTest(false);
+  uint32_t member_update_count{};
+  auto& priority_set = test_server_->server()
+                           .clusterManager()
+                           .clusters()
+                           .active_clusters_.find("cluster_0")
+                           ->second.get()
+                           .prioritySet();
+  // Keep track of how many times we're seeing a member update callback.
+  auto member_update_cb = priority_set.addMemberUpdateCb([&](const auto& hosts_added, const auto&) {
+    // We should see both hosts present in the member update callback.
+    EXPECT_EQ(2, hosts_added.size());
+    member_update_count++;
+  });
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(1, member_update_count);
+}
+
+TEST_P(EdsOverGrpcIntegrationTest, StatsReadyFilter) {
+  config_helper_.prependFilter("name: eds-ready-filter");
+  initializeTest(false);
+  // Initial state: no healthy endpoints
+  EXPECT_EQ(0, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().getStatusValue());
+  EXPECT_EQ("EDS not ready", response->body());
+  cleanupUpstreamAndDownstream();
+  // 2/2 healthy endpoints.
+  setEndpoints(2, 2, 0);
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/cluster1", "",
+                                                downstream_protocol_, version_, "foo.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("EDS is ready", response->body());
+  cleanupUpstreamAndDownstream();
+}
+
+// TEST_P(EdsOverGrpcIntegrationTest, ReuseMuxForMultipleClusters) {
+//   envoy::config::cluster::v3::Cluster cluster_1;
+//   envoy::config::cluster::v3::Cluster cluster_2;
+//   std::vector<envoy::config::cluster::v3::Cluster> clusters_to_add = {cluster_1, cluster_2};
+// }
+
 } // namespace
 } // namespace Envoy

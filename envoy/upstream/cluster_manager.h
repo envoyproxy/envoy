@@ -371,6 +371,13 @@ public:
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
   /**
+   * Obtain EDS subscription factory for the cluster manager.
+   *
+   * @return Config::SubscriptionFactory& EDS subscription factory.
+   */
+  virtual Config::SubscriptionFactory& edsSubscriptionFactory() PURE;
+
+  /**
    * Returns a struct with all the Stats::StatName objects needed by
    * Clusters. This helps factor out some relatively heavy name
    * construction which occur when there is a large CDS update during operation,

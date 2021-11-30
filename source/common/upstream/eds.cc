@@ -38,7 +38,7 @@ EdsClusterImpl::EdsClusterImpl(
   }
   const auto resource_name = getResourceName();
   subscription_ =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+      factory_context.clusterManager().edsSubscriptionFactory().subscriptionFromConfigSource(
           eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
           resource_decoder_, {});
 }
