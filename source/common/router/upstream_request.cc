@@ -434,6 +434,7 @@ void UpstreamRequest::onPoolReady(
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
+    stream_info_. // FIXME
   }
 
   StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();

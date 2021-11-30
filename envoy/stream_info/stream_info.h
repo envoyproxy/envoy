@@ -404,6 +404,9 @@ public:
    */
   virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
+
+  virtual void setUpstreamNumStreams(size_t num_streams);
+  virtual size_t upstreamNumStreams();
 };
 
 /**
