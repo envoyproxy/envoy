@@ -18,7 +18,7 @@ check_backend() {
         count=$(echo "$output" | grep -c "$expected" | xargs)
         if [ "$count" -eq 0 ]; then
             echo "Test fail: locality $expected is expected to be routed to."
-            exit 1
+            return 1
         fi
     done
 }
