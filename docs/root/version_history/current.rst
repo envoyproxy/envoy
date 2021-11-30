@@ -27,6 +27,7 @@ Bug Fixes
 *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 * active health checks: health checks using a TLS transport socket and secrets delivered via :ref:`SDS <config_secret_discovery_service>` will now wait until secrets are loaded before the first health check attempt. This should improve startup times by not having to wait for the :ref:`no_traffic_interval <envoy_v3_api_field_config.core.v3.HealthCheck.no_traffic_interval>` until the next attempt.
+* ext_authz: fix the ext_authz http filter to correctly set response flags to ``UAEX`` when a connection is denied.
 * ext_authz: fix the ext_authz network filter to correctly set response flag and code details to ``UAEX`` when a connection is denied.
 * listener: fixed the crash when updating listeners that do not bind to port.
 * tcp: fixed a bug where upstream circuit breakers applied HTTP per-request bounds to TCP connections.
