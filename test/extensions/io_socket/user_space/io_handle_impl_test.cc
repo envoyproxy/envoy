@@ -1072,6 +1072,7 @@ TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
 
   EXPECT_CALL(check, Call()).Times(0);
   io_handle_->close();
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
