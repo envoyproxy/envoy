@@ -75,8 +75,8 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
     return Http::HeaderMap::Iterate::Continue;
   });
   bool values_match = true;
-  rhs.iterate([&values_match, &lhs, &rhs, &rhs_keys]
-              (const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  rhs.iterate([&values_match, &lhs, &rhs,
+               &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const std::string key{header.key().getStringView()};
     // Compare with canonicalized multi-value headers. This ensures we respect order within
     // a header.
