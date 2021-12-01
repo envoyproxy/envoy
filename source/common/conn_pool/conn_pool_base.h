@@ -108,6 +108,7 @@ public:
   // (functionally) unlimited.
   // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
+  uint32_t configured_stream_limit_;
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
