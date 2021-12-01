@@ -14,7 +14,7 @@ public:
   BufferedMessageTtlManager(Event::Dispatcher& dispatcher, BufferedAsyncClientCallbacks& callbacks,
                             std::chrono::milliseconds message_ack_timeout)
       : dispatcher_(dispatcher), message_ack_timeout_(message_ack_timeout), callbacks_(callbacks),
-        timer_(dispatcher_.createTimer([this] { checkMessages(); })) {}
+        timer_(dispatcher_.createTimer([this] { checkExpiredMessages(); })) {}
 
   ~BufferedMessageTtlManager() { timer_->disableTimer(); }
 
@@ -32,7 +32,7 @@ public:
   }
 
 private:
-  void checkMessages() {
+  void checkExpiredMessages() {
     const auto now = dispatcher_.timeSource().monotonicTime();
 
     while (!deadline_.empty()) {
