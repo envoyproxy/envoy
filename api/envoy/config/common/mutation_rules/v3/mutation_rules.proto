@@ -10,24 +10,50 @@ option java_multiple_files = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // The HeaderMutationRules structure specifies what headers may be
-// manipulated by a processing filter. By default, all mutations are possible.
-// Various rules may be specified in order to restrict what a processing filter
-// can do. This structure is used by the External Processing Filter to make
+// manipulated by a processing filter. By default, all mutations are
+// possible. This rule makes it possible to disallow modifications of
+// certain filters according to the parameters below.
+//
+// This structure is used by the External Processing Filter to make
 // it possible to restrict what an external processing server can do.
+// Every attempt to add, change, append, or remove a header will be
+// tested against the rules here. Disallowed header mutations will be
+// ignored, and a DEBUG message logged, unless "disallow_is_error" is
+// set to true.
+// [#next-free-field: 8]
 message HeaderMutationRules {
-  // Prevent modification of headers that could affect routing decisions. This includes
-  // "host", ":authority", ":scheme", and ":method".
+  // Prevent modification of headers that could affect routing
+  // decisions. This includes "host", ":authority", ":scheme",
+  // and ":method".
   bool disallow_routing = 1;
 
-  // Prevent modification of envoy-internal headers. These typically start with
-  // "x-envoy" but this prefix may be overridden elsewhere.
+  // Prevent modification of envoy-internal headers. These typically
+  // start with "x-envoy" but this prefix may be overridden elsewhere.
   bool disallow_envoy = 2;
 
   // Prevent modification of any system header, defined as a header that
   // starts with a ":" character.
   bool disallow_system = 3;
 
-  // Prevent modification of any header at all. For the ext_proc filter, this means
-  // that a processing server may still choose to reject the entire request.
+  // Prevent modification of any header at all. For the ext_proc filter,
+  // this means that a processing server may still choose to reject the
+  // entire request.
   bool disallow_all = 4;
+
+  // If set, specifically allow any header that matches this regular
+  // expression. This overrides all other settings except for
+  // "disallow_expression".
+  string allow_expression = 5;
+
+  // If set, specifically disallow any header that matches this regular
+  // expression regardless of any other settings. This overrides all
+  // other settings.
+  string disallow_expression = 6;
+
+  // If the rules in this list cause a header mutation to be disallowed,
+  // which will cause the filter using this configuration to terminate the
+  // request with a 500 error. If false, which is the default, then any
+  // attempt to set, add, or modify a disallowed header will result in a
+  // DEBUG log message.
+  bool disallow_is_error = 7;
 }
