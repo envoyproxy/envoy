@@ -60,9 +60,6 @@ public:
     return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
   }
   void closeAllSockets() override {
-    if (bind_type_ == ListenerComponentFactory::BindType::ReusePort) {
-      return;
-    }
     for (auto& socket : sockets_) {
       socket->close();
     }
