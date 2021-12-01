@@ -69,12 +69,14 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.http_reject_path_with_fragment",
     "envoy.reloadable_features.http_strip_fragment_from_path_unsafe_if_disabled",
     "envoy.reloadable_features.http_transport_failure_reason_in_body",
+    "envoy.reloadable_features.internal_address",
     "envoy.reloadable_features.internal_redirects_with_body",
     "envoy.reloadable_features.listener_reuse_port_default_enabled",
     "envoy.reloadable_features.listener_wildcard_match_ip_family",
     "envoy.reloadable_features.new_tcp_connection_pool",
     "envoy.reloadable_features.no_chunked_encoding_header_for_304",
     "envoy.reloadable_features.preserve_downstream_scheme",
+    "envoy.reloadable_features.proxy_102_103",
     "envoy.reloadable_features.remove_legacy_json",
     "envoy.reloadable_features.require_strict_1xx_and_204_response_headers",
     "envoy.reloadable_features.send_strict_1xx_and_204_response_headers",
@@ -86,11 +88,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.use_observable_cluster_name",
     "envoy.reloadable_features.validate_connect",
     "envoy.reloadable_features.vhds_heartbeats",
-    "envoy.reloadable_features.upstream_http2_flood_checks",
     "envoy.restart_features.explicit_wildcard_resource",
     "envoy.restart_features.use_apple_api_for_dns_lookups",
     // Misplaced flags: please do not add flags to this section.
-    "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
     "envoy.reloadable_features.sanitize_http_header_referer",
     "envoy.reloadable_features.skip_dispatching_frames_for_closed_connection",
     // End misplaced flags: please do not add flags in this section.
@@ -116,6 +116,8 @@ constexpr const char* disabled_runtime_features[] = {
     "envoy.reloadable_features.enable_grpc_async_client_cache",
     // TODO(dmitri-d) reset to true to enable unified mux by default
     "envoy.reloadable_features.unified_mux",
+    // TODO(birenroy): flip to true in a future PR to enable by default
+    "envoy.reloadable_features.http2_new_codec_wrapper",
 };
 
 RuntimeFeatures::RuntimeFeatures() {

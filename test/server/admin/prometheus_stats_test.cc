@@ -148,9 +148,13 @@ TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
   Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
+  Stats::Tag tag3 = {"replace_problematic", R"(val"ue with\ some
+ issues)"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
+  tags.push_back(tag3);
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\","
+                         "replace_problematic=\"val\\\"ue with\\\\ some\\n issues\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }

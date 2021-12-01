@@ -1567,9 +1567,9 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class SinkPredicatesImpl : public SinkPredicates {
+class SinkPredicatesTest : public SinkPredicates {
 public:
-  ~SinkPredicatesImpl() override = default;
+  ~SinkPredicatesTest() override = default;
   absl::flat_hash_set<std::string>& sinkedStatNames() { return sinked_stat_names_; }
   bool includeCounter(const Counter&) override { return false; }
   bool includeGauge(const Gauge&) override { return false; }
@@ -1583,9 +1583,9 @@ private:
 };
 
 TEST_F(HistogramTest, ForEachSinkedHistogram) {
-  std::unique_ptr<Stats::SinkPredicatesImpl> moved_sink_predicates =
-      std::make_unique<SinkPredicatesImpl>();
-  SinkPredicatesImpl* sink_predicates = moved_sink_predicates.get();
+  std::unique_ptr<Stats::SinkPredicatesTest> moved_sink_predicates =
+      std::make_unique<SinkPredicatesTest>();
+  SinkPredicatesTest* sink_predicates = moved_sink_predicates.get();
   std::vector<std::reference_wrapper<Stats::Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Stats::Histogram>> unsinked_histograms;
 

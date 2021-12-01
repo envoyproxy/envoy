@@ -1,5 +1,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <regex>
@@ -685,6 +686,7 @@ private:
 };
 
 StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+  // TODO: Change this huge if-else ladder to use a switch case instead.
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -951,6 +953,20 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
             return stream_info.filterChainName();
           }
           return absl::nullopt;
+        });
+  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          return stream_info.virtualClusterName();
+        });
+  } else if (field_name == "TLS_JA3_FINGERPRINT") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+            result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
+          }
+          return result;
         });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
@@ -1335,14 +1351,10 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
-  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
-  // when converting that to a structure.
-  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
-  catch (EnvoyException& ex) {
-    return unspecifiedValue();
+  if (MessageUtil::jsonConvertValue(*proto, val)) {
+    return val;
   }
-  return val;
+  return unspecifiedValue();
 }
 
 // Given a token, extract the command string between parenthesis if it exists.

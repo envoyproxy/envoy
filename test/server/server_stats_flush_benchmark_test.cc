@@ -19,7 +19,7 @@
 
 namespace Envoy {
 
-class SinkPredicatesImpl : public Stats::SinkPredicates {
+class TestSinkPredicates : public Stats::SinkPredicates {
 public:
   bool includeCounter(const Stats::Counter&) override { return (++num_counters_) % 10 == 0; }
   bool includeGauge(const Stats::Gauge&) override { return (++num_gauges_) % 10 == 0; }
@@ -41,7 +41,7 @@ public:
       : pool_(symbol_table_), stats_allocator_(symbol_table_), stats_store_(stats_allocator_) {
     if (set_sink_predicates) {
       stats_store_.setSinkPredicates(
-          std::unique_ptr<Stats::SinkPredicates>{std::make_unique<SinkPredicatesImpl>()});
+          std::unique_ptr<Stats::SinkPredicates>{std::make_unique<TestSinkPredicates>()});
     }
 
     // Create counters

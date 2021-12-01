@@ -176,11 +176,12 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     set_headers_decompressed(false);
   }
 
-  if (status == enumToInt(Http::Code::Continue) && !decoded_100_continue_) {
+  const bool is_special_1xx = Http::HeaderUtility::isSpecial1xx(*headers);
+  if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
-    decoded_100_continue_ = true;
-    response_decoder_->decode100ContinueHeaders(std::move(headers));
-  } else if (status != enumToInt(Http::Code::Continue)) {
+    decoded_1xx_ = true;
+    response_decoder_->decode1xxHeaders(std::move(headers));
+  } else if (!is_special_1xx) {
     response_decoder_->decodeHeaders(std::move(headers),
                                      /*end_stream=*/fin);
     if (status == enumToInt(Http::Code::NotModified)) {

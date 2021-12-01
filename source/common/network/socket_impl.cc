@@ -30,6 +30,11 @@ SocketImpl::SocketImpl(IoHandlePtr&& io_handle,
     return;
   }
 
+  if (connection_info_provider_->remoteAddress() != nullptr) {
+    addr_type_ = connection_info_provider_->remoteAddress()->type();
+    return;
+  }
+
   // Should not happen but some tests inject -1 fds
   if (!io_handle_->isOpen()) {
     return;

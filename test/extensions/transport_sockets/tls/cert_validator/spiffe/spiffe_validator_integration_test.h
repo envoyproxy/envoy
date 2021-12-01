@@ -39,10 +39,11 @@ public:
   }
 
 protected:
+  void addStringMatcher(envoy::type::matcher::v3::StringMatcher const& matcher);
   bool allow_expired_cert_{};
   envoy::config::core::v3::TypedExtensionConfig* custom_validator_config_{nullptr};
   std::unique_ptr<ContextManager> context_manager_;
-  std::vector<envoy::type::matcher::v3::StringMatcher> san_matchers_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
   const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       std::get<1>(GetParam())};
 };
