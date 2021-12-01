@@ -30,8 +30,8 @@ jobs:
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazelisk shutdown
-          bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //:ios_dist
+          ./bazelw shutdown
+          ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //:ios_dist
         if: steps.check-cache.outputs.cache-hit != 'true'
         name: 'Build Envoy.framework distributable'
   swifthelloworld:
@@ -56,12 +56,12 @@ jobs:
         name: 'Short-circuit'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app
+        run: ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app
         name: 'Build swift app'
       # Run the app in the background and redirect logs.
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app &> /tmp/envoy.log &
+        run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/hello_world:app &> /tmp/envoy.log &
         name: 'Run swift app'
       - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
         name: 'Check connectivity'
@@ -90,12 +90,12 @@ jobs:
         name: 'Short-circuit'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app
+        run: ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app
         name: 'Build swift app'
       # Run the app in the background and redirect logs.
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app &> /tmp/envoy.log &
+        run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/swift/async_await:app &> /tmp/envoy.log &
         name: 'Run swift app'
       - run: sed '/\[2\] Uploaded 7 MB of data/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
         name: 'Check upload succeeded'
@@ -124,12 +124,12 @@ jobs:
         name: 'Short-circuit'
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/objective-c/hello_world:app
+        run: ./bazelw build --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/objective-c/hello_world:app
         name: 'Build objective-c app'
       # Run the app in the background and redirect logs.
       - env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bazelisk run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/objective-c/hello_world:app &> /tmp/envoy.log &
+        run: ./bazelw run --config=ios --config=remote-ci-macos --remote_header="Authorization=Bearer $GITHUB_TOKEN" //examples/objective-c/hello_world:app &> /tmp/envoy.log &
         name: 'Run objective-c app'
       - run: sed '/received headers with status 200/q' <(touch /tmp/envoy.log && tail -F /tmp/envoy.log)
         name: 'Check connectivity'

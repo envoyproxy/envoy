@@ -42,7 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel test \
+          ./bazelw test \
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-macos \
@@ -81,7 +81,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel test \
+          ./bazelw test \
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-macos \
@@ -125,7 +125,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazel test \
+          ./bazelw test \
             --test_output=all \
             --build_tests_only \
             --config=remote-ci-linux-clang \

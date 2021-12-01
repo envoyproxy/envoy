@@ -19,7 +19,7 @@ To get started using Tulsi with Envoy Mobile:
 
 1. Download and `install Tulsi <https://tulsi.bazel.build/docs/gettingstarted.html>`_
 2. Open the :repo:`envoy-mobile.tulsiproj <envoy-mobile.tulsiproj>` file
-3. From the ``Packages`` tab, click ``Bazel..`` and select the ``bazelw`` binary from at the root of the Envoy Mobile directory (to ensure you're building with the local version of Bazel)
+3. From the ``Packages`` tab, click ``Bazel..`` and select the ``bazelw`` binary from at the root of the Envoy Mobile directory (to ensure you're building with the correct version of Bazel)
 4. Click on the ``Configs`` tab in Tulsi, and click ``Generate``
 5. Open up the Xcode project, and build
 
