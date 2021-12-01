@@ -247,7 +247,8 @@ The following command operators are supported:
     the request was never attempted upstream.
 
   TCP
-    Not implemented ("-").
+    Number of times the connection request is attempted upstream. Note that an attempt count of '0'
+    means that the connection request was never attempted upstream.
 
   Renders a numeric value in typed JSON logs.
 
