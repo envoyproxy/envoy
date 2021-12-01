@@ -30,7 +30,7 @@ protected:
     ON_CALL(context_, listenerMetadata()).WillByDefault(ReturnRef(listener_metadata_));
     ON_CALL(context_, initManager()).WillByDefault(ReturnRef(init_manager_));
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
-    ON_CALL(context_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+    ON_CALL(context_, mainThreadDispatcher()).WillByDefault(ReturnRef(dispatcher_));
   }
 
   void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
@@ -101,6 +101,8 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
   // Check if the context still holds a valid Wasm even after the factory is destroyed.
   EXPECT_TRUE(context);
   EXPECT_TRUE(context->wasm());
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {

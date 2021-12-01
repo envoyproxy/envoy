@@ -50,6 +50,7 @@ public:
   MOCK_METHOD(Random::RandomGenerator&, randomGenerator, ());
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (const));
   MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(Stats::CustomStatNamespaces&, customStatNamespaces, ());
 
   testing::NiceMock<Filesystem::MockInstance> file_system_;
   Event::GlobalTimeSystem time_system_;
@@ -109,6 +110,10 @@ public:
   MOCK_METHOD(bool, supportsMmsg, (), (const));
   MOCK_METHOD(bool, supportsUdpGro, (), (const));
   MOCK_METHOD(bool, supportsIpTransparent, (), (const));
+  MOCK_METHOD(bool, supportsMptcp, (), (const));
+  MOCK_METHOD(bool, supportsGetifaddrs, (), (const));
+  MOCK_METHOD(void, setAlternateGetifaddrs, (AlternateGetifaddrs alternate_getifaddrs));
+  MOCK_METHOD(SysCallIntResult, getifaddrs, (InterfaceAddressVector & interfaces));
 
   // Map from (sockfd,level,optname) to boolean socket option.
   using SockOptKey = std::tuple<os_fd_t, int, int>;

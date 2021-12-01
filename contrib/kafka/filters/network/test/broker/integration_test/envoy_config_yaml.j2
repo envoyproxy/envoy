@@ -28,7 +28,6 @@ static_resources:
                 address: 127.0.0.1
                 port_value: {{ data['kafka_real_port'] }}
 admin:
-  access_log_path: /dev/null
   profile_path: /dev/null
   address:
     socket_address: { address: 127.0.0.1, port_value: {{ data['envoy_monitoring_port'] }} }

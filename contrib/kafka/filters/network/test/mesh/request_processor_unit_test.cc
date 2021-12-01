@@ -3,7 +3,9 @@
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/api_versions.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/metadata.h"
+#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce.h"
 #include "contrib/kafka/filters/network/source/mesh/request_processor.h"
+#include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -22,6 +24,11 @@ public:
   MOCK_METHOD(void, onRequestReadyForAnswer, ());
 };
 
+class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
+public:
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
+};
+
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(absl::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
@@ -33,8 +40,25 @@ class RequestProcessorTest : public testing::Test {
 protected:
   MockAbstractRequestListener listener_;
   MockUpstreamKafkaConfiguration configuration_;
-  RequestProcessor testee_ = {listener_, configuration_};
+  MockUpstreamKafkaFacade upstream_kafka_facade_;
+  RequestProcessor testee_ = {listener_, configuration_, upstream_kafka_facade_};
 };
+
+TEST_F(RequestProcessorTest, ShouldProcessProduceRequest) {
+  // given
+  const RequestHeader header = {PRODUCE_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const ProduceRequest data = {0, 0, {}};
+  const auto message = std::make_shared<Request<ProduceRequest>>(header, data);
+
+  InFlightRequestSharedPtr capture = nullptr;
+  EXPECT_CALL(listener_, onRequest(_)).WillOnce(testing::SaveArg<0>(&capture));
+
+  // when
+  testee_.onMessage(message);
+
+  // then
+  ASSERT_NE(std::dynamic_pointer_cast<ProduceRequestHolder>(capture), nullptr);
+}
 
 TEST_F(RequestProcessorTest, ShouldProcessMetadataRequest) {
   // given
@@ -70,9 +94,9 @@ TEST_F(RequestProcessorTest, ShouldProcessApiVersionsRequest) {
 
 TEST_F(RequestProcessorTest, ShouldHandleUnsupportedRequest) {
   // given
-  const RequestHeader header = {LIST_OFFSET_REQUEST_API_KEY, 0, 0, absl::nullopt};
-  const ListOffsetRequest data = {0, {}};
-  const auto message = std::make_shared<Request<ListOffsetRequest>>(header, data);
+  const RequestHeader header = {LIST_OFFSETS_REQUEST_API_KEY, 0, 0, absl::nullopt};
+  const ListOffsetsRequest data = {0, {}};
+  const auto message = std::make_shared<Request<ListOffsetsRequest>>(header, data);
 
   // when, then - exception gets thrown.
   EXPECT_THROW_WITH_REGEX(testee_.onMessage(message), EnvoyException, "unsupported");

@@ -1,14 +1,6 @@
-# Script for automating cleanup PR creation for deprecated runtime features
+# Bazel usage
 #
-# sh tools/deprecate_version/deprecate_version.sh
-#
-# Direct usage (not recommended):
-#
-# python tools/deprecate_version/deprecate_version.py
-#
-# e.g
-#
-#  python tools/deprecate_version/deprecate_version.py
+# bazel run //tools/deprecate_version:deprecate_version
 #
 # A GitHub access token must be set in GITHUB_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
@@ -30,6 +22,8 @@ import sys
 
 import github
 from git import Repo
+
+import envoy_repo
 
 try:
     input = raw_input  # Python 2
@@ -134,7 +128,7 @@ def create_issues(access_token, runtime_and_pr):
 def get_runtime_and_pr():
     """Returns a list of tuples of [runtime features to deprecate, PR, commit the feature was added]
     """
-    repo = Repo(os.getcwd())
+    repo = Repo(envoy_repo.PATH)
 
     # grep source code looking for reloadable features which are true to find the
     # PR they were added.

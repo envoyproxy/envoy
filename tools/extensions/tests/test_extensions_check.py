@@ -339,7 +339,8 @@ def test_extensions__check_metadata_categories(ext_cats, all_cats):
     if wrong_cats:
         assert (
             result
-            == [f'Unknown extension category for EXTENSION: {cat}' for cat in wrong_cats])
+            == [f'Unknown extension category for EXTENSION: {cat}. '
+                'Please add it to tools/extensions/extensions_check.py' for cat in wrong_cats])
         return
 
     assert result == []

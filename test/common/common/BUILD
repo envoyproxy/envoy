@@ -104,6 +104,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "dns_utils_test",
+    srcs = ["dns_utils_test.cc"],
+    deps = [
+        "//source/common/common:dns_utils_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "mem_block_builder_test",
     srcs = ["mem_block_builder_test.cc"],
     deps = ["//source/common/common:mem_block_builder_lib"],
@@ -140,16 +150,6 @@ envoy_cc_test(
     name = "hex_test",
     srcs = ["hex_test.cc"],
     deps = ["//source/common/common:hex_lib"],
-)
-
-envoy_cc_test(
-    name = "key_value_store_test",
-    srcs = ["key_value_store_test.cc"],
-    deps = [
-        "//source/common/common:key_value_store_lib",
-        "//test/mocks/event:event_mocks",
-        "//test/test_common:file_system_for_test_lib",
-    ],
 )
 
 envoy_cc_test(

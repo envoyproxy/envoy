@@ -34,7 +34,14 @@ public:
   CdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(),
                             ConfigHelper::discoveredClustersBootstrap(
-                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ? "GRPC" : "DELTA_GRPC")) {
+                                sotwOrDelta() == Grpc::SotwOrDelta::Sotw ||
+                                        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
+                                    ? "GRPC"
+                                    : "DELTA_GRPC")) {
+    if (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
+        sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
+      config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux", "true");
+    }
     use_lds_ = false;
     sotw_or_delta_ = sotwOrDelta();
   }
@@ -106,7 +113,7 @@ public:
     EXPECT_TRUE(xds_stream_->waitForHeadersComplete());
     Envoy::Http::LowerCaseString path_string(":path");
     std::string expected_method(
-        sotwOrDelta() == Grpc::SotwOrDelta::Sotw
+        sotwOrDelta() == Grpc::SotwOrDelta::Sotw || sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw
             ? "/envoy.service.cluster.v3.ClusterDiscoveryService/StreamClusters"
             : "/envoy.service.cluster.v3.ClusterDiscoveryService/DeltaClusters");
     EXPECT_EQ(xds_stream_->headers().get(path_string)[0]->value(), expected_method);
@@ -175,6 +182,40 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test the fast addition and removal of clusters when they use ThreadAwareLb.
+TEST_P(CdsIntegrationTest, CdsClusterWithThreadAwareLbCycleUpDownUp) {
+  // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
+  test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
+
+  // Tell Envoy that cluster_1 is gone.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {ClusterName1}, "42");
+  // Make sure that Envoy's ClusterManager has made use of the DiscoveryResponse that says cluster_1
+  // is gone.
+  test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
+
+  // Update cluster1_ to use MAGLEV load balancer policy.
+  cluster1_ = ConfigHelper::buildStaticCluster(
+      ClusterName1, fake_upstreams_[UpstreamIndex1]->localAddress()->ip()->port(),
+      Network::Test::getLoopbackAddressString(ipVersion()), "MAGLEV");
+
+  // Cyclically add and remove cluster with ThreadAwareLb.
+  for (int i = 42; i < 142; i += 2) {
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().Cluster, absl::StrCat(i), {}, {}, {}));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {cluster1_}, {cluster1_}, {}, absl::StrCat(i + 1));
+    EXPECT_TRUE(
+        compareDiscoveryRequest(Config::TypeUrl::get().Cluster, absl::StrCat(i + 1), {}, {}, {}));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TypeUrl::get().Cluster, {}, {}, {ClusterName1}, absl::StrCat(i + 2));
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
 // Tests adding a cluster, adding another, then removing the first.
 TEST_P(CdsIntegrationTest, TwoClusters) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
@@ -227,6 +268,7 @@ TEST_P(CdsIntegrationTest, TwoClusters) {
 // resources it already has: the reconnected stream need not start with a state-of-the-world update.
 TEST_P(CdsIntegrationTest, VersionsRememberedAfterReconnect) {
   SKIP_IF_XDS_IS(Grpc::SotwOrDelta::Sotw);
+  SKIP_IF_XDS_IS(Grpc::SotwOrDelta::UnifiedSotw);
 
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");

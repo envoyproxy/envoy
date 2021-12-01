@@ -136,11 +136,6 @@ static_resources:
                 address: front-proxy.yourcompany.net
                 port_value: 9400
                 protocol: TCP
-    # There are so few connections going back
-    # that we can get some imbalance. Until we come up
-    # with a better solution just limit the requests
-    # so we can cycle and get better spread.
-    max_requests_per_connection: 25000
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:
@@ -154,13 +149,21 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "front-proxy.yourcompany.net"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "front-proxy.yourcompany.net"
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
         explicit_http_config:
           http2_protocol_options: {}
+        common_http_protocol_options:
+          # There are so few connections going back
+          # that we can get some imbalance. Until we come up
+          # with a better solution just limit the requests
+          # so we can cycle and get better spread.
+          max_requests_per_connection: 25000
   - name: lightstep_saas
     type: LOGICAL_DNS
     lb_policy: ROUND_ROBIN
@@ -187,8 +190,10 @@ static_resources:
           validation_context:
             trusted_ca:
               filename: certs/cacert.pem
-            match_subject_alt_names:
-              exact: "collector-grpc.lightstep.com"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "collector-grpc.lightstep.com"
 flags_path: "/etc/envoy/flags"
 stats_sinks:
 - name: envoy.stat_sinks.statsd

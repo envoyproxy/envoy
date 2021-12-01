@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package utility_test.file_wip;
+
+import "udpa/annotations/status.proto";
+
+option (udpa.annotations.file_status).work_in_progress = true;
+
+message Foo {
+}

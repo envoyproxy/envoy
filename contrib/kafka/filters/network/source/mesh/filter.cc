@@ -14,9 +14,10 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
 
-KafkaMeshFilter::KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration)
+KafkaMeshFilter::KafkaMeshFilter(const UpstreamKafkaConfiguration& configuration,
+                                 UpstreamKafkaFacade& upstream_kafka_facade)
     : KafkaMeshFilter{std::make_shared<RequestDecoder>(std::vector<RequestCallbackSharedPtr>(
-          {std::make_shared<RequestProcessor>(*this, configuration)}))} {}
+          {std::make_shared<RequestProcessor>(*this, configuration, upstream_kafka_facade)}))} {}
 
 KafkaMeshFilter::KafkaMeshFilter(RequestDecoderSharedPtr request_decoder)
     : request_decoder_{request_decoder} {}

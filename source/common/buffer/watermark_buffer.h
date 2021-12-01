@@ -67,7 +67,7 @@ private:
   uint32_t low_watermark_{0};
   uint32_t overflow_watermark_{0};
   // Tracks the latest state of watermark callbacks.
-  // True between the time above_high_watermark_ has been called until above_high_watermark_ has
+  // True between the time above_high_watermark_ has been called until below_low_watermark_ has
   // been called.
   bool above_high_watermark_called_{false};
   // Set to true when above_overflow_watermark_ is called (and isn't cleared).
@@ -92,6 +92,11 @@ public:
   static BufferMemoryAccountSharedPtr createAccount(WatermarkBufferFactory* factory,
                                                     Http::StreamResetHandler& reset_handler);
   ~BufferMemoryAccountImpl() override {
+    // The buffer_memory_allocated_ should always be zero on destruction, even
+    // if we triggered a reset of the downstream. This is because the destructor
+    // will only trigger when no entities have a pointer to the account, meaning
+    // any slices which charge and credit the account should have credited the
+    // account when they were deleted, maintaining this invariant.
     ASSERT(buffer_memory_allocated_ == 0);
     ASSERT(!reset_handler_.has_value());
   }
@@ -129,15 +134,13 @@ private:
   // Returns the class index based off of the buffer_memory_allocated_
   // This can differ with current_bucket_idx_ if buffer_memory_allocated_ was
   // just modified.
-  // The class indexes returned are based on buckets of powers of two, if the
-  // account is above a minimum threshold. Returned class index range is [-1,
-  // NUM_MEMORY_CLASSES_).
-  int balanceToClassIndex();
+  // Returned class index, if present, is in the range [0, NUM_MEMORY_CLASSES_).
+  absl::optional<uint32_t> balanceToClassIndex();
   void updateAccountClass();
 
   uint64_t buffer_memory_allocated_ = 0;
   // Current bucket index where the account is being tracked in.
-  int current_bucket_idx_ = -1;
+  absl::optional<uint32_t> current_bucket_idx_{};
 
   WatermarkBufferFactory* factory_ = nullptr;
 
@@ -195,16 +198,19 @@ public:
   }
 
   BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) override;
+  uint64_t resetAccountsGivenPressure(float pressure) override;
 
   // Called by BufferMemoryAccountImpls created by the factory on account class
   // updated.
-  void updateAccountClass(const BufferMemoryAccountSharedPtr& account, int current_class,
-                          int new_class);
+  void updateAccountClass(const BufferMemoryAccountSharedPtr& account,
+                          absl::optional<uint32_t> current_class,
+                          absl::optional<uint32_t> new_class);
 
   uint32_t bitshift() const { return bitshift_; }
 
   // Unregister a buffer memory account.
-  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account, int current_class);
+  virtual void unregisterAccount(const BufferMemoryAccountSharedPtr& account,
+                                 absl::optional<uint32_t> current_class);
 
 protected:
   // Enable subclasses to inspect the mapping.

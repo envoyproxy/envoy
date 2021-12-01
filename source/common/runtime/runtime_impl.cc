@@ -6,7 +6,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -453,8 +452,8 @@ void LoaderImpl::onRtdsReady() {
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v3::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(
-          rtds_layer.rtds_config().resource_api_version(), validation_visitor, "name"),
+    : Envoy::Config::SubscriptionBase<envoy::service::runtime::v3::Runtime>(validation_visitor,
+                                                                            "name"),
       parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       stats_scope_(store_.createScope("runtime")), resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }) {}

@@ -9,7 +9,7 @@
 
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 #include "contrib/rocketmq_proxy/filters/network/test/utility.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -54,11 +54,11 @@ public:
       TestUtility::validate(proto_config_);
     }
     config_ = std::make_unique<TestConfigImpl>(proto_config_, factory_context_, stats_);
-    conn_manager_ =
-        std::make_unique<ConnectionManager>(*config_, factory_context_.dispatcher().timeSource());
+    conn_manager_ = std::make_unique<ConnectionManager>(
+        *config_, factory_context_.mainThreadDispatcher().timeSource());
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
     conn_manager_->onNewConnection();
-    current_ = factory_context_.dispatcher().timeSource().monotonicTime();
+    current_ = factory_context_.mainThreadDispatcher().timeSource().monotonicTime();
   }
 
   void initializeCluster() {

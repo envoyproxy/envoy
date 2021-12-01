@@ -1,5 +1,6 @@
 #include "source/common/formatter/substitution_formatter.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <regex>
@@ -716,6 +717,26 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
+  } else if (field_name == "UPSTREAM_WIRE_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->wireBytesReceived();
+        });
+  } else if (field_name == "UPSTREAM_HEADER_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->headerBytesReceived();
+        });
+  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->wireBytesReceived();
+        });
+  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->headerBytesReceived();
+        });
   } else if (field_name == "PROTOCOL") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -739,6 +760,26 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
   } else if (field_name == "BYTES_SENT") {
     field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+  } else if (field_name == "UPSTREAM_WIRE_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->wireBytesSent();
+        });
+  } else if (field_name == "UPSTREAM_HEADER_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getUpstreamBytesMeter()->headerBytesSent();
+        });
+  } else if (field_name == "DOWNSTREAM_WIRE_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->wireBytesSent();
+        });
+  } else if (field_name == "DOWNSTREAM_HEADER_BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.getDownstreamBytesMeter()->headerBytesSent();
+        });
   } else if (field_name == "DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });
@@ -911,6 +952,15 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
             return stream_info.filterChainName();
           }
           return absl::nullopt;
+        });
+  } else if (field_name == "TLS_JA3_FINGERPRINT") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
+            result = std::string(stream_info.downstreamAddressProvider().ja3Hash());
+          }
+          return result;
         });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
@@ -1295,14 +1345,10 @@ ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMa
   }
 
   ProtobufWkt::Value val;
-  // TODO(chaoqin-li1123): make this conversion return an error status instead of throwing.
-  // Access logger conversion from protobufs occurs via json intermediate state, which can throw
-  // when converting that to a structure.
-  TRY_NEEDS_AUDIT { MessageUtil::jsonConvertValue(*proto, val); }
-  catch (EnvoyException& ex) {
-    return unspecifiedValue();
+  if (MessageUtil::jsonConvertValue(*proto, val)) {
+    return val;
   }
-  return val;
+  return unspecifiedValue();
 }
 
 // Given a token, extract the command string between parenthesis if it exists.

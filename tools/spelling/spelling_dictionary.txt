@@ -11,23 +11,28 @@ ALS
 AMZ
 APC
 API
+ARRAYSIZE
 ARN
 ASAN
 ASCII
 ASM
+ASSERTed
 ASSERTs
 AST
 AWS
 BACKTRACE
 BSON
 BPF
+Repick
 btree
 CAS
 CB
+cbor
 CDN
 CDS
 CEL
 DSR
+DSS
 EBADF
 ENOTCONN
 EPIPE
@@ -42,6 +47,7 @@ RTP
 STATNAME
 SkyWalking
 TIDs
+Timedout
 WRSQ
 WASI
 ceil
@@ -124,6 +130,8 @@ FQDN
 FREEBIND
 FUZZER
 FUZZERS
+dereferencing
+dnsresolvers
 guarddog
 GC
 GCC
@@ -141,7 +149,6 @@ GSS
 GTEST
 GURL
 Grabbit
-Hashable
 HC
 HCM
 HDS
@@ -189,6 +196,7 @@ LEDS
 LEV
 LF
 LHS
+libsxg
 LLVM
 LPT
 LRS
@@ -196,7 +204,9 @@ Loggable
 MB
 MD
 MERCHANTABILITY
+Merkle
 MGET
+MPTCP
 MQ
 MSDN
 MSET
@@ -246,8 +256,10 @@ PEM
 PERF
 PGV
 PID
+PKCS12
 PKTINFO
 PNG
+Pointwise
 PostCBs
 PREBIND
 PRNG
@@ -324,6 +336,7 @@ STRLEN
 STS
 SVG
 SVID
+SXG
 Symbolizer
 TBD
 TCLAP
@@ -358,6 +371,7 @@ UUID
 UUIDs
 VC
 VCHAR
+VCL
 VH
 VHDS
 VLOG
@@ -473,6 +487,7 @@ bursty
 bytecode
 bytestream
 bytestring
+cacert
 cacheable
 cacheability
 callee
@@ -489,6 +504,7 @@ canonicalizer
 canonicalizing
 cardinality
 casted
+cfg
 charset
 checkin
 checksum
@@ -563,6 +579,7 @@ dedup
 dedupe
 deduplicate
 deduplicates
+deduplication
 deflater
 deletable
 deleter
@@ -625,6 +642,7 @@ evbuffer
 evbuffers
 evconnlistener
 evented
+eventfd
 evwatch
 exe
 execlp
@@ -689,6 +707,7 @@ handshaker
 hardcoded
 hardcodes
 hardcoding
+hashable
 hasher
 hashtagging
 hd
@@ -755,6 +774,7 @@ keyder
 kqueue
 kubernetes
 kv
+kvlist
 kvs
 lala
 latencies
@@ -766,6 +786,7 @@ lexically
 libc
 libevent
 libprotobuf
+librdkafka
 libtool
 libstdc
 lifecycle
@@ -803,6 +824,7 @@ megamiss
 mem
 memcmp
 memcpy
+memset
 memoize
 mergeable
 messagename
@@ -843,6 +865,7 @@ namespaced
 namespaces
 namespacing
 nan
+nanos
 natively
 ndk
 netblock
@@ -990,6 +1013,7 @@ rebalancer
 rebalancing
 rebuffer
 rebuilder
+receival
 reconnection
 recurse
 recv
@@ -1006,6 +1030,7 @@ refcount
 referencee
 referer
 refetch
+refvec
 regex
 regexes
 reified
@@ -1073,11 +1098,13 @@ sendto
 serializable
 serializer
 serv
+servercert
 setenv
 setsockopt
 sig
 sigaction
 sigactions
+sigaltstack
 siginfo
 signalstack
 siloed
@@ -1282,3 +1309,12 @@ zlib
 OBQ
 SemVer
 SCM
+SCTP
+CRLF
+clen
+crlf
+ep
+suri
+transid
+routable
+vhosts

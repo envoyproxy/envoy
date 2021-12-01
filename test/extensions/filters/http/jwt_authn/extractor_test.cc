@@ -54,6 +54,15 @@ providers:
     from_headers:
       - name: prefix-header
         value_prefix: '"CCCDDD"'
+  provider9:
+    issuer: issuer9
+    from_cookies:
+      - token-cookie
+      - token-cookie-2
+  provider10:
+    issuer: issuer10
+    from_cookies:
+      - token-cookie-3
 )";
 
 class ExtractorTest : public testing::Test {
@@ -263,6 +272,33 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
 
   tokens[0]->removeJwt(headers);
+}
+
+// Test extracting token from a cookie
+TEST_F(ExtractorTest, TestCookieToken) {
+  auto headers = TestRequestHeaderMapImpl{
+      {"cookie", "token-cookie=token-cookie-value; token-cookie-2=token-cookie-value-2"},
+      {"cookie", "token-cookie-3=\"token-cookie-value-3\""}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 3);
+
+  // only issuer9 has specified "token-cookie" cookie location.
+  EXPECT_EQ(tokens[0]->token(), "token-cookie-value");
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer9"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer10"));
+  tokens[0]->removeJwt(headers);
+
+  // only issuer9 has specified "token-cookie-2" cookie location.
+  EXPECT_EQ(tokens[1]->token(), "token-cookie-value-2");
+  EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer9"));
+  EXPECT_FALSE(tokens[1]->isIssuerAllowed("issuer10"));
+  tokens[1]->removeJwt(headers);
+
+  // only issuer10 has specified "token-cookie-3" cookie location.
+  EXPECT_EQ(tokens[2]->token(), "token-cookie-value-3");
+  EXPECT_TRUE(tokens[2]->isIssuerAllowed("issuer10"));
+  EXPECT_FALSE(tokens[2]->isIssuerAllowed("issuer9"));
+  tokens[2]->removeJwt(headers);
 }
 
 // Test extracting multiple tokens.

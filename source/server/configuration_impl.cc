@@ -192,9 +192,7 @@ WatchdogImpl::WatchdogImpl(const envoy::config::bootstrap::v3::Watchdog& watchdo
   actions_ = watchdog.actions();
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                         const Options& options)
-    : enable_deprecated_v2_api_(options.bootstrapVersion() == 2u) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   const auto& admin = bootstrap.admin();
 
   admin_.profile_path_ =
@@ -208,6 +206,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
         admin_.socket_options_,
         Network::SocketOptionFactory::buildLiteralOptions(admin.socket_options()));
   }
+  admin_.ignore_global_conn_limit_ = admin.ignore_global_conn_limit();
 
   if (!bootstrap.flags_path().empty()) {
     flags_path_ = bootstrap.flags_path();
@@ -218,16 +217,6 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
     if (layered_runtime_.layers().empty()) {
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
-  }
-  if (enable_deprecated_v2_api_) {
-    auto* enabled_deprecated_v2_api_layer = layered_runtime_.add_layers();
-    enabled_deprecated_v2_api_layer->set_name("enabled_deprecated_v2_api (auto-injected)");
-    auto* static_layer = enabled_deprecated_v2_api_layer->mutable_static_layer();
-    ProtobufWkt::Value val;
-    val.set_bool_value(true);
-    (*static_layer
-          ->mutable_fields())["envoy.test_only.broken_in_production.enable_deprecated_v2_api"] =
-        val;
   }
 }
 

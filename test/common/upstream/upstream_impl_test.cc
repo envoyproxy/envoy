@@ -39,6 +39,8 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/priority_set.h"
+#include "test/mocks/upstream/thread_aware_load_balancer.h"
+#include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
@@ -2079,6 +2081,138 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
       EnvoyException, "invalid value \"fakelbtype\"");
 }
 
+// load_balancing_policy should be used when lb_policy is set to LOAD_BALANCING_POLICY_CONFIG.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: LOAD_BALANCING_POLICY_CONFIG
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
+// load_balancing_policy should also be used when lb_policy is set to something else besides
+// LOAD_BALANCING_POLICY_CONFIG.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    lb_policy: ROUND_ROBIN
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
+// load_balancing_policy should also be used when lb_policy is omitted.
+TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    load_balancing_policy:
+      policies:
+        - typed_extension_config:
+            name: custom_lb
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+              value:
+                foo: "bar"
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 11001
+  )EOF";
+
+  NiceMock<MockTypedLoadBalancerFactory> factory;
+  EXPECT_CALL(factory, name()).WillRepeatedly(Return("custom_lb"));
+  Registry::InjectFactory<TypedLoadBalancerFactory> registered_factory(factory);
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), true);
+  cluster.initialize([] {});
+
+  EXPECT_EQ(1UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(LoadBalancerType::LoadBalancingPolicyConfig, cluster.info()->lbType());
+  EXPECT_TRUE(cluster.info()->addedViaApi());
+}
+
 TEST_F(StaticClusterImplTest, MalformedHostIP) {
   const std::string yaml = R"EOF(
     name: name
@@ -2175,6 +2309,32 @@ TEST_F(StaticClusterImplTest, SourceAddressPriority) {
     StaticClusterImpl cluster(config, runtime_, factory_context, std::move(scope), false);
     EXPECT_EQ(cluster_address, cluster.info()->sourceAddress()->ip()->addressAsString());
   }
+}
+
+// LEDS is not supported with a static cluster at the moment.
+TEST_F(StaticClusterImplTest, LedsUnsupported) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          leds_cluster_locality_config:
+            leds_collection_name: xdstp://foo/leds_collection_name
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
+  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      admin_, ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, stats_,
+      singleton_manager_, tls_, validation_visitor_, *api_, options_);
+  EXPECT_THROW_WITH_MESSAGE(
+      StaticClusterImpl cluster(cluster_config, runtime_, factory_context, std::move(scope), false),
+      EnvoyException,
+      "LEDS is only supported when EDS is used. Static cluster staticcluster cannot use LEDS.");
 }
 
 class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -2405,9 +2565,8 @@ class ClusterInfoImplTest : public testing::Test {
 public:
   ClusterInfoImplTest() : api_(Api::createApiForTest(stats_, random_)) {}
 
-  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml,
-                                                    bool avoid_boosting = true) {
-    cluster_config_ = parseClusterFromV3Yaml(yaml, avoid_boosting);
+  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+    cluster_config_ = parseClusterFromV3Yaml(yaml);
     scope_ = stats_.createScope(fmt::format("cluster.{}.", cluster_config_.alt_stat_name().empty()
                                                                ? cluster_config_.name()
                                                                : cluster_config_.alt_stat_name()));
@@ -2668,7 +2827,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
           option: "value"
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Didn't find a registered network or http filter or "
                             "protocol options implementation for name: 'no_such_filter'");
 }
@@ -2814,6 +2973,33 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
+TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+  const std::string yaml_base = R"EOF(
+  name: {}
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  )EOF";
+
+  const std::string yaml_set_max_connection_duration = yaml_base + R"EOF(
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http_protocol_options: {{}}
+      common_http_protocol_options:
+        max_connection_duration: {}
+  )EOF";
+
+  auto cluster1 = makeCluster(fmt::format(yaml_base, "cluster1"));
+  EXPECT_EQ(absl::nullopt, cluster1->info()->maxConnectionDuration());
+
+  auto cluster2 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster2", "9s"));
+  EXPECT_EQ(std::chrono::seconds(9), cluster2->info()->maxConnectionDuration());
+
+  auto cluster3 = makeCluster(fmt::format(yaml_set_max_connection_duration, "cluster3", "0s"));
+  EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
+}
+
 TEST_F(ClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name
@@ -2876,7 +3062,7 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   }
   {
     auto cluster2 = makeCluster(yaml + explicit_timeout_new);
-    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad, false), EnvoyException,
+    EXPECT_THROW_WITH_REGEX(makeCluster(yaml + explicit_timeout_bad), EnvoyException,
                             ".*Proto constraint validation failed.*");
   }
   const std::string no_timeout = R"EOF(
@@ -3134,13 +3320,13 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
     TestNetworkFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
         factory);
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                               "filter envoy.test.filter does not support protocol options");
   }
   {
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
-    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                               "filter envoy.test.filter does not support protocol options");
   }
 }
@@ -3368,9 +3554,13 @@ TEST_F(ClusterInfoImplTest, Http3) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
   )EOF",
                                                        Network::Address::IpVersion::v4);
   auto cluster1 = makeCluster(yaml);
@@ -3441,9 +3631,13 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3486,9 +3680,13 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -3504,6 +3702,8 @@ TEST_F(ClusterInfoImplTest, Http3Auto) {
           http3_protocol_options:
             quic_protocol_options:
               max_concurrent_streams: 2
+          alternate_protocols_cache_options:
+            name: default
         common_http_protocol_options:
           idle_timeout: 1s
   )EOF";
@@ -3543,9 +3743,13 @@ TEST_F(ClusterInfoImplTest, UseDownstreamHttpProtocolWithoutDowngrade) {
             validation_context:
               trusted_ca:
                 filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-              match_subject_alt_names:
-              - exact: localhost
-              - exact: 127.0.0.1
+              match_typed_subject_alt_names:
+              - matcher:
+                  exact: localhost
+                san_type: URI
+              - matcher:
+                  exact: 127.0.0.1
+                san_type: IP_ADDRESS
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
         "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -3940,58 +4144,6 @@ TEST(HostPartitionTest, PartitionHosts) {
   EXPECT_EQ(2, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
   EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
   EXPECT_EQ(hosts[4], update_hosts_params.excluded_hosts_per_locality->get()[1][1]);
-}
-
-// Verifies that partitionHosts correctly splits hosts based on their health flags when
-// "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster" is disabled.
-TEST(HostPartitionTest, PartitionHostsImmediateFailureExcludeDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster", "false"}});
-
-  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source)};
-
-  hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
-  hosts[2]->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
-  hosts[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-  hosts[4]->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
-  hosts[4]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-
-  auto hosts_per_locality =
-      makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2], hosts[3], hosts[4]}});
-
-  auto update_hosts_params =
-      HostSetImpl::partitionHosts(std::make_shared<const HostVector>(hosts), hosts_per_locality);
-
-  EXPECT_EQ(5, update_hosts_params.hosts->size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts->get().size());
-  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts->get()[0]);
-  EXPECT_EQ(1, update_hosts_params.degraded_hosts->get().size());
-  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts->get()[0]);
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts->get().size());
-  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts->get()[0]);
-
-  EXPECT_EQ(2, update_hosts_params.hosts_per_locality->get()[0].size());
-  EXPECT_EQ(3, update_hosts_params.hosts_per_locality->get()[1].size());
-
-  EXPECT_EQ(0, update_hosts_params.healthy_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.healthy_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[3], update_hosts_params.healthy_hosts_per_locality->get()[1][0]);
-
-  EXPECT_EQ(1, update_hosts_params.degraded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(0, update_hosts_params.degraded_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[1], update_hosts_params.degraded_hosts_per_locality->get()[0][0]);
-
-  EXPECT_EQ(0, update_hosts_params.excluded_hosts_per_locality->get()[0].size());
-  EXPECT_EQ(1, update_hosts_params.excluded_hosts_per_locality->get()[1].size());
-  EXPECT_EQ(hosts[2], update_hosts_params.excluded_hosts_per_locality->get()[1][0]);
 }
 
 TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {

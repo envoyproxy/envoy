@@ -10,7 +10,6 @@
 #include "source/common/network/utility.h"
 #include "source/server/active_tcp_listener.h"
 
-#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
@@ -95,7 +94,7 @@ TEST_F(ActiveTcpListenerTest, PopulateSNIWhenActiveTcpSocketTimeout) {
 
   absl::string_view server_name = "envoy.io";
   auto accepted_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-  accepted_socket->address_provider_->setRequestedServerName(server_name);
+  accepted_socket->connection_info_provider_->setRequestedServerName(server_name);
 
   // fake the socket is open.
   NiceMock<Network::MockIoHandle> io_handle;
@@ -189,7 +188,7 @@ TEST_F(ActiveTcpListenerTest, RedirectedRebalancer) {
       }));
   EXPECT_CALL(*test_filter, onAccept(_))
       .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
-        cb.socket().addressProvider().restoreLocalAddress(alt_address);
+        cb.socket().connectionInfoProvider().restoreLocalAddress(alt_address);
         return Network::FilterStatus::Continue;
       }));
   // Verify that listener1 hands off the connection by not creating network filter chain.

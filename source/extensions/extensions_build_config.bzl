@@ -133,8 +133,6 @@ EXTENSIONS = {
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
-    "envoy.filters.network.mysql_proxy":                          "//source/extensions/filters/network/mysql_proxy:config",
-    "envoy.filters.network.postgres_proxy":                       "//source/extensions/filters/network/postgres_proxy:config",
     "envoy.filters.network.ratelimit":                            "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.rbac":                                 "//source/extensions/filters/network/rbac:config",
     "envoy.filters.network.redis_proxy":                          "//source/extensions/filters/network/redis_proxy:config",
@@ -175,6 +173,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
+    "envoy.filters.thrift.header_to_metadata":          "//source/extensions/filters/network/thrift_proxy/filters/header_to_metadata:config",
     "envoy.filters.thrift.ratelimit":                   "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
 
     #
@@ -198,6 +197,7 @@ EXTENSIONS = {
     "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
     "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
+    "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
 
     #
     # Retry host predicates
@@ -293,9 +293,32 @@ EXTENSIONS = {
 
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+
+    #
+    # Key value store
+    #
+
+    "envoy.key_value.file_based":     "//source/extensions/key_value/file_based:config_lib",
+
+    #
+    # RBAC matchers
+    #
+
+    "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
+
+    #
+    # DNS Resolver
+    #
+
+    # c-ares DNS resolver extension is recommended to be enabled to maintain the legacy DNS resolving behavior.
+    "envoy.network.dns_resolver.cares":                "//source/extensions/network/dns_resolver/cares:config",
+
+    # apple DNS resolver extension is only needed in MacOS build plus one want to use apple library for DNS resolving.
+    "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which
 # need to directly reference Envoy extensions.
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]
 EXTENSION_PACKAGE_VISIBILITY = ["//:extension_library"]
+CONTRIB_EXTENSION_PACKAGE_VISIBILITY = ["//:contrib_library"]

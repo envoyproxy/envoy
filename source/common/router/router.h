@@ -51,6 +51,7 @@ public:
   struct TimeoutData {
     std::chrono::milliseconds global_timeout_{0};
     std::chrono::milliseconds per_try_timeout_{0};
+    std::chrono::milliseconds per_try_idle_timeout_{0};
   };
 
   struct HedgingParams {
@@ -146,7 +147,22 @@ public:
                                   bool per_try_timeout_hedging_enabled,
                                   bool respect_expected_rq_timeout);
 
-  static bool trySetGlobalTimeout(const Http::HeaderEntry* header_timeout_entry,
+  /**
+   * Try to parse a header entry that may have a timeout field
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @return result timeout value from header. It will return nullopt if parse failed.
+   */
+  static absl::optional<std::chrono::milliseconds>
+  tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry);
+
+  /**
+   * Try to set global timeout.
+   *
+   * @param header_timeout_entry header entry which may contain a timeout value.
+   * @param timeout timeout data to set from header timeout entry.
+   */
+  static void trySetGlobalTimeout(const Http::HeaderEntry& header_timeout_entry,
                                   TimeoutData& timeout);
 
   /**
@@ -242,8 +258,8 @@ class RouterFilterInterface {
 public:
   virtual ~RouterFilterInterface() = default;
 
-  virtual void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                            UpstreamRequest& upstream_request) PURE;
+  virtual void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                                    UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                                  UpstreamRequest& upstream_request, bool end_stream) PURE;
   virtual void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -256,12 +272,14 @@ public:
                                UpstreamRequest& upstream_request) PURE;
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
   virtual void onPerTryTimeout(UpstreamRequest& upstream_request) PURE;
+  virtual void onPerTryIdleTimeout(UpstreamRequest& upstream_request) PURE;
   virtual void onStreamMaxDurationReached(UpstreamRequest& upstream_request) PURE;
 
   virtual Http::StreamDecoderFilterCallbacks* callbacks() PURE;
   virtual Upstream::ClusterInfoConstSharedPtr cluster() PURE;
   virtual FilterConfig& config() PURE;
   virtual FilterUtility::TimeoutData timeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const PURE;
   virtual Http::RequestHeaderMap* downstreamHeaders() PURE;
   virtual Http::RequestTrailerMap* downstreamTrailers() PURE;
   virtual bool downstreamResponseStarted() const PURE;
@@ -283,10 +301,8 @@ class Filter : Logger::Loggable<Logger::Id::router>,
                public RouterFilterInterface {
 public:
   Filter(FilterConfig& config)
-      : config_(config), final_upstream_request_(nullptr),
-        downstream_100_continue_headers_encoded_(false), downstream_response_started_(false),
-        downstream_end_stream_(false), is_retry_(false),
-        attempting_internal_redirect_with_complete_stream_(false),
+      : config_(config), final_upstream_request_(nullptr), downstream_1xx_headers_encoded_(false),
+        downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
         request_buffer_overflowed_(false) {}
 
   ~Filter() override;
@@ -408,8 +424,8 @@ public:
     std::string value;
     const Network::Connection* conn = downstreamConnection();
     // Need to check for null conn if this is ever used by Http::AsyncClient in the future.
-    value = conn->addressProvider().remoteAddress()->asString() +
-            conn->addressProvider().localAddress()->asString();
+    value = conn->connectionInfoProvider().remoteAddress()->asString() +
+            conn->connectionInfoProvider().localAddress()->asString();
 
     const std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
     downstream_set_cookies_.emplace_back(
@@ -418,8 +434,8 @@ public:
   }
 
   // RouterFilterInterface
-  void onUpstream100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers,
-                                    UpstreamRequest& upstream_request) override;
+  void onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
+                            UpstreamRequest& upstream_request) override;
   void onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPtr&& headers,
                          UpstreamRequest& upstream_request, bool end_stream) override;
   void onUpstreamData(Buffer::Instance& data, UpstreamRequest& upstream_request,
@@ -431,11 +447,15 @@ public:
                        UpstreamRequest& upstream_request) override;
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override;
   void onPerTryTimeout(UpstreamRequest& upstream_request) override;
+  void onPerTryIdleTimeout(UpstreamRequest& upstream_request) override;
   void onStreamMaxDurationReached(UpstreamRequest& upstream_request) override;
   Http::StreamDecoderFilterCallbacks* callbacks() override { return callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override { return cluster_; }
   FilterConfig& config() override { return config_; }
   FilterUtility::TimeoutData timeout() override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> dynamicMaxStreamDuration() const override {
+    return dynamic_max_stream_duration_;
+  }
   Http::RequestHeaderMap* downstreamHeaders() override { return downstream_headers_; }
   Http::RequestTrailerMap* downstreamTrailers() override { return downstream_trailers_; }
   bool downstreamResponseStarted() const override { return downstream_response_started_; }
@@ -452,8 +472,8 @@ public:
 private:
   friend class UpstreamRequest;
 
-  RetryStatePtr retry_state_;
-
+  void onPerTryTimeoutCommon(UpstreamRequest& upstream_request, Stats::Counter& error_counter,
+                             const std::string& response_code_details);
   Stats::StatName upstreamZone(Upstream::HostDescriptionConstSharedPtr upstream_host);
   void chargeUpstreamCode(uint64_t response_status_code,
                           const Http::ResponseHeaderMap& response_headers,
@@ -497,13 +517,14 @@ private:
   // for the remaining upstream requests to return.
   void resetOtherUpstreams(UpstreamRequest& upstream_request);
   void sendNoHealthyUpstreamResponse();
-  bool setupRedirect(const Http::ResponseHeaderMap& headers, UpstreamRequest& upstream_request);
+  bool setupRedirect(const Http::ResponseHeaderMap& headers);
   bool convertRequestHeadersForInternalRedirect(Http::RequestHeaderMap& downstream_headers,
                                                 const Http::HeaderEntry& internal_redirect,
                                                 uint64_t status_code);
   void updateOutlierDetection(Upstream::Outlier::Result result, UpstreamRequest& upstream_request,
                               absl::optional<uint64_t> code);
   void doRetry();
+  void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -511,6 +532,7 @@ private:
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_.http_context_; }
 
+  RetryStatePtr retry_state_;
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_;
@@ -535,16 +557,16 @@ private:
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
   std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
-
+  // The stream lifetime configured by request header.
+  absl::optional<std::chrono::milliseconds> dynamic_max_stream_duration_;
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
-  bool downstream_100_continue_headers_encoded_ : 1;
+  bool downstream_1xx_headers_encoded_ : 1;
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_in_request_ : 1;
-  bool attempting_internal_redirect_with_complete_stream_ : 1;
   bool request_buffer_overflowed_ : 1;
   bool internal_redirects_with_body_enabled_ : 1;
   uint32_t attempt_count_{1};

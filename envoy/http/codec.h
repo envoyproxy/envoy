@@ -140,10 +140,11 @@ public:
 class ResponseEncoder : public virtual StreamEncoder {
 public:
   /**
-   * Encode 100-Continue headers.
-   * @param headers supplies the 100-Continue header map to encode.
+   * Encode supported 1xx headers.
+   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * @param headers supplies the 1xx header map to encode.
    */
-  virtual void encode100ContinueHeaders(const ResponseHeaderMap& headers) PURE;
+  virtual void encode1xxHeaders(const ResponseHeaderMap& headers) PURE;
 
   /**
    * Encode headers, optionally indicating end of stream. Response headers must
@@ -225,7 +226,7 @@ public:
   /**
    * @return StreamInfo::StreamInfo& the stream_info for this stream.
    */
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 };
 
 /**
@@ -235,10 +236,11 @@ public:
 class ResponseDecoder : public virtual StreamDecoder {
 public:
   /**
-   * Called with decoded 100-Continue headers.
-   * @param headers supplies the decoded 100-Continue headers map.
+   * Called with decoded 1xx headers.
+   * Currently 100-Continue, 102-Processing, and 103-Early-Data headers are supported.
+   * @param headers supplies the decoded 1xx headers map.
    */
-  virtual void decode100ContinueHeaders(ResponseHeaderMapPtr&& headers) PURE;
+  virtual void decode1xxHeaders(ResponseHeaderMapPtr&& headers) PURE;
 
   /**
    * Called with decoded headers, optionally indicating end of stream.
@@ -356,6 +358,11 @@ public:
    * @param the account to assign this stream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 /**
@@ -389,6 +396,14 @@ public:
    * @param ReceivedSettings the settings received from the peer.
    */
   virtual void onSettings(ReceivedSettings& settings) { UNREFERENCED_PARAMETER(settings); }
+
+  /**
+   * Fires when the MAX_STREAMS frame is received from the peer.
+   * This is an HTTP/3 frame, indicating the new maximum stream ID which can be opened.
+   * This may occur multiple times across the lifetime of an HTTP/3 connection.
+   * @param num_streams the number of streams now allowed to be opened.
+   */
+  virtual void onMaxStreamsChanged(uint32_t num_streams) { UNREFERENCED_PARAMETER(num_streams); }
 };
 
 /**

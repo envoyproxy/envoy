@@ -5,13 +5,12 @@ namespace {
 
 using DrainCloseIntegrationTest = HttpProtocolIntegrationTest;
 
-// Add a health check filter and verify correct behavior when draining.
 TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
+  autonomous_upstream_ = true;
   // The probability of drain close increases over time. With a high timeout,
   // the probability will be very low, but the rapid retries prevent this from
   // increasing total test time.
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;
@@ -43,9 +42,9 @@ TEST_P(DrainCloseIntegrationTest, DrainCloseGradual) {
 }
 
 TEST_P(DrainCloseIntegrationTest, DrainCloseImmediate) {
+  autonomous_upstream_ = true;
   drain_strategy_ = Server::DrainStrategy::Immediate;
   drain_time_ = std::chrono::seconds(100);
-  config_helper_.addFilter(ConfigHelper::defaultHealthCheckFilter());
   initialize();
 
   absl::Notification drain_sequence_started;

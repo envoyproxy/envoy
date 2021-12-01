@@ -7,6 +7,7 @@
 
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/proto/bookstore.pb.h"
+#include "test/test_common/registry.h"
 
 // This file contains any filter-specific setup and input clean-up needed in the generic filter fuzz
 // target.
@@ -108,8 +109,8 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
 void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for the ext_authz filter.
   addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
-  connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   ON_CALL(factory_context_, clusterManager()).WillByDefault(testing::ReturnRef(cluster_manager_));
   ON_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .WillByDefault(Return(&async_request_));
@@ -125,7 +126,9 @@ void UberFilterFuzzer::perFilterSetup() {
   encoder_callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
 
   // Prepare expectations for dynamic forward proxy.
-  ON_CALL(factory_context_.dispatcher_, createDnsResolver(_, _))
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  ON_CALL(dns_resolver_factory, createDnsResolver(_, _, _))
       .WillByDefault(testing::Return(resolver_));
 
   // Prepare expectations for TAP config.
@@ -136,6 +139,8 @@ void UberFilterFuzzer::perFilterSetup() {
   // Prepare expectations for WASM filter.
   ON_CALL(factory_context_, listenerMetadata())
       .WillByDefault(testing::ReturnRef(listener_metadata_));
+  ON_CALL(factory_context_.api_, customStatNamespaces())
+      .WillByDefault(testing::ReturnRef(custom_stat_namespaces_));
 }
 
 } // namespace HttpFilters

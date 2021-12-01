@@ -350,7 +350,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
 
   // Add a small buffer filter to the standard HTTP filter chain. Websocket
   // upgrades will use the HTTP filter chain so will also have small buffers.
-  config_helper_.addFilter(ConfigHelper::smallBufferFilter());
+  config_helper_.prependFilter(ConfigHelper::smallBufferFilter());
 
   // Add a second upgrade type which goes directly to the router filter.
   config_helper_.addConfigModifier(

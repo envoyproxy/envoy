@@ -38,7 +38,7 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: 127.0.0.2
+                address: 127.0.0.1
                 port_value: 1234
     transport_socket:
       name: envoy.transport_sockets.tls
@@ -50,7 +50,9 @@ static_resources:
             private_key: {"filename": "certs/serverkey.pem"}
             ocsp_staple: {"filename": "certs/server_ocsp_resp.der"}
           validation_context:
-            match_subject_alt_names:
-            - exact: "foo"
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: "foo"
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt

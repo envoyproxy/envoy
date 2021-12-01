@@ -150,7 +150,7 @@ Api::IoCallUint64Result IoHandleImpl::writev(const Buffer::RawSlice* slices, uin
   }
   if (is_input_empty) {
     return Api::ioCallUint64ResultNoError();
-  };
+  }
   if (!isOpen()) {
     return {0, Api::IoErrorPtr(new Network::IoSocketError(SOCKET_ERROR_BADF),
                                Network::IoSocketError::deleteIoError)};
@@ -274,17 +274,38 @@ Network::IoHandlePtr IoHandleImpl::accept(struct sockaddr*, socklen_t*) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
-Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstSharedPtr) {
-  // Buffered Io handle should always be considered as connected.
-  // Use write or read to determine if peer is closed.
-  return {0, 0};
+Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
+  if (peer_handle_ != nullptr) {
+    // Buffered Io handle should always be considered as connected unless the server peer cannot be
+    // found. Use write or read to determine if peer is closed.
+    return {0, 0};
+  } else {
+    ENVOY_LOG(debug, "user namespace handle {} connect to previously closed peer {}.",
+              static_cast<void*>(this), address->asStringView());
+    return Api::SysCallIntResult{-1, SOCKET_ERROR_INVAL};
+  }
 }
 
 Api::SysCallIntResult IoHandleImpl::setOption(int, int, const void*, socklen_t) {
   return makeInvalidSyscallResult();
 }
 
-Api::SysCallIntResult IoHandleImpl::getOption(int, int, void*, socklen_t*) {
+Api::SysCallIntResult IoHandleImpl::getOption(int level, int optname, void* optval,
+                                              socklen_t* optlen) {
+  // Check result of connect(). It is either connected or closed.
+  if (level == SOL_SOCKET && optname == SO_ERROR) {
+    if (peer_handle_ != nullptr) {
+      // The peer is valid at this comment. Consider it as connected.
+      *optlen = sizeof(int);
+      *static_cast<int*>(optval) = 0;
+      return Api::SysCallIntResult{0, 0};
+    } else {
+      // The peer is closed. Reset the option value to non-zero.
+      *optlen = sizeof(int);
+      *static_cast<int*>(optval) = SOCKET_ERROR_INVAL;
+      return Api::SysCallIntResult{0, 0};
+    }
+  }
   return makeInvalidSyscallResult();
 }
 

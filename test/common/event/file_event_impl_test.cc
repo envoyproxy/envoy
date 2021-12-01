@@ -88,8 +88,6 @@ TEST_P(FileEventImplActivateTest, Activate) {
   EXPECT_CALL(read_event, ready());
   ReadyWatcher write_event;
   EXPECT_CALL(write_event, ready());
-  ReadyWatcher closed_event;
-  EXPECT_CALL(closed_event, ready());
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
 
@@ -103,14 +101,10 @@ TEST_P(FileEventImplActivateTest, Activate) {
         if (events & FileReadyType::Write) {
           write_event.ready();
         }
-
-        if (events & FileReadyType::Closed) {
-          closed_event.ready();
-        }
       },
-      trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+      trigger, FileReadyType::Read | FileReadyType::Write);
 
-  file_event->activate(FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+  file_event->activate(FileReadyType::Read | FileReadyType::Write);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 
   os_sys_calls_.close(fd);
@@ -125,7 +119,6 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   ReadyWatcher fd_event;
   ReadyWatcher read_event;
   ReadyWatcher write_event;
-  ReadyWatcher closed_event;
 
   ReadyWatcher prepare_watcher;
   evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
@@ -140,19 +133,13 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
         if (events & FileReadyType::Read) {
           read_event.ready();
           file_event->activate(FileReadyType::Write);
-          file_event->activate(FileReadyType::Closed);
         }
 
         if (events & FileReadyType::Write) {
           write_event.ready();
-          file_event->activate(FileReadyType::Closed);
-        }
-
-        if (events & FileReadyType::Closed) {
-          closed_event.ready();
         }
       },
-      trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+      trigger, FileReadyType::Read | FileReadyType::Write);
 
   testing::InSequence s;
   // First loop iteration: handle scheduled read event and the real write event produced by poll.
@@ -166,13 +153,10 @@ TEST_P(FileEventImplActivateTest, ActivateChaining) {
   EXPECT_CALL(prepare_watcher, ready());
   EXPECT_CALL(fd_event, ready());
   EXPECT_CALL(write_event, ready());
-  EXPECT_CALL(closed_event, ready());
-  // Third loop iteration: handle close event scheduled while handling write.
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(fd_event, ready());
-  EXPECT_CALL(closed_event, ready());
-  // Fourth loop iteration: poll returned no new real events.
-  EXPECT_CALL(prepare_watcher, ready());
+  if constexpr (Event::PlatformDefaultTriggerType != Event::FileTriggerType::EmulatedEdge) {
+    // Third loop iteration: poll returned no new real events.
+    EXPECT_CALL(prepare_watcher, ready());
+  }
 
   file_event->activate(FileReadyType::Read);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
@@ -189,7 +173,6 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
   ReadyWatcher fd_event;
   ReadyWatcher read_event;
   ReadyWatcher write_event;
-  ReadyWatcher closed_event;
 
   ReadyWatcher prepare_watcher;
   evwatch_prepare_new(&static_cast<DispatcherImpl*>(dispatcher.get())->base(), onWatcherReady,
@@ -210,12 +193,8 @@ TEST_P(FileEventImplActivateTest, SetEnableCancelsActivate) {
         if (events & FileReadyType::Write) {
           write_event.ready();
         }
-
-        if (events & FileReadyType::Closed) {
-          closed_event.ready();
-        }
       },
-      trigger, FileReadyType::Read | FileReadyType::Write | FileReadyType::Closed);
+      trigger, FileReadyType::Read | FileReadyType::Write);
 
   testing::InSequence s;
   // First loop iteration: handle scheduled read event and the real write event produced by poll.
