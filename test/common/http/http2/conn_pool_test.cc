@@ -1452,14 +1452,14 @@ TEST_F(Http2ConnPoolImplTest, IncreaseCapacityWithSettingsFrame) {
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 99 /*capacity*/);
   EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 1);
 
-  // Settings frame results in 0 capacity, the state of client transists from READY to BUSY.
+  // Settings frame results in 0 capacity, the state of client changes from READY to BUSY.
   NiceMock<MockReceivedSettings> settings;
   settings.max_concurrent_streams_ = 1;
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 0 /*capacity*/);
   EXPECT_EQ(pool_->owningList(Envoy::ConnectionPool::ActiveClient::State::READY).size(), 0);
 
-  // Settings frame results in 9 capacity, the state of client transists from BUSY to READY.
+  // Settings frame results in 9 capacity, the state of client changes from BUSY to READY.
   settings.max_concurrent_streams_ = 10;
   test_clients_[0].codec_client_->onSettings(settings);
   CHECK_STATE(1 /*active*/, 0 /*pending*/, 9 /*capacity*/);
