@@ -30,6 +30,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/retry_priority.h"
@@ -3531,6 +3532,27 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // stream error.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+  SocketInterfaceSwap socket_swap;
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Makes us have Envoy's writes to downstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.writev_matcher_->setSourcePort(lookupPort("http"));
+  socket_swap.writev_matcher_->setWritevOverride(ebadf);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  socket_swap.writev_matcher_->setWritevOverride(nullptr);
 }
 
 } // namespace Envoy
