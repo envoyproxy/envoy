@@ -5,7 +5,6 @@ package envoy.config.listener.v3;
 import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/socket_option.proto";
 import "envoy/config/listener/v3/api_listener.proto";
 import "envoy/config/listener/v3/listener_components.proto";
@@ -37,7 +36,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 34]
+// [#next-free-field: 33]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -136,13 +135,44 @@ message Listener {
   //
   // If specified, all :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` must
   // have a non-empty :ref:`name <envoy_v3_api_field_config.listener.v3.FilterChain.name>` and empty :ref:`filter_chain_match <envoy_v3_api_msg_config.listener.v3.FilterChain.filter_chain_match>`.
+  //
+  // Example 1: Match port 80 for chain "http", port 443 and SNI "*.server.com" for chain "server" or SNI "*.com" for chain "https".
+
+  // .. code-block:: yaml
+  //
+  //  filter_chain_matcher:
+  //    matcher_tree:
+  //      input:
+  //        typed_config:
+  //          "@type": type.googleapis.com/envoy.config.listener.v3.DestinationPortInput
+  //      exact_match_map:
+  //        map:
+  //          "80":
+  //            action:
+  //              name: http
+  //          "443":
+  //            matcher:
+  //              matcher_tree:
+  //                input:
+  //                  typed_config:
+  //                    "@type": type.googleapis.com/envoy.config.listener.v3.SNIInput
+  //                custom_match:
+  //                  typed_config:
+  //                    "@type": type.googleapis.com/envoy.config.listener.v3.ServerNameMatcher
+  //                    domain_matchers:
+  //                    - server_names: ["*.server.com"]
+  //                      on_match:
+  //                        action:
+  //                          name: server
+  //                    - server_names: ["*.com"]
+  //                      on_match:
+  //                        action:
+  //                          name: https
+  //
+  // The example above requires that filter chains named "http", "server", and "https" are present in :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>` field.
+  //
   // [#not-implemented-hide:]
   repeated xds.type.matcher.v3.Matcher filter_chain_matcher = 32;
-
-  // Defines the discovery service configuration for filter chains indexed by the filter chain name.
-  // The set of filter chain names must be disjoint from the filter chain names in the field :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.filter_chains>`.
-  // [#not-implemented-hide:]
-  map<string, core.v3.ExtensionConfigSource> filter_chain_discovery = 33;
 
   // If a connection is redirected using *iptables*, the port on which the proxy
   // receives it might be different from the original destination address. When this flag is set to

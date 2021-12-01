@@ -223,6 +223,9 @@ message FilterChain {
   reserved "tls_context";
 
   // The criteria to use when matching a connection to this filter chain.
+  // Note: :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  // supersedes this field.
   FilterChainMatch filter_chain_match = 1;
 
   // A list of individual network filters that make up the filter chain for
@@ -260,6 +263,9 @@ message FilterChain {
   // establishment, the connection is summarily closed.
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
+  // Note: :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  // requires that filter chains are uniquely named.
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
   // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
@@ -441,25 +447,7 @@ message PortMatcher {
 
     // Match action to apply when the port is within one of the port ranges.
     xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
-
-    // Indicates whether this match option should be considered if there is a
-    // matcher for the specific port value. For example, consider a matcher
-    // for the port range [1, 1000] applied to a specific port 80. If there
-    // is another matcher for the specific port 80 that fully matches, then
-    // the specific port matcher is selected. However, if the specific port
-    // matcher does not fully match, then the behavior depends on whether the
-    // range matcher [1, 1000] is exclusive. Exclusive port matchers do not
-    // apply when there is a more specific port match. Non-exclusive port
-    // matchers may apply when the nested match conditions are satisfied for
-    // the range matcher but not for the specific port value nested matcher.
-    //
-    // The order of range matchers is important since it dictates the order
-    // of matching in case of overlapping port ranges.
-    bool exclusive = 3;
   }
-
-  // Match port by value. Takes precedence over matching by the port ranges.
-  map<int32, xds.type.matcher.v3.Matcher.OnMatch> port_map = 1;
 
   // Match port by port ranges.
   repeated PortRangeMatcher range_matchers = 2;
