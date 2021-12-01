@@ -332,7 +332,9 @@ static void ios_http_filter_set_response_callbacks(envoy_http_filter_callbacks c
   }
 }
 
-static void ios_http_filter_on_cancel(envoy_stream_intel stream_intel, const void *context) {
+static void ios_http_filter_on_cancel(envoy_stream_intel stream_intel,
+                                      envoy_final_stream_intel final_stream_intel,
+                                      const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
   @autoreleasepool {
@@ -345,6 +347,7 @@ static void ios_http_filter_on_cancel(envoy_stream_intel stream_intel, const voi
 }
 
 static void ios_http_filter_on_error(envoy_error error, envoy_stream_intel stream_intel,
+                                     envoy_final_stream_intel final_stream_intel,
                                      const void *context) {
   // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
   // is necessary to act as a breaker for any Objective-C allocation that happens.
