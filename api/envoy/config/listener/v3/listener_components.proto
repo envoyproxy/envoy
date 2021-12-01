@@ -415,7 +415,7 @@ message TransportProtocolInput {
 }
 
 // Matcher input that allows matching connections by by the application protocol (e.g. ALPN for TLS protocol).
-// This values will be compared against the application
+// This value will be compared against the application
 // protocols of a new connection, when detected by one of the listener filters.
 //
 // Suggested values include:
