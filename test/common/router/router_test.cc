@@ -2504,7 +2504,7 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   response_decoder3->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
-  EXPECT_EQ(333U, callbacks_.stream_info_.upstreamConnectionId());
+  EXPECT_EQ(333U, callbacks_.stream_info_.upstreamInfo()->upstreamConnectionId());
 
   // TODO: Verify hedge stats here once they are implemented.
 }
@@ -5009,7 +5009,8 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   bool filter_state_verified = false;
   router_.config().upstream_logs_.push_back(
       std::make_shared<TestAccessLog>([&](const auto& stream_info) {
-        filter_state_verified = stream_info.upstreamFilterState()->hasDataWithName("upstream data");
+        filter_state_verified =
+            stream_info.upstreamInfo()->upstreamFilterState()->hasDataWithName("upstream data");
       }));
 
   upstream_stream_info_.filterState()->setData(
@@ -5037,7 +5038,8 @@ TEST_F(RouterTest, PropagatesUpstreamFilterState) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   EXPECT_TRUE(filter_state_verified);
-  EXPECT_TRUE(callbacks_.streamInfo().upstreamFilterState()->hasDataWithName("upstream data"));
+  EXPECT_TRUE(callbacks_.streamInfo().upstreamInfo()->upstreamFilterState()->hasDataWithName(
+      "upstream data"));
 }
 
 TEST_F(RouterTest, UpstreamSSLConnection) {
@@ -5071,9 +5073,10 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
-  ASSERT_NE(nullptr, callbacks_.streamInfo().upstreamSslConnection());
-  EXPECT_EQ(session_id, callbacks_.streamInfo().upstreamSslConnection()->sessionId());
-  EXPECT_FALSE(callbacks_.streamInfo().upstreamConnectionId().has_value());
+  ASSERT_NE(nullptr, callbacks_.streamInfo().upstreamInfo()->upstreamSslConnection());
+  EXPECT_EQ(session_id,
+            callbacks_.streamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
+  EXPECT_FALSE(callbacks_.streamInfo().upstreamInfo()->upstreamConnectionId().has_value());
 }
 
 // Verify that upstream timing information is set into the StreamInfo after the upstream

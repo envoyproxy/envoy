@@ -245,26 +245,29 @@ void Utility::extractCommonAccessLogProperties(
         Protobuf::util::TimeUtil::NanosecondsToDuration(dur.value().count()));
   }
 
-  if (stream_info.upstreamHost() != nullptr) {
-    Network::Utility::addressToProtobufAddress(
-        *stream_info.upstreamHost()->address(),
-        *common_access_log.mutable_upstream_remote_address());
-    common_access_log.set_upstream_cluster(stream_info.upstreamHost()->cluster().name());
+  if (stream_info.upstreamInfo().has_value()) {
+    const auto& upstream_info = stream_info.upstreamInfo().value().get();
+    if (upstream_info.upstreamHost() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamHost()->address(),
+          *common_access_log.mutable_upstream_remote_address());
+      common_access_log.set_upstream_cluster(upstream_info.upstreamHost()->cluster().name());
+    }
+    if (upstream_info.upstreamLocalAddress() != nullptr) {
+      Network::Utility::addressToProtobufAddress(
+          *upstream_info.upstreamLocalAddress(),
+          *common_access_log.mutable_upstream_local_address());
+    }
+    if (!upstream_info.upstreamTransportFailureReason().empty()) {
+      common_access_log.set_upstream_transport_failure_reason(
+          upstream_info.upstreamTransportFailureReason());
+    }
   }
-
   if (!stream_info.getRouteName().empty()) {
     common_access_log.set_route_name(stream_info.getRouteName());
   }
 
-  if (stream_info.upstreamLocalAddress() != nullptr) {
-    Network::Utility::addressToProtobufAddress(*stream_info.upstreamLocalAddress(),
-                                               *common_access_log.mutable_upstream_local_address());
-  }
   responseFlagsToAccessLogResponseFlags(common_access_log, stream_info);
-  if (!stream_info.upstreamTransportFailureReason().empty()) {
-    common_access_log.set_upstream_transport_failure_reason(
-        stream_info.upstreamTransportFailureReason());
-  }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_access_log.mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
   }

@@ -512,13 +512,6 @@ public:
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
 
   /**
-   * Returns the upstream timing information for this stream.
-   * It is not expected that the fields in upstreamTiming() will be set until
-   * the upstream request is complete.
-   */
-  virtual UpstreamTiming& upstreamTiming() PURE;
-
-  /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
    * and may be longer than lastDownstreamTxByteSent.
    */
@@ -562,16 +555,6 @@ public:
   virtual uint64_t responseFlags() const PURE;
 
   /**
-   * @return upstream host description.
-   */
-  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
-
-  /**
-   * @return the upstream local address.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
-
-  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;
@@ -585,12 +568,6 @@ public:
    * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @return the upstream SSL connection. This will be nullptr if the upstream
-   * connection does not use SSL.
-   */
-  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
@@ -620,19 +597,6 @@ public:
    */
   virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
-
-  /**
-   * Filter State object to be shared between upstream and downstream filters.
-   * @param pointer to upstream connections filter state.
-   * @return pointer to filter state to be used by upstream connections.
-   */
-  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
-
-  /**
-   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
-   *         failed.
-   */
-  virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
    * @param headers request headers.
@@ -687,11 +651,6 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
-
-  /**
-   * @return the ID of the upstream connection, or absl::nullopt if not available.
-   */
-  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
    * @param attempt_count, the number of times the request was attempted upstream.

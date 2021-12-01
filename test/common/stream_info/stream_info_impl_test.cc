@@ -138,7 +138,6 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 
     EXPECT_EQ(nullptr, stream_info.upstreamInfo());
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
-    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
     stream_info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
 
     stream_info.protocol(Http::Protocol::Http10);
@@ -164,10 +163,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
     EXPECT_EQ("access_denied", stream_info.connectionTerminationDetails().value());
 
-    EXPECT_EQ(nullptr, stream_info.upstreamHost());
+    EXPECT_EQ(nullptr, stream_info.upstreamInfo()->upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
     stream_info.upstreamInfo()->setUpstreamHost(host);
-    EXPECT_EQ(host, stream_info.upstreamHost());
+    EXPECT_EQ(host, stream_info.upstreamInfo()->upstreamHost());
 
     EXPECT_FALSE(stream_info.healthCheck());
     stream_info.healthCheck(true);
@@ -185,8 +184,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
     stream_info.upstreamInfo()->setUpstreamFilterState(stream_info.filterState());
-    EXPECT_EQ(1,
-              stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
+    EXPECT_EQ(1, stream_info.upstreamInfo()
+                     ->upstreamFilterState()
+                     ->getDataReadOnly<TestIntAccessor>("test")
+                     .access());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
@@ -199,12 +200,12 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
     stream_info.upstreamInfo()->setUpstreamSslConnection(ssl_info);
-    EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
+    EXPECT_EQ(session_id, stream_info.upstreamInfo()->upstreamSslConnection()->sessionId());
 
-    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
+    EXPECT_FALSE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
     stream_info.upstreamInfo()->setUpstreamConnectionId(12345);
-    ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
-    EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
+    ASSERT_TRUE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
+    EXPECT_EQ(12345, stream_info.upstreamInfo()->upstreamConnectionId().value());
 
     std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
     EXPECT_NE(stream_info.upstreamInfo(), new_info);

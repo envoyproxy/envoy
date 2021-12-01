@@ -224,7 +224,7 @@ TEST_F(HttpConnManFinalizerImplTest, NullRequestHeadersAndNullRouteEntry) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(nullptr));
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
@@ -268,7 +268,6 @@ TEST_F(HttpConnManFinalizerImplTest, StreamInfoLogs) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).Times(3);
   const auto start_timestamp =
       SystemTime{std::chrono::duration_cast<SystemTime::duration>(std::chrono::hours{123})};
   EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(start_timestamp));
@@ -310,7 +309,6 @@ TEST_F(HttpConnManFinalizerImplTest, UpstreamClusterTagSet) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(11));
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
-  EXPECT_CALL(stream_info, upstreamHost()).Times(3);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("my_upstream_cluster")));
@@ -352,7 +350,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanOptionalHeaders) {
   absl::optional<uint32_t> response_code;
   EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
@@ -542,7 +540,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanPopulatedFailureResponse) {
   EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(100));
   ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
-  EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
 
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
   EXPECT_CALL(span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("503")));

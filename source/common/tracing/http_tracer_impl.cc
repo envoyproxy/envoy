@@ -198,9 +198,9 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
       Tracing::Tags::get().HttpProtocol,
       Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-  if (stream_info.upstreamHost()) {
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,
-                stream_info.upstreamHost()->address()->asStringView());
+                stream_info.upstreamInfo()->upstreamHost()->address()->asStringView());
   }
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
@@ -215,10 +215,11 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
-  if (nullptr != stream_info.upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster,
+                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
     span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                stream_info.upstreamHost()->cluster().observabilityName());
+                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.
@@ -351,21 +352,27 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
 
 const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const StreamInfo::StreamInfo& info = ctx.stream_info;
+  const StreamInfo::StreamInfo& stream_info = ctx.stream_info;
   switch (kind_) {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
-    return &info.dynamicMetadata();
+    return &stream_info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    Router::RouteConstSharedPtr route = info.route();
+    Router::RouteConstSharedPtr route = stream_info.route();
     return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
+    if (stream_info.upstreamInfo().has_value() &&
+        stream_info.upstreamInfo().value().get().upstreamHost()) {
+      return &stream_info.upstreamInfo().value().get().upstreamHost()->cluster().metadata();
+    }
+    return nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kHost: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? hostPtr->metadata().get() : nullptr;
+    if (stream_info.upstreamInfo().has_value() &&
+        stream_info.upstreamInfo().value().get().upstreamHost()) {
+      return stream_info.upstreamInfo().value().get().upstreamHost()->metadata().get();
+    }
+    return nullptr;
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

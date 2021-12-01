@@ -56,14 +56,8 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(testing::Const(*this), upstreamInfo()).WillByDefault(Invoke([this]() {
     return OptRef<const UpstreamInfo>(*upstream_info_);
   }));
-  ON_CALL(*this, upstreamLocalAddress()).WillByDefault(Invoke([this]() {
-    return upstream_info_->upstreamLocalAddress();
-  }));
   ON_CALL(*this, downstreamAddressProvider())
       .WillByDefault(ReturnPointee(downstream_connection_info_provider_));
-  ON_CALL(*this, upstreamSslConnection()).WillByDefault(Invoke([this]() {
-    return upstream_info_->upstreamSslConnection();
-  }));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
   ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
@@ -87,24 +81,16 @@ MockStreamInfo::MockStreamInfo()
     return response_flags_ != 0;
   }));
   ON_CALL(*this, responseFlags()).WillByDefault(Return(response_flags_));
-  ON_CALL(*this, upstreamHost()).WillByDefault(Invoke([this]() {
-    return upstream_info_->upstreamHost();
-  }));
   ON_CALL(*this, dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(Const(*this), dynamicMetadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, filterState()).WillByDefault(ReturnRef(filter_state_));
   ON_CALL(Const(*this), filterState()).WillByDefault(Invoke([this]() -> const FilterState& {
     return *filter_state_;
   }));
-  ON_CALL(*this, upstreamFilterState()).WillByDefault(Invoke([this]() {
-    return upstream_info_->upstreamFilterState();
-  }));
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, upstreamTransportFailureReason())
-      .WillByDefault(ReturnRef(upstream_info_->upstreamTransportFailureReason()));
   ON_CALL(*this, setUpstreamInfo(_))
       .WillByDefault(Invoke([this](std::shared_ptr<UpstreamInfo> info) { upstream_info_ = info; }));
   ON_CALL(*this, setFilterChainName(_))
@@ -112,9 +98,6 @@ MockStreamInfo::MockStreamInfo()
         filter_chain_name_ = std::string(filter_chain_name);
       }));
   ON_CALL(*this, filterChainName()).WillByDefault(ReturnRef(filter_chain_name_));
-  ON_CALL(*this, upstreamConnectionId()).WillByDefault(Invoke([this]() {
-    return upstream_info_->upstreamConnectionId();
-  }));
   ON_CALL(*this, setAttemptCount(_)).WillByDefault(Invoke([this](uint32_t attempt_count) {
     attempt_count_ = attempt_count;
   }));
@@ -129,8 +112,6 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
-  ON_CALL(*this, upstreamTiming()).WillByDefault(ReturnRef(upstream_info_->upstreamTiming()));
-  ON_CALL(Const(*this), upstreamTiming()).WillByDefault(Return(upstream_info_->upstreamTiming()));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;

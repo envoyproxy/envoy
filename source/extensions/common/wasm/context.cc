@@ -88,6 +88,13 @@ Http::RequestHeaderMapPtr buildRequestHeaderMapFromPairs(const Pairs& pairs) {
 
 template <typename P> static uint32_t headerSize(const P& p) { return p ? p->size() : 0; }
 
+Upstream::HostDescriptionConstSharedPtr getHost(const StreamInfo::StreamInfo* info) {
+  if (info && info->upstreamInfo() && info->upstreamInfo().value().get().upstreamHost()) {
+    return info->upstreamInfo().value().get().upstreamHost();
+  }
+  return nullptr;
+}
+
 } // namespace
 
 // Test support.
@@ -443,9 +450,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
       const CelState* state;
       if (info->filterState().hasData<CelState>(key)) {
         state = &info->filterState().getDataReadOnly<CelState>(key);
-      } else if (info->upstreamFilterState() &&
-                 info->upstreamFilterState()->hasData<CelState>(key)) {
-        state = &info->upstreamFilterState()->getDataReadOnly<CelState>(key);
+      } else if (info->upstreamInfo().has_value() &&
+                 info->upstreamInfo().value().get().upstreamFilterState() &&
+                 info->upstreamInfo().value().get().upstreamFilterState()->hasData<CelState>(key)) {
+        state =
+            &info->upstreamInfo().value().get().upstreamFilterState()->getDataReadOnly<CelState>(
+                key);
       } else {
         return {};
       }
@@ -522,8 +532,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::CLUSTER_NAME:
-    if (info && info->upstreamHost()) {
-      return CelValue::CreateString(&info->upstreamHost()->cluster().name());
+    if (getHost(info)) {
+      return CelValue::CreateString(&getHost(info)->cluster().name());
     } else if (info && info->route() && info->route()->routeEntry()) {
       return CelValue::CreateString(&info->route()->routeEntry()->clusterName());
     } else if (info && info->upstreamClusterInfo().has_value() &&
@@ -532,8 +542,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::CLUSTER_METADATA:
-    if (info && info->upstreamHost()) {
-      return CelProtoWrapper::CreateMessage(&info->upstreamHost()->cluster().metadata(), arena);
+    if (getHost(info)) {
+      return CelProtoWrapper::CreateMessage(&getHost(info)->cluster().metadata(), arena);
     } else if (info && info->upstreamClusterInfo().has_value() &&
                info->upstreamClusterInfo().value()) {
       return CelProtoWrapper::CreateMessage(&info->upstreamClusterInfo().value()->metadata(),
@@ -541,8 +551,8 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
     }
     break;
   case PropertyToken::UPSTREAM_HOST_METADATA:
-    if (info && info->upstreamHost() && info->upstreamHost()->metadata()) {
-      return CelProtoWrapper::CreateMessage(info->upstreamHost()->metadata().get(), arena);
+    if (getHost(info)) {
+      return CelProtoWrapper::CreateMessage(getHost(info)->metadata().get(), arena);
     }
     break;
   case PropertyToken::ROUTE_NAME:

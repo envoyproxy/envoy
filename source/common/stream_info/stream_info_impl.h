@@ -126,19 +126,6 @@ struct StreamInfoImpl : public StreamInfo {
                                                                 start_time_monotonic_);
   }
 
-  void maybeCreateUpstreamInfo() {
-    if (!upstream_info_) {
-      upstream_info_ = std::make_shared<UpstreamInfoImpl>();
-    }
-  }
-
-  absl::optional<uint64_t> upstreamConnectionId() const override {
-    if (!upstream_info_) {
-      return absl::nullopt;
-    }
-    return upstream_info_->upstreamConnectionId();
-  }
-
   void setUpstreamInfo(std::shared_ptr<UpstreamInfo> info) override { upstream_info_ = info; }
 
   std::shared_ptr<UpstreamInfo> upstreamInfo() override { return upstream_info_; }
@@ -148,10 +135,6 @@ struct StreamInfoImpl : public StreamInfo {
       return {};
     }
     return *upstream_info_;
-  }
-  UpstreamTiming& upstreamTiming() override {
-    maybeCreateUpstreamInfo();
-    return upstream_info_->upstreamTiming();
   }
 
   absl::optional<std::chrono::nanoseconds> requestComplete() const override {
@@ -220,25 +203,11 @@ struct StreamInfoImpl : public StreamInfo {
 
   uint64_t responseFlags() const override { return response_flags_; }
 
-  Upstream::HostDescriptionConstSharedPtr upstreamHost() const override {
-    if (!upstream_info_) {
-      return nullptr;
-    }
-    return upstream_info_->upstreamHost();
-  }
-
   void setRouteName(absl::string_view route_name) override {
     route_name_ = std::string(route_name);
   }
 
   const std::string& getRouteName() const override { return route_name_; }
-
-  const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_local_address_;
-    }
-    return upstream_info_->upstreamLocalAddress();
-  }
 
   bool healthCheck() const override { return health_check_request_; }
 
@@ -246,10 +215,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const Network::ConnectionInfoProvider& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
-  }
-
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return upstream_info_ ? upstream_info_->upstreamSslConnection() : nullptr;
   }
 
   Router::RouteConstSharedPtr route() const override { return route_; }
@@ -263,20 +228,6 @@ struct StreamInfoImpl : public StreamInfo {
 
   const FilterStateSharedPtr& filterState() override { return filter_state_; }
   const FilterState& filterState() const override { return *filter_state_; }
-
-  const FilterStateSharedPtr& upstreamFilterState() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_filter_state_;
-    }
-    return upstream_info_->upstreamFilterState();
-  }
-
-  const std::string& upstreamTransportFailureReason() const override {
-    if (!upstream_info_) {
-      return legacy_upstream_transport_failure_reason_;
-    }
-    return upstream_info_->upstreamTransportFailureReason();
-  }
 
   void setRequestHeaders(const Http::RequestHeaderMap& headers) override {
     request_headers_ = &headers;
@@ -361,7 +312,6 @@ struct StreamInfoImpl : public StreamInfo {
   Router::RouteConstSharedPtr route_;
   envoy::config::core::v3::Metadata metadata_{};
   FilterStateSharedPtr filter_state_;
-  FilterStateSharedPtr legacy_upstream_filter_state_;
   std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
 
@@ -387,13 +337,11 @@ private:
   std::shared_ptr<UpstreamInfo> upstream_info_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
-  Network::Address::InstanceConstSharedPtr legacy_upstream_local_address_;
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
   std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;
-  std::string legacy_upstream_transport_failure_reason_;
   absl::optional<Upstream::ClusterInfoConstSharedPtr> upstream_cluster_info_;
   std::string filter_chain_name_;
   Tracing::Reason trace_reason_;

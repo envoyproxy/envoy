@@ -33,8 +33,6 @@ public:
   MOCK_METHOD(void, setUpstreamInfo, (std::shared_ptr<UpstreamInfo>));
   MOCK_METHOD(std::shared_ptr<UpstreamInfo>, upstreamInfo, ());
   MOCK_METHOD(OptRef<const UpstreamInfo>, upstreamInfo, (), (const));
-  MOCK_METHOD(UpstreamTiming&, upstreamTiming, ());
-  MOCK_METHOD(OptRef<const UpstreamTiming>, upstreamTiming, (), (const));
   MOCK_METHOD(void, onRequestComplete, ());
   MOCK_METHOD(absl::optional<std::chrono::nanoseconds>, requestComplete, (), (const));
   MOCK_METHOD(DownstreamTiming&, downstreamTiming, ());
@@ -57,12 +55,9 @@ public:
   MOCK_METHOD(bool, hasResponseFlag, (ResponseFlag), (const));
   MOCK_METHOD(bool, hasAnyResponseFlag, (), (const));
   MOCK_METHOD(uint64_t, responseFlags, (), (const));
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
-  MOCK_METHOD(const Network::Address::InstanceConstSharedPtr&, upstreamLocalAddress, (), (const));
   MOCK_METHOD(bool, healthCheck, (), (const));
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
-  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, upstreamSslConnection, (), (const));
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
@@ -71,8 +66,6 @@ public:
               (const std::string&, const std::string&, const std::string&));
   MOCK_METHOD(const FilterStateSharedPtr&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
-  MOCK_METHOD(const FilterStateSharedPtr&, upstreamFilterState, (), (const));
-  MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::RequestHeaderMap&));
   MOCK_METHOD(const Http::RequestHeaderMap*, getRequestHeaders, (), (const));
   MOCK_METHOD(void, setUpstreamClusterInfo, (const Upstream::ClusterInfoConstSharedPtr&));
@@ -87,7 +80,6 @@ public:
   MOCK_METHOD(void, setConnectionID, (uint64_t));
   MOCK_METHOD(void, setFilterChainName, (const absl::string_view));
   MOCK_METHOD(const std::string&, filterChainName, (), (const));
-  MOCK_METHOD(absl::optional<uint64_t>, upstreamConnectionId, (), (const));
   MOCK_METHOD(void, setAttemptCount, (uint32_t), ());
   MOCK_METHOD(absl::optional<uint32_t>, attemptCount, (), (const));
   MOCK_METHOD(const BytesMeterSharedPtr&, getUpstreamBytesMeter, (), (const));

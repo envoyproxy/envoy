@@ -64,7 +64,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   // Envoy routes request to upstream hosts not to origin servers directly. This choice would
   // allow HTTP/3 to be used on a per-upstream host basis, even for origins which are load
   // balanced across them.
-  Upstream::HostDescriptionConstSharedPtr host = encoder_callbacks_->streamInfo().upstreamHost();
+  Upstream::HostDescriptionConstSharedPtr host =
+      encoder_callbacks_->streamInfo().upstreamInfo()->upstreamHost();
   const uint32_t port = host->address()->ip()->port();
   const std::string& hostname = host->hostname();
   Http::AlternateProtocolsCache::Origin origin(Http::Headers::get().SchemeValues.Https, hostname,

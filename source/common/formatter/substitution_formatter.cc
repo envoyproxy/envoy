@@ -793,9 +793,13 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
         });
   } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
+    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
+        [](const StreamInfo::StreamInfo& stream_info)
+            -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+          if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+            return stream_info.upstreamInfo()->upstreamHost()->address();
+          }
+          return nullptr;
         });
   } else if (field_name == "UPSTREAM_CLUSTER") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
@@ -817,9 +821,13 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
                      : absl::make_optional<std::string>(upstream_cluster_name);
         });
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamLocalAddress();
+    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
+        [](const StreamInfo::StreamInfo& stream_info)
+            -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+          if (stream_info.upstreamInfo().has_value()) {
+            return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+          }
+          return nullptr;
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
@@ -940,8 +948,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          if (!stream_info.upstreamTransportFailureReason().empty()) {
-            result = stream_info.upstreamTransportFailureReason();
+          if (stream_info.upstreamInfo().has_value() &&
+              !stream_info.upstreamInfo().value().get().upstreamTransportFailureReason().empty()) {
+            result = stream_info.upstreamInfo().value().get().upstreamTransportFailureReason();
           }
           return result;
         });
