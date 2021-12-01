@@ -4,7 +4,6 @@ config {
       cluster_name: "ext_authz_server"
     }
   }
-  transport_api_version: V3
   metadata_context_namespaces: "jazz.sax"
   metadata_context_namespaces: "rock.guitar"
   metadata_context_namespaces: "hiphop.drums"	

@@ -4,7 +4,6 @@ config {
       cluster_name: "ext_authz_server"
     }
   }
-  transport_api_version: V3
   with_request_body {
     max_request_bytes: 10
   }

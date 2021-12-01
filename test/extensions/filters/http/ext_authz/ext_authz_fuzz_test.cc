@@ -1,9 +1,8 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
-#include "common/http/context_impl.h"
-#include "common/network/address_impl.h"
-
-#include "extensions/filters/http/ext_authz/ext_authz.h"
+#include "source/common/http/context_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
@@ -26,23 +25,24 @@ makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
   Filters::Common::ExtAuthz::ResponsePtr response =
       std::make_unique<Filters::Common::ExtAuthz::Response>();
   response->status = status;
-  // TODO: add headers to remove, append, set, body, status_code.
+  // TODO: We only add the response status.
+  // Add fuzzed inputs for headers_to_(set/append/add), body, status_code to the Response.
   return response;
 }
 
 Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
-    envoy::extensions::filters::http::ext_authz::Result::ResultSelectorCase result_case) {
+    envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
   Filters::Common::ExtAuthz::CheckStatus check_status;
-  switch (result_case) {
-  case envoy::extensions::filters::http::ext_authz::Result::kOk: {
+  switch (result) {
+  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::OK: {
     check_status = Filters::Common::ExtAuthz::CheckStatus::OK;
     break;
   }
-  case envoy::extensions::filters::http::ext_authz::Result::kError: {
+  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::ERROR: {
     check_status = Filters::Common::ExtAuthz::CheckStatus::Error;
     break;
   }
-  case envoy::extensions::filters::http::ext_authz::Result::kDenied: {
+  case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::DENIED: {
     check_status = Filters::Common::ExtAuthz::CheckStatus::Denied;
     break;
   }
@@ -59,8 +59,8 @@ public:
   FuzzerMocks() : addr_(std::make_shared<Network::Address::PipeInstance>("/test/test.sock")) {
 
     ON_CALL(decoder_callbacks_, connection()).WillByDefault(Return(&connection_));
-    connection_.stream_info_.downstream_address_provider_->setRemoteAddress(addr_);
-    connection_.stream_info_.downstream_address_provider_->setLocalAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+    connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
   }
 
   NiceMock<Runtime::MockLoader> runtime_;
@@ -80,13 +80,14 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
 
   static FuzzerMocks mocks;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Http::ContextImpl http_context(stats_store.symbolTable());
   Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
 
   // Prepare filter.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
   FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix");
+      proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix", bootstrap);
   std::unique_ptr<Filter> filter =
       std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
@@ -104,13 +105,13 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
                                 const envoy::service::auth::v3::CheckRequest& check_param,
                                 Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
         check_request = check_param;
-        callbacks.onComplete(
-            makeAuthzResponse(resultCaseToCheckStatus(input.result().result_selector_case())));
+        callbacks.onComplete(makeAuthzResponse(resultCaseToCheckStatus(input.result())));
       }));
 
   // TODO: Add response headers.
   Envoy::Extensions::HttpFilters::HttpFilterFuzzer fuzzer;
-  fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()), input.data());
+  fuzzer.runData(static_cast<Envoy::Http::StreamDecoderFilter*>(filter.get()),
+                 input.request_data());
   // TODO: Query the request header map in HttpFilterFuzzer to test headers_to_(add/remove/append).
   // TODO: Test check request attributes against config and filter metadata.
   ENVOY_LOG_MISC(trace, "Check Request attributes {}", check_request.attributes().DebugString());
