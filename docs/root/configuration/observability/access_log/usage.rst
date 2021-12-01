@@ -384,6 +384,13 @@ The following command operators are supported:
 %ROUTE_NAME%
   Name of the route.
 
+%VIRTUAL_CLUSTER_NAME%
+  HTTP*/gRPC
+    Name of the matched Virtual Cluster (if any).
+
+  TCP/UDP
+    Not implemented ("-")
+
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
 
