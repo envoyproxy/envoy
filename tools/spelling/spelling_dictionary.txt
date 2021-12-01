@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARRAYSIZE
 ARN
 ASAN
 ASCII
@@ -255,6 +256,7 @@ PEM
 PERF
 PGV
 PID
+PKCS12
 PKTINFO
 PNG
 Pointwise
@@ -577,6 +579,7 @@ dedup
 dedupe
 deduplicate
 deduplicates
+deduplication
 deflater
 deletable
 deleter
@@ -771,6 +774,7 @@ keyder
 kqueue
 kubernetes
 kv
+kvlist
 kvs
 lala
 latencies
@@ -820,6 +824,7 @@ megamiss
 mem
 memcmp
 memcpy
+memset
 memoize
 mergeable
 messagename
@@ -863,6 +868,7 @@ nan
 nanos
 natively
 ndk
+negative
 netblock
 netblocks
 netfilter
@@ -1008,6 +1014,7 @@ rebalancer
 rebalancing
 rebuffer
 rebuilder
+receival
 reconnection
 recurse
 recv
@@ -1103,6 +1110,7 @@ siginfo
 signalstack
 siloed
 sim
+sinked
 sizeof
 smatch
 snapshotted
@@ -1311,3 +1319,4 @@ ep
 suri
 transid
 routable
+vhosts

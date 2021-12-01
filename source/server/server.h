@@ -293,6 +293,10 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
+  void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
+    stats_store_.setSinkPredicates(std::move(sink_predicates));
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr

@@ -753,6 +753,22 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   std::string body;
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    std::string virtual_cluster_name = "authN";
+    stream_info.setVirtualClusterName(virtual_cluster_name);
+    EXPECT_EQ("authN", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+  }
+
+  {
     // Use a local stream info for these tests as as setSslConnection can only be called once.
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");

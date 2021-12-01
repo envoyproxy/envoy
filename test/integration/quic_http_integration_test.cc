@@ -663,7 +663,8 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
 }
 
-TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
+// TODO(#19006): Track down the flakiness and re-enable.
+TEST_P(QuicHttpIntegrationTest, DISABLED_AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);
 }
 

@@ -453,6 +453,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Set up stat prefixes, etc.
   request_vcluster_ = route_entry_->virtualCluster(headers);
+  if (request_vcluster_ != nullptr) {
+    callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
+  }
   ENVOY_STREAM_LOG(debug, "cluster '{}' match for URL '{}'", *callbacks_,
                    route_entry_->clusterName(), headers.getPathValue());
 
@@ -1227,8 +1230,9 @@ void Filter::handleNon5xxResponseHeaders(absl::optional<Grpc::Status::GrpcStatus
 
 void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
                                   UpstreamRequest& upstream_request) {
-  chargeUpstreamCode(100, *headers, upstream_request.upstreamHost(), false);
-  ENVOY_STREAM_LOG(debug, "upstream 100 continue", *callbacks_);
+  const uint64_t response_code = Http::Utility::getResponseStatus(*headers);
+  chargeUpstreamCode(response_code, *headers, upstream_request.upstreamHost(), false);
+  ENVOY_STREAM_LOG(debug, "upstream 1xx ({}).", *callbacks_, response_code);
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;

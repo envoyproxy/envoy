@@ -23,14 +23,17 @@
 namespace Envoy {
 namespace {
 
+using testing::HasSubstr;
+
 std::string protocolTestParamsAndBoolToString(
-    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool>>& params) {
-  return fmt::format("{}_{}",
+    const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool, bool>>& params) {
+  return fmt::format("{}_{}_{}",
                      HttpProtocolIntegrationTest::protocolTestParamsToString(
                          ::testing::TestParamInfo<HttpProtocolTestParams>(std::get<0>(params.param),
                                                                           /*an_index=*/0)),
                      std::get<1>(params.param) ? "with_per_stream_buffer_accounting"
-                                               : "without_per_stream_buffer_accounting");
+                                               : "without_per_stream_buffer_accounting",
+                     std::get<2>(params.param) ? "WrappedHttp2" : "BareHttp2");
 }
 
 void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::function<void()> func) {
@@ -64,7 +67,7 @@ void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::funct
 
 class Http2BufferWatermarksTest
     : public SocketInterfaceSwap,
-      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+      public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   std::vector<IntegrationStreamDecoderPtr>
@@ -97,7 +100,9 @@ public:
     } else {
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
-
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
@@ -136,7 +141,7 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2BufferWatermarksTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 // We should create four buffers each billing the same downstream request's
@@ -272,7 +277,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
 // up notifying the BufferMemoryAccount when the dtor of the downstream stream
 // occurs.
 class ProtocolsBufferWatermarksTest
-    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool>>,
+    : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, bool, bool>>,
       public HttpIntegrationTest {
 public:
   ProtocolsBufferWatermarksTest()
@@ -287,6 +292,9 @@ public:
     } else {
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
+    const bool enable_new_wrapper = std::get<2>(GetParam());
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_new_codec_wrapper",
+                                      enable_new_wrapper ? "true" : "false");
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(std::get<0>(GetParam()).upstream_protocol);
   }
@@ -302,7 +310,7 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP1, Http::CodecType::HTTP2, Http::CodecType::HTTP3},
                          {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 TEST_P(ProtocolsBufferWatermarksTest, AccountShouldBeRegisteredAndUnregisteredOnce) {
@@ -427,7 +435,7 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersions, Http2OverloadManagerIntegrationTest,
     testing::Combine(testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
                          {Http::CodecType::HTTP2}, {FakeHttpConnection::Type::HTTP2})),
-                     testing::Bool()),
+                     testing::Bool(), testing::Bool()),
     protocolTestParamsAndBoolToString);
 
 TEST_P(Http2OverloadManagerIntegrationTest,
@@ -609,6 +617,91 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   ASSERT_TRUE(smallest_response->waitForEndStream());
   ASSERT_TRUE(smallest_response->complete());
   EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
+}
+
+TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  useAccessLog("%RESPONSE_CODE%");
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Set 10MiB receive window for the client.
+  const int downstream_window_size = 10 * 1024 * 1024;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(downstream_window_size);
+  http2_options.mutable_initial_connection_window_size()->set_value(downstream_window_size);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  writev_matcher_->setSourcePort(lookupPort("http"));
+  writev_matcher_->setWritevReturnsEgain();
+
+  // Send a request
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-length", "10"},
+  });
+  auto& encoder = encoder_decoder.first;
+  const std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_response = std::move(upstream_request_);
+
+  // Send the responses back. It is larger than the downstream's receive window
+  // size. Thus, the codec will not end the stream, but the Envoy level stream
+  // should.
+  upstream_request_for_response->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                               false);
+  const int response_size = downstream_window_size + 1024; // Slightly over the window size.
+  upstream_request_for_response->encodeData(response_size, true);
+
+  if (streamBufferAccounting()) {
+    // Wait for access log to know the Envoy level stream has been deleted.
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
+  }
+
+  // Set the pressure so the overload action kills the response if doing stream
+  // accounting
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to downstream.
+  writev_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(response->waitForReset());
+    EXPECT_TRUE(response->reset());
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting the
+    // streams.
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->headers().getStatusValue(), "200");
+  }
 }
 
 } // namespace Envoy

@@ -56,6 +56,7 @@ MockStreamInfo::MockStreamInfo()
         std::chrono::duration_cast<std::chrono::nanoseconds>(ts_.systemTime() - start_time_)
             .count());
   }));
+  ON_CALL(*this, downstreamTiming()).WillByDefault(ReturnRef(downstream_timing_));
   ON_CALL(*this, setUpstreamLocalAddress(_))
       .WillByDefault(
           Invoke([this](const Network::Address::InstanceConstSharedPtr& upstream_local_address) {
@@ -109,7 +110,12 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));
+  ON_CALL(*this, setVirtualClusterName(_))
+      .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
+        virtual_cluster_name_ = virtual_cluster_name;
+      }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
   ON_CALL(*this, upstreamTransportFailureReason())
       .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
   ON_CALL(*this, setConnectionID(_)).WillByDefault(Invoke([this](uint64_t id) {
@@ -140,6 +146,8 @@ MockStreamInfo::MockStreamInfo()
       .WillByDefault(Invoke([this](const BytesMeterSharedPtr& downstream_bytes_meter) {
         downstream_bytes_meter_ = downstream_bytes_meter;
       }));
+  ON_CALL(*this, upstreamTiming()).WillByDefault(ReturnRef(upstream_timing_));
+  ON_CALL(Const(*this), upstreamTiming()).WillByDefault(Return(upstream_timing_));
 }
 
 MockStreamInfo::~MockStreamInfo() = default;
