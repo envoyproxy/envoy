@@ -182,14 +182,10 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
 
 std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   std::vector<ParentHistogramSharedPtr> ret;
-  Thread::LockGuard lock(hist_mutex_);
-  {
-    ret.reserve(histogram_set_.size());
-    for (const auto& histogram_ptr : histogram_set_) {
-      ret.emplace_back(histogram_ptr);
-    }
-  }
-
+  forEachHistogram([&ret](std::size_t size) mutable { ret.reserve(size); },
+                   [&ret](ParentHistogram& histogram) mutable {
+                     ret.emplace_back(ParentHistogramSharedPtr(&histogram));
+                   });
   return ret;
 }
 
@@ -678,7 +674,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
                                        *buckets, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
-          if (parent_.sink_predicates_.get() && parent_.sink_predicates_->includeHistogram(*stat)) {
+          if (parent_.sink_predicates_.has_value() &&
+              parent_.sink_predicates_->includeHistogram(*stat)) {
             parent_.sinked_histograms_.insert(stat.get());
           }
         }
@@ -995,7 +992,7 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
 
 void ThreadLocalStoreImpl::forEachSinkedHistogram(SizeFn f_size,
                                                   StatFn<ParentHistogram> f_stat) const {
-  if (sink_predicates_.get() != nullptr) {
+  if (sink_predicates_.has_value()) {
     Thread::LockGuard lock(hist_mutex_);
 
     if (f_size != nullptr) {

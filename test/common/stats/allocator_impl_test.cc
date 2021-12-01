@@ -59,6 +59,7 @@ public:
   bool includeTextReadout(const TextReadout& text_readout) override {
     return sinked_stat_names_.find(text_readout.statName()) != sinked_stat_names_.end();
   }
+  bool includeHistogram(const Histogram&) override { return false; }
 
 private:
   StatNameHashSet sinked_stat_names_;
