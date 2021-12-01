@@ -519,5 +519,12 @@ public:
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 
+class MatchingData {
+public:
+  static absl::string_view name() { return "network"; }
+
+  virtual ~MatchingData() = default;
+};
+
 } // namespace Network
 } // namespace Envoy
