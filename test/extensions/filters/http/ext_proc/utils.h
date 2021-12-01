@@ -18,7 +18,7 @@ public:
                                            const envoy::config::core::v3::HeaderMap& actual);
 };
 
-MATCHER_P(HeaderProtosEqual, expected, "HTTP header protos match") {
+MATCHER_P(HeaderProtosEqual, expected, absl::StrFormat("HTTP header has \"%s\"", expected)) {
   return ExtProcTestUtility::headerProtosEqualIgnoreOrder(expected, arg);
 }
 
