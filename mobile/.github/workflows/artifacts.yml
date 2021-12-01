@@ -26,7 +26,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           current_release_version=$(git describe --tag --abbrev=0)
-          bazelisk build \
+          ./bazelw build \
               --config=release-android \
               --fat_apk_cpu=x86 \
               --define=pom_version=$current_release_version \
@@ -114,7 +114,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          bazelisk build \
+          ./bazelw build \
             --config=release-ios \
             --ios_multi_cpus=i386,x86_64,armv7,arm64 \
             --config=remote-ci-macos \

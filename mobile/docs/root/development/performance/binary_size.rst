@@ -63,7 +63,7 @@ necessary tools::
 The binary being compiled is ``//test/performance:test_binary_size``.
 The binary is getting built with the following build command::
 
-  bazelisk build //test/performance:test_binary_size --config=sizeopt --copt=-ggdb3 --linkopt=-fuse-ld=lld
+  ./bazelw build //test/performance:test_binary_size --config=sizeopt --copt=-ggdb3 --linkopt=-fuse-ld=lld
 
 Thus the binary is compiled with the following flags pertinent to reducing
 binary size:

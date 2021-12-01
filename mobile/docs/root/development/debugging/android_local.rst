@@ -56,7 +56,7 @@ With the project ready, you can now start debugging with Android Studio.
 For example:
 ::
 
-    $ bazelisk build android_dist --config=android --fat_apk_cpu=x86 -c dbg
+    $ ./bazelw build android_dist --config=android --fat_apk_cpu=x86 -c dbg
 
 Android supported archs are `arm64_v8a`, `armeabi-v7a`, `x86`, `x86_64`.
 

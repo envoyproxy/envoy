@@ -23,7 +23,7 @@ Common (C/C++) tests
 
 To run the entire C/C++ test suite locally, use the following Bazel command:
 
-``bazelisk test --test_output=all //test/common/...``
+``./bazelw test --test_output=all //test/common/...``
 
 ----------
 Java tests
@@ -31,7 +31,7 @@ Java tests
 
 To run the entire Java unit test suite locally, use the following Bazel command:
 
-``bazelisk test --test_output=all --build_tests_only //test/java/...``
+``./bazelw test --test_output=all --build_tests_only //test/java/...``
 
 ------------
 Kotlin tests
@@ -39,7 +39,7 @@ Kotlin tests
 
 To run the entire Kotlin unit test suite locally, use the following Bazel command:
 
-``bazelisk test --test_output=all --build_tests_only //test/kotlin/...``
+``./bazelw test --test_output=all --build_tests_only //test/kotlin/...``
 
 -----------
 Swift tests
@@ -47,7 +47,7 @@ Swift tests
 
 To run the entire Swift unit test suite locally, use the following Bazel command:
 
-``bazelisk test --config=ios --test_output=all --build_tests_only //test/swift/...``
+``./bazelw test --config=ios --test_output=all --build_tests_only //test/swift/...``
 
 --------
 Coverage
