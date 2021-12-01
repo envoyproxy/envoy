@@ -962,9 +962,9 @@ void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
     ListenerImpl& listener) {
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about about which non-binding
+  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
   // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections.
+  // different listeners receiving connections destined for the same port.
   if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
       (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
        hasListenerWithCompatibleAddress(active_listeners_, listener))) {
