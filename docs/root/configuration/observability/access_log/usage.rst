@@ -241,6 +241,16 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+%UPSTREAM_REQUEST_ATTEMPT_COUNT%
+  HTTP
+    Number of times the request is attempted upstream. Note that an attempt count of '0' means that
+    the request was never attempted upstream.
+
+  TCP
+    Not implemented ("-").
+
+  Renders a numeric value in typed JSON logs.
+
 %UPSTREAM_WIRE_BYTES_SENT%
   HTTP
     Total number of bytes sent to the upstream by the http stream.
