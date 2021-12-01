@@ -20,8 +20,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // it possible to restrict what an external processing server can do.
 // Every attempt to add, change, append, or remove a header will be
 // tested against the rules here. Disallowed header mutations will be
-// ignored, and a DEBUG message logged, unless "disallow_is_error" is
-// set to true.
+// ignored unless "disallow_is_error" is set to true.
+//
+// In addition, a counter will be incremented whenever a mutation is
+// rejected. In the ext_proc filter, that counter is named
+// "rejected_header_mutations".
 // [#next-free-field: 8]
 message HeaderMutationRules {
   // Prevent modification of headers that could affect routing
