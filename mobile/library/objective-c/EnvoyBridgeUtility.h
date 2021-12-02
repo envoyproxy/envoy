@@ -24,7 +24,7 @@ static inline envoy_data *toNativeDataPtr(NSData *data) {
 }
 
 static inline envoy_data toManagedNativeString(NSString *s) {
-  size_t length = s.length;
+  size_t length = [s lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
   uint8_t *native_string = (uint8_t *)safe_malloc(sizeof(uint8_t) * length);
   memcpy(native_string, s.UTF8String, length); // NOLINT(safe-memcpy)
   envoy_data ret = {length, native_string, free, native_string};
