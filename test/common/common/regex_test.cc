@@ -8,6 +8,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "xds/type/matcher/v3/regex.pb.h"
 
 namespace Envoy {
 namespace Regex {
@@ -154,6 +155,41 @@ TEST(Utility, ParseRegex) {
     EXPECT_NO_THROW(Utility::parseRegex(matcher));
     EXPECT_LOG_NOT_CONTAINS("warn", "> max program size", Utility::parseRegex(matcher));
     EXPECT_EQ(0, warn_count.value());
+  }
+
+  // Verify that XDS regex configs can be converted into regex compiled matchers.
+  {
+    const std::string yaml_string = R"EOF(
+engine:
+  name: google-re2
+  typed_config:
+    "@type": type.googleapis.com/envoy.type.matcher.v3.RegexMatcher.GoogleRE2
+regex: /asdf/.*
+)EOF";
+    xds::type::matcher::v3::RegexMatcher matcher;
+    TestUtility::loadFromYaml(yaml_string, matcher);
+
+    auto* factory = Config::Utility::getFactory<CompiledMatcherFactory>(matcher.engine());
+
+    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+        matcher.engine().typed_config(), ProtobufMessage::getStrictValidationVisitor(), *factory);
+    auto regex_matcher = factory->createCompiledMatcherFactoryCb(
+        *message, ProtobufMessage::getStrictValidationVisitor());
+
+    const auto compiled_matcher = regex_matcher(matcher.regex());
+    const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
+    EXPECT_TRUE(compiled_matcher->match(long_string));
+  }
+
+  // Verify that XDS regex configs with deprecated fields can be converted into regex compiled
+  // matchers.
+  {
+    xds::type::matcher::v3::RegexMatcher matcher;
+    matcher.mutable_google_re2();
+    matcher.set_regex("/asdf/.*");
+    const auto compiled_matcher = Utility::parseRegex(matcher);
+    const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
+    EXPECT_TRUE(compiled_matcher->match(long_string));
   }
 }
 

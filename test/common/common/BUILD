@@ -276,6 +276,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
