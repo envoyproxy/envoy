@@ -108,7 +108,7 @@ public:
   // (functionally) unlimited.
   // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
-  // The will start out as the upper limit of max conurrent streams for this connection
+  // The will start out as the upper limit of max concurrent streams for this connection
   // if capped by configuration, or it will be set to std::numeric_limits<uint32_t>::max()
   // to be (functionally) unlimited.
   uint32_t configured_stream_limit_;
