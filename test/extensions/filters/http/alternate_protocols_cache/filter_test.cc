@@ -104,7 +104,7 @@ TEST_F(FilterTest, ValidAltSvc) {
   std::string hostname = "host1";
   std::shared_ptr<Upstream::MockHostDescription> hd =
       std::make_shared<Upstream::MockHostDescription>();
-  StreamInfo::MockStreamInfo stream_info;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info));
   stream_info.upstreamInfo()->setUpstreamHost(hd);
   EXPECT_CALL(*hd, hostname()).WillOnce(ReturnRef(hostname));
