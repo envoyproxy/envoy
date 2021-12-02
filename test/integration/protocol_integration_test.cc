@@ -3544,7 +3544,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
-
+  ASSERT(!Api::OsSysCallsSingleton::get().supportsUdpGso());
   SocketInterfaceSwap socket_swap;
 
   initialize();
@@ -3563,10 +3563,14 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
     // For HTTP/3 since the packets are black holed, there is no client side
     // indication of connection close. Wait on Envoy stats instead.
     test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+    codec_client_->close();
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
   socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
 }
 
 } // namespace Envoy
