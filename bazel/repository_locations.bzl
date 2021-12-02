@@ -859,6 +859,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -882,6 +883,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1078,6 +1080,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # ANTLR has a runtime component, so is not purely build.
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1098,6 +1101,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",

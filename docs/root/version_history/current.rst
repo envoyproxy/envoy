@@ -54,6 +54,8 @@ Removed Config or Runtime
 New Features
 ------------
 * access log: added :ref:`grpc_stream_retry_policy <envoy_v3_api_field_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig.grpc_stream_retry_policy>` to the gRPC logger to reconnect when a connection fails to be established.
+* access_log: added :ref:`METADATA<envoy_v3_api_msg_extensions.formatter.metadata.v3.Metadata>` token to handle all types of metadata (DYNAMIC, CLUSTER, ROUTE).
+* access_log: added a CEL extension filter to enable filtering of access logs based on Envoy attribute expressions.
 * access_log: added new access_log command operator ``%UPSTREAM_REQUEST_ATTEMPT_COUNT%`` to retrieve the number of times given request got attempted upstream.
 * access_log: added new access_log command operator ``%VIRTUAL_CLUSTER_NAME%`` to retrieve the matched Virtual Cluster name.
 * api: added support for *xds.type.v3.TypedStruct* in addition to the now-deprecated *udpa.type.v1.TypedStruct* proto message, which is a wrapper proto used to encode typed JSON data in a *google.protobuf.Any* field.
