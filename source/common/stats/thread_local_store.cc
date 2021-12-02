@@ -1011,6 +1011,14 @@ void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& s
   if (sink_predicates != nullptr) {
     sink_predicates_.emplace(*sink_predicates);
     alloc_.setSinkPredicates(std::move(sink_predicates));
+    // Add histograms to the set of sinked histograms.
+    Thread::LockGuard lock(hist_mutex_);
+    sinked_histograms_.clear();
+    for (auto& histogram : histogram_set_) {
+      if (sink_predicates_->includeHistogram(*histogram)) {
+        sinked_histograms_.insert(histogram);
+      }
+    }
   }
 }
 

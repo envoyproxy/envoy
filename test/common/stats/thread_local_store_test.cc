@@ -1582,6 +1582,41 @@ private:
   absl::flat_hash_set<std::string> sinked_stat_names_;
 };
 
+TEST_F(HistogramTest, ForEachHistogram) {
+  std::vector<std::reference_wrapper<Stats::Histogram>> histograms;
+
+  const size_t num_stats = 11;
+  for (size_t idx = 0; idx < num_stats; ++idx) {
+    auto stat_name = absl::StrCat("histogram.", idx);
+    histograms.emplace_back(
+        store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+  }
+  EXPECT_EQ(histograms.size(), 11);
+
+  size_t num_histograms = 0;
+  size_t num_iterations = 0;
+  store_->forEachHistogram([&num_histograms](std::size_t size) { num_histograms = size; },
+                           [&num_iterations](Stats::ParentHistogram&) { ++num_iterations; });
+  EXPECT_EQ(num_histograms, 11);
+  EXPECT_EQ(num_iterations, 11);
+
+  Histogram& deleted_histogram = histograms[4];
+
+  // Verify that rejecting histograms removes them from the iteration set.
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  num_histograms = 0;
+  num_iterations = 0;
+  store_->forEachHistogram([&num_histograms](std::size_t size) { num_histograms = size; },
+                           [&num_iterations](Stats::ParentHistogram&) { ++num_iterations; });
+  EXPECT_EQ(num_histograms, 0);
+  EXPECT_EQ(num_iterations, 0);
+
+  // Verify that we can access the local reference without a crash.
+  (void)deleted_histogram.unit();
+}
+
 TEST_F(HistogramTest, ForEachSinkedHistogram) {
   std::unique_ptr<Stats::SinkPredicatesTest> moved_sink_predicates =
       std::make_unique<SinkPredicatesTest>();
@@ -1589,11 +1624,25 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
   std::vector<std::reference_wrapper<Stats::Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Stats::Histogram>> unsinked_histograms;
 
+  const size_t num_stats = 11;
+  // Create some histograms before setting the predicates.
+  for (size_t idx = 0; idx < num_stats / 2; ++idx) {
+    auto stat_name = absl::StrCat("histogram.", idx);
+    // sink every 3rd stat
+    if ((idx + 1) % 3 == 0) {
+      sink_predicates->sinkedStatNames().insert(stat_name);
+      sinked_histograms.emplace_back(
+          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+    } else {
+      unsinked_histograms.emplace_back(
+          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+    }
+  }
+
   store_->setSinkPredicates(std::move(moved_sink_predicates));
 
-  const size_t num_stats = 11;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
+  // Create some histograms after setting the predicates.
+  for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
     auto stat_name = absl::StrCat("histogram.", idx);
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
@@ -1620,6 +1669,18 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
       });
   EXPECT_EQ(num_sinked_histograms, 3);
   EXPECT_EQ(num_iterations, 3);
+
+  // Verify that rejecting histograms removes them from the sink set.
+  envoy::config::metrics::v3::StatsConfig stats_config_;
+  stats_config_.mutable_stats_matcher()->set_reject_all(true);
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_));
+  num_sinked_histograms = 0;
+  num_iterations = 0;
+  store_->forEachSinkedHistogram(
+      [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
+      [&num_iterations](Stats::ParentHistogram&) { ++num_iterations; });
+  EXPECT_EQ(num_sinked_histograms, 0);
+  EXPECT_EQ(num_iterations, 0);
 }
 
 class ThreadLocalRealThreadsTestBase : public Thread::RealThreadsTestHelper,
