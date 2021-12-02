@@ -19,10 +19,28 @@
 
 namespace Envoy {
 
+class TestSinkPredicates : public Stats::SinkPredicates {
+public:
+  bool includeCounter(const Stats::Counter&) override { return (++num_counters_) % 10 == 0; }
+  bool includeGauge(const Stats::Gauge&) override { return (++num_gauges_) % 10 == 0; }
+  bool includeTextReadout(const Stats::TextReadout&) override {
+    return (++num_text_readouts_) % 10 == 0;
+  }
+
+private:
+  size_t num_counters_ = 0;
+  size_t num_gauges_ = 0;
+  size_t num_text_readouts_ = 0;
+};
+
 class StatsSinkFlushSpeedTest {
 public:
-  StatsSinkFlushSpeedTest(size_t const num_stats)
+  StatsSinkFlushSpeedTest(size_t const num_stats, bool set_sink_predicates = false)
       : pool_(symbol_table_), stats_allocator_(symbol_table_), stats_store_(stats_allocator_) {
+    if (set_sink_predicates) {
+      stats_store_.setSinkPredicates(
+          std::unique_ptr<Stats::SinkPredicates>{std::make_unique<TestSinkPredicates>()});
+    }
 
     // Create counters
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
@@ -39,6 +57,12 @@ public:
     for (uint64_t idx = 0; idx < num_stats; ++idx) {
       auto stat_name = pool_.add(absl::StrCat("text_readout.", idx));
       stats_store_.textReadoutFromStatName(stat_name).set(absl::StrCat("text_readout.", idx));
+    }
+
+    // Create histograms
+    for (uint64_t idx = 0; idx < num_stats; ++idx) {
+      std::string stat_name(absl::StrCat("histogram.", idx));
+      stats_store_.histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified);
     }
   }
 
@@ -69,6 +93,22 @@ static void bmFlushToSinks(::benchmark::State& state) {
   StatsSinkFlushSpeedTest speed_test(state.range(0));
   speed_test.test(state);
 }
+
+static void bmFlushToSinksWithPredicatesSet(::benchmark::State& state) {
+  // Skip expensive benchmarks for unit tests.
+  if (benchmark::skipExpensiveBenchmarks() && state.range(0) > 100) {
+    state.SkipWithError("Skipping expensive benchmark");
+    return;
+  }
+
+  StatsSinkFlushSpeedTest speed_test(state.range(0), true);
+  speed_test.test(state);
+}
+
 BENCHMARK(bmFlushToSinks)->Unit(::benchmark::kMillisecond)->RangeMultiplier(10)->Range(10, 1000000);
+BENCHMARK(bmFlushToSinksWithPredicatesSet)
+    ->Unit(::benchmark::kMillisecond)
+    ->RangeMultiplier(10)
+    ->Range(10, 1000000);
 
 } // namespace Envoy

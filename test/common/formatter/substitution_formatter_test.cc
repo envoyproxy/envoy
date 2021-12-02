@@ -362,6 +362,28 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    StreamInfoFormatter attempt_count_format("UPSTREAM_REQUEST_ATTEMPT_COUNT");
+    absl::optional<uint32_t> attempt_count{3};
+    EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(attempt_count));
+    EXPECT_EQ("3", attempt_count_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(attempt_count_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(3.0)));
+  }
+
+  {
+    StreamInfoFormatter attempt_count_format("UPSTREAM_REQUEST_ATTEMPT_COUNT");
+    absl::optional<uint32_t> attempt_count;
+    EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(attempt_count));
+    EXPECT_EQ("0", attempt_count_format.format(request_headers, response_headers, response_trailers,
+                                               stream_info, body));
+    EXPECT_THAT(attempt_count_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(0.0)));
+  }
+
+  {
     StreamInfo::BytesMeterSharedPtr upstream_bytes_meter{
         std::make_shared<StreamInfo::BytesMeter>()};
     upstream_bytes_meter->addWireBytesReceived(1);
@@ -751,6 +773,22 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    std::string virtual_cluster_name = "authN";
+    stream_info.setVirtualClusterName(virtual_cluster_name);
+    EXPECT_EQ("authN", upstream_format.format(request_headers, response_headers, response_trailers,
+                                              stream_info, body));
+  }
+
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("VIRTUAL_CLUSTER_NAME");
+    EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+  }
 
   {
     // Use a local stream info for these tests as as setSslConnection can only be called once.

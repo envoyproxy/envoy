@@ -20,6 +20,7 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -168,7 +169,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  store.forEachCounter(
+  store.forEachSinkedCounter(
       [this](std::size_t size) mutable {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
@@ -178,7 +179,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         counters_.push_back({counter.latch(), counter});
       });
 
-  store.forEachGauge(
+  store.forEachSinkedGauge(
       [this](std::size_t size) mutable {
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
@@ -195,7 +196,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     histograms_.push_back(*histogram);
   }
 
-  store.forEachTextReadout(
+  store.forEachSinkedTextReadout(
       [this](std::size_t size) mutable {
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
