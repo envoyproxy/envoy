@@ -231,7 +231,7 @@ message HttpGenericBodyMatch {
 }
 
 // Matches a specific IP address against a set of possibly overlapping subnets.
-// TODO(kuat) Move to cncf/xds.
+// TODO(kuat) Move to xds repository.
 message IPMatcher {
   // Specifies an optional list of IP address ranges and a match action.
   message IPRangeMatcher {
