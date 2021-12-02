@@ -961,13 +961,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
     ListenerImpl& listener) {
-  // Typically we catch address issues when we try to bind to the same address multiple times.
-  // However, for listeners that do not bind we must check to make sure we are not duplicating. This
-  // is an edge case and nothing will explicitly break, but there is no possibility that two
-  // listeners that do not bind will ever be used. Only the first one will be used when searched for
-  // by address. Thus we block it.
-  if (!listener.bindToPort() && (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
-                                 hasListenerWithCompatibleAddress(active_listeners_, listener))) {
+  // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
+  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
+  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
+  // different listeners receiving connections destined for the same port.
+  if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
+      (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
+       hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, listener.address()->asString());
