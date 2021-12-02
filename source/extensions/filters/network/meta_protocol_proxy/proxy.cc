@@ -41,13 +41,14 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
   std::string terminal_filter_name;
   for (const auto& filter : filters) {
     if (has_terminal_filter) {
-      throw EnvoyException(fmt::format("Termial filter: {} must be the last generic L7 filter",
-                                       terminal_filter_name));
+      throw EnvoyException(fmt::format(
+          "Termial filter: {} must be the last meta protocol L7 filter", terminal_filter_name));
     }
 
     auto& factory = Config::Utility::getAndCheckFactory<NamedFilterConfigFactory>(filter);
 
     ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
+    ASSERT(message != nullptr);
     Envoy::Config::Utility::translateOpaqueConfig(filter.typed_config(),
                                                   context.messageValidationVisitor(), *message);
 
@@ -60,13 +61,13 @@ std::vector<FilterFactoryCb> FilterConfig::filtersFactoryFromProto(
   }
 
   if (!has_terminal_filter) {
-    throw EnvoyException("A termial L7 filter is necessary for generic proxy");
+    throw EnvoyException("A termial L7 filter is necessary for meta protocol proxy");
   }
   return factories;
 }
 
 ActiveStream::ActiveStream(Filter& parent, RequestPtr request)
-    : parent_(parent), request_(std::move(request)) {}
+    : parent_(parent), downstream_request_stream_(std::move(request)) {}
 
 ActiveStream::~ActiveStream() {
   for (auto& filter : decoder_filters_) {
@@ -80,7 +81,6 @@ ActiveStream::~ActiveStream() {
   }
 }
 
-const Network::Connection* ActiveStream::connection() { return &parent_.connection(); }
 Envoy::Event::Dispatcher& ActiveStream::dispatcher() { return parent_.connection().dispatcher(); }
 const CodecFactory& ActiveStream::downstreamCodec() { return *parent_.config_->codec_factory_; }
 void ActiveStream::resetStream() {
@@ -93,17 +93,32 @@ void ActiveStream::resetStream() {
 
 void ActiveStream::sendLocalReply(Status status, absl::string_view status_detail,
                                   ResponseUpdateFunction&& func) {
-  parent_.sendLocalReply(status, status_detail, std::move(func));
+  ASSERT(parent_.creator_ != nullptr);
+  local_or_upstream_response_stream_ =
+      parent_.creator_->response(status, status_detail, *downstream_request_stream_);
+
+  ASSERT(local_or_upstream_response_stream_ != nullptr);
+
+  if (func != nullptr) {
+    func(*local_or_upstream_response_stream_);
+  }
+
+  parent_.sendReplyDownstream(*local_or_upstream_response_stream_, *this);
 }
 
 void ActiveStream::continueDecoding() {
-  if (active_stream_reset_ || request_ == nullptr) {
+  if (active_stream_reset_ || downstream_request_stream_ == nullptr) {
     return;
   }
 
-  ASSERT(request_ != nullptr);
+  if (cached_route_entry_ == nullptr) {
+    cached_route_entry_ = parent_.config_->route_matcher_->routeEntry(*downstream_request_stream_);
+  }
+
+  ASSERT(downstream_request_stream_ != nullptr);
   for (; next_decoder_filter_index_ < decoder_filters_.size();) {
-    auto status = decoder_filters_[next_decoder_filter_index_]->onStreamDecoded(*request_);
+    auto status =
+        decoder_filters_[next_decoder_filter_index_]->onStreamDecoded(*downstream_request_stream_);
     next_decoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
       break;
@@ -115,18 +130,21 @@ void ActiveStream::continueDecoding() {
 }
 
 void ActiveStream::upstreamResponse(ResponsePtr response) {
-  response_ = std::move(response);
+  local_or_upstream_response_stream_ = std::move(response);
   continueEncoding();
 }
 
+void ActiveStream::completeDirectly() { parent_.deferredStream(*this); };
+
 void ActiveStream::continueEncoding() {
-  if (active_stream_reset_ || response_ == nullptr) {
+  if (active_stream_reset_ || local_or_upstream_response_stream_ == nullptr) {
     return;
   }
 
-  ASSERT(response_ != nullptr);
+  ASSERT(local_or_upstream_response_stream_ != nullptr);
   for (; next_encoder_filter_index_ < encoder_filters_.size();) {
-    auto status = encoder_filters_[next_encoder_filter_index_]->onStreamEncoded(*response_);
+    auto status = encoder_filters_[next_encoder_filter_index_]->onStreamEncoded(
+        *local_or_upstream_response_stream_);
     next_encoder_filter_index_++;
     if (status == FilterStatus::StopIteration) {
       break;
@@ -135,8 +153,14 @@ void ActiveStream::continueEncoding() {
 
   if (next_encoder_filter_index_ == encoder_filters_.size()) {
     ENVOY_LOG(debug, "Complete decoder filters");
-    parent_.sendReplyDownstream(*response_);
+    parent_.sendReplyDownstream(*local_or_upstream_response_stream_, *this);
   }
+}
+
+void ActiveStream::onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) {
+  ASSERT(parent_.connection().state() == Network::Connection::State::Open);
+  parent_.deferredStream(*this);
+  parent_.connection().write(buffer, close_connection);
 }
 
 Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool) {
@@ -148,37 +172,26 @@ Envoy::Network::FilterStatus Filter::onData(Envoy::Buffer::Instance& data, bool)
   return Envoy::Network::FilterStatus::StopIteration;
 }
 
-void Filter::onRequest(RequestPtr request) {
-  // New normal request and create active stream for this request.
-  newDownstreamRequest(std::move(request));
-}
+void Filter::onDecodingSuccess(RequestPtr request) { newDownstreamRequest(std::move(request)); }
 
-void Filter::onDirectResponse(ResponsePtr direct) { sendReplyDownstream(*direct); }
-
-void Filter::onDecodingError() {
+void Filter::onDecodingFailure() {
   resetStreamsForUnexpectedError();
   connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
-void Filter::sendReplyDownstream(Response& response) {
-  ASSERT(callbacks_->connection().state() == Network::Connection::State::Open);
-  response_encoder_->encode(response, response_buffer_);
-  callbacks_->connection().write(response_buffer_, false);
-}
-
-void Filter::sendLocalReply(Status status, absl::string_view status_detail,
-                            ResponseUpdateFunction&& func) {
-  auto response = creator_->response(status, status_detail);
-  func(*response);
-  sendReplyDownstream(*response);
+void Filter::sendReplyDownstream(Response& response, ResponseEncoderCallback& callback) {
+  response_encoder_->encode(response, callback);
 }
 
 void Filter::newDownstreamRequest(RequestPtr request) {
   auto stream = std::make_unique<ActiveStream>(*this, std::move(request));
-  config_->createFilterChain(*stream);
+  auto raw_stream = stream.get();
   LinkedList::moveIntoList(std::move(stream), active_streams_);
+
+  config_->createFilterChain(*raw_stream);
+
   // Start request.
-  (*active_streams_.begin())->continueDecoding();
+  raw_stream->continueDecoding();
 }
 
 void Filter::deferredStream(ActiveStream& stream) {

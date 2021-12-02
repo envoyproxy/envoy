@@ -78,7 +78,7 @@ public:
 
       std::vector<absl::string_view> result = absl::StrSplit(body, '|');
       if (result.size() != 5) {
-        callback_->onDecodingError();
+        callback_->onDecodingFailure();
         return false;
       }
 
@@ -92,7 +92,7 @@ public:
         request->data_.emplace(pair);
       }
 
-      callback_->onRequest(std::move(request));
+      callback_->onDecodingSuccess(std::move(request));
       return true;
     }
 
@@ -140,7 +140,7 @@ public:
 
       std::vector<absl::string_view> result = absl::StrSplit(body, '|');
       if (result.size() != 3) {
-        callback_->onDecodingError();
+        callback_->onDecodingFailure();
         return false;
       }
 
@@ -153,7 +153,7 @@ public:
         response->data_.emplace(pair);
       }
 
-      callback_->onResponse(std::move(response));
+      callback_->onDecodingSuccess(std::move(response));
       return true;
     }
 
@@ -171,7 +171,7 @@ public:
           buffer_.drain(4);
 
           if (message_size_.value() < 4) {
-            callback_->onDecodingError();
+            callback_->onDecodingFailure();
             return;
           }
         }
@@ -195,26 +195,30 @@ public:
 
   class FakeRequestEncoder : public RequestEncoder {
   public:
-    void encode(const Request& request, Buffer::Instance& buffer) override {
+    void encode(const Request& request, RequestEncoderCallback& callback) override {
       const FakeRequest* typed_request = dynamic_cast<const FakeRequest*>(&request);
       ASSERT(typed_request != nullptr);
 
       std::string body;
       body.reserve(512);
-      body = typed_request->protocol_ + "|" + typed_request->host_ + "|" +
-             typed_request->path_ + "|" + typed_request->method_ + "|";
+      body = typed_request->protocol_ + "|" + typed_request->host_ + "|" + typed_request->path_ +
+             "|" + typed_request->method_ + "|";
       for (const auto& pair : typed_request->data_) {
         body += pair.first + ":" + pair.second + ";";
       }
-      buffer.writeBEInt<uint32_t>(body.size());
-      buffer.add(body);
+      buffer_.writeBEInt<uint32_t>(body.size());
+      buffer_.add(body);
+
+      callback.onEncodingSuccess(buffer_, true);
     }
+
+    Buffer::OwnedImpl buffer_;
   };
 
   class FakeResponseEncoder : public ResponseEncoder {
   public:
-    void encode(const Response& request, Buffer::Instance& buffer) override {
-      const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&request);
+    void encode(const Response& response, ResponseEncoderCallback& callback) override {
+      const FakeResponse* typed_response = dynamic_cast<const FakeResponse*>(&response);
       ASSERT(typed_response != nullptr);
 
       std::string body;
@@ -224,15 +228,19 @@ public:
         body += pair.first + ":" + pair.second + ";";
       }
       // Additional 4 bytes for status.
-      buffer.writeBEInt<uint32_t>(body.size() + 4);
-      buffer.writeBEInt<uint32_t>(static_cast<uint32_t>(typed_response->status_));
-      buffer.add(body);
+      buffer_.writeBEInt<uint32_t>(body.size() + 4);
+      buffer_.writeBEInt<uint32_t>(static_cast<uint32_t>(typed_response->status_));
+      buffer_.add(body);
+
+      callback.onEncodingSuccess(buffer_, false);
     }
+
+    Buffer::OwnedImpl buffer_;
   };
 
   class FakeMessageCreator : public MessageCreator {
   public:
-    ResponsePtr response(Status status, absl::string_view status_detail, Request*) override {
+    ResponsePtr response(Status status, absl::string_view status_detail, const Request&) override {
       auto response = std::make_unique<FakeResponse>();
       response->status_ = status;
       response->status_detail_ = std::string(status_detail);
@@ -252,9 +260,13 @@ class FakeStreamCodecFactoryConfig : public CodecFactoryConfig {
 public:
   CodecFactoryPtr createFactory(const Protobuf::Message& config,
                                 Envoy::Server::Configuration::FactoryContext& context) override;
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
 
-  std::string name() const override { return "envoy.generic_proxy.codec.fake"; }
+  std::string configType() override { return ""; }
+
+  std::string name() const override { return "envoy.meta_protocol_proxy.codec.fake"; }
 };
 
 } // namespace MetaProtocolProxy

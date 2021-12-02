@@ -24,11 +24,6 @@ public:
   virtual ~StreamFilterCallbacks() = default;
 
   /**
-   * @return const Network::Connection* the originating connection, or nullptr if there is none.
-   */
-  virtual const Network::Connection* connection() PURE;
-
-  /**
    * @return Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
    */
   virtual Envoy::Event::Dispatcher& dispatcher() PURE;
@@ -48,11 +43,6 @@ public:
    * @return const RouteEntry* cached route entry for current request.
    */
   virtual const RouteEntry* routeEntry() const PURE;
-
-  /**
-   * Returns the clusterInfo for the cached route.
-   */
-  virtual Upstream::ClusterInfoConstSharedPtr clusterInfo() PURE;
 };
 
 class DecoderFilterCallback : public StreamFilterCallbacks {
@@ -63,6 +53,8 @@ public:
   virtual void continueDecoding() PURE;
 
   virtual void upstreamResponse(ResponsePtr response) PURE;
+
+  virtual void completeDirectly() PURE;
 };
 
 class EncoderFilterCallback : public StreamFilterCallbacks {

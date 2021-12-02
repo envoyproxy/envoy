@@ -18,9 +18,16 @@ class RequestDecoderCallback {
 public:
   virtual ~RequestDecoderCallback() = default;
 
-  virtual void onRequest(RequestPtr request) PURE;
-  virtual void onDirectResponse(ResponsePtr direct) PURE;
-  virtual void onDecodingError() PURE;
+  /**
+   * If request decoding success then this method will be called.
+   * @param request request from decoding.
+   */
+  virtual void onDecodingSuccess(RequestPtr request) PURE;
+
+  /**
+   * If request decoding failure then this method will be called.
+   */
+  virtual void onDecodingFailure() PURE;
 };
 
 /**
@@ -30,8 +37,46 @@ class ResponseDecoderCallback {
 public:
   virtual ~ResponseDecoderCallback() = default;
 
-  virtual void onResponse(ResponsePtr response) PURE;
-  virtual void onDecodingError() PURE;
+  /**
+   * If response decoding success then this method will be called.
+   * @param response response from decoding.
+   */
+  virtual void onDecodingSuccess(ResponsePtr response) PURE;
+
+  /**
+   * If response decoding failure then this method will be called.
+   */
+  virtual void onDecodingFailure() PURE;
+};
+
+/**
+ * Encoder callback of request.
+ */
+class RequestEncoderCallback {
+public:
+  virtual ~RequestEncoderCallback() = default;
+
+  /**
+   * If request encoding success then this method will be called.
+   * @param buffer encoding result buffer.
+   * @param expect_response whether the current request requires an upstream response.
+   */
+  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) PURE;
+};
+
+/**
+ * Encoder callback of Response.
+ */
+class ResponseEncoderCallback {
+public:
+  virtual ~ResponseEncoderCallback() = default;
+
+  /**
+   * If response encoding success then this method will be called.
+   * @param buffer encoding result buffer.
+   * @param close_connection whether the downstream connection should be closed.
+   */
+  virtual void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) PURE;
 };
 
 /**
@@ -63,8 +108,7 @@ class RequestEncoder {
 public:
   virtual ~RequestEncoder() = default;
 
-  // TODO(wbpcode): update this method to support async encoding.
-  virtual void encode(const Request&, Buffer::Instance& buffer) PURE;
+  virtual void encode(const Request&, RequestEncoderCallback& callback) PURE;
 };
 
 /*
@@ -74,8 +118,7 @@ class ResponseEncoder {
 public:
   virtual ~ResponseEncoder() = default;
 
-  // TODO(wbpcode): update this method to support async encoding.
-  virtual void encode(const Response&, Buffer::Instance& buffer) PURE;
+  virtual void encode(const Response&, ResponseEncoderCallback& callback) PURE;
 };
 
 class MessageCreator {
@@ -86,7 +129,7 @@ public:
    * Create local response message for local reply.
    */
   virtual ResponsePtr response(Status status, absl::string_view status_detail,
-                               Request* origin_request = nullptr) PURE;
+                               const Request& origin_request) PURE;
 };
 
 using RequestDecoderPtr = std::unique_ptr<RequestDecoder>;

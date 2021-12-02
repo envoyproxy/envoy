@@ -59,11 +59,13 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // ResponseDecoderCallback
-  void onResponse(ResponsePtr response) override;
-  void onDecodingError() override;
+  void onDecodingSuccess(ResponsePtr response) override;
+  void onDecodingFailure() override;
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
   void encodeBufferToUpstream(Buffer::Instance& buffer);
+
+  void completeUpstreamRequest();
 
   bool stream_reset_{};
 
@@ -74,6 +76,7 @@ public:
   Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
 
+  bool request_complete_{};
   bool response_started_{};
   bool response_complete_{};
   ResponseDecoderPtr response_decoder_;
@@ -81,31 +84,46 @@ public:
 using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
 
 class RouterFilter : public DecoderFilter,
-                     Logger::Loggable<Envoy::Logger::Id::filter>,
-                     public Upstream::LoadBalancerContextBase {
+                     public Upstream::LoadBalancerContextBase,
+                     public RequestEncoderCallback,
+                     Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   RouterFilter(Server::Configuration::FactoryContext& context) : context_(context) {}
 
   // DecoderFilter
   void onDestroy() override;
 
-  FilterStatus onStreamDecoded(Request& request) override;
   void setDecoderFilterCallbacks(DecoderFilterCallback& callbacks) override {
     callbacks_ = &callbacks;
   }
+  FilterStatus onStreamDecoded(Request& request) override;
+
+  // RequestEncoderCallback
+  void onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) override;
 
   void onUpstreamResponse(ResponsePtr response);
-  void resetStream(StreamResetReason reason);
+  void completeDirectly();
 
   void onUpstreamRequestReset(UpstreamRequest& upstream_request, StreamResetReason reason);
   void cleanUpstreamRequests(bool filter_complete);
 
+  void setRouteEntry(const RouteEntry* route_entry) { route_entry_ = route_entry; }
+
+  std::list<UpstreamRequestPtr>& upstreamRequestsForTest() { return upstream_requests_; }
+
 private:
   friend class UpstreamRequest;
 
+  void kickOffNewUpstreamRequest();
+  void resetStream(StreamResetReason reason);
+
+  bool expect_response_{};
   bool filter_complete_{};
 
+  const RouteEntry* route_entry_{};
+
   Buffer::OwnedImpl upstream_request_buffer_;
+
   RequestEncoderPtr request_encoder_;
 
   std::list<UpstreamRequestPtr> upstream_requests_;

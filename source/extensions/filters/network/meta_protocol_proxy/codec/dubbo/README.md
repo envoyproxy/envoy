@@ -1,1 +1,1 @@
-This dubbo codec now is only for some try.
+This dubbo codec now is only for only test.

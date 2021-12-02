@@ -11,15 +11,27 @@ namespace MetaProtocolProxy {
 
 class MockRequestDecoderCallback : public RequestDecoderCallback {
 public:
-  MOCK_METHOD(void, onRequest, (RequestPtr request));
-  MOCK_METHOD(void, onDirectResponse, (ResponsePtr direct));
-  MOCK_METHOD(void, onDecodingError, ());
+  MOCK_METHOD(void, onDecodingSuccess, (RequestPtr request));
+  MOCK_METHOD(void, onDecodingFailure, ());
 };
 
 class MockResponseDecoderCallback : public ResponseDecoderCallback {
 public:
-  MOCK_METHOD(void, onResponse, (ResponsePtr response));
-  MOCK_METHOD(void, onDecodingError, ());
+  MOCK_METHOD(void, onDecodingSuccess, (ResponsePtr response));
+  MOCK_METHOD(void, onDecodingFailure, ());
+};
+
+class MockRequestEncoderCallback : public RequestEncoderCallback {
+public:
+  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool expect_response));
+};
+
+/**
+ * Encoder callback of Response.
+ */
+class MockResponseEncoderCallback : public ResponseEncoderCallback {
+public:
+  MOCK_METHOD(void, onEncodingSuccess, (Buffer::Instance & buffer, bool close_connection));
 };
 
 class MockRequestDecoder : public RequestDecoder {
@@ -36,21 +48,21 @@ public:
 
 class MockRequestEncoder : public RequestEncoder {
 public:
-  MOCK_METHOD(void, encode, (const Request&, Buffer::Instance& buffer));
+  MOCK_METHOD(void, encode, (const Request&, RequestEncoderCallback& callback));
 };
 
 class MockResponseEncoder : public ResponseEncoder {
 public:
-  MOCK_METHOD(void, encode, (const Response&, Buffer::Instance& buffer));
+  MOCK_METHOD(void, encode, (const Response&, ResponseEncoderCallback& callback));
 };
 
 class MockMessageCreator : public MessageCreator {
 public:
   MOCK_METHOD(ResponsePtr, response,
-              (Status status, absl::string_view status_detail, Request* origin_request));
+              (Status status, absl::string_view status_detail, const Request&));
 };
 
-class MockCodecFactory : CodecFactory {
+class MockCodecFactory : public CodecFactory {
 public:
   MockCodecFactory();
 

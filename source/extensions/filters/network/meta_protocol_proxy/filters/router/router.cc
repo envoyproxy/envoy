@@ -15,7 +15,7 @@ namespace Router {
 namespace {
 absl::string_view resetReasonToStringView(StreamResetReason reason) {
   static std::string Reasons[] = {"local_reset", "connection_failure", "connection_termination",
-                                  "overflow", "ProtocolError"};
+                                  "overflow", "protocol_error"};
   return Reasons[static_cast<uint32_t>(reason)];
 }
 } // namespace
@@ -50,6 +50,13 @@ void UpstreamRequest::resetStream(StreamResetReason reason) {
   parent_.onUpstreamRequestReset(*this, reason);
 }
 
+void UpstreamRequest::completeUpstreamRequest() {
+  response_complete_ = true;
+  ASSERT(conn_pool_handle_ == nullptr);
+  ASSERT(conn_data_ != nullptr);
+  conn_data_.reset();
+}
+
 void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
                                     Upstream::HostDescriptionConstSharedPtr host) {
   conn_pool_handle_ = nullptr;
@@ -57,12 +64,9 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason, ab
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
 
-  switch (reason) {
-  case ConnectionPool::PoolFailureReason::Overflow:
+  if (reason == ConnectionPool::PoolFailureReason::Overflow) {
     resetStream(StreamResetReason::Overflow);
-  default:
-    // Treat pool timeout as connection failure.
-    resetStream(StreamResetReason::ConnectionFailure);
+    return;
   }
 
   resetStream(StreamResetReason::ConnectionFailure);
@@ -78,6 +82,11 @@ void UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
   conn_pool_handle_ = nullptr;
 
   encodeBufferToUpstream(parent_.upstream_request_buffer_);
+
+  if (parent_.expect_response_ == false) {
+    completeUpstreamRequest();
+    parent_.completeDirectly();
+  }
 }
 
 void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
@@ -93,15 +102,12 @@ void UpstreamRequest::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   }
 }
 
-void UpstreamRequest::onResponse(ResponsePtr response) {
-  response_complete_ = true;
-  ASSERT(conn_pool_handle_ == nullptr);
-  ASSERT(conn_data_ != nullptr);
-  conn_data_.reset();
+void UpstreamRequest::onDecodingSuccess(ResponsePtr response) {
+  completeUpstreamRequest();
   parent_.onUpstreamResponse(std::move(response));
 }
 
-void UpstreamRequest::onDecodingError() {
+void UpstreamRequest::onDecodingFailure() {
   response_complete_ = true;
   resetStream(StreamResetReason::ProtocolError);
 }
@@ -140,6 +146,11 @@ void UpstreamRequest::encodeBufferToUpstream(Buffer::Instance& buffer) {
 void RouterFilter::onUpstreamResponse(ResponsePtr response) {
   // TODO(wbpcode): To support retry policy.
   callbacks_->upstreamResponse(std::move(response));
+  filter_complete_ = true;
+}
+
+void RouterFilter::completeDirectly() {
+  callbacks_->completeDirectly();
   filter_complete_ = true;
 }
 
@@ -187,48 +198,63 @@ void RouterFilter::resetStream(StreamResetReason reason) {
     break;
   case StreamResetReason::ConnectionTermination:
     callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    break;
   case StreamResetReason::Overflow:
     callbacks_->sendLocalReply(Status::LocalUnknowedError, resetReasonToStringView(reason));
+    break;
   }
 
   filter_complete_ = true;
 }
 
-FilterStatus RouterFilter::onStreamDecoded(Request& request) {
-  const auto route_entry = callbacks_->routeEntry();
-  if (route_entry == nullptr) {
-    callbacks_->sendLocalReply(Status::LocalExpectedError, "route_not_found");
-    return FilterStatus::StopIteration;
-  }
+void RouterFilter::onEncodingSuccess(Buffer::Instance& buffer, bool expect_response) {
+  upstream_request_buffer_.move(buffer);
+  kickOffNewUpstreamRequest();
+  expect_response_ = expect_response;
+}
 
-  const auto& cluster_name = route_entry->clusterName();
+void RouterFilter::kickOffNewUpstreamRequest() {
+  const auto& cluster_name = route_entry_->clusterName();
 
   auto thread_local_cluster = context_.clusterManager().getThreadLocalCluster(cluster_name);
   if (thread_local_cluster == nullptr) {
     callbacks_->sendLocalReply(Status::LocalUnknowedError, "cluster_not_found");
-    return FilterStatus::StopIteration;
+    filter_complete_ = true;
+    return;
   }
 
   auto cluster_info = thread_local_cluster->info();
   if (cluster_info->maintenanceMode()) {
     callbacks_->sendLocalReply(Status::LocalUnknowedError, "cluster_maintain_mode");
-    return FilterStatus::StopIteration;
+    filter_complete_ = true;
+    return;
   }
 
   auto tcp_data = thread_local_cluster->tcpConnPool(Upstream::ResourcePriority::Default, this);
   if (!tcp_data.has_value()) {
+    filter_complete_ = true;
     callbacks_->sendLocalReply(Status::LocalUnknowedError, "no_healthy_upstream");
-    return FilterStatus::StopIteration;
+    return;
   }
-
-  request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
-  request_encoder_->encode(request, upstream_request_buffer_);
 
   auto upstream_request = std::make_unique<UpstreamRequest>(*this, std::move(tcp_data.value()));
   auto raw_upstream_request = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
 
   raw_upstream_request->startStream();
+}
+
+FilterStatus RouterFilter::onStreamDecoded(Request& request) {
+  setRouteEntry(callbacks_->routeEntry());
+
+  if (route_entry_ == nullptr) {
+    callbacks_->sendLocalReply(Status::LocalExpectedError, "route_not_found");
+    return FilterStatus::StopIteration;
+  }
+
+  request_encoder_ = callbacks_->downstreamCodec().requestEncoder();
+  request_encoder_->encode(request, *this);
+
   return FilterStatus::StopIteration;
 }
 

@@ -15,7 +15,9 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Struct>();
+  }
 
   bool isTerminalFilter() override { return true; }
 

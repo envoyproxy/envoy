@@ -19,7 +19,12 @@ MockStreamFilterConfig::MockStreamFilterConfig() {
   ON_CALL(*this, createEmptyConfigProto()).WillByDefault(Invoke([]() {
     return std::make_unique<ProtobufWkt::Struct>();
   }));
+  ON_CALL(*this, createFilterFactoryFromProto(_, _, _))
+      .WillByDefault(Return([](FilterChainFactoryCallbacks&) {}));
+  ON_CALL(*this, createRouteSpecificFilterConfig(_, _, _)).WillByDefault(Return(nullptr));
   ON_CALL(*this, name()).WillByDefault(Return("envoy.filters.meta_protocol.mock_filter"));
+  ON_CALL(*this, configType()).WillByDefault(Return(""));
+  ON_CALL(*this, isTerminalFilter()).WillByDefault(Return(false));
 }
 
 MockStreamFilter::MockStreamFilter() {

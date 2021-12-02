@@ -93,6 +93,7 @@ class ActiveStream : public FilterChainFactoryCallbacks,
                      public EncoderFilterCallback,
                      public LinkedObject<ActiveStream>,
                      public Envoy::Event::DeferredDeletable,
+                     public ResponseEncoderCallback,
                      Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
   ActiveStream(Filter& parent, RequestPtr request);
@@ -111,32 +112,38 @@ public:
   }
 
   // StreamFilterCallbacks
-  const Network::Connection* connection() override;
   Envoy::Event::Dispatcher& dispatcher() override;
   const CodecFactory& downstreamCodec() override;
   void resetStream() override;
   const RouteEntry* routeEntry() const override { return cached_route_entry_.get(); }
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return cached_cluster_info_; }
 
   // DecoderFilterCallback
   void sendLocalReply(Status status, absl::string_view status_detail,
                       ResponseUpdateFunction&&) override;
   void continueDecoding() override;
   void upstreamResponse(ResponsePtr response) override;
+  void completeDirectly() override;
 
   // EncoderFilterCallback
   void continueEncoding() override;
 
-private:
-  Filter& parent_;
+  // ResponseEncoderCallback
+  void onEncodingSuccess(Buffer::Instance& buffer, bool close_connection) override;
 
+  std::vector<DecoderFilterSharedPtr>& decoderFiltersForTest() { return decoder_filters_; }
+  std::vector<EncoderFilterSharedPtr>& encoderFiltersForTest() { return encoder_filters_; }
+  size_t nextDecoderFilterIndexForTest() { return next_decoder_filter_index_; }
+  size_t nextEncoderFilterIndexForTest() { return next_encoder_filter_index_; }
+
+private:
   bool active_stream_reset_{false};
 
-  RequestPtr request_;
-  ResponsePtr response_;
+  Filter& parent_;
+
+  RequestPtr downstream_request_stream_;
+  ResponsePtr local_or_upstream_response_stream_;
 
   RouteEntryConstSharedPtr cached_route_entry_;
-  Upstream::ClusterInfoConstSharedPtr cached_cluster_info_;
 
   std::vector<DecoderFilterSharedPtr> decoder_filters_;
   size_t next_decoder_filter_index_{0};
@@ -170,9 +177,8 @@ public:
   }
 
   // RequestDecoderCallback
-  void onRequest(RequestPtr request) override;
-  void onDirectResponse(ResponsePtr direct) override;
-  void onDecodingError() override;
+  void onDecodingSuccess(RequestPtr request) override;
+  void onDecodingFailure() override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override {
@@ -185,8 +191,7 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void sendReplyDownstream(Response& response);
-  void sendLocalReply(Status status, absl::string_view status_detail, ResponseUpdateFunction&&);
+  void sendReplyDownstream(Response& response, ResponseEncoderCallback& callback);
 
   Network::Connection& connection() {
     ASSERT(callbacks_ != nullptr);
@@ -199,13 +204,15 @@ public:
   void deferredStream(ActiveStream& stream);
 
   static const std::string& name() {
-    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.generic_proxy");
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.meta_protocol_proxy");
   }
+
+  std::list<ActiveStreamPtr>& activeStreamsForTest() { return active_streams_; }
+
+  void resetStreamsForUnexpectedError();
 
 private:
   friend class ActiveStream;
-
-  void resetStreamsForUnexpectedError();
 
   bool downstream_connection_closed_{};
 

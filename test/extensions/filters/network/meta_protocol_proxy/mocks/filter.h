@@ -36,6 +36,38 @@ public:
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
                ProtobufMessage::ValidationVisitor&));
   MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, configType, ());
+  MOCK_METHOD(bool, isTerminalFilter, ());
+};
+
+class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
+public:
+  MockFilterChainFactoryCallbacks() = default;
+
+  MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr filter));
+  MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter));
+};
+
+template <class Base> class MockStreamFilterCallbacks : public Base {
+public:
+  MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(const CodecFactory&, downstreamCodec, ());
+  MOCK_METHOD(void, resetStream, ());
+  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+};
+
+class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
+public:
+  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction&&));
+  MOCK_METHOD(void, continueDecoding, ());
+  MOCK_METHOD(void, upstreamResponse, (ResponsePtr response));
+  MOCK_METHOD(void, completeDirectly, ());
+};
+
+class MockEncoderFilterCallback : public MockStreamFilterCallbacks<EncoderFilterCallback> {
+public:
+  MOCK_METHOD(void, continueEncoding, ());
 };
 
 } // namespace MetaProtocolProxy
