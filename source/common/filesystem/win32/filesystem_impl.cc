@@ -96,7 +96,7 @@ FilePtr InstanceImplWin32::createFile(const FilePathAndType& file_info) {
   case DestinationType::Stdout:
     return std::make_unique<StdStreamFileImplWin32<STD_OUTPUT_HANDLE>>();
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr; // for gcc
 }
 
 bool InstanceImplWin32::fileExists(const std::string& path) {

@@ -107,7 +107,8 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   }
 
   // The percentages should always add up to 100 but we have to have a return for the compiler.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected load error");
+  return {0, HostAvailability::Healthy};
 }
 
 LoadBalancerBase::LoadBalancerBase(

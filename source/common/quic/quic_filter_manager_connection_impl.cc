@@ -61,7 +61,7 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   // Currently read buffer is capped by connection level flow control. And write buffer limit is set
   // during construction. Changing the buffer limit during the life time of the connection is not
   // supported.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected call to setBufferLimits");
 }
 
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
@@ -127,7 +127,7 @@ Ssl::ConnectionInfoConstSharedPtr QuicFilterManagerConnectionImpl::ssl() const {
 
 void QuicFilterManagerConnectionImpl::rawWrite(Buffer::Instance& /*data*/, bool /*end_stream*/) {
   // Network filter should stop iteration.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected call to rawWrite");
 }
 
 void QuicFilterManagerConnectionImpl::updateBytesBuffered(size_t old_buffered_bytes,
@@ -190,8 +190,8 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     codec_stats_->quic_version_rfc_v1_.inc();
     return;
   default:
-    ENVOY_BUG(false, fmt::format("Unexpected QUIC version {}",
-                                 quic::QuicVersionToString(version.transport_version)));
+    IS_ENVOY_BUG(fmt::format("Unexpected QUIC version {}",
+                             quic::QuicVersionToString(version.transport_version)));
   }
 }
 

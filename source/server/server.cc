@@ -970,7 +970,7 @@ bool InstanceImpl::enableReusePortDefault() {
         "envoy.reloadable_features.listener_reuse_port_default_enabled");
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return false; // for gcc
 }
 
 } // namespace Server

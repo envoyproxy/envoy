@@ -71,7 +71,7 @@ void HappyEyeballsConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
       return;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Failed to remove read filter");
 }
 
 bool HappyEyeballsConnectionImpl::initializeReadFilters() {
@@ -306,7 +306,7 @@ void HappyEyeballsConnectionImpl::removeConnectionCallbacks(ConnectionCallbacks&
       return;
     }
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("Failed to remove connection callbacks");
 }
 
 void HappyEyeballsConnectionImpl::close(ConnectionCloseType type) {

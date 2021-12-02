@@ -46,7 +46,7 @@ std::string toString(Network::Socket::Type socket_type) {
   case Network::Socket::Type::Datagram:
     return "SocketType::Datagram";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 // Finds and returns the DynamicListener for the name provided from listener_map, creating and

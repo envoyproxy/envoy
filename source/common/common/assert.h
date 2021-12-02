@@ -247,6 +247,8 @@ void resetEnvoyBugCountersForTest();
  */
 #define ENVOY_BUG(...) PASS_ON(PASS_ON(_ENVOY_BUG_VERBOSE)(__VA_ARGS__))
 
+#define IS_ENVOY_BUG(...) ENVOY_BUG(false, __VA_ARGS__);
+
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage
 // reports.

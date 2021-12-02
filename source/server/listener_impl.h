@@ -145,7 +145,7 @@ public:
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
   Server::DrainManager& drainManager();

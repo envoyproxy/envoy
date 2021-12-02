@@ -26,7 +26,7 @@ absl::string_view statusCodeToString(StatusCode code) {
   case StatusCode::InboundFramesWithEmptyPayload:
     return "InboundFramesWithEmptyPayloadError";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 struct EnvoyStatusPayload {

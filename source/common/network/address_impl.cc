@@ -87,7 +87,6 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   default:
     return absl::InvalidArgumentError(fmt::format("Unexpected sockaddr family: {}", ss.ss_family));
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr addressFromSockAddrOrThrow(const sockaddr_storage& ss,

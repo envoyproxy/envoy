@@ -445,18 +445,13 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
   case ConnectionPool::PoolFailureReason::Overflow:
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
-    break;
-
+    return;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-    break;
-
+    return;
   case ConnectionPool::PoolFailureReason::Timeout:
     onConnectTimeout();
-    break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    return;
   }
 }
 

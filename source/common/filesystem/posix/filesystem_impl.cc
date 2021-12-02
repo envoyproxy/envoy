@@ -85,7 +85,7 @@ FilePtr InstanceImplPosix::createFile(const FilePathAndType& file_info) {
   case DestinationType::Stdout:
     return std::make_unique<FileImplPosix>(FilePathAndType{DestinationType::Stdout, "/dev/stdout"});
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return nullptr; // for gcc
 }
 
 bool InstanceImplPosix::fileExists(const std::string& path) {
