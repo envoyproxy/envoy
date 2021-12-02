@@ -108,7 +108,13 @@ public:
   // (functionally) unlimited.
   // TODO: this could be moved to an optional to make it actually unlimited.
   uint32_t remaining_streams_;
+  // The will start out as the upper limit of max conurrent streams for this connection
+  // if capped by configuration, or it will be set to std::numeric_limits<uint32_t>::max()
+  // to be (functionally) unlimited.
   uint32_t configured_stream_limit_;
+  // The max concurrent stream for this connection, it's initialized by `configured_stream_limit_`
+  // and can be adjusted by SETTINGS frame, but the max value of it can't exceed
+  // `configured_stream_limit_`.
   uint32_t concurrent_stream_limit_;
   Upstream::HostDescriptionConstSharedPtr real_host_description_;
   Stats::TimespanPtr conn_connect_ms_;
