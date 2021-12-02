@@ -27,8 +27,7 @@ def generate_compilation_database(args):
 
     db_entries = []
     for db in Path(execroot).glob('**/*.compile_commands.json'):
-        with open(db, 'r') as f:
-            db_entries.extend(json.load(f))
+        db_entries.extend(json.loads(db.read_text()))
 
     def replace_execroot_marker(db_entry):
         if 'directory' in db_entry and db_entry['directory'] == '__EXEC_ROOT__':
