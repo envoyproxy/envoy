@@ -39,6 +39,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
@@ -1340,14 +1341,6 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxyingLate1xx) { testEnvoyProxying1xx(fal
 // Multiple 1xx after the request completes.
 TEST_P(ProtocolIntegrationTest, EnvoyProxyingLateMultiple1xx) {
   testEnvoyProxying1xx(false, false, true);
-}
-
-TEST_P(ProtocolIntegrationTest, EnvoyProxying102) {
-  testEnvoyProxying1xx(false, false, false, "102");
-}
-
-TEST_P(ProtocolIntegrationTest, EnvoyProxying103) {
-  testEnvoyProxying1xx(false, false, false, "103");
 }
 
 TEST_P(ProtocolIntegrationTest, TwoRequests) { testTwoRequests(); }
@@ -3534,11 +3527,17 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 }
 
+class NoUdpGso : public Api::OsSysCallsImpl {
+public:
+  bool supportsUdpGso() const override { return false; }
+};
+
 TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+  // Make sure for HTTP/3 Enovy will use sendmsg, so the write_matcher will work.
+  NoUdpGso reject_gso_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
+
   SocketInterfaceSwap socket_swap;
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    return;
-  }
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -3547,12 +3546,19 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
 
   // Makes us have Envoy's writes to downstream return EBADF
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
-  socket_swap.writev_matcher_->setSourcePort(lookupPort("http"));
-  socket_swap.writev_matcher_->setWritevOverride(ebadf);
+  socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  // TODO(danzh) set to true to repro.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
-  ASSERT_TRUE(codec_client_->waitForDisconnect());
-  socket_swap.writev_matcher_->setWritevOverride(nullptr);
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3 since the packets are black holed, there is no client side
+    // indication of connection close. Wait on Envoy stats instead.
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
 }
 
 } // namespace Envoy
