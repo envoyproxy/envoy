@@ -39,16 +39,17 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/bazelbuild/buildtools/archive/{version}.tar.gz"],
         use_category = ["api"],
     ),
+    # TODO(zhxie): for test only, wait for cncf/xds#20
     com_github_cncf_udpa = dict(
         project_name = "xDS API",
         project_desc = "xDS API Working Group (xDS-WG)",
-        project_url = "https://github.com/cncf/xds",
+        project_url = "https://github.com/zhxie/xds",
         # During the UDPA -> xDS migration, we aren't working with releases.
-        version = "cb28da3451f158a947dfc45090fe92b07b243bc1",
-        sha256 = "5bc8365613fe2f8ce6cc33959b7667b13b7fe56cb9d16ba740c06e1a7c4242fc",
+        version = "f2882d7d829dfde0988049e4c96ff44e09dd791e",
+        sha256 = "82e2301791df52867428b3768aa6872da333e0a2eaf46fad5da028d97f10b341",
         release_date = "2021-10-11",
         strip_prefix = "xds-{version}",
-        urls = ["https://github.com/cncf/xds/archive/{version}.tar.gz"],
+        urls = ["https://github.com/zhxie/xds/archive/{version}.tar.gz"],
         use_category = ["api"],
     ),
     com_github_openzipkin_zipkinapi = dict(
