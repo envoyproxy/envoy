@@ -3541,7 +3541,7 @@ public:
 };
 
 TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
-  // Make sure for HTTP/3 Enovy will use sendmsg, so the write_matcher will work.
+  // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
 
@@ -3556,7 +3556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
-  // TODO(danzh) set to true to repro.
+  // TODO(danzh) set to true.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
