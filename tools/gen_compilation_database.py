@@ -5,7 +5,7 @@ import json
 import os
 import shlex
 import subprocess
-import pathlib
+from pathlib import Path
 
 
 # This method is equivalent to https://github.com/grailbio/bazel-compilation-database/blob/master/generate.py
@@ -26,7 +26,7 @@ def generate_compilation_database(args):
                                        + bazel_options).decode().strip()
 
     db_entries = []
-    for db in pathlib.Path(execroot).glob('**/*.compile_commands.json'):
+    for db in Path(execroot).glob('**/*.compile_commands.json'):
         with open(db, 'r') as f:
             db_entries.extend(json.load(f))
 
@@ -38,8 +38,7 @@ def generate_compilation_database(args):
                 db_entry['command'].replace('-isysroot __BAZEL_XCODE_SDKROOT__', ''))
         return db_entry
 
-    db_entries = list(map(replace_execroot_marker, db_entries))
-    return db_entries
+    return list(map(replace_execroot_marker, db_entries))
 
 
 def is_header(filename):
