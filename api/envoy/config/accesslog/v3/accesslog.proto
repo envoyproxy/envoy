@@ -83,6 +83,7 @@ message AccessLogFilter {
     GrpcStatusFilter grpc_status_filter = 10;
 
     // Extension filter.
+    // [#extension-category: envoy.access_loggers.extension_filters]
     ExtensionFilter extension_filter = 11;
 
     // Metadata Filter

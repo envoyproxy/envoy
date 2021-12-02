@@ -49,6 +49,7 @@ proto_library(
         "//envoy/data/dns/v3:pkg",
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
+        "//envoy/extensions/access_loggers/filters/cel/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
         "//envoy/extensions/access_loggers/stream/v3:pkg",

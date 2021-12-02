@@ -467,6 +467,16 @@ public:
   virtual const std::string& getRouteName() const PURE;
 
   /**
+   * @param std::string name denotes the name of the virtual cluster.
+   */
+  virtual void setVirtualClusterName(const absl::optional<std::string>& name) PURE;
+
+  /**
+   * @return std::string& the name of the virtual cluster which got matched.
+   */
+  virtual const absl::optional<std::string>& virtualClusterName() const PURE;
+
+  /**
    * @param bytes_received denotes number of bytes to add to total received bytes.
    */
   virtual void addBytesReceived(uint64_t bytes_received) PURE;
