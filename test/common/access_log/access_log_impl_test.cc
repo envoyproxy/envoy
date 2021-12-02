@@ -1598,6 +1598,72 @@ typed_config:
   }
 }
 
+#if defined(USE_CEL_PARSER)
+TEST_F(AccessLogImplTest, CelExtensionFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: cel_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+      expression: "(request.headers['log'] == 'true') && (response.code >= 400)"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  request_headers_.addCopy("log", "true");
+  stream_info_.response_code_ = 404;
+  EXPECT_CALL(*file_, write(_));
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+
+  request_headers_.remove("log");
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, CelExtensionFilterExpressionError) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: cel_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+      expression: "foo['test']"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr logger = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  logger->log(&request_headers_, &response_headers_, &response_trailers_, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, CelExtensionFilterExpressionUnparsable) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: cel_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+      expression: "(+++"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          EnvoyException, "Not able to parse filter expression: .*");
+}
+#endif // USE_CEL_PARSER
+
 // Test that the deprecated extension names are disabled by default.
 // TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST_F(AccessLogImplTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {

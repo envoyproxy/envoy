@@ -209,6 +209,14 @@ struct StreamInfoImpl : public StreamInfo {
 
   const std::string& getRouteName() const override { return route_name_; }
 
+  void setVirtualClusterName(const absl::optional<std::string>& virtual_cluster_name) override {
+    virtual_cluster_name_ = virtual_cluster_name;
+  }
+
+  const absl::optional<std::string>& virtualClusterName() const override {
+    return virtual_cluster_name_;
+  }
+
   bool healthCheck() const override { return health_check_request_; }
 
   void healthCheck(bool is_health_check) override { health_check_request_ = is_health_check; }
@@ -314,6 +322,9 @@ struct StreamInfoImpl : public StreamInfo {
   FilterStateSharedPtr filter_state_;
   std::string route_name_;
   absl::optional<uint32_t> attempt_count_;
+  // TODO(agrawroh): Check if the owner of this storage outlives the StreamInfo. We should only copy
+  // the string if it could outlive the StreamInfo.
+  absl::optional<std::string> virtual_cluster_name_;
 
 private:
   static Network::ConnectionInfoProviderSharedPtr emptyDownstreamAddressProvider() {
@@ -338,7 +349,6 @@ private:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   const Network::ConnectionInfoProviderSharedPtr downstream_connection_info_provider_;
-  std::string requested_server_name_;
   const Http::RequestHeaderMap* request_headers_{};
   Http::RequestIdStreamInfoProviderSharedPtr request_id_provider_;
   absl::optional<DownstreamTiming> downstream_timing_;

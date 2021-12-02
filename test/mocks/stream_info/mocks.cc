@@ -90,9 +90,14 @@ MockStreamInfo::MockStreamInfo()
   ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
     route_name_ = std::string(route_name);
   }));
+  ON_CALL(*this, setVirtualClusterName(_))
+      .WillByDefault(Invoke([this](const absl::optional<std::string>& virtual_cluster_name) {
+        virtual_cluster_name_ = virtual_cluster_name;
+      }));
   ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, setUpstreamInfo(_))
       .WillByDefault(Invoke([this](std::shared_ptr<UpstreamInfo> info) { upstream_info_ = info; }));
+  ON_CALL(*this, virtualClusterName()).WillByDefault(ReturnRef(virtual_cluster_name_));
   ON_CALL(*this, setFilterChainName(_))
       .WillByDefault(Invoke([this](const absl::string_view filter_chain_name) {
         filter_chain_name_ = std::string(filter_chain_name);

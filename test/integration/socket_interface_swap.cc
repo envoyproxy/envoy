@@ -9,10 +9,10 @@ SocketInterfaceSwap::SocketInterfaceSwap() {
           [writev_matcher = writev_matcher_](Envoy::Network::TestIoSocketHandle* io_handle,
                                              const Buffer::RawSlice*,
                                              uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-            if (writev_matcher->shouldReturnEgain(io_handle)) {
+            Network::IoSocketError* error_override = writev_matcher->returnOverride(io_handle);
+            if (error_override) {
               return Api::IoCallUint64Result(
-                  0, Api::IoErrorPtr(Network::IoSocketError::getIoSocketEagainInstance(),
-                                     Network::IoSocketError::deleteIoError));
+                  0, Api::IoErrorPtr(error_override, Network::IoSocketError::deleteIoError));
             }
             return absl::nullopt;
           }));
@@ -23,7 +23,7 @@ void SocketInterfaceSwap::IoHandleMatcher::setResumeWrites() {
   mutex_.Await(absl::Condition(
       +[](Network::TestIoSocketHandle** matched_iohandle) { return *matched_iohandle != nullptr; },
       &matched_iohandle_));
-  writev_returns_egain_ = false;
+  error_ = nullptr;
   matched_iohandle_->activateInDispatcherThread(Event::FileReadyType::Write);
 }
 
