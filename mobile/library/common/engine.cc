@@ -105,7 +105,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
           network_configurator_ =
               Network::ConfiguratorFactory{server_->serverFactoryContext()}.get();
           auto v4_interfaces = network_configurator_->enumerateV4Interfaces();
-          auto v6_interfaces = network_configurator_->enumerateV4Interfaces();
+          auto v6_interfaces = network_configurator_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
           logInterfaces("netconf_get_v6_interfaces", v6_interfaces);
           client_scope_ = server_->serverFactoryContext().scope().createScope("pulse.");
