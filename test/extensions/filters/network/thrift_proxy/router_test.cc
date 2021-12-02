@@ -438,7 +438,7 @@ public:
       EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
     } break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 
@@ -1618,7 +1618,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));
