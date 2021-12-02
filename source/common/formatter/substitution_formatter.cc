@@ -686,6 +686,7 @@ private:
 };
 
 StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+  // TODO: Change this huge if-else ladder to use a switch case instead.
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
@@ -816,6 +817,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.upstreamLocalAddress();
+        });
+  } else if (field_name == "UPSTREAM_REQUEST_ATTEMPT_COUNT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.attemptCount().value_or(0);
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
@@ -952,6 +958,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
             return stream_info.filterChainName();
           }
           return absl::nullopt;
+        });
+  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          return stream_info.virtualClusterName();
         });
   } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(

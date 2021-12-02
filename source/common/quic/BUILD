@@ -125,17 +125,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "envoy_quic_session_cache_lib",
-    srcs = ["envoy_quic_session_cache.cc"],
-    hdrs = ["envoy_quic_session_cache.h"],
-    external_deps = ["quiche_quic_platform"],
-    tags = ["nofips"],
-    deps = [
-        "@com_github_google_quiche//:quic_core_crypto_crypto_handshake_lib",
-    ],
-)
-
-envoy_cc_library(
     name = "spdy_server_push_utils_for_envoy_lib",
     srcs = ["spdy_server_push_utils_for_envoy.cc"],
     tags = ["nofips"],
@@ -173,7 +162,6 @@ envoy_cc_library(
         ":envoy_quic_connection_helper_lib",
         ":envoy_quic_proof_verifier_lib",
         ":envoy_quic_server_session_lib",
-        ":envoy_quic_session_cache_lib",
         ":envoy_quic_utils_lib",
         "//envoy/http:codec_interface",
         "//envoy/registry",

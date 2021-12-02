@@ -308,17 +308,17 @@ public:
   Http::Http1::ParserStatus onMessageCompleteBase() override {
     auto rc = ServerConnectionImpl::onMessageCompleteBase();
 
-    if (activeRequest().has_value() && activeRequest().value().request_decoder_) {
+    if (activeRequest() && activeRequest()->request_decoder_) {
       // Undo the read disable from the base class - we have many tests which
       // waitForDisconnect after a full request has been read which will not
       // receive the disconnect if reading is disabled.
-      activeRequest().value().response_encoder_.readDisable(false);
+      activeRequest()->response_encoder_.readDisable(false);
     }
     return rc;
   }
   ~TestHttp1ServerConnectionImpl() override {
-    if (activeRequest().has_value()) {
-      activeRequest().value().response_encoder_.clearReadDisableCallsForTests();
+    if (activeRequest()) {
+      activeRequest()->response_encoder_.clearReadDisableCallsForTests();
     }
   }
 };

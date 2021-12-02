@@ -60,7 +60,7 @@ public:
   }
 
 protected:
-  bool initializeUpstreamFloodTest();
+  void initializeUpstreamFloodTest();
   std::vector<char> serializeFrames(const Http2Frame& frame, uint32_t num_frames);
   void floodServer(const Http2Frame& frame, const std::string& flood_stat, uint32_t num_frames);
   void floodServer(absl::string_view host, absl::string_view path,
@@ -81,13 +81,12 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::ValuesIn({false, true})),
     testParamsToString);
 
-bool Http2FloodMitigationTest::initializeUpstreamFloodTest() {
+void Http2FloodMitigationTest::initializeUpstreamFloodTest() {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower upstream outbound frame limits to make tests run faster
   config_helper_.setUpstreamOutboundFramesLimits(AllFrameFloodLimit, ControlFrameFloodLimit);
   initialize();
-  return true;
 }
 
 void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
@@ -1139,28 +1138,19 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamPingFlood) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
-
+  initializeUpstreamFloodTest();
   floodClient(Http2Frame::makePingFrame(), ControlFrameFloodLimit + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamSettings) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
-
+  initializeUpstreamFloodTest();
   floodClient(Http2Frame::makeEmptySettingsFrame(), ControlFrameFloodLimit + 1,
               "cluster.cluster_0.http2.outbound_control_flood");
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamWindowUpdate) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
-
+  initializeUpstreamFloodTest();
   constexpr uint32_t max_allowed =
       5 + 2 * (1 + Http2::Utility::OptionsLimits::
                            DEFAULT_MAX_INBOUND_WINDOW_UPDATE_FRAMES_PER_DATA_FRAME_SENT *
@@ -1181,9 +1171,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
         ->set_value(0);
     ConfigHelper::setProtocolOptions(*cluster, protocol_options);
   });
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1202,10 +1190,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeaders) {
 
 // Verify that the HTTP/2 connection is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeader) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
-
+  initializeUpstreamFloodTest();
   // Send client request which will send an upstream request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1238,9 +1223,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
     ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                      protocol_options);
   });
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   // Send client request which will send an upstream request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1280,9 +1263,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamZerolenHeaderAllowed) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   // Send client request which will send an upstream request.
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1309,9 +1290,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyData) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1334,10 +1313,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamEmptyHeadersContinuation) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamPriorityNoOpenStreams) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
-
+  initializeUpstreamFloodTest();
   floodClient(Http2Frame::makePriorityFrame(Http2Frame::makeClientStreamId(1),
                                             Http2Frame::makeClientStreamId(2)),
               Http2::Utility::OptionsLimits::DEFAULT_MAX_INBOUND_PRIORITY_FRAMES_PER_STREAM * 2 + 1,
@@ -1345,9 +1321,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityNoOpenStreams) {
 }
 
 TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
@@ -1375,9 +1349,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneOpenStream) {
 
 // Verify that protocol constraint tracker correctly applies limits to the CLOSED streams as well.
 TEST_P(Http2FloodMitigationTest, UpstreamPriorityOneClosedStream) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -1416,9 +1388,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
         auto seconds = std::chrono::duration_cast<std::chrono::seconds>(timeout);
         stream_idle_timeout->set_seconds(seconds.count());
       });
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
   // pre-fill upstream connection 1 away from overflow
   auto response = prefillOutboundUpstreamQueue(ControlFrameFloodLimit);
 
@@ -1435,9 +1405,7 @@ TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnStreamIdleTimeout) {
 // Verify that the server can detect flooding by the RST_STREAM sent to upstream when downstream
 // disconnects.
 TEST_P(Http2FloodMitigationTest, UpstreamRstStreamOnDownstreamRemoteClose) {
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
   // pre-fill 1 away from overflow
   auto response = prefillOutboundUpstreamQueue(ControlFrameFloodLimit);
 
@@ -1464,9 +1432,7 @@ TEST_P(Http2FloodMitigationTest, RequestMetadata) {
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
-  if (!initializeUpstreamFloodTest()) {
-    return;
-  }
+  initializeUpstreamFloodTest();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
