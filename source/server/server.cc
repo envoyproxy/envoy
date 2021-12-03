@@ -152,8 +152,9 @@ InstanceImpl::~InstanceImpl() {
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
-    // Stop tracing and flush the trace data.
+    // Flush the trace data.
     perfetto::TrackEvent::Flush();
+    // Disable tracing and block until tracing has stopped.
     tracing_session_->StopBlocking();
     close(tracing_fd_);
   }
@@ -394,8 +395,10 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
   args.backends = perfetto::kInProcessBackend;
   perfetto::Tracing::Initialize(args);
   perfetto::TrackEvent::Register();
+
+  // Prepare a configuration for a new "Perfetto" tracing session.
   perfetto::TraceConfig cfg;
-  // TODO(rojkov): make the tracer configurable with either `Perfetto`'s native
+  // TODO(rojkov): make the tracer configurable with either "Perfetto"'s native
   // message or custom one embedded into Bootstrap.
   cfg.add_buffers()->set_size_kb(1024);
   auto* ds_cfg = cfg.add_data_sources()->mutable_config();
@@ -403,13 +406,16 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   const std::string pftrace_path =
       PROTOBUF_GET_STRING_OR_DEFAULT(bootstrap_, perf_tracing_file_path, "envoy.pftrace");
+  // Instantiate a new tracing session.
   tracing_session_ = perfetto::Tracing::NewTrace();
   tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
   if (tracing_fd_ == -1) {
     throw EnvoyException(
         fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
   }
+  // Configure the tracing session.
   tracing_session_->Setup(cfg, tracing_fd_);
+  // Enable tracing and block until tracing has started.
   tracing_session_->StartBlocking();
 #endif
 
