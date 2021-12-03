@@ -141,6 +141,12 @@ public:
    * @return Network::Address::OptionsSharedPtr the list of listener socket options.
    */
   virtual Network::Socket::OptionsSharedPtr socketOptions() PURE;
+
+  /**
+   * @return bool whether the listener should avoid blocking connections based on the globally set
+   * limit.
+   */
+  virtual bool ignoreGlobalConnLimit() const PURE;
 };
 
 /**

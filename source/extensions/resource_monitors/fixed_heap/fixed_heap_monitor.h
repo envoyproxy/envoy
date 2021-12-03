@@ -31,7 +31,7 @@ public:
       const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
       std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
 
-  void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
   const uint64_t max_heap_;

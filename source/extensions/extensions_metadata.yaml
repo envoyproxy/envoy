@@ -3,6 +3,11 @@ envoy.access_loggers.file:
   - envoy.access_loggers
   security_posture: robust_to_untrusted_downstream
   status: stable
+envoy.access_loggers.extension_filters.cel:
+  categories:
+  - envoy.access_loggers.extension_filters
+  security_posture: unknown
+  status: alpha
 envoy.access_loggers.http_grpc:
   categories:
   - envoy.access_loggers

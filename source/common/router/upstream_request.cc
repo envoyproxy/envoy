@@ -427,10 +427,12 @@ void UpstreamRequest::onPoolReady(
     stream_info_.protocol(protocol.value());
   }
 
-  upstream_timing_.upstream_connect_start_ = info.upstreamTiming().upstream_connect_start_;
-  upstream_timing_.upstream_connect_complete_ = info.upstreamTiming().upstream_connect_complete_;
-  upstream_timing_.upstream_handshake_complete_ =
-      info.upstreamTiming().upstream_handshake_complete_;
+  if (info.upstreamInfo().has_value()) {
+    auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
+    upstream_timing_.upstream_connect_start_ = upstream_timing.upstream_connect_start_;
+    upstream_timing_.upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
+    upstream_timing_.upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
+  }
 
   stream_info_.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
@@ -468,7 +470,8 @@ void UpstreamRequest::onPoolReady(
   calling_encode_headers_ = true;
   auto* headers = parent_.downstreamHeaders();
   if (parent_.routeEntry()->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstreamHeaders()->setHost(host->hostname());
+    Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
+                                   parent_.routeEntry()->appendXfh());
   }
 
   if (span_ != nullptr) {

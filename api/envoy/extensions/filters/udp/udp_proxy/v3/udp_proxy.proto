@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -82,4 +82,9 @@ message UdpProxyConfig {
   // :ref:`prefer_gro <envoy_v3_api_field_config.core.v3.UdpSocketConfig.prefer_gro>` is true for upstream
   // sockets as the assumption is datagrams will be received from a single source.
   config.core.v3.UdpSocketConfig upstream_socket_config = 6;
+
+  // Perform per packet load balancing (upstream host selection) on each received data chunk.
+  // The default if not specified is false, that means each data chunk is forwarded
+  // to upstream host selected on first chunk receival for that "session" (identified by source IP/port and local IP/port).
+  bool use_per_packet_load_balancing = 7;
 }

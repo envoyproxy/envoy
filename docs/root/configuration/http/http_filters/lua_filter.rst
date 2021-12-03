@@ -248,8 +248,7 @@ There are two ways of doing this, the first one is via the ``body()`` API.
 .. code-block:: lua
 
     function envoy_on_response(response_handle)
-      local content_length = response_handle:body():setBytes("<html><b>Not Found<b></html>")
-      response_handle:headers():replace("content-length", content_length)
+      response_handle:body():setBytes("<html><b>Not Found<b></html>")
       response_handle:headers():replace("content-type", "text/html")
     end
 
@@ -260,8 +259,7 @@ Or, through ``bodyChunks()`` API, which let Envoy to skip buffering the upstream
 
     function envoy_on_response(response_handle)
 
-      -- Sets the content-length.
-      response_handle:headers():replace("content-length", 28)
+      -- Sets the content-type.
       response_handle:headers():replace("content-type", "text/html")
 
       local last
@@ -769,8 +767,8 @@ its keys can only be *string* or *numeric*.
   function envoy_on_request(request_handle)
     local headers = request_handle:headers()
     request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "request.info", {
-      auth: headers:get("authorization"),
-      token: headers:get("x-request-token"),
+      auth = headers:get("authorization"),
+      token = headers:get("x-request-token"),
     })
   end
 

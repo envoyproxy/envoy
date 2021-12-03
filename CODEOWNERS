@@ -6,6 +6,7 @@
 /api/ @envoyproxy/api-shepherds
 # access loggers
 /*/extensions/access_loggers/common @auni53 @zuercher
+/*/extensions/access_loggers/filters/cel @dio @douglas-reid
 /*/extensions/access_loggers/open_telemetry @itamarkam @yanavlasov
 /*/extensions/access_loggers/stream @mattklein123 @davinci26
 # compression extensions
