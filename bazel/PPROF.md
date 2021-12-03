@@ -362,29 +362,38 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
 ```
 
 For events that don't follow function scoping, use `TRACE_EVENT_BEGIN` and
-`TRACE_EVENT_END`. Please note that in case of events crossing function boundaries
-it is usually required to emit them on a separate dedicated track. Below is an
-example for a trace event covering an object's life span:
+`TRACE_EVENT_END`. Please be careful with these events as all events on a given
+thread share the same stack. This means that it's not recommended to have a matching
+pair of `TRACE_EVENT_BEGIN` and `TRACE_EVENT_END` markers in separate functions,
+since an unrelated event might terminate the original event unexpectedly; for events
+that cross function boundaries it's usually best to emit them on a separate track.
+Below is an example for a trace event covering an object's life span:
 
 ```c++
 #include "source/common/common/perf_tracing.h"
 
-#define PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID 42
-
-Http::Request::Request(const Config& conf) {
+Http::Request::Request(int request_id)
+ : request_id_(request_id) {
   TRACE_EVENT_BEGIN("core", "Http::Request",
-                    perfetto::Track(PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID, perfetto::ThreadTrack::Current()));
+                    perfetto::Track(request_id_, perfetto::ThreadTrack::Current()));
   ...
 }
 
 Http::Request::~Request() {
   ...
 
-  TRACE_EVENT_END("core", perfetto::Track(PERFETTO_HTTP_REQUEST_CHILD_TRACK_ID,
-                                          perfetto::ThreadTrack::Current()));
+  TRACE_EVENT_END("core", perfetto::Track(request_id_, perfetto::ThreadTrack::Current()));
 }
 
 ```
+
+Unfortunately this may lead to excessive number of tracks if they are unique for every
+pair of emitted events. The existing visualization tools may not work well if the number
+of tracks is too big. In this case the resulting trace data needs to be processed
+differently. Alternatively, if you are interested in benchmarking only and don't need
+any tracing capabilities, then you can resort to the Performance Annotation system mentioned
+above which supports cross-scoped events too, but doesn't require any post-processing to get
+a benchmark's final report.
 
 Time-varying numeric data can be recorded with the `TRACE_COUNTER` macro:
 

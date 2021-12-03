@@ -9,21 +9,28 @@
 // traces which can be later analyzed online at https://ui.perfetto.dev/ or with
 // custom tools.
 //
+// See https://perfetto.dev/docs/instrumentation/track-events for more details.
+//
 // The support is enabled with
 //   bazel --define=perf_tracing=enabled ...
 // In the absence of such directives the macros for instrumenting code for
 // performance analysis will expand to nothing.
 //
-// The supported `Perfetto` macros are TRACE_EVENT, TRACE_EVENT_BEGIN,
-// TRACE_EVENT_END and TRACE_COUNTER.
-//
-// See https://perfetto.dev/docs/instrumentation/track-events for more details.
-//
-// See also, source/common/common/perf_annotation.h adding Performance
-// Annotation system which is a better fit for micro-benchmarking and for the
-// cases when an opening cross-scoped event (i.e. TRACE_EVENT_BEGIN) can be
-// followed by the same opening event, not a closing one (this often happens
-// for open-loop benchmarks).
+// The supported `Perfetto` macros are TRACE_EVENT, TRACE_COUNTER,
+// TRACE_EVENT_BEGIN and TRACE_EVENT_END. Please be careful with the last two:
+// all events on a given thread share the same stack. This means that it's not
+// recommended to have a matching pair of TRACE_EVENT_BEGIN and TRACE_EVENT_END
+// markers in separate functions, since an unrelated event might terminate the
+// original event unexpectedly; for events that cross function boundaries it's
+// usually best to emit them on a separate track. Unfortunately this may lead to
+// excessive number of tracks if they are unique for every pair of emitted
+// events. The existing visualization tools may not work well if the number of
+// tracks is too big. In this case the resulting trace data needs to be processed
+// differently. Alternatively, if you are interested in benchmarking only and don't
+// need any tracing capabilities, then you can resort to the Performance Annotation
+// system which supports cross-scoped events too, but doesn't require any
+// post-processing to get a benchmark's final report.
+// See source/common/common/perf_annotation.h for details.
 
 // NOLINT(namespace-envoy)
 
