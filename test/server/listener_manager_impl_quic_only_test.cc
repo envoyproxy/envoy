@@ -140,7 +140,7 @@ udp_listener_config:
   EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 
-  // Stop listenning shouldn't close the socket.
+  // Stop listening shouldn't close the socket.
   EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce(Invoke([](std::function<void()> callback) {
     callback();
   }));
