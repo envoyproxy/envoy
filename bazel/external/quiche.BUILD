@@ -2007,7 +2007,6 @@ envoy_cc_library(
         "quiche/quic/core/crypto/quic_compressed_certs_cache.cc",
         "quiche/quic/core/crypto/quic_crypto_client_config.cc",
         "quiche/quic/core/crypto/quic_crypto_server_config.cc",
-        "quiche/quic/core/crypto/server_proof_verifier.h",
         "quiche/quic/core/crypto/transport_parameters.cc",
     ],
     hdrs = [

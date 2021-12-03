@@ -79,6 +79,10 @@ Api::IoCallUint64Result IoHandleImpl::close() {
       ENVOY_LOG(trace, "socket {} close after peer closed.", static_cast<void*>(this));
     }
   }
+  if (user_file_event_) {
+    // No event callback should be handled after close completes.
+    user_file_event_.reset();
+  }
   closed_ = true;
   return Api::ioCallUint64ResultNoError();
 }
