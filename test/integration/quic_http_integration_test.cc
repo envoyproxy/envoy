@@ -1,7 +1,6 @@
 #include <openssl/x509_vfy.h>
 
 #include <cstddef>
-#include <pthread.h>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/overload/v3/overload.pb.h"
@@ -275,6 +274,7 @@ public:
 
   void setConcurrency(size_t concurrency) {
     concurrency_ = concurrency;
+    if (concurrency > 1) {
     config_helper_.addConfigModifier(
         [=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           // SO_REUSEPORT is needed because concurrency > 1.
@@ -283,12 +283,12 @@ public:
               ->mutable_enable_reuse_port()
               ->set_value(true);
         });
+    }
   }
 
   void testMultipleQuicConnections() {
     // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
-
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;
     for (size_t i = 1; i <= concurrency_; ++i) {
@@ -514,7 +514,6 @@ TEST_P(QuicHttpIntegrationTest, MultiWorkerWithLongConnectionId) {
 
 TEST_P(QuicHttpIntegrationTest, PortMigration) {
   setConcurrency(2);
-
   initialize();
   uint32_t old_port = lookupPort("http");
   codec_client_ = makeHttpConnection(old_port);
@@ -571,7 +570,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
 
 TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
   setConcurrency(2);
-
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(2);
   uint32_t old_port = lookupPort("http");
@@ -615,7 +613,6 @@ TEST_P(QuicHttpIntegrationTest, PortMigrationOnPathDegrading) {
 
 TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
   setConcurrency(2);
-
   initialize();
   client_quic_options_.mutable_num_timeouts_to_trigger_port_migration()->set_value(0);
   uint32_t old_port = lookupPort("http");
@@ -654,7 +651,6 @@ TEST_P(QuicHttpIntegrationTest, NoPortMigrationWithoutConfig) {
 
 TEST_P(QuicHttpIntegrationTest, PortMigrationFailureOnPathDegrading) {
   setConcurrency(2);
-
   validation_failure_on_path_response_ = true;
   initialize();
   uint32_t old_port = lookupPort("http");
