@@ -275,19 +275,20 @@ public:
   void setConcurrency(size_t concurrency) {
     concurrency_ = concurrency;
     if (concurrency > 1) {
-    config_helper_.addConfigModifier(
-        [=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-          // SO_REUSEPORT is needed because concurrency > 1.
-          bootstrap.mutable_static_resources()
-              ->mutable_listeners(0)
-              ->mutable_enable_reuse_port()
-              ->set_value(true);
-        });
+      config_helper_.addConfigModifier(
+          [=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+            // SO_REUSEPORT is needed because concurrency > 1.
+            bootstrap.mutable_static_resources()
+                ->mutable_listeners(0)
+                ->mutable_enable_reuse_port()
+                ->set_value(true);
+          });
     }
   }
 
   void testMultipleQuicConnections() {
-    // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
+    // Enabling SO_REUSEPORT with 8 workers. Unfortunately this setting makes the test rarely flaky
+    // if it is configured to run with --runs_per_test=N where N > 1 but without --jobs=1.
     setConcurrency(8);
     initialize();
     std::vector<IntegrationCodecClientPtr> codec_clients;

@@ -1119,7 +1119,8 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
   for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
     if (listener.udp_listener_config().has_quic_options()) {
-      // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same port.
+      // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
+      // port.
       listener.mutable_enable_reuse_port()->set_value(false);
     }
   }
