@@ -565,9 +565,12 @@ Context::findValue(absl::string_view name, Protobuf::Arena* arena, bool last) co
   case PropertyToken::PLUGIN_VM_ID:
     return CelValue::CreateStringView(toAbslStringView(wasm()->vm_id()));
   case PropertyToken::FILTER_STATE:
-    return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
-                                                                              info->filterState())
-        ->Produce(arena);
+    if (info) {
+      return Protobuf::Arena::Create<Filters::Common::Expr::FilterStateWrapper>(arena,
+                                                                                info->filterState())
+          ->Produce(arena);
+    }
+    break;
   }
   return {};
 }
