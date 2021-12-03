@@ -1,13 +1,12 @@
 #include "source/extensions/filters/network/meta_protocol_proxy/filters/router/router.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
-
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"
-#include "test/test_common/utility.h"
-#include "test/test_common/registry.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -46,8 +45,7 @@ public:
     factory_context_.cluster_manager_.initializeThreadLocalClusters({cluster_name});
 
     EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
-                newConnection(_))
-        .Times(1);
+                newConnection(_));
 
     filter_->onEncodingSuccess(test_buffer, expect_response);
     EXPECT_EQ(1, filter_->upstreamRequestsForTest().size());
@@ -112,7 +110,7 @@ TEST_F(RouterFilterTest, OnUpstreamCluster) {
   test_buffer.add("test");
 
   // No upstream cluster.
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_not_found", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_not_found", _));
 
   filter_->onEncodingSuccess(test_buffer, false);
 }
@@ -135,7 +133,7 @@ TEST_F(RouterFilterTest, UpstreamClusterMaintainMode) {
   EXPECT_CALL(*factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
               maintenanceMode())
       .WillOnce(Return(true));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_maintain_mode", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "cluster_maintain_mode", _));
   filter_->onEncodingSuccess(test_buffer, false);
 }
 
@@ -156,20 +154,19 @@ TEST_F(RouterFilterTest, UpstreamClusterNoHealthyUpstream) {
   // No conn pool.
   EXPECT_CALL(factory_context_.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
       .WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "no_healthy_upstream", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "no_healthy_upstream", _));
   filter_->onEncodingSuccess(test_buffer, false);
 }
 
-TEST_F(RouterFilterTest, kickOffNormalUpstreamRequest) { kickOffNewUpstreamRequest(false); }
+TEST_F(RouterFilterTest, KickOffNormalUpstreamRequest) { kickOffNewUpstreamRequest(false); }
 
 TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
   kickOffNewUpstreamRequest(false);
 
   EXPECT_CALL(
       factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.handles_.back(),
-      cancel(_))
-      .Times(1);
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _)).Times(1);
+      cancel(_));
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _));
 
   auto upstream_request = filter_->upstreamRequestsForTest().begin()->get();
 
@@ -181,7 +178,7 @@ TEST_F(RouterFilterTest, UpstreamRequestResetBeforePoolCallback) {
 TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
   kickOffNewUpstreamRequest(false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "overflow", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "overflow", _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
@@ -190,7 +187,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionOverflow) {
 TEST_F(RouterFilterTest, UpstreamRequestPoolFailureConnctionTimeout) {
   kickOffNewUpstreamRequest(false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_failure", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_failure", _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
@@ -203,8 +200,8 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndExpectNoResponse) {
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
-  EXPECT_CALL(mock_filter_callback_, completeDirectly()).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
+  EXPECT_CALL(mock_filter_callback_, completeDirectly());
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
@@ -219,14 +216,14 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionErrorBeforeRespons
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
   EXPECT_NE(upstream_request->conn_data_, nullptr);
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "local_reset", _));
 
   mock_conn.close(Network::ConnectionCloseType::FlushWrite);
   // Mock connection close event.
@@ -242,14 +239,14 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyButConnectionTerminationBeforeR
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
   EXPECT_NE(upstream_request->conn_data_, nullptr);
   EXPECT_EQ(upstream_request->conn_pool_handle_, nullptr);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_termination", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "connection_termination", _));
 
   mock_conn.close(Network::ConnectionCloseType::FlushWrite);
   // Mock connection close event.
@@ -265,7 +262,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
@@ -300,7 +297,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponse) {
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
 
-  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, upstreamResponse(_));
 
   upstream_request->onDecodingSuccess(std::move(response));
 }
@@ -312,7 +309,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndEndStreamBeforeResponse) {
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
@@ -343,7 +340,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndEndStreamBeforeResponse) {
   EXPECT_CALL(*raw_mock_response_decoder, decode(BufferStringEqual("test_2")))
       .WillOnce(Invoke([&](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _));
 
   upstream_request->onUpstreamData(test_buffer, true);
 }
@@ -355,7 +352,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
 
   NiceMock<Network::MockClientConnection> mock_conn;
 
-  EXPECT_CALL(mock_conn, write(_, _)).Times(1);
+  EXPECT_CALL(mock_conn, write(_, _));
 
   factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolReady(mock_conn);
 
@@ -388,7 +385,7 @@ TEST_F(RouterFilterTest, UpstreamRequestPoolReadyAndResponseDecodingFailure) {
 
   upstream_request->onUpstreamData(test_buffer, false);
 
-  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _)).Times(1);
+  EXPECT_CALL(mock_filter_callback_, sendLocalReply(_, "protocol_error", _));
 
   upstream_request->onDecodingFailure();
 }

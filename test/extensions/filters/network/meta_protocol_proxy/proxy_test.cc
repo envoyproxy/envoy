@@ -1,18 +1,18 @@
-#include "source/extensions/filters/network/meta_protocol_proxy/proxy.h"
-
-#include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
-
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
-#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"
-#include "test/test_common/utility.h"
-#include "test/test_common/registry.h"
-#include "test/mocks/server/factory_context.h"
-
-#include "gtest/gtest.h"
 #include <memory>
 #include <string>
 #include <utility>
+
+#include "source/extensions/filters/network/meta_protocol_proxy/proxy.h"
+
+#include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/codec.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
+#include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
+#include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using testing::ByMove;
 using testing::NiceMock;
@@ -184,7 +184,7 @@ TEST_F(FilterConfigTest, RouteEntry) {
 /**
  * Test creating an L7 filter chain.
  */
-TEST_F(FilterConfigTest, createFilterChain) {
+TEST_F(FilterConfigTest, CreateFilterChain) {
   auto mock_stream_filter = std::make_shared<NiceMock<MockStreamFilter>>();
   mock_stream_filters_ = {mock_stream_filter, mock_stream_filter, mock_stream_filter};
 
@@ -257,23 +257,23 @@ TEST_F(FilterTest, SimpleOnData) {
 
   Buffer::OwnedImpl fake_empty_buffer;
 
-  EXPECT_CALL(*decoder_, decode(_)).Times(1);
+  EXPECT_CALL(*decoder_, decode(_));
   filter_->onData(fake_empty_buffer, false);
 }
 
-TEST_F(FilterTest, onDecodingFailureWithoutActiveStreams) {
+TEST_F(FilterTest, OnDecodingFailureWithoutActiveStreams) {
   initializeFilter();
 
   Buffer::OwnedImpl fake_empty_buffer;
 
-  EXPECT_CALL(*decoder_, decode(_)).Times(1);
+  EXPECT_CALL(*decoder_, decode(_));
   filter_->onData(fake_empty_buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));
   decoder_callback_->onDecodingFailure();
 }
 
-TEST_F(FilterTest, onDecodingSuccessWithNormalRequest) {
+TEST_F(FilterTest, OnDecodingSuccessWithNormalRequest) {
   auto mock_stream_filter = std::make_shared<NiceMock<MockStreamFilter>>();
   mock_stream_filters_ = {mock_stream_filter, mock_stream_filter, mock_stream_filter};
 
@@ -281,7 +281,7 @@ TEST_F(FilterTest, onDecodingSuccessWithNormalRequest) {
 
   Buffer::OwnedImpl fake_empty_buffer;
 
-  EXPECT_CALL(*decoder_, decode(_)).Times(1);
+  EXPECT_CALL(*decoder_, decode(_));
   filter_->onData(fake_empty_buffer, false);
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
@@ -363,7 +363,7 @@ TEST_F(FilterTest, NewStreamAndResetStream) {
   EXPECT_EQ(0, filter_->activeStreamsForTest().size());
 }
 
-TEST_F(FilterTest, onDecodingFailureWithActiveStreams) {
+TEST_F(FilterTest, OnDecodingFailureWithActiveStreams) {
   initializeFilter();
 
   auto request_0 = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
@@ -375,7 +375,7 @@ TEST_F(FilterTest, onDecodingFailureWithActiveStreams) {
   EXPECT_EQ(2, filter_->activeStreamsForTest().size());
 
   Buffer::OwnedImpl fake_empty_buffer;
-  EXPECT_CALL(*decoder_, decode(_)).Times(1);
+  EXPECT_CALL(*decoder_, decode(_));
   filter_->onData(fake_empty_buffer, false);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_));

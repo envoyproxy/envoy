@@ -13,9 +13,9 @@ envoy_cc_mock(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        "//source/common/protobuf",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:config_interface",
         "//source/extensions/filters/network/meta_protocol_proxy/interface:filter_interface",
-        "//source/common/protobuf:protobuf",
     ],
 )
 

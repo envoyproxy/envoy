@@ -1,7 +1,6 @@
 #include "source/extensions/filters/network/meta_protocol_proxy/config.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
-
 #include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"

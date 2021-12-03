@@ -1,18 +1,17 @@
-#include "source/extensions/filters/network/meta_protocol_proxy/route.h"
+#include <memory>
 
+#include "source/common/config/metadata.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/match.h"
+#include "source/extensions/filters/network/meta_protocol_proxy/route.h"
 
 #include "test/extensions/filters/network/meta_protocol_proxy/fake_codec.h"
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/filter.h"
 #include "test/extensions/filters/network/meta_protocol_proxy/mocks/route.h"
-#include "test/test_common/utility.h"
-#include "test/test_common/registry.h"
 #include "test/mocks/server/factory_context.h"
-
-#include "source/common/config/metadata.h"
+#include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include <memory>
 
 using testing::Invoke;
 using testing::NiceMock;
