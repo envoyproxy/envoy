@@ -9,6 +9,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
+#include "absl/types/variant.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -36,12 +38,9 @@ public:
 };
 
 /**
- * DNS response.
+ * DNS A/AAAA record response.
  */
-struct DnsResponse {
-  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
-      : address_(address), ttl_(ttl) {}
-
+struct AddrInfoResponse {
   const Address::InstanceConstSharedPtr address_;
   const std::chrono::seconds ttl_;
 };
@@ -49,19 +48,35 @@ struct DnsResponse {
 /**
  * DNS SRV record response.
  */
-struct DnsSrvResponse {
-  DnsSrvResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
-      : host_(host), port_(port), priority_(priority), weight_(weight) {}
-
+struct SrvResponse {
   const std::string host_;
   const uint16_t port_;
   const uint16_t priority_;
   const uint16_t weight_;
 };
 
+/**
+ * DNS response.
+ */
+class DnsResponse {
+public:
+  DnsResponse(const Address::InstanceConstSharedPtr& address, const std::chrono::seconds ttl)
+      : response_(AddrInfoResponse{address, ttl}) {}
+
+  DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
+      : response_(SrvResponse{host, port, priority, weight}) {}
+
+  const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
+
+  const SrvResponse& srv() const { return absl::get<SrvResponse>(response_); }
+
+private:
+  absl::variant<AddrInfoResponse, SrvResponse> response_;
+};
+
 enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
 
-enum class DnsResourceType : uint8_t { SRV = 33 };
+enum class RecordType { A, AAAA, SRV };
 
 /**
  * An asynchronous DNS resolver.
@@ -80,7 +95,8 @@ public:
    * @param status supplies the final status of the resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
+  using ResolveCb =
+      std::function<void(ResolutionStatus status, const std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -102,7 +118,7 @@ public:
    * @return if non-null, a handle that can be used to cancel the resolution.
    *         This is only valid until the invocation of callback or ~DnsResolver().
    */
-  virtual ActiveDnsQuery* query(const std::string& dns_name, DnsResourceType resource_type) PURE;
+  virtual ActiveDnsQuery* query(const std::string& dns_name, RecordType resource_type) PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;
