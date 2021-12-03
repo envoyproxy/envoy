@@ -37,7 +37,9 @@ BENCHMARK(bufferCreateEmpty);
 static void bufferVsWatermarkBuffer(benchmark::State& state) {
   const uint64_t length = state.range(0);
   const uint64_t high_watermark = state.range(1);
-  const bool use_watermark_buffer = (state.range(2) != 0);
+  const uint64_t step = state.range(2);
+  const bool use_watermark_buffer = (state.range(3) != 0);
+  const std::string data(step, 'a');
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
@@ -49,25 +51,28 @@ static void bufferVsWatermarkBuffer(benchmark::State& state) {
       buffer = std::make_unique<Buffer::OwnedImpl>();
     }
 
-    for (uint64_t idx = 0; idx < length; ++idx) {
-      buffer->add("a", 1);
+    for (uint64_t idx = 0; idx < length; idx += step) {
+      buffer->add(data);
     }
   }
-  benchmark::DoNotOptimize(length);
 }
 BENCHMARK(bufferVsWatermarkBuffer)
-    ->Args({1024, 0, 0})
-    ->Args({1024, 0, 1})
-    ->Args({1024, 1, 1})
-    ->Args({1024, 1024, 1})
-    ->Args({64 * 1024, 0, 0})
-    ->Args({64 * 1024, 0, 1})
-    ->Args({64 * 1024, 1, 1})
-    ->Args({64 * 1024, 64 * 1024, 1})
-    ->Args({1024 * 1024, 0, 0})
-    ->Args({1024 * 1024, 0, 1})
-    ->Args({1024 * 1024, 1, 1})
-    ->Args({1024 * 1024, 1024 * 1024, 1});
+    ->Args({1024, 0, 1, 0})
+    ->Args({1024, 0, 1, 1})
+    ->Args({1024, 1, 1, 1})
+    ->Args({1024, 1024, 1, 1})
+    ->Args({64 * 1024, 0, 1, 0})
+    ->Args({64 * 1024, 0, 1, 1})
+    ->Args({64 * 1024, 1, 1, 1})
+    ->Args({64 * 1024, 64 * 1024, 1, 1})
+    ->Args({64 * 1024, 0, 32, 0})
+    ->Args({64 * 1024, 64 * 1024, 32, 1})
+    ->Args({1024 * 1024, 0, 1, 0})
+    ->Args({1024 * 1024, 0, 1, 1})
+    ->Args({1024 * 1024, 1, 1, 1})
+    ->Args({1024 * 1024, 1024 * 1024, 1, 1})
+    ->Args({1024 * 1024, 0, 32, 0})
+    ->Args({1024 * 1024, 1024 * 1024, 32, 1});
 
 // Measure performance impact of enabling accounts.
 static void bufferAccountUse(benchmark::State& state) {
@@ -79,19 +84,20 @@ static void bufferAccountUse(benchmark::State& state) {
   config.set_minimum_account_to_track_power_of_two(2);
   Buffer::WatermarkBufferFactory buffer_factory(config);
   FakeStreamResetHandler reset_handler;
+  auto account = buffer_factory.createAccount(reset_handler);
+  RELEASE_ASSERT(account != nullptr, "");
 
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     Buffer::OwnedImpl buffer;
     if (enable_accounts) {
-      auto account = buffer_factory.createAccount(reset_handler);
-      RELEASE_ASSERT(account != nullptr, "");
       buffer.bindAccount(account);
     }
     for (uint64_t idx = 0; idx < iters; ++idx) {
       buffer.add(data);
     }
   }
+  account->clearDownstream();
 }
 BENCHMARK(bufferAccountUse)
     ->Args({1, 1024 * 1024, 0})
