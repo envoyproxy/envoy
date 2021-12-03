@@ -108,7 +108,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status,
-             const std::list<Network::DnsResponse>&& response) -> void {
+             std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
 
