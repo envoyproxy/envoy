@@ -31,9 +31,8 @@ DnsResolverImpl::DnsResolverImpl(
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(dns_resolver_options),
-      use_resolvers_as_fallback_(use_resolvers_as_fallback),
-      resolvers_vector_(maybeBuildResolversVector(resolvers)),
-      resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
+      user_defined_resolvers_(
+          maybeBuildUserDefinedResolvers(resolvers, use_resolvers_as_fallback)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -43,17 +42,41 @@ DnsResolverImpl::~DnsResolverImpl() {
   ares_destroy(channel_);
 }
 
-absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+absl::optional<DnsResolverImpl::UserDefinedResolvers>
+DnsResolverImpl::maybeBuildUserDefinedResolvers(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_resolvers_as_fallback) {
   if (resolvers.empty()) {
     return absl::nullopt;
+  }
+
+  if (use_resolvers_as_fallback) {
+    std::vector<in_addr> resolver_addrs;
+
+    for (const auto& resolver : resolvers) {
+      if (!resolver->ip() || resolver->ip()->ipv6()) {
+        throw EnvoyException(fmt::format(
+            "DNS resolver '{}' is {}", resolver->asString(),
+            !resolver->ip()
+                ? "not an IP address"
+                : "an IPv6 address. Only IPv4 addresses may be used as fallback nameservers"));
+      }
+
+      // c-ares only supports ipv4 addresses set this way
+      if (resolver->ip()->ipv4()) {
+        in_addr in;
+        in.s_addr = resolver->ip()->ipv4()->address();
+        resolver_addrs.push_back(in);
+      }
+    }
+    return {resolver_addrs};
   }
 
   std::vector<std::string> resolver_addrs;
   resolver_addrs.reserve(resolvers.size());
   for (const auto& resolver : resolvers) {
     // This should be an IP address (i.e. not a pipe).
-    if (resolver->ip() == nullptr) {
+    if (!resolver->ip()) {
       throw EnvoyException(
           fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
     }
@@ -67,30 +90,6 @@ absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
                                          resolver->ip()->port()));
   }
   return {absl::StrJoin(resolver_addrs, ",")};
-}
-
-std::vector<in_addr> DnsResolverImpl::maybeBuildResolversVector(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
-  if (resolvers.empty()) {
-    return {};
-  }
-
-  std::vector<in_addr> resolver_addrs;
-
-  for (const auto& resolver : resolvers) {
-    if (resolver->ip() == nullptr) {
-      throw EnvoyException(
-          fmt::format("DNS resolver '{}' is not an IP address", resolver->asString()));
-    }
-
-    // c-ares only supports ipv4 addresses set this way
-    if (resolver->ip()->ipv4()) {
-      in_addr in;
-      in.s_addr = resolver->ip()->ipv4()->address();
-      resolver_addrs.push_back(in);
-    }
-  }
-  return resolver_addrs;
 }
 
 DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
@@ -118,19 +117,21 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   options->sock_state_cb_data = this;
   optmask |= ARES_OPT_SOCK_STATE_CB;
 
-  ENVOY_LOG_MISC(error, "resolvers {}, use dns fallback {}", resolvers_vector_.size(),
-                 use_resolvers_as_fallback_);
-  if (!resolvers_vector_.empty() && use_resolvers_as_fallback_) {
-    ENVOY_LOG_MISC(error, "using resolvers as fallback {}", resolvers_vector_.size());
-    options->nservers = resolvers_vector_.size();
-    options->servers = &resolvers_vector_[0];
+  // Point channel to fallback name servers if they exist.
+  if (user_defined_resolvers_.has_value() &&
+      absl::holds_alternative<std::vector<in_addr>>(user_defined_resolvers_.value())) {
+    auto& resolvers_vector = absl::get<std::vector<in_addr>>(user_defined_resolvers_.value());
+    options->nservers = resolvers_vector.size();
+    options->servers = &resolvers_vector.front();
     optmask |= ARES_OPT_SERVERS;
   }
   ares_init_options(&channel_, options, optmask);
 
-  // Ensure that the channel points to custom resolvers, if they exist.
-  if (resolvers_csv_.has_value() && !use_resolvers_as_fallback_) {
-    int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+  // Otherwise point channel to override name servers if they exist.
+  if (user_defined_resolvers_.has_value() &&
+      absl::holds_alternative<std::string>(user_defined_resolvers_.value())) {
+    auto& resolvers_csv = absl::get<std::string>(user_defined_resolvers_.value());
+    int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
 }

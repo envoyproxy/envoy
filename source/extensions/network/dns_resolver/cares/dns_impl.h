@@ -14,6 +14,7 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/types/variant.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -107,10 +108,11 @@ private:
     int optmask_;
   };
 
-  static absl::optional<std::string>
-  maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
-  static std::vector<in_addr>
-  maybeBuildResolversVector(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+  using UserDefinedResolvers = absl::variant<std::vector<in_addr>, std::string>;
+
+  static absl::optional<UserDefinedResolvers> maybeBuildUserDefinedResolvers(
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+      const bool use_resolvers_as_fallback);
 
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);
@@ -131,9 +133,7 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
-  const bool use_resolvers_as_fallback_;
-  std::vector<in_addr> resolvers_vector_;
-  const absl::optional<std::string> resolvers_csv_;
+  absl::optional<UserDefinedResolvers> user_defined_resolvers_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

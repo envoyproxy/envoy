@@ -434,6 +434,34 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   ares_free_data(resolvers);
 }
 
+TEST_F(DnsImplConstructor, CustomResolversAsFallbackWithIPv6NotSupported) {
+  auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv6Instance(addr6->ip()->addressAsString(), addr6->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.set_use_resolvers_as_fallback(true);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config),
+      EnvoyException,
+      "DNS resolver '[::1]:54' is an IPv6 address. Only IPv4 addresses may be used as fallback "
+      "nameservers");
+}
+
 TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
