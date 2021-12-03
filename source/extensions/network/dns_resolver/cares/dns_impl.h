@@ -109,7 +109,6 @@ private:
   };
 
   using UserDefinedResolvers = absl::variant<std::vector<in_addr>, std::string>;
-
   static absl::optional<UserDefinedResolvers> maybeBuildUserDefinedResolvers(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
       const bool use_resolvers_as_fallback);
