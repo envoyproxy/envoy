@@ -26,6 +26,7 @@ namespace {
 
 using ::Envoy::Matcher::ActionFactory;
 using ::Envoy::Matcher::CustomMatcherFactory;
+using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
@@ -60,6 +61,11 @@ public:
     const auto result = match_tree()->match(TestData());
     EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
     EXPECT_FALSE(result.on_match_.has_value());
+  }
+  void validateUnableToMatch() {
+    auto match_tree = factory_.create(matcher_);
+    const auto result = match_tree()->match(TestData());
+    EXPECT_EQ(result.match_state_, MatchState::UnableToMatch);
   }
 
   StringActionFactory action_factory_;
@@ -140,6 +146,8 @@ matcher_tree:
       - ranges:
         - address_prefix: 128.0.0.0
           prefix_len: 1
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
         - address_prefix: 192.0.0.0
           prefix_len: 2
         on_match:
@@ -287,6 +295,70 @@ matcher_tree:
     auto input = TestDataInputFactory("input", "128.0.0.1");
     auto nested = TestDataInputFactory("nested", "");
     validateMatch("foo");
+  }
+}
+
+TEST_F(TrieMatcherTest, NoData) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 0.0.0.0
+        on_match:
+          matcher:
+            matcher_tree:
+              input:
+                name: nested
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+              custom_match:
+                name: ip_matcher
+                typed_config:
+                  "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+                  range_matchers:
+                  - ranges:
+                    - address_prefix: 192.0.0.0
+                      prefix_len: 2
+                    on_match:
+                      action:
+                        name: test_action
+                        typed_config:
+                          "@type": type.googleapis.com/google.protobuf.StringValue
+                          value: foo
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory(
+        "input", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    auto nested = TestDataInputFactory("nested", "");
+    validateNoMatch();
+  }
+  {
+    auto input = TestDataInputFactory("input", "127.0.0.1");
+    auto nested = TestDataInputFactory(
+        "nested", {DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt});
+    validateNoMatch();
+  }
+  {
+    auto input = TestDataInputFactory(
+        "input", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    auto nested = TestDataInputFactory("nested", "");
+    validateUnableToMatch();
+  }
+  {
+    auto input = TestDataInputFactory("input", "127.0.0.1");
+    auto nested = TestDataInputFactory(
+        "nested", {DataInputGetResult::DataAvailability::NotAvailable, absl::nullopt});
+    validateUnableToMatch();
   }
 }
 
