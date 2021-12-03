@@ -21,7 +21,7 @@ namespace ExtAuthz {
 namespace {
 
 Filters::Common::ExtAuthz::ResponsePtr
-makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
+makeAuthzResponse(const Filters::Common::ExtAuthz::CheckStatus status) {
   Filters::Common::ExtAuthz::ResponsePtr response =
       std::make_unique<Filters::Common::ExtAuthz::Response>();
   response->status = status;
@@ -31,7 +31,7 @@ makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus status) {
 }
 
 Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
-    envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
+    const envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::AuthResult result) {
   Filters::Common::ExtAuthz::CheckStatus check_status;
   switch (result) {
   case envoy::extensions::filters::http::ext_authz::ExtAuthzTestCase::OK: {
@@ -85,11 +85,17 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
 
   // Prepare filter.
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
-  FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-      proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix", bootstrap);
-  std::unique_ptr<Filter> filter =
-      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+  const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
+  std::unique_ptr<Filter> filter;
+  try {
+    const FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
+        proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix", bootstrap);
+    filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
+    return;
+  }
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 

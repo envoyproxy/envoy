@@ -64,7 +64,7 @@ filter_metadata {
 result {
   ok {}
 }
-data {
+request_data {
   headers {
     headers {
       key: ":host"

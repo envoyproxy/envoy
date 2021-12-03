@@ -6,7 +6,7 @@ config {
   }
   stat_prefix: "with_stat_prefix"
 }
-data {
+request_data {
   headers {
     headers {
       key: ":host"

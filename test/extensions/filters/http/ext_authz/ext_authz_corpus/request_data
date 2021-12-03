@@ -8,7 +8,7 @@ config {
     max_request_bytes: 10
   }
 }
-data {
+request_data {
   headers {
     headers {
       key: ":host"

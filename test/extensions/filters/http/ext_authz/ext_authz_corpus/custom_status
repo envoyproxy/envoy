@@ -8,7 +8,7 @@ config {
     code: ServiceUnavilable
   }
 }
-data {
+request_data {
   headers {
     headers {
       key: ":host"
