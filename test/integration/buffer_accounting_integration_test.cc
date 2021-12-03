@@ -23,6 +23,8 @@
 namespace Envoy {
 namespace {
 
+using testing::HasSubstr;
+
 std::string protocolTestParamsAndBoolToString(
     const ::testing::TestParamInfo<std::tuple<HttpProtocolTestParams, bool, bool>>& params) {
   return fmt::format("{}_{}_{}",
@@ -211,8 +213,8 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
 
   // Makes us have Envoy's writes to upstream return EAGAIN
-  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -226,7 +228,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   for (auto& response : responses) {
     ASSERT_TRUE(response->waitForEndStream());
@@ -244,12 +246,12 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   initialize();
 
   buffer_factory_->setExpectedAccountBalance(response_body_size, num_requests);
-  writev_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
   // start to accumulate in the transport socket buffer.
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setWriteReturnsEgain();
 
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
@@ -261,7 +263,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   // Wait for streams to terminate.
   for (auto& response : responses) {
@@ -452,8 +454,8 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   initialize();
 
   // Makes us have Envoy's writes to upstream return EAGAIN
-  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto smallest_request_response = std::move(sendRequests(1, 4096, 4096)[0]);
@@ -498,7 +500,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
       "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to upstream, any request streams that survive can go through.
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   if (!streamBufferAccounting()) {
     // If we're not doing the accounting, we didn't end up resetting these
@@ -531,9 +533,9 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   initialize();
 
   // Makes us have Envoy's writes to downstream return EAGAIN
-  writev_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setWriteReturnsEgain();
 
   auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
   waitForNextUpstreamRequest();
@@ -587,7 +589,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
       "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to downstream, any responses that survive can go through.
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   if (streamBufferAccounting()) {
     EXPECT_TRUE(largest_response->waitForReset());
@@ -615,6 +617,91 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   ASSERT_TRUE(smallest_response->waitForEndStream());
   ASSERT_TRUE(smallest_response->complete());
   EXPECT_EQ(smallest_response->headers().getStatusValue(), "200");
+}
+
+TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnded) {
+  useAccessLog("%RESPONSE_CODE%");
+  initializeOverloadManagerInBootstrap(
+      TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reset_high_memory_stream"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.90
+            saturation_threshold: 0.98
+    )EOF"));
+  initialize();
+
+  // Set 10MiB receive window for the client.
+  const int downstream_window_size = 10 * 1024 * 1024;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions());
+  http2_options.mutable_initial_stream_window_size()->set_value(downstream_window_size);
+  http2_options.mutable_initial_connection_window_size()->set_value(downstream_window_size);
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+
+  // Makes us have Envoy's writes to downstream return EAGAIN
+  write_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
+
+  // Send a request
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"content-length", "10"},
+  });
+  auto& encoder = encoder_decoder.first;
+  const std::string data(10, 'a');
+  codec_client_->sendData(encoder, data, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  FakeStreamPtr upstream_request_for_response = std::move(upstream_request_);
+
+  // Send the responses back. It is larger than the downstream's receive window
+  // size. Thus, the codec will not end the stream, but the Envoy level stream
+  // should.
+  upstream_request_for_response->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}},
+                                               false);
+  const int response_size = downstream_window_size + 1024; // Slightly over the window size.
+  upstream_request_for_response->encodeData(response_size, true);
+
+  if (streamBufferAccounting()) {
+    // Wait for access log to know the Envoy level stream has been deleted.
+    EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("200"));
+  }
+
+  // Set the pressure so the overload action kills the response if doing stream
+  // accounting
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 62);
+
+  if (streamBufferAccounting()) {
+    test_server_->waitForCounterGe("envoy.overload_actions.reset_high_memory_stream.count", 1);
+  }
+
+  // Reduce resource pressure
+  updateResource(0.80);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
+
+  // Resume writes to downstream.
+  write_matcher_->setResumeWrites();
+
+  if (streamBufferAccounting()) {
+    EXPECT_TRUE(response->waitForReset());
+    EXPECT_TRUE(response->reset());
+  } else {
+    // If we're not doing the accounting, we didn't end up resetting the
+    // streams.
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ(response->headers().getStatusValue(), "200");
+  }
 }
 
 } // namespace Envoy

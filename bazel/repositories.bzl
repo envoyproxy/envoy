@@ -115,10 +115,6 @@ def _python_deps():
         name = "com_github_twitter_common_finagle_thrift",
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
-    external_http_archive(
-        name = "six",
-        build_file = "@com_google_protobuf//third_party:six.BUILD",
-    )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -1062,6 +1058,9 @@ def _rules_fuzzing():
         repo_mapping = {
             "@fuzzing_py_deps": "@fuzzing_pip3",
         },
+        # TODO(asraa): Try this fix for OSS-Fuzz build failure on tar command.
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_fuzzing.patch"],
     )
 
 def _kafka_deps():

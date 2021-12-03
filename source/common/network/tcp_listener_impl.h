@@ -17,7 +17,8 @@ namespace Network {
 class TcpListenerImpl : public BaseListenerImpl {
 public:
   TcpListenerImpl(Event::DispatcherImpl& dispatcher, Random::RandomGenerator& random,
-                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port);
+                  SocketSharedPtr socket, TcpListenerCallbacks& cb, bool bind_to_port,
+                  bool ignore_global_conn_limit);
   ~TcpListenerImpl() override {
     if (bind_to_port_) {
       socket_->ioHandle().resetFileEvents();
@@ -37,11 +38,12 @@ private:
 
   // Returns true if global connection limit has been reached and the accepted socket should be
   // rejected/closed. If the accepted socket is to be admitted, false is returned.
-  static bool rejectCxOverGlobalLimit();
+  bool rejectCxOverGlobalLimit() const;
 
   Random::RandomGenerator& random_;
   bool bind_to_port_;
   UnitFloat reject_fraction_;
+  const bool ignore_global_conn_limit_;
 };
 
 } // namespace Network
