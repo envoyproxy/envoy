@@ -50,8 +50,6 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
-#define PERFETTO_CHILD_TRACK_ID 42
-
 namespace Envoy {
 namespace Http {
 
@@ -627,8 +625,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_,
           connection_manager_.timeSource())) {
-  TRACE_EVENT_BEGIN("core", "ActiveStream",
-                    perfetto::Track(PERFETTO_CHILD_TRACK_ID, perfetto::ThreadTrack::Current()));
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
                connection_manager.config_.scopedRouteConfigProvider() != nullptr) ||
@@ -700,11 +696,6 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     max_stream_duration_timer_->enableTimer(connection_manager_.config_.maxStreamDuration().value(),
                                             this);
   }
-}
-
-ConnectionManagerImpl::ActiveStream::~ActiveStream() {
-  TRACE_EVENT_END("core",
-                  perfetto::Track(PERFETTO_CHILD_TRACK_ID, perfetto::ThreadTrack::Current()));
 }
 
 void ConnectionManagerImpl::ActiveStream::completeRequest() {
