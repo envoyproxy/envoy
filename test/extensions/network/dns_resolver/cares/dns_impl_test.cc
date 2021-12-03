@@ -57,9 +57,6 @@ using IpList = std::list<std::string>;
 using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
-// Represents a single TestDnsServer query state and lifecycle. This implements
-// just enough of RFC 1035 to handle queries we generate in the tests below.
-enum class RecordType { A, AAAA };
 
 class TestDnsServerQuery {
 public:
@@ -625,7 +622,7 @@ public:
     std::list<Address::InstanceConstSharedPtr> address;
 
     for_each(response.begin(), response.end(),
-             [&](DnsResponse resp) { address.emplace_back(resp.address_); });
+             [&](DnsResponse resp) { address.emplace_back(resp.addrInfo().address_); });
     return address;
   }
 
@@ -633,7 +630,7 @@ public:
     std::list<std::string> address;
 
     for_each(response.begin(), response.end(), [&](DnsResponse resp) {
-      address.emplace_back(resp.address_->ip()->addressAsString());
+      address.emplace_back(resp.addrInfo().address_->ip()->addressAsString());
     });
     return address;
   }
@@ -646,7 +643,7 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
+        [=](DnsResolver::ResolutionStatus status, const std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -667,7 +664,7 @@ public:
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (const auto& address : results) {
-              EXPECT_EQ(address.ttl_, expected_ttl.value());
+              EXPECT_EQ(address.addrInfo().ttl_, expected_ttl.value());
             }
           }
 
@@ -678,15 +675,16 @@ public:
   ActiveDnsQuery* resolveWithUnreferencedParameters(const std::string& address,
                                                     const DnsLookupFamily lookup_family,
                                                     bool expected_to_execute) {
-    return resolver_->resolve(address, lookup_family,
-                              [expected_to_execute](DnsResolver::ResolutionStatus status,
-                                                    std::list<DnsResponse>&& results) -> void {
-                                if (!expected_to_execute) {
-                                  FAIL();
-                                }
-                                UNREFERENCED_PARAMETER(status);
-                                UNREFERENCED_PARAMETER(results);
-                              });
+    return resolver_->resolve(
+        address, lookup_family,
+        [expected_to_execute](DnsResolver::ResolutionStatus status,
+                              const std::list<DnsResponse>&& results) -> void {
+          if (!expected_to_execute) {
+            FAIL();
+          }
+          UNREFERENCED_PARAMETER(status);
+          UNREFERENCED_PARAMETER(results);
+        });
   }
 
   template <typename T>
@@ -694,7 +692,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
-                                                 std::list<DnsResponse>&& results) -> void {
+                                                 const std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
                                 throw exception_object;
