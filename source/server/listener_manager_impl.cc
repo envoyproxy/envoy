@@ -515,16 +515,7 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   stopListener(*draining_it->listener_, [this, listener_tag]() {
     for (auto& listener : draining_listeners_) {
       if (listener.listener_->listenerTag() == listener_tag) {
-        if (!listener.listener_->udpListenerConfig().has_value() ||
-            listener.listener_->udpListenerConfig()
-                ->listenerFactory()
-                .isTransportConnectionless()) {
-          // Close the listen socket right away to avoid leaving TCP connections in accept queue
-          // already waiting for long timeout. However, connection-oriented UDP listener shouldn't
-          // close the socket because it needs to receive packets on existing connection via the
-          // listen socket.
-          listener.listener_->listenSocketFactory().closeAllSockets();
-        }
+        maybeCloseSocketsForListener(*listener.listener_);
       }
     }
   });
@@ -875,14 +866,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
         stats_.listener_stopped_.inc();
         for (auto& listener : active_listeners_) {
           if (listener->listenerTag() == listener_tag) {
-            if (!listener->udpListenerConfig().has_value() ||
-                listener->udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
-              // Close the listen socket right away to avoid leaving TCP connections in accept queue
-              // already waiting for long timeout. However, connection-oriented UDP listener
-              // shouldn't close the socket because it needs to receive packets on existing
-              // connection via the listen socket.
-              listener->listenSocketFactory().closeAllSockets();
-            }
+            maybeCloseSocketsForListener(*listener);
           }
         }
       });
@@ -1050,6 +1034,17 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
               e.what());
     incListenerCreateFailureStat();
     throw e;
+  }
+}
+
+void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
+  if (!listener.udpListenerConfig().has_value() ||
+      listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
+    // Close the listen socket right away to avoid leaving TCP connections in accept queue
+    // already waiting for long timeout. However, connection-oriented UDP listener shouldn't
+    // close the socket because it needs to receive packets on existing connection via the
+    // listen socket.
+    listener.listenSocketFactory().closeAllSockets();
   }
 }
 
