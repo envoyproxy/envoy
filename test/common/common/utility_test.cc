@@ -243,12 +243,12 @@ TEST(InputConstMemoryStream, All) {
 }
 
 TEST(StringUtil, WhitespaceChars) {
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, ' '));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\t'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\f'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\v'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\n'));
-  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars, '\r'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), ' '));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\t'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\f'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\v'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\n'));
+  EXPECT_NE(nullptr, strchr(StringUtil::WhitespaceChars.data(), '\r'));
 }
 
 TEST(StringUtil, itoa) {
