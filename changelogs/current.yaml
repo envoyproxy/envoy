@@ -99,7 +99,9 @@ minor_behavior_changes:
 - area: dynamic_forward_proxy
   change: |
     No longer waiting on DNS responses in the dynamic forward proxy filter if upstream proxying is turned on. This behaviorial change can be reverted by setting runtime guard ``envoy.reloadable_features.skip_dns_lookup_for_proxied_requests`` to false.
-
+- area: oauth
+  change: |
+    query parameters in the :ref:`authorization_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.authorization_endpoint>` are now preserved.
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: http
