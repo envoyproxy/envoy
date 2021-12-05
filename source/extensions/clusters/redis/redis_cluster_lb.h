@@ -55,6 +55,7 @@ public:
   std::string primary_hostname_;
   uint16_t primary_port_;
   std::vector<ReplicaToResolve> replicas_to_resolve_;
+
 private:
   int64_t start_;
   int64_t end_;

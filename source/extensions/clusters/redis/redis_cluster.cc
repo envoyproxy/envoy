@@ -308,8 +308,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
-void RedisCluster::RedisDiscoverySession::updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool emptyResponse)
-{
+void RedisCluster::RedisDiscoverySession::updateDnsStats(
+    Network::DnsResolver::ResolutionStatus status, bool emptyResponse) {
   if (status == Network::DnsResolver::ResolutionStatus::Failure || emptyResponse) {
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {
       parent_.info_->stats().update_failure_.inc();
@@ -319,31 +319,32 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(Network::DnsResolver::R
   }
 }
 
-
-void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPtr&& slots)
-{
+void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPtr&& slots) {
   // Iterate over all slots replicate and resolve all missing addresses one at a time
   for (ClusterSlot& slot : *slots) {
     // Resolve primary
     if (slot.primary() == nullptr) {
-      ENVOY_LOG(trace, "starting async DNS resolution for primary slot address {}", slot.primary_hostname_);
-      parent_.dns_resolver_->resolve(slot.primary_hostname_, parent_.dns_lookup_family_,
+      ENVOY_LOG(trace, "starting async DNS resolution for primary slot address {}",
+                slot.primary_hostname_);
+      parent_.dns_resolver_->resolve(
+          slot.primary_hostname_, parent_.dns_lookup_family_,
           [this, &slot, &slots](Network::DnsResolver::ResolutionStatus status,
-                std::list<Network::DnsResponse>&& response) -> void {
+                                std::list<Network::DnsResponse>&& response) -> void {
             ENVOY_LOG(trace, "async DNS resolution complete for {}", slot.primary_hostname_);
             updateDnsStats(status, response.empty());
             if (status != Network::DnsResolver::ResolutionStatus::Success) {
               // Failed
-              ENVOY_LOG(debug, "Unable to resolve cluster slot primary address {}", slot.primary_hostname_);
+              ENVOY_LOG(debug, "Unable to resolve cluster slot primary address {}",
+                        slot.primary_hostname_);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
             }
             // Primary slot address resolved
-            slot.setPrimary(Network::Utility::getAddressWithPort(*response.front().address_, slot.primary_port_));
+            slot.setPrimary(Network::Utility::getAddressWithPort(*response.front().address_,
+                                                                 slot.primary_port_));
             // Continue resolving slot's addresses until everything is resolved
             resolveClusterHostnames(std::move(slots));
-          }
-      );
+          });
       // do one resolution at a time: once resolved, callback will invoke this function again
       return;
     }
@@ -353,9 +354,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
       uint16_t port = slot.replicas_to_resolve_.back().second;
       slot.replicas_to_resolve_.pop_back();
       ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", host);
-      parent_.dns_resolver_->resolve(host, parent_.dns_lookup_family_,
+      parent_.dns_resolver_->resolve(
+          host, parent_.dns_lookup_family_,
           [this, &slot, &slots, port, host](Network::DnsResolver::ResolutionStatus status,
-                std::list<Network::DnsResponse>&& response) -> void {
+                                            std::list<Network::DnsResponse>&& response) -> void {
             ENVOY_LOG(trace, "async DNS resolution complete for {}", host);
             updateDnsStats(status, response.empty());
             if (status != Network::DnsResolver::ResolutionStatus::Success) {
@@ -368,8 +370,7 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
             slot.addReplica(Network::Utility::getAddressWithPort(*response.front().address_, port));
             // Continue resolving slot's addresses until everything is resolved
             resolveClusterHostnames(std::move(slots));
-          }
-      );
+          });
       // do one resolution at a time: once resolved, callback will invoke this function again
       return;
     }
@@ -403,8 +404,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
   //    2) (integer) 5460             <-- end slot range
   //
   //    3) 1) "127.0.0.1"                                   |
-  //       2) (integer) 30001                               <-  master for slot as IP(HOST) / Port / ID
-  //       3) "09dbe9720cda62f7865eabc5fd8857c5d2678366"    |
+  //       2) (integer) 30001                               <-  master for slot as IP(HOST) / Port /
+  //       ID 3) "09dbe9720cda62f7865eabc5fd8857c5d2678366"    |
   //
   //    4) 1) "127.0.0.1"                                   |
   //       2) (integer) 30004                               <- replicas in the same format as master
@@ -439,7 +440,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     // Try to parse primary slot address as IP address
     // It may fail in AWS elasticache use case: it uses hostnames instead of IPs.
     // If this is the case - we'll come back later and try to resolve hostnames asynchronously.
-    ClusterSlot slot(slot_range[SlotRangeStart].asInteger(), slot_range[SlotRangeEnd].asInteger(), processClusterByIP(slot_range[SlotPrimary]));
+    ClusterSlot slot(slot_range[SlotRangeStart].asInteger(), slot_range[SlotRangeEnd].asInteger(),
+                     processClusterByIP(slot_range[SlotPrimary]));
     if (slot.primary() == nullptr) {
       // Primary address is hostname: save the name for further resolving
       const auto& array = slot_range[SlotPrimary].asArray();
@@ -481,8 +483,8 @@ void RedisCluster::RedisDiscoverySession::onResponse(
 }
 
 // Ensure that Slot Cluster response has valid format
-bool RedisCluster::RedisDiscoverySession::validateCluster(const NetworkFilters::Common::Redis::RespValue& value)
-{
+bool RedisCluster::RedisDiscoverySession::validateCluster(
+    const NetworkFilters::Common::Redis::RespValue& value) {
   // Verify data types
   if (value.type() != NetworkFilters::Common::Redis::RespType::Array) {
     return false;
