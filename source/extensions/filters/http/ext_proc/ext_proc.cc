@@ -25,7 +25,7 @@ using Http::RequestTrailerMap;
 using Http::ResponseHeaderMap;
 using Http::ResponseTrailerMap;
 
-static const std::string ErrorPrefix = "ext_proc error";
+static const std::string ErrorPrefix = "ext_proc_error";
 static const int DefaultImmediateStatus = 200;
 static const std::string FilterName = "envoy.filters.http.ext_proc";
 
@@ -536,7 +536,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status) {
     cleanUpTimers();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: gRPC error %i", ErrorPrefix, status));
+    errorResponse.set_details(absl::StrFormat("%s_gRPC_error_%i", ErrorPrefix, status));
     sendImmediateResponse(errorResponse);
   }
 }
@@ -572,7 +572,7 @@ void Filter::onMessageTimeout() {
     encoding_state_.setCallbackState(ProcessorState::CallbackState::Idle);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
-    errorResponse.set_details(absl::StrFormat("%s: per-message timeout exceeded", ErrorPrefix));
+    errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
   }
 }

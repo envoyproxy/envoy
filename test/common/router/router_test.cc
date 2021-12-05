@@ -322,7 +322,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       callbacks_,
       sendLocalReply(Http::Code::ServiceUnavailable,
                      testing::Eq("missing required header: :method"), _, _,
-                     "filter_removed_required_request_headers{missing required header: :method}"))
+                     "filter_removed_required_request_headers{missing_required_header:_:method}"))
       .WillOnce(testing::InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();
