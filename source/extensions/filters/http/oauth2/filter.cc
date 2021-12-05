@@ -55,9 +55,6 @@ constexpr const char* CookieTailFormatString = ";version=1;path=/;Max-Age={};sec
 constexpr const char* CookieTailHttpOnlyFormatString =
     ";version=1;path=/;Max-Age={};secure;HttpOnly";
 
-const char* AuthorizationEndpointFormat =
-    "{}?client_id={}&scope={}&response_type=code&redirect_uri={}&state={}";
-
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 const std::string& queryParamsError() { CONSTRUCT_ON_FIRST_USE(std::string, "error"); }
@@ -144,6 +141,12 @@ FilterConfig::FilterConfig(
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
+  }
+  if (!Http::Utility::Url().initialize(proto_config.authorization_endpoint(),
+                                       /*is_connect_request=*/false)) {
+    throw EnvoyException(
+        fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
+                    authorization_endpoint_));
   }
 }
 
@@ -330,11 +333,25 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    const std::string new_url = fmt::format(
-        AuthorizationEndpointFormat, config_->authorizationEndpoint(), config_->clientId(),
-        config_->encodedAuthScopes(), escaped_redirect_uri, escaped_state);
+    Http::Utility::Url authorization_endpoint;
+    // ASSERT is safe because the constructor throws an exception if the authorization endpoint is
+    // not a valid URL.
+    ASSERT(authorization_endpoint.initialize(config_->authorizationEndpoint(),
+                                             /*is_connect_request=*/false));
+    auto query_params =
+        Http::Utility::parseQueryString(authorization_endpoint.pathAndQueryParams());
+    query_params["client_id"] = config_->clientId();
+    query_params["redirect_uri"] = escaped_redirect_uri;
+    query_params["response_type"] = "code";
+    query_params["scope"] = config_->encodedAuthScopes();
+    query_params["state"] = escaped_state;
+    const std::string path_and_query_params = Http::Utility::replaceQueryString(
+        Http::HeaderString(authorization_endpoint.pathAndQueryParams()), query_params);
+    const std::string new_url =
+        absl::StrCat(authorization_endpoint.scheme(), "://", authorization_endpoint.hostAndPort(),
+                     path_and_query_params, config_->encodedResourceQueryParams());
 
-    response_headers->setLocation(new_url + config_->encodedResourceQueryParams());
+    response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
 
     config_->stats().oauth_unauthorized_rq_.inc();
