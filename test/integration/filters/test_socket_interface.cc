@@ -13,10 +13,22 @@
 namespace Envoy {
 namespace Network {
 
+Api::IoCallUint64Result TestIoSocketHandle::sendmsg(const Buffer::RawSlice* slices,
+                                                    uint64_t num_slice, int flags,
+                                                    const Address::Ip* self_ip,
+                                                    const Address::Instance& peer_address) {
+  if (write_override_) {
+    auto result = write_override_(this, slices, num_slice);
+    if (result.has_value()) {
+      return std::move(result).value();
+    }
+  }
+  return Test::IoSocketHandlePlatformImpl::sendmsg(slices, num_slice, flags, self_ip, peer_address);
+}
 Api::IoCallUint64Result TestIoSocketHandle::writev(const Buffer::RawSlice* slices,
                                                    uint64_t num_slice) {
-  if (writev_override_) {
-    auto result = writev_override_(this, slices, num_slice);
+  if (write_override_) {
+    auto result = write_override_(this, slices, num_slice);
     if (result.has_value()) {
       return std::move(result).value();
     }
@@ -30,8 +42,8 @@ IoHandlePtr TestIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen
     return nullptr;
   }
 
-  return std::make_unique<TestIoSocketHandle>(writev_override_, result.return_value_,
-                                              socket_v6only_, domain_);
+  return std::make_unique<TestIoSocketHandle>(write_override_, result.return_value_, socket_v6only_,
+                                              domain_);
 }
 
 IoHandlePtr TestIoSocketHandle::duplicate() {
@@ -40,13 +52,13 @@ IoHandlePtr TestIoSocketHandle::duplicate() {
     throw EnvoyException(fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                                      errorDetails(result.errno_)));
   }
-  return std::make_unique<TestIoSocketHandle>(writev_override_, result.return_value_,
-                                              socket_v6only_, domain_);
+  return std::make_unique<TestIoSocketHandle>(write_override_, result.return_value_, socket_v6only_,
+                                              domain_);
 }
 
 IoHandlePtr TestSocketInterface::makeSocket(int socket_fd, bool socket_v6only,
                                             absl::optional<int> domain) const {
-  return std::make_unique<TestIoSocketHandle>(writev_override_proc_, socket_fd, socket_v6only,
+  return std::make_unique<TestIoSocketHandle>(write_override_proc_, socket_fd, socket_v6only,
                                               domain);
 }
 
