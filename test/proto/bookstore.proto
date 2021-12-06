@@ -160,7 +160,7 @@ service Bookstore {
   }
   rpc PostCustomVerb(EchoBodyRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
-      post: "/foo/bar:registeredverb"
+      post: "/foo/bar:verb"
     };
   }
 }

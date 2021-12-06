@@ -344,7 +344,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
 
   // It is matched to PostWildcard `POST /wildcard/{arg=**}`.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/wildcard/random:unregisteredverb"}};
+                                         {":path", "/wildcard/random:unknown"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
@@ -365,10 +365,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
                      "bookstore.Bookstore", false),
       *api_);
 
-  // Now, the `registeredverb` is resgitered by PostCustomVerb `POST /foo/bar:registeredverb`,
+  // Now, the `verb` is registered by PostCustomVerb `POST /foo/bar:verb`,
   // so the transcoder will strictly match this custom verb.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/wildcard/random:registeredverb"}};
+                                         {":path", "/wildcard/random:verb"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
@@ -377,7 +377,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
-  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:registeredverb to a method.");
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:verb to a method.");
   EXPECT_FALSE(transcoder);
 }
 
@@ -390,10 +390,10 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   proto_config.set_match_unregistered_custom_verb(true);
   JsonTranscoderConfig config(proto_config, *api_);
 
-  // Even though the `unregisteredverb` is not registered, the transcoder will still strictly
+  // Even though the `unknown` is not registered, the transcoder will still strictly
   // try to match it.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/wildcard/random:unregisteredverb"}};
+                                         {":path", "/wildcard/random:unknown"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
@@ -402,7 +402,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
       config.createTranscoder(headers, request_in, response_in, transcoder, method_info);
 
   EXPECT_EQ(status.code(), StatusCode::kNotFound);
-  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unregisteredverb to a method.");
+  EXPECT_EQ(status.message(), "Could not resolve /wildcard/random:unknown to a method.");
   EXPECT_FALSE(transcoder);
 }
 
