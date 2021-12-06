@@ -247,11 +247,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     };
   } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-      absl::optional<std::string> virtual_cluster_name = stream_info.virtualClusterName();
-      if (virtual_cluster_name.has_value()) {
-        return virtual_cluster_name.value();
-      }
-      return "";
+      return stream_info.virtualClusterName().value_or("");
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
