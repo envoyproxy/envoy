@@ -79,15 +79,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "main-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-92.0.4511.0 (linux/dev)
-        version = "75edea1922aefe415e0e60ac576116634b0a94f8",
-        sha256 = "70e9d8737e35d67f94b9e742ca59c02c36f30f1d822d5a3706511a23798d8049",
+        # chromium-94.0.4606.81 (linux/dev)
+        version = "648cbaf033401b7fe7acdce02f275b06a88aab5c",
+        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-05-13",
+        release_date = "2021-07-15",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -651,11 +651,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.27.0",
-        sha256 = "69de5c704a05ff37862f7e0f5534d4f479418afc21806c887db544a316f3cb6b",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
+        version = "0.28.0",
+        sha256 = "8e968b5fcea1d2d64071872b12737bbb5514524ee5f0a4f54f5920266c261acb",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2021-03-18",
+        release_date = "2021-07-07",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -828,12 +828,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "7f2d442e3cb02b4ef4892e62b0e9a8ce94a83db2",
-        sha256 = "7de89aa92bb23b66b130891dc4d73b3aa1514271d39d261239fe7eef7744166d",
+        version = "5b786dfeb069f03bad6cde7efeedbe643f4f0c84",
+        sha256 = "867dbf12385b769ba1505420730e4166458062a165b370b2db25bd401a3f0ed1",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2021-11-24",
+        release_date = "2021-12-01",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -859,6 +859,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -882,6 +883,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1078,6 +1080,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # ANTLR has a runtime component, so is not purely build.
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1098,6 +1101,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
