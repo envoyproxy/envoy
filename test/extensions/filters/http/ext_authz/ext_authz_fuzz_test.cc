@@ -82,20 +82,22 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::http::ext_authz::ExtAuthzT
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   Http::ContextImpl http_context(stats_store.symbolTable());
-  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
 
   // Prepare filter.
   const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz proto_config = input.config();
-  std::unique_ptr<Filter> filter;
-  try {
-    const FilterConfigSharedPtr config = std::make_shared<FilterConfig>(
-        proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix", bootstrap);
-    filter = std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
+  FilterConfigSharedPtr config;
 
+  try {
+    config = std::make_shared<FilterConfig>(
+        proto_config, stats_store, mocks.runtime_, http_context, "ext_authz_prefix", bootstrap);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException during filter config validation: {}", e.what());
     return;
   }
+
+  Filters::Common::ExtAuthz::MockClient* client = new Filters::Common::ExtAuthz::MockClient();
+  std::unique_ptr<Filter> filter =
+      std::make_unique<Filter>(config, Filters::Common::ExtAuthz::ClientPtr{client});
   filter->setDecoderFilterCallbacks(mocks.decoder_callbacks_);
   filter->setEncoderFilterCallbacks(mocks.encoder_callbacks_);
 
