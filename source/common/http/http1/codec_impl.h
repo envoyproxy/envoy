@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <list>
 #include <memory>
@@ -225,19 +226,29 @@ public:
   }
 
   void commitToBuffer() {
-    if (hasFilled() > 0) {
-      ASSERT(reservation_ != nullptr);
-      reservation_->commit(hasFilled());
-      reservation_ = nullptr;
-      raw_slice_ = {nullptr, 0};
-      current_pos_ = nullptr;
+    if (reservation_ == nullptr) {
+      return;
     }
+
+    size_t filled = hasFilled();
+
+    if (filled > 0) {
+      reservation_->commit(filled);
+    }
+
+    reservation_ = nullptr;
+    raw_slice_ = {nullptr, 0};
+    current_pos_ = nullptr;
   }
+
+  // Method only used for test.
+  uint64_t remainingForTest() { return remaining(); }
 
 private:
   uint64_t remaining() { return raw_slice_.len_ - hasFilled(); }
 
   uint64_t hasFilled() {
+    ASSERT(raw_slice_.mem_ != nullptr);
     ASSERT(current_pos_ != nullptr);
     ASSERT(current_pos_ >= static_cast<char*>(raw_slice_.mem_));
     return current_pos_ - (static_cast<char*>(raw_slice_.mem_));
