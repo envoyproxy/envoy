@@ -245,7 +245,7 @@ private:
     processClusterByIP(const NetworkFilters::Common::Redis::RespValue& value);
     bool validateCluster(const NetworkFilters::Common::Redis::RespValue& value);
     void resolveClusterHostnames(ClusterSlotsPtr&& slots);
-    void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool emptyResponse);
+    void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
