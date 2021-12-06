@@ -46,7 +46,14 @@ using namespace std::chrono_literals;
 
 namespace Envoy {
 
-using testing::HasSubstr;
+using ::testing::HasSubstr;
+
+template <class M> bool CheckProtoEquality(M proto1, std::string text_proto2) {
+  M proto2;
+  if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2))
+    return false;
+  return Envoy::Protobuf::util::MessageDifferencer::Equals(proto1, proto2);
+}
 
 class RuntimeStatsHelper : public TestScopedRuntime {
 public:
@@ -1231,25 +1238,28 @@ TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("null").ShortDebugString(), "null_value: NULL_VALUE");
-  EXPECT_EQ(ValueUtil::loadFromYaml("true").ShortDebugString(), "bool_value: true");
-  EXPECT_EQ(ValueUtil::loadFromYaml("1").ShortDebugString(), "number_value: 1");
-  EXPECT_EQ(ValueUtil::loadFromYaml("9223372036854775807").ShortDebugString(),
-            "string_value: \"9223372036854775807\"");
-  EXPECT_EQ(ValueUtil::loadFromYaml("\"foo\"").ShortDebugString(), "string_value: \"foo\"");
-  EXPECT_EQ(ValueUtil::loadFromYaml("foo").ShortDebugString(), "string_value: \"foo\"");
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
+                                 "string_value: \"9223372036854775807\""));
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
+  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("[foo, bar]").ShortDebugString(),
-            "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
-  EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
-            "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+  EXPECT_TRUE(CheckProtoEquality(
+      ValueUtil::loadFromYaml("[foo, bar]"),
+      "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }"));
+  EXPECT_TRUE(CheckProtoEquality(
+      ValueUtil::loadFromYaml("foo: bar"),
+      "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }"));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
-  EXPECT_EQ(ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux").ShortDebugString(),
-            "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }");
+  EXPECT_TRUE(CheckProtoEquality(
+      ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux"),
+      "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }"));
 }
 
 TEST(LoadFromYamlExceptionTest, BadConversion) {
@@ -1466,9 +1476,13 @@ TEST_F(ProtobufUtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Struct dest_struct;
+  std::string expected_duration_text = R"pb(seconds: -281474976710656)pb";
+  ProtobufWkt::Duration expected_duration_proto;
+  Protobuf::TextFormat::ParseFromString(expected_duration_text, &expected_duration_proto);
   EXPECT_THROW_WITH_REGEX(TestUtility::jsonConvert(source_duration, dest_struct), EnvoyException,
-                          "Unable to convert protobuf message to JSON string.*"
-                          "seconds exceeds limit for field:  seconds: -281474976710656\n");
+                          fmt::format("Unable to convert protobuf message to JSON string.*"
+                                      "seconds exceeds limit for field:  {}",
+                                      expected_duration_proto.DebugString()));
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3665.
