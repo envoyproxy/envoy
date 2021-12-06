@@ -232,7 +232,7 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession::processClusterByIP(
   try {
     return Network::Utility::parseInternetAddress(array[0].asString(), array[1].asInteger(), false);
   } catch (const EnvoyException& ex) {
-    // Probably elasticache use case: hostname instead of IP
+    // Probably ElastiCache use case: hostname instead of IP
     return nullptr;
   }
 }
@@ -438,7 +438,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       return;
     }
     // Try to parse primary slot address as IP address
-    // It may fail in AWS elasticache use case: it uses hostnames instead of IPs.
+    // It may fail in AWS ElastiCache use case: it uses hostnames instead of IPs.
     // If this is the case - we'll come back later and try to resolve hostnames asynchronously.
     ClusterSlot slot(slot_range[SlotRangeStart].asInteger(), slot_range[SlotRangeEnd].asInteger(),
                      processClusterByIP(slot_range[SlotPrimary]));
@@ -460,7 +460,7 @@ void RedisCluster::RedisDiscoverySession::onResponse(
       if (replica_address) {
         slot.addReplica(std::move(replica_address));
       } else {
-        // Possible AWS elasticache use case: hostname instead of IP
+        // Possible AWS ElastiCache use case: hostname instead of IP
         const auto& array = replica->asArray();
         slot.addReplicaToResolve(array[0].asString(), array[1].asInteger());
       }
