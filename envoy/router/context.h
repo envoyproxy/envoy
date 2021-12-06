@@ -26,7 +26,7 @@ public:
   /**
    * @return a reference to the default generic connection pool factory.
    */
-  virtual const GenericConnPoolFactory& genericConnPoolFactory() const PURE;
+  virtual GenericConnPoolFactory& genericConnPoolFactory() PURE;
 };
 
 } // namespace Router
