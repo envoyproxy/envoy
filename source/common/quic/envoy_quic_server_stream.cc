@@ -141,7 +141,7 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyServerStreamBase::OnInitialHeadersComplete(fin, frame_len, header_list);
-  if (!headers_decompressed() || header_list.empty()) {
+  if (!headers_decompressed() || header_list.empty() || saw_invalid_header_) {
     onStreamError(absl::nullopt);
     return;
   }
@@ -415,6 +415,11 @@ bool EnvoyQuicServerStream::hasPendingData() {
   // Quic stream sends headers and trailers on the same stream, and buffers them in the same sending
   // buffer if needed. So checking this buffer is sufficient.
   return BufferedDataBytes() > 0;
+}
+
+void EnvoyQuicServerStream::OnInvalidHeaders() {
+  details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+  saw_invalid_header_ = true;
 }
 
 } // namespace Quic

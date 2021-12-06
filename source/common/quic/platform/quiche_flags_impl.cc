@@ -37,6 +37,9 @@ absl::flat_hash_map<absl::string_view, Flag*> makeFlagMap() {
   FLAGS_quic_reloadable_flag_quic_disable_version_draft_29->setValue(true);
   // This flag fixes a QUICHE issue which may crash Envoy during connection close.
   FLAGS_quic_reloadable_flag_quic_single_ack_in_packet2->setValue(true);
+  // These two flags enforce QUICHE headers verification.
+  FLAGS_quic_reloadable_flag_quic_verify_request_headers_2->setValue(true);
+  FLAGS_quic_reloadable_flag_quic_act_upon_invalid_header->setValue(true);
 
 #define QUIC_PROTOCOL_FLAG(type, flag, ...) flags.emplace(FLAGS_##flag->name(), FLAGS_##flag);
 #include "quiche/quic/core/quic_protocol_flags_list.h"

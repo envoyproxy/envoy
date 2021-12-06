@@ -136,7 +136,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     return;
   }
   quic::QuicSpdyStream::OnInitialHeadersComplete(fin, frame_len, header_list);
-  if (!headers_decompressed() || header_list.empty()) {
+  if (!headers_decompressed() || header_list.empty() || saw_invalid_header_) {
     onStreamError(!http3_options_.override_stream_error_on_invalid_http_message().value(),
                   quic::QUIC_BAD_APPLICATION_PAYLOAD);
     return;
@@ -355,6 +355,11 @@ void EnvoyQuicClientStream::onStreamError(absl::optional<bool> should_close_conn
 }
 
 bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
+
+void EnvoyQuicClientStream::OnInvalidHeaders() {
+  details_ = Http3ResponseCodeDetailValues::invalid_http_header;
+  saw_invalid_header_ = true;
+}
 
 } // namespace Quic
 } // namespace Envoy

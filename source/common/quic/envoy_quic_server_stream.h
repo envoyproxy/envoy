@@ -65,6 +65,7 @@ protected:
   void OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                  const quic::QuicHeaderList& header_list) override;
   void OnHeadersTooLarge() override;
+  void OnInvalidHeaders() override;
 
   // Http::MultiplexedStreamImplBase
   void onPendingFlushTimer() override;
