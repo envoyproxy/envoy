@@ -257,5 +257,22 @@ void resetEnvoyBugCountersForTest();
 // after a switch (some_enum) with all enum values included in the cases. The macro name includes
 // "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage reports.
 #define NOT_REACHED_GCOVR_EXCL_LINE PANIC("not reached")
+
+// It is safer to avoid defaults in switch statements, so that as new enums are added, the compiler
+// checks that new code is added as well. Google's proto library adds 2 sentinal values which should
+// not be used, and these macros allows avoiding using "default:" to handle them and instead using
+// case SENTINAL_VALUES_USED:
+//   PANIC_DUE_TO_SENTINAL_VALUE;
+#define SENTINAL_VALUES_USED                                                                       \
+  std::numeric_limits<int32_t>::max() : FALLTHRU;                                                  \
+  case std::numeric_limits<int32_t>::min()
+
+#define PANIC_DUE_TO_SENTINAL_VALUE PANIC("unexpected sentinal value used")
+
+// Envoy has a number of switch statements which panic if there's no legal value set.
+// This is not encouraged, as it's too easy to panic using break; instead of return;
+// but this macro replaces a less clear crash using NOT_REACHED_GCOVR_EXCL_LINE.
+#define PANIC_DUE_TO_CORRUPT_ENUM PANIC("corrupted enum");
+
 } // namespace Assert
 } // namespace Envoy
