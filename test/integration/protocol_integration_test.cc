@@ -30,6 +30,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/retry_priority.h"
@@ -38,6 +39,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
@@ -3531,6 +3533,44 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // stream error.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+}
+
+class NoUdpGso : public Api::OsSysCallsImpl {
+public:
+  bool supportsUdpGso() const override { return false; }
+};
+
+TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+  // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
+  NoUdpGso reject_gso_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
+  ASSERT(!Api::OsSysCallsSingleton::get().supportsUdpGso());
+  SocketInterfaceSwap socket_swap;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Makes us have Envoy's writes to downstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  // TODO(danzh) set to true.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3 since the packets are black holed, there is no client side
+    // indication of connection close. Wait on Envoy stats instead.
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+    codec_client_->close();
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
 }
 
 } // namespace Envoy

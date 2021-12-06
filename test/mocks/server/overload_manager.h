@@ -14,6 +14,9 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
+  MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
+  MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
+  MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName));
 
 private:
   const OverloadActionState disabled_state_;

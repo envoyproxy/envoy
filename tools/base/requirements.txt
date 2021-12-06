@@ -657,9 +657,9 @@ snowballstemmer==2.1.0 \
     --hash=sha256:b51b447bea85f9968c13b650126a888aabd4cb4463fca868ec596826325dedc2 \
     --hash=sha256:e997baa4f2e9139951b6f4c631bad912dfd3c792467e2f03d7239464af90e914
     # via sphinx
-sphinx==4.3.0 \
-    --hash=sha256:6d051ab6e0d06cba786c4656b0fe67ba259fe058410f49e95bee6e49c4052cbf \
-    --hash=sha256:7e2b30da5f39170efcd95c6270f07669d623c276521fee27ad6c380f49d2bf5b
+sphinx==4.3.1 \
+    --hash=sha256:048dac56039a5713f47a554589dc98a442b39226a2b9ed7f82797fcb2fe9253f \
+    --hash=sha256:32a5b3e9a1b176cc25ed048557d4d3d01af635e6b76c5bc7a43b0a34447fbd45
     # via
     #   -r requirements.in
     #   envoy.docs.sphinx-runner
@@ -744,7 +744,6 @@ typing-extensions==3.10.0.2 \
     # via
     #   aiodocker
     #   aiohttp
-    #   gitpython
 uritemplate==3.0.1 \
     --hash=sha256:07620c3f3f8eed1f12600845892b0e036a2420acf513c53f7de0abd911a5894f \
     --hash=sha256:5af8ad10cec94f215e3f48112de2022e1d5a37ed427fbd88652fa908f2ab7cae
