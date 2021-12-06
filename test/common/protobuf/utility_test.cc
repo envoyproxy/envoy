@@ -48,7 +48,7 @@ namespace Envoy {
 
 using ::testing::HasSubstr;
 
-template <class M> bool CheckProtoEquality(M proto1, std::string text_proto2) {
+template <class M> bool checkProtoEquality(M proto1, std::string text_proto2) {
   M proto2;
   if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2))
     return false;
@@ -1238,26 +1238,26 @@ TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("null"), "null_value: NULL_VALUE"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("true"), "bool_value: true"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("1"), "number_value: 1"));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("9223372036854775807"),
                                  "string_value: \"9223372036854775807\""));
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
-  EXPECT_TRUE(CheckProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("\"foo\""), "string_value: \"foo\""));
+  EXPECT_TRUE(checkProtoEquality(ValueUtil::loadFromYaml("foo"), "string_value: \"foo\""));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
-  EXPECT_TRUE(CheckProtoEquality(
+  EXPECT_TRUE(checkProtoEquality(
       ValueUtil::loadFromYaml("[foo, bar]"),
       "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }"));
-  EXPECT_TRUE(CheckProtoEquality(
+  EXPECT_TRUE(checkProtoEquality(
       ValueUtil::loadFromYaml("foo: bar"),
       "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }"));
 }
 
 TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObjectWithIgnoredEntries) {
-  EXPECT_TRUE(CheckProtoEquality(
+  EXPECT_TRUE(checkProtoEquality(
       ValueUtil::loadFromYaml("!ignore foo: bar\nbaz: qux"),
       "struct_value { fields { key: \"baz\" value { string_value: \"qux\" } } }"));
 }
