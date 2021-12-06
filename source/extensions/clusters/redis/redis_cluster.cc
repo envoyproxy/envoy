@@ -309,8 +309,8 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
 }
 
 void RedisCluster::RedisDiscoverySession::updateDnsStats(
-    Network::DnsResolver::ResolutionStatus status, bool emptyResponse) {
-  if (status == Network::DnsResolver::ResolutionStatus::Failure || emptyResponse) {
+    Network::DnsResolver::ResolutionStatus status, bool empty_response) {
+  if (status == Network::DnsResolver::ResolutionStatus::Failure || empty_response) {
     if (status == Network::DnsResolver::ResolutionStatus::Failure) {
       parent_.info_->stats().update_failure_.inc();
     } else {
