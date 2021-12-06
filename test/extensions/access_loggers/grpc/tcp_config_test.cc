@@ -67,9 +67,6 @@ public:
 // Normal OK configuration.
 TEST_F(TcpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
 
-// Wrong configuration with invalid clusters.
-TEST_F(TcpGrpcAccessLogConfigTest, InvalidCluster) { run("invalid"); }
-
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache

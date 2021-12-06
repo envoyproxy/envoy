@@ -67,9 +67,6 @@ public:
 // Normal OK configuration.
 TEST_F(HttpGrpcAccessLogConfigTest, Ok) { run("good_cluster"); }
 
-// Wrong configuration with invalid clusters.
-TEST_F(HttpGrpcAccessLogConfigTest, InvalidCluster) { run("invalid"); }
-
 } // namespace
 } // namespace HttpGrpc
 } // namespace AccessLoggers
