@@ -3556,7 +3556,6 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
-  // TODO(danzh) set to true.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
