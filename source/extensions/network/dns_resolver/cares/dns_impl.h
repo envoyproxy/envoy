@@ -14,7 +14,6 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/node_hash_map.h"
-#include "absl/types/variant.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -28,9 +27,8 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher,
+  DnsResolverImpl(Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                  const bool use_resolvers_as_fallback,
                   const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
   ~DnsResolverImpl() override;
 
@@ -108,16 +106,8 @@ private:
     int optmask_;
   };
 
-  // The UserDefinedResolvers variant holds name server addresses that are defined in Envoy config.
-  // Resolvers will either be used as a FallbackResolvers or OverrideResolvers as defined in config.
-  // Two different types are used so Envoy can co-opt c-ares's implementation to expose fallback,
-  // and override semantics.
-  using FallbackResolvers = std::vector<in_addr>;
-  using OverrideResolvers = std::string;
-  using UserDefinedResolvers = absl::variant<FallbackResolvers, OverrideResolvers>;
-  static absl::optional<UserDefinedResolvers> maybeBuildUserDefinedResolvers(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-      const bool use_resolvers_as_fallback);
+  static absl::optional<std::string>
+  maybeBuildResolversCsv(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
 
   // Callback for events on sockets tracked in events_.
   void onEventCallback(os_fd_t fd, uint32_t events);
@@ -138,7 +128,8 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
-  absl::optional<UserDefinedResolvers> user_defined_resolvers_;
+  const bool use_resolvers_as_fallback_;
+  const absl::optional<std::string> resolvers_csv_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

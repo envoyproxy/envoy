@@ -28,10 +28,6 @@ message CaresDnsResolverConfig {
   // nameserver from the system (e.g., /etc/resolv.conf).
   // Otherwise, the resolvers listed in the resolvers list will override the default system
   // resolvers. Defaults to false.
-  //
-  // .. attention::
-  //
-  //     Only IPv4 addresses without a specified port are allowed if set to true.
   bool use_resolvers_as_fallback = 3;
 
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.

@@ -24,15 +24,14 @@ namespace Envoy {
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
-    Event::Dispatcher& dispatcher,
+    Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_resolvers_as_fallback,
     const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(dns_resolver_options),
-      user_defined_resolvers_(
-          maybeBuildUserDefinedResolvers(resolvers, use_resolvers_as_fallback)) {
+      use_resolvers_as_fallback_(use_resolvers_as_fallback),
+      resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -42,30 +41,10 @@ DnsResolverImpl::~DnsResolverImpl() {
   ares_destroy(channel_);
 }
 
-absl::optional<DnsResolverImpl::UserDefinedResolvers>
-DnsResolverImpl::maybeBuildUserDefinedResolvers(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const bool use_resolvers_as_fallback) {
+absl::optional<std::string> DnsResolverImpl::maybeBuildResolversCsv(
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
   if (resolvers.empty()) {
     return absl::nullopt;
-  }
-
-  if (use_resolvers_as_fallback) {
-    DnsResolverImpl::FallbackResolvers resolver_addrs;
-
-    for (const auto& resolver : resolvers) {
-      if (resolver->ip() == nullptr || resolver->ip()->ipv6() || resolver->ip()->port() != 0) {
-        throw EnvoyException(fmt::format(
-            "DNS resolver '{}' is not an IP address, an IPv6 address, or has a port defined",
-            resolver->asString()));
-      }
-
-      ASSERT(resolver->ip()->ipv4());
-      in_addr in;
-      in.s_addr = resolver->ip()->ipv4()->address();
-      resolver_addrs.push_back(in);
-    }
-    return {resolver_addrs};
   }
 
   std::vector<std::string> resolver_addrs;
@@ -111,37 +90,20 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
     static_cast<DnsResolverImpl*>(arg)->onAresSocketStateChange(fd, read, write);
   };
   options->sock_state_cb_data = this;
-  optmask |= ARES_OPT_SOCK_STATE_CB;
+  ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 
-  // Point channel to fallback name servers if they exist. FallbackResolvers need to be applied to
-  // c-ares options _before_ the channel is initialized. c-ares uses a layered priority
-  // initialization where name servers set in options is the first layer. Therefore, if no other
-  // "higher" priority nameservers are found (e.g., in /etc/resolv.conf) then the resolvers set here
-  // are used. Therefore, Envoy achieves "fallback" semantics this way.
-  if (user_defined_resolvers_.has_value() &&
-      absl::holds_alternative<DnsResolverImpl::FallbackResolvers>(
-          user_defined_resolvers_.value())) {
-    ENVOY_LOG_MISC(error, "JOSE FALLBACK");
-    auto& resolvers_vector =
-        absl::get<DnsResolverImpl::FallbackResolvers>(user_defined_resolvers_.value());
-    options->nservers = resolvers_vector.size();
-    options->servers = &resolvers_vector.front();
-    optmask |= ARES_OPT_SERVERS;
-  }
-  ares_init_options(&channel_, options, optmask);
+  if (resolvers_csv_.has_value()) {
+    bool use_resolvers = true;
+    if (use_resolvers_as_fallback_) {
+      struct ares_addr_node* next_server;
+      ares_get_servers(channel_, &next_server);
+      use_resolvers = next_server == NULL ? true : false;
+    }
 
-  // After initialization Envoy can _override_ the nameservers c-ares uses by using
-  // ares_ser_servers_* APIs. Envoy uses the ares_set_servers_ports_csv in order to be able to
-  // define specific ports, and in order to not mantain statically allocated memory by using the
-  // ares linked list type.
-  if (user_defined_resolvers_.has_value() &&
-      absl::holds_alternative<DnsResolverImpl::OverrideResolvers>(
-          user_defined_resolvers_.value())) {
-    ENVOY_LOG_MISC(error, "JOSE OVERRIDE");
-    auto& resolvers_csv =
-        absl::get<DnsResolverImpl::OverrideResolvers>(user_defined_resolvers_.value());
-    int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    if (use_resolvers) {
+      int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+      RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    }
   }
 }
 
@@ -433,8 +395,8 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(
-        dispatcher, resolvers, cares.use_resolvers_as_fallback(), dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(dispatcher, cares.use_resolvers_as_fallback(),
+                                                      resolvers, dns_resolver_options);
   }
 };
 
