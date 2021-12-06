@@ -342,6 +342,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
                      "bookstore.Bookstore", false),
       *api_);
 
+  // It is matched to PostWildcard `POST /wildcard/{arg=**}`.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/wildcard/random:unregisteredverb"}};
 
@@ -364,6 +365,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
                      "bookstore.Bookstore", false),
       *api_);
 
+  // Now, the `registeredverb` is resgitered by PostCustomVerb `POST /foo/bar:registeredverb`,
+  // so the transcoder will strictly match this custom verb.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/wildcard/random:registeredverb"}};
 
@@ -387,6 +390,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   proto_config.set_match_unregistered_custom_verb(true);
   JsonTranscoderConfig config(proto_config, *api_);
 
+  // Even though the `unregisteredverb` is not registered, the transcoder will still strictly
+  // try to match it.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/wildcard/random:unregisteredverb"}};
 
