@@ -40,15 +40,15 @@ public:
   const VirtualClusterStatNames& virtualClusterStatNames() const override {
     return virtual_cluster_stat_names_;
   }
-  GenericConnPoolFactory* genericConnPoolFactory() const override {
+  const GenericConnPoolFactory& genericConnPoolFactory() const override {
     ASSERT(generic_conn_pool_factory_ != nullptr);
-    return generic_conn_pool_factory_;
+    return *generic_conn_pool_factory_;
   }
 
 private:
   const StatNames stat_names_;
   const VirtualClusterStatNames virtual_cluster_stat_names_;
-  GenericConnPoolFactory* generic_conn_pool_factory_{};
+  const GenericConnPoolFactory* generic_conn_pool_factory_;
 };
 
 } // namespace Router

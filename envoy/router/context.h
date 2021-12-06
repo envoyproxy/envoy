@@ -24,9 +24,9 @@ public:
   virtual const VirtualClusterStatNames& virtualClusterStatNames() const PURE;
 
   /**
-   * @return a pointer to the default generic connection pool factory.
+   * @return a reference to the default generic connection pool factory.
    */
-  virtual GenericConnPoolFactory* genericConnPoolFactory() const PURE;
+  virtual const GenericConnPoolFactory& genericConnPoolFactory() const PURE;
 };
 
 } // namespace Router

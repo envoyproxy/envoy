@@ -691,19 +691,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
 std::unique_ptr<GenericConnPool>
 Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
-  GenericConnPoolFactory* factory = config_.router_context_.genericConnPoolFactory();
-
+  const GenericConnPoolFactory* factory = nullptr;
   if (cluster_->upstreamConfig().has_value()) {
-    auto custom_factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
+    factory = Envoy::Config::Utility::getFactory<GenericConnPoolFactory>(
         cluster_->upstreamConfig().value());
-    // If cluster specified conn pool factory is not null then overwrite the default factory.
-    if (custom_factory != nullptr) {
-      factory = custom_factory;
-    }
-
-    ENVOY_BUG(custom_factory != nullptr,
+    ENVOY_BUG(factory != nullptr,
               fmt::format("invalid factory type '{}', failing over to default upstream",
                           cluster_->upstreamConfig().value().DebugString()));
+  }
+  if (!factory) {
+    factory = &config_.router_context_.genericConnPoolFactory();
   }
 
   bool should_tcp_proxy = false;
