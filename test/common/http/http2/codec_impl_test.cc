@@ -83,8 +83,7 @@ public:
 
     // Returns true if there are bytes to send or receive, and the connection is in good state.
     bool canDispatch() const {
-      return (buffer_.length() > 0 || connection_->wantsToWrite()) &&
-             status_.ok();
+      return (buffer_.length() > 0 || connection_->wantsToWrite()) && status_.ok();
     }
 
     bool dispatching_{};
@@ -162,9 +161,8 @@ public:
           server_wrapper_->buffer_.add(data);
         }));
     ON_CALL(server_connection_, write(_, _))
-        .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-          client_wrapper_->buffer_.add(data);
-        }));
+        .WillByDefault(Invoke(
+            [&](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
   }
 
   void http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
@@ -1690,7 +1688,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
   // Drive the server once to send some encoded data, and drive the client once to receive part of
-  // that data. Do not drive further in order to avoid sending WINDOW_UPDATEs from client to
+  // that data. Do not drive further in order to avoid sending a WINDOW_UPDATE from client to
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
@@ -1698,7 +1696,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 
-  // Now drive the response to completion, allowing WINDOW_UPDATEs from client to server. The
+  // Now drive the response to completion, allowing a WINDOW_UPDATE from client to server. The
   // client decodes more data, the server is finally able to send trailers (disabling the flush
   // timer), and the client decodes any remaining data and trailers.
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
@@ -1735,7 +1733,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
   // Drive the server once to send some encoded data, and drive the client once to receive part of
-  // that data. Do not drive further in order to avoid sending WINDOW_UPDATEs from client to
+  // that data. Do not drive further in order to avoid sending a WINDOW_UPDATE from client to
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
@@ -1776,7 +1774,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
   // Drive the server once to send some encoded data, and drive the client once to receive part of
-  // that data. Do not drive further in order to avoid sending WINDOW_UPDATEs from client to
+  // that data. Do not drive further in order to avoid sending a WINDOW_UPDATE from client to
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
@@ -1816,7 +1814,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, true);
   // Drive the server once to send some encoded data, and drive the client once to receive part of
-  // that data. Do not drive further in order to avoid sending WINDOW_UPDATEs from client to
+  // that data. Do not drive further in order to avoid sending a WINDOW_UPDATE from client to
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
