@@ -34,12 +34,6 @@ public:
 
   void run(const std::string cluster_name) {
     const auto good_cluster = "good_cluster";
-    EXPECT_CALL(context_.cluster_manager_, checkActiveStaticCluster(cluster_name))
-        .WillOnce(Invoke([good_cluster](const std::string& cluster_name) {
-          if (cluster_name != good_cluster) {
-            throw EnvoyException("fake");
-          }
-        }));
 
     auto* common_config = http_grpc_access_log_.mutable_common_config();
     common_config->set_log_name("foo");
