@@ -398,9 +398,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
 
 TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   char addr4str[INET_ADDRSTRLEN];
-  // we pick a port that isn't 53 as the default resolve.conf might be
-  // set to point to localhost.
-  auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
+  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
 
   // convert the address and options into typed_dns_resolver_config
   envoy::config::core::v3::Address dns_resolvers;
@@ -429,9 +427,35 @@ TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
   EXPECT_EQ(result, ARES_SUCCESS);
   EXPECT_EQ(resolvers->family, AF_INET);
-  EXPECT_NE(resolvers->udp_port, 54);
-  EXPECT_STREQ(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "127.0.0.1");
+  EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
   ares_free_data(resolvers);
+}
+
+TEST_F(DnsImplConstructor, CustomResolversAsFallbackWithPortNotSupported) {
+  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4:54");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.set_use_resolvers_as_fallback(true);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config),
+      EnvoyException,
+      "DNS resolver '[::1]:54' is not an IP address, an IPv6 address, or has a port defined");
 }
 
 TEST_F(DnsImplConstructor, CustomResolversAsFallbackWithIPv6NotSupported) {
@@ -458,8 +482,7 @@ TEST_F(DnsImplConstructor, CustomResolversAsFallbackWithIPv6NotSupported) {
   EXPECT_THROW_WITH_MESSAGE(
       dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config),
       EnvoyException,
-      "DNS resolver '[::1]:54' is an IPv6 address. Only IPv4 addresses may be used as fallback "
-      "nameservers");
+      "DNS resolver '[::1]:54' is not an IP address, an IPv6 address, or has a port defined");
 }
 
 TEST_F(DnsImplConstructor, SupportsMultipleCustomResolversAndDnsOptions) {

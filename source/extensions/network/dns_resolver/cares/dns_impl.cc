@@ -121,6 +121,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   if (user_defined_resolvers_.has_value() &&
       absl::holds_alternative<DnsResolverImpl::FallbackResolvers>(
           user_defined_resolvers_.value())) {
+    ENVOY_LOG_MISC(error, "JOSE FALLBACK");
     auto& resolvers_vector =
         absl::get<DnsResolverImpl::FallbackResolvers>(user_defined_resolvers_.value());
     options->nservers = resolvers_vector.size();
@@ -136,6 +137,7 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   if (user_defined_resolvers_.has_value() &&
       absl::holds_alternative<DnsResolverImpl::OverrideResolvers>(
           user_defined_resolvers_.value())) {
+    ENVOY_LOG_MISC(error, "JOSE OVERRIDE");
     auto& resolvers_csv =
         absl::get<DnsResolverImpl::OverrideResolvers>(user_defined_resolvers_.value());
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
