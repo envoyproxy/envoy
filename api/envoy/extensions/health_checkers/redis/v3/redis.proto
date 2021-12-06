@@ -8,6 +8,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.extensions.health_checkers.redis.v3";
 option java_outer_classname = "RedisProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/health_checkers/redis/v3;redisv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Redis]

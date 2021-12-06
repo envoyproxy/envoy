@@ -818,6 +818,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
           return stream_info.upstreamLocalAddress();
         });
+  } else if (field_name == "UPSTREAM_REQUEST_ATTEMPT_COUNT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.attemptCount().value_or(0);
+        });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
         StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
