@@ -108,7 +108,13 @@ private:
     int optmask_;
   };
 
-  using UserDefinedResolvers = absl::variant<std::vector<in_addr>, std::string>;
+  // The UserDefinedResolvers variant holds name server addresses that are defined in Envoy config.
+  // Resolvers will either be used as a FallbackResolvers or OverrideResolvers as defined in config.
+  // Two different types are used so Envoy can co-opt c-ares's implementation to expose fallback,
+  // and override semantics.
+  using FallbackResolvers = std::vector<in_addr>;
+  using OverrideResolvers = std::string;
+  using UserDefinedResolvers = absl::variant<FallbackResolvers, OverrideResolvers>;
   static absl::optional<UserDefinedResolvers> maybeBuildUserDefinedResolvers(
       const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
       const bool use_resolvers_as_fallback);
