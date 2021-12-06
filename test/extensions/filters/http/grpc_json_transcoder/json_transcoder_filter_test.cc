@@ -367,8 +367,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
 
   // Now, the `verb` is registered by PostCustomVerb `POST /foo/bar:verb`,
   // so the transcoder will strictly match this custom verb.
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {":path", "/wildcard/random:verb"}};
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/wildcard/random:verb"}};
 
   TranscoderInputStreamImpl request_in, response_in;
   TranscoderPtr transcoder;
