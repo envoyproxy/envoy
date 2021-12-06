@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -221,6 +221,10 @@ message GrpcJsonTranscoder {
   // If true, unescape '+' to space when extracting variables in query parameters.
   // This is to support `HTML 2.0 <https://tools.ietf.org/html/rfc1866#section-8.2.1>`_
   bool query_param_unescape_plus = 12;
+
+  // If true, try to match the custom verb even if it is unregistered. By
+  // default, only match when it is registered.
+  bool match_unregistered_custom_verb = 13;
 
   // Configure the behavior when handling requests that cannot be transcoded.
   //
