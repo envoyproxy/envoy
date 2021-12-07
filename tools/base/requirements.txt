@@ -342,9 +342,9 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-frozendict==2.1.0 \
-    --hash=sha256:0189168749ddea8601afd648146c502533f93ae33840eb76cd71f694742623cd \
-    --hash=sha256:1c0de90a47fcfb9abf18458cb82573e817455e45f9e6a250f8988e6725f3973a
+frozendict==2.1.1 \
+    --hash=sha256:655b879217dd445a2023e16154cc231febef802b5c812d5c2e822280ad69e1dc \
+    --hash=sha256:bbad8ef1a428f5e6f7e195742fd739f56a5a602f9cf9bbe86f55a4848b1fabd6
     # via
     #   -r requirements.in
     #   envoy.base.runner
