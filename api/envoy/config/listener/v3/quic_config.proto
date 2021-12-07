@@ -31,11 +31,12 @@ message QuicProtocolOptions {
 
   // Maximum number of milliseconds that connection will be alive when there is
   // no network activity. 300000ms if not specified.
-  google.protobuf.Duration idle_timeout = 2;
+  google.protobuf.Duration idle_timeout = 2 [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Connection timeout in milliseconds before the crypto handshake is finished.
   // 20000ms if not specified.
-  google.protobuf.Duration crypto_handshake_timeout = 3;
+  google.protobuf.Duration crypto_handshake_timeout = 3
+      [(validate.rules).duration = {gte {nanos: 1000000}}];
 
   // Runtime flag that controls whether the listener is enabled or not. If not specified, defaults
   // to enabled.
