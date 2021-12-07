@@ -50,8 +50,9 @@ using ::testing::HasSubstr;
 
 template <class M> bool checkProtoEquality(M proto1, std::string text_proto2) {
   M proto2;
-  if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2))
+  if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2)) {
     return false;
+  }
   return Envoy::Protobuf::util::MessageDifferencer::Equals(proto1, proto2);
 }
 
