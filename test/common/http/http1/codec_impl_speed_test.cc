@@ -1,7 +1,8 @@
+#include <cstddef>
+
 #include "source/common/http/http1/codec_impl.h"
 
 #include "benchmark/benchmark.h"
-#include <cstddef>
 
 namespace Envoy {
 namespace Http {
