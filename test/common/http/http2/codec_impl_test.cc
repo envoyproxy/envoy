@@ -123,6 +123,15 @@ public:
       EXPECT_EQ(0,
                 TestUtility::findGauge(server_stats_store_, "http2.pending_send_bytes")->value());
     }
+
+    // Ensure that tests driveToCompletion(). Some tests set `expect_buffered_data_on_teardown_` to
+    // indicate that they purposefully leave buffered data.
+    if (expect_buffered_data_on_teardown_) {
+      EXPECT_TRUE(client_wrapper_->buffer_.length() > 0 || server_wrapper_->buffer_.length() > 0);
+    } else {
+      EXPECT_EQ(client_wrapper_->buffer_.length(), 0);
+      EXPECT_EQ(server_wrapper_->buffer_.length(), 0);
+    }
   }
 
   virtual void initialize() {
@@ -334,6 +343,7 @@ public:
   MockStreamCallbacks server_stream_callbacks_;
   // Corrupt a metadata frame payload.
   bool corrupt_metadata_frame_ = false;
+  bool expect_buffered_data_on_teardown_ = false;
 
   uint32_t max_request_headers_kb_ = Http::DEFAULT_MAX_REQUEST_HEADERS_KB;
   uint32_t max_request_headers_count_ = Http::DEFAULT_MAX_HEADERS_COUNT;
@@ -497,6 +507,7 @@ TEST_P(Http2CodecImplTest, ContinueHeaders) {
 
 // nghttp2 rejects trailers with :status.
 TEST_P(Http2CodecImplTest, TrailerStatus) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -569,6 +580,7 @@ TEST_P(Http2CodecImplTest, Unsupported1xxHeader) {
 
 // nghttp2 treats 101 inside an HTTP/2 stream as an invalid HTTP header field.
 TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -587,6 +599,7 @@ TEST_P(Http2CodecImplTest, Invalid101SwitchingProtocols) {
 }
 
 TEST_P(Http2CodecImplTest, InvalidContinueWithFin) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -652,6 +665,7 @@ TEST_P(Http2CodecImplTest, CodecHasCorrectStreamErrorIfTrue) {
 }
 
 TEST_P(Http2CodecImplTest, InvalidRepeatContinue) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -700,6 +714,7 @@ TEST_P(Http2CodecImplTest, InvalidRepeatContinueAllowed) {
 };
 
 TEST_P(Http2CodecImplTest, Invalid204WithContentLength) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   TestRequestHeaderMapImpl request_headers;
@@ -946,6 +961,7 @@ TEST_P(Http2CodecImplTest, LargeMetadataVecTest) {
 
 TEST_P(Http2CodecImplTest, BadMetadataVecReceivedTest) {
   allow_metadata_ = true;
+  expect_buffered_data_on_teardown_ = true;
   initialize();
 
   // Generates a valid stream_id by sending a request header.
@@ -1029,6 +1045,7 @@ TEST_P(Http2CodecImplTest, NoMetadataEndStreamTest) {
 
 // Validate the keepalive PINGs are sent and received correctly.
 TEST_P(Http2CodecImplTest, ConnectionKeepalive) {
+  expect_buffered_data_on_teardown_ = true;
   constexpr uint32_t interval_ms = 100;
   constexpr uint32_t timeout_ms = 200;
   client_http2_options_.mutable_connection_keepalive()->mutable_interval()->set_nanos(interval_ms *
@@ -2067,6 +2084,7 @@ TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsConsumeErr
 }
 
 TEST_P(Http2CodecImplStreamLimitTest, LazyDecreaseMaxConcurrentStreamsIgnoreError) {
+  expect_buffered_data_on_teardown_ = true;
   initialize();
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http2_consume_stream_refused_errors", "false"}});
@@ -2968,6 +2986,7 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
 }
 
 TEST_P(Http2CodecImplTest, PriorityFlood) {
+  expect_buffered_data_on_teardown_ = true;
   priorityFlood();
   driveToCompletion();
   // The PRIORITY flood is detected by the server codec.
@@ -2984,6 +3003,7 @@ TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
 }
 
 TEST_P(Http2CodecImplTest, WindowUpdateFlood) {
+  expect_buffered_data_on_teardown_ = true;
   windowUpdateFlood();
   driveToCompletion();
   // The server codec should fail when it gets 1 WINDOW_UPDATE frame too many.
@@ -2999,6 +3019,7 @@ TEST_P(Http2CodecImplTest, WindowUpdateFloodOverride) {
 }
 
 TEST_P(Http2CodecImplTest, EmptyDataFlood) {
+  expect_buffered_data_on_teardown_ = true;
   Buffer::OwnedImpl data;
   emptyDataFlood(data);
   server_wrapper_->buffer_.add(std::move(data));
