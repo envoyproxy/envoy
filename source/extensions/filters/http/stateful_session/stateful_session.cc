@@ -17,12 +17,18 @@ StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
   if (config.host_statuses_size() > 0) {
     std::vector<envoy::config::core::v3::HealthStatus> host_statuses;
     host_statuses.reserve(config.host_statuses_size());
+
+    // Proto method `host_statuses()` returns an array of type int instead of an array of type
+    // `envoy::config::core::v3::HealthStatus`. So getting host status by the `host_statuses(int)`
+    // to keep the origin enum type information is necessary.
     for (int i = 0; i < config.host_statuses_size(); i++) {
       host_statuses.push_back(config.host_statuses(i));
     }
     host_statuses_ = Upstream::LoadBalancerContextBase::createOverrideHostStatus(host_statuses);
   } else {
-    host_statuses_ = ~host_statuses_;
+    // If no expected health status is configured then any host status will be accepted by default.
+    // Set all bits to 1.
+    host_statuses_ = ~static_cast<uint32_t>(0);
   }
 
   auto& factory =

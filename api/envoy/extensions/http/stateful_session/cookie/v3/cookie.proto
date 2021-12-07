@@ -33,7 +33,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     cookie: sticky-host="MS4yLjMuNDo4MA=="
 //
 // When processing the upstream response, if endpoint `1.2.3.4:80` is indeed the final choice
-// (endpoint `1.2.3.4:80` exists and it's status is as expected), the extension does nothing.
+// (endpoint `1.2.3.4:80` exists and its status is as expected), the extension does nothing.
 // If endpoint `1.2.3.4:80` is not the final choice, the new selected host will be used to
 // update the cookie (via the `set-cookie` response header).
 //

@@ -45,8 +45,8 @@ message StatefulSessionPerRoute {
   oneof override {
     option (validate.required) = true;
 
-    // Disable the Lua filter for this particular vhost or route. If disabled is specified in
-    // multiple per-filter-configs, the most specific one will be used.
+    // Disable the stateful session filter for this particular vhost or route. If disabled is
+    // specified in multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
     // Per-route stateful session configuration that can be served by RDS or static route table.
