@@ -20,6 +20,7 @@ Minor Behavior Changes
 * json: switching from rapidjson to nlohmann/json. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.remove_legacy_json`` to false.
 * listener: destroy per network filter chain stats when a network filter chain is removed during the listener in place update.
 * quic: add back the support for IETF draft 29 which is guarded via ``envoy.reloadable_features.FLAGS_quic_reloadable_flag_quic_disable_version_draft_29``. It is off by default so Envoy only supports RFCv1 without flipping this runtime guard explicitly. Draft 29 is not recommended for use.
+* router: take elapsed time into account when setting the x-envoy-expected-rq-timeout-ms header for retries, and never send a value that's longer than the request timeout. This behavioral change can be temporarily reverted by setting runtime guard ``envoy.reloadable_features.update_expected_rq_timeout_on_retry`` to false.
 
 Bug Fixes
 ---------
@@ -27,6 +28,7 @@ Bug Fixes
 
 * ext_authz: fix the ext_authz http filter to correctly set response flags to ``UAEX`` when a connection is denied.
 * ext_authz: fix the ext_authz network filter to correctly set response flag and code details to ``UAEX`` when a connection is denied.
+* hcm: stop processing the response if encoding it has caused downstream reset. The fix is guarded by ``envoy.reloadable_features.handle_stream_reset_during_hcm_encoding``.
 * listener: fixed issue where more than one listener could listen on the same port if using reuse port, thus randomly accepting connections on different listeners. This configuration is now rejected.
 * thrift_proxy: do not close downstream connections when an upstream connection overflow happens.
 * thrift_proxy: fix the thrift_proxy connection manager to correctly report success/error response metrics when performing :ref:`payload passthrough <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.payload_passthrough>`.
@@ -71,6 +73,7 @@ New Features
 * dns_resolver: added :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` to support apple DNS resolver as an extension.
 * ext_authz: added :ref:`query_parameters_to_set <envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_set>` and :ref:`query_parameters_to_remove <envoy_v3_api_field_service.auth.v3.OkHttpResponse.query_parameters_to_remove>` for adding and removing query string parameters when using a gRPC authorization server.
 * http: added support for %REQUESTED_SERVER_NAME% to extract SNI as a custom header.
+* http: added support for %VIRTUAL_CLUSTER_NAME% to extract the matched Virtual Cluster name as a custom header.
 * http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 * http: added timing information about upstream connection and encryption establishment to stream info. These can currently be accessed via custom access loggers.
 * http: added support for :ref:`forwarding HTTP1 reason phrase <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.forward_reason_phrase>`.

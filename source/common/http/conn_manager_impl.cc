@@ -325,7 +325,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error:", error));
+                    absl::StrCat("codec_error:", StringUtil::replaceAllEmptySpace(error)));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -1537,6 +1537,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().Overload);
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding")) {
+    filter_manager_.onDownstreamReset();
   }
 
   connection_manager_.doDeferredStreamDestroy(*this);
