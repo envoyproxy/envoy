@@ -234,7 +234,7 @@ stages:
         bazelBuildExtraOptions: "--sandbox_base=/tmp/sandbox_base"
 
 - stage: distribution
-  dependsOn: ["linux_arm64", "linux_x64"]
+  dependsOn: []  # "linux_arm64", "linux_x64"]
   jobs:
   - job: package_x64
     dependsOn: []
