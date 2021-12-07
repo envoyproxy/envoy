@@ -17,7 +17,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // fraction of currently open downstream connections divided by a statically configured maximum
 // specified in the DownstreamConnectionsConfig.
 message DownstreamConnectionsConfig {
-  // Maximum threshold for global open active downstream connections.
-  // Default value is TODO(nezdolik) figure out a sane default value so that Envoy does not reject all connections by default.
+  // Maximum threshold for global open active downstream connections, defaults to 0.
   uint64 max_active_downstream_connections = 1 [(validate.rules).uint64 = {gt: 0}];
 }

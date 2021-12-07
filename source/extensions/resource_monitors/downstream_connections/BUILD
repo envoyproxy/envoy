@@ -17,7 +17,6 @@ envoy_cc_library(
         "//envoy/server:proactive_resource_monitor_interface",
         "//envoy/server:resource_monitor_config_interface",
         "//source/common/common:assert_lib",
-        "//source/common/memory:stats_lib",
         "@envoy_api//envoy/extensions/resource_monitors/downstream_connections/v3:pkg_cc_proto",
     ],
 )
