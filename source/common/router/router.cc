@@ -496,7 +496,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                                              std::string(res.entry_->value().getStringView()));
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
-                         res.entry_->key().getStringView(), "}");
+                         StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
         callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, details);
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -1197,9 +1197,9 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
-  const std::string details = absl::StrCat(
+  const std::string details = StringUtil::replaceAllEmptySpace(absl::StrCat(
       basic_details, "{", Http::Utility::resetReasonToString(reset_reason),
-      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}");
+      transport_failure_reason.empty() ? "" : absl::StrCat(",", transport_failure_reason), "}"));
   onUpstreamAbort(error_code, response_flags, body, dropped, details);
 }
 

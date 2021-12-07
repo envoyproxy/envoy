@@ -1639,7 +1639,8 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
     // sendLocalReply() will fail. Net net, this is safe.
     wasm()->addAfterVmCallAction([this, response_code, body_text = std::string(body_text),
                                   modify_headers = std::move(modify_headers), grpc_status,
-                                  details = std::string(details)] {
+                                  details = StringUtil::replaceAllEmptySpace(
+                                      absl::string_view(details.data(), details.size()))] {
       decoder_callbacks_->sendLocalReply(static_cast<Envoy::Http::Code>(response_code), body_text,
                                          modify_headers, grpc_status, details);
     });

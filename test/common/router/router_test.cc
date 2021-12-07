@@ -322,7 +322,7 @@ TEST_F(RouterTest, MissingRequiredHeaders) {
       callbacks_,
       sendLocalReply(Http::Code::ServiceUnavailable,
                      testing::Eq("missing required header: :method"), _, _,
-                     "filter_removed_required_request_headers{missing required header: :method}"))
+                     "filter_removed_required_request_headers{missing_required_header:_:method}"))
       .WillOnce(testing::InvokeWithoutArgs([] {}));
   router_.decodeHeaders(headers, true);
   router_.onDestroy();
@@ -374,7 +374,7 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection failure,tls version mismatch}");
+            "upstream_reset_before_response_started{connection_failure,tls_version_mismatch}");
 }
 
 TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
@@ -409,7 +409,7 @@ TEST_F(RouterTest, PoolFailureDueToConnectTimeout) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(callbacks_.details(),
-            "upstream_reset_before_response_started{connection failure,connect_timeout}");
+            "upstream_reset_before_response_started{connection_failure,connect_timeout}");
 }
 
 TEST_F(RouterTest, Http1Upstream) {
@@ -1018,7 +1018,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
   EXPECT_EQ(0U,
             callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
-  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{connection failure}");
+  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{connection_failure}");
   EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
 }
 

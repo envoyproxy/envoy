@@ -14,6 +14,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
 
@@ -21,18 +22,6 @@
 
 namespace Envoy {
 namespace StreamInfo {
-
-namespace {
-
-using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
-
-const ReplacementMap& emptySpaceReplacement() {
-  CONSTRUCT_ON_FIRST_USE(
-      ReplacementMap,
-      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
-}
-
-} // namespace
 
 struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamConnectionId(uint64_t id) override { upstream_connection_id_ = id; }
@@ -247,7 +236,8 @@ struct StreamInfoImpl : public StreamInfo {
   void setResponseCode(uint32_t code) override { response_code_ = code; }
 
   void setResponseCodeDetails(absl::string_view rc_details) override {
-    response_code_details_.emplace(absl::StrReplaceAll(rc_details, emptySpaceReplacement()));
+    ASSERT(!StringUtil::hasEmptySpace(rc_details));
+    response_code_details_.emplace(rc_details);
   }
 
   const absl::optional<std::string>& connectionTerminationDetails() const override {

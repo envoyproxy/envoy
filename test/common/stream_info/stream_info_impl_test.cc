@@ -274,7 +274,7 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
 TEST_F(StreamInfoImplTest, Details) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
-  stream_info.setResponseCodeDetails("two words");
+  stream_info.setResponseCodeDetails("two_words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
 }

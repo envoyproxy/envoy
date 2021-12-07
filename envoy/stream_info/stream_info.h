@@ -192,7 +192,7 @@ struct ResponseCodeDetailValues {
   const std::string FilterRemovedRequiredResponseHeaders =
       "filter_removed_required_response_headers";
   // The request was rejected because the original IP couldn't be detected.
-  const std::string OriginalIPDetectionFailed = "rejecting because detection failed";
+  const std::string OriginalIPDetectionFailed = "rejecting_because_detection_failed";
   // Changes or additions to details should be reflected in
   // docs/root/configuration/http/http_conn_man/response_code_details.rst
 };

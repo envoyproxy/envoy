@@ -301,7 +301,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
-  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote reset}");
+  EXPECT_EQ(callbacks_.details(), "upstream_reset_before_response_started{remote_reset}");
 }
 
 class RouterTestChildSpan : public RouterTestBase {
