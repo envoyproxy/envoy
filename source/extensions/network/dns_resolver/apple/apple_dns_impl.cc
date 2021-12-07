@@ -318,7 +318,7 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
   // Therefore, only add this address to the list if kDNSServiceFlagsAdd is set.
   if (flags & kDNSServiceFlagsAdd) {
     ASSERT(address, "invalid to add null address");
-    auto dns_response = buildDnsResponse(address, ttl);
+    auto dns_response = buildDnsResponse(address, ttl).addrInfo();
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
               dns_response.address_->ip()->addressAsString(), ttl);
     if (dns_response.address_->ip()->ipv4()) {
