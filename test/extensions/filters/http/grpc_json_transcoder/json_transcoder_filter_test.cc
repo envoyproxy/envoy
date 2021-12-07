@@ -335,7 +335,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
   EXPECT_FALSE(transcoder);
 }
 
-// of path segment and can capture it in a wildcard segment.
+// By default, the transcoder will treat unregistered custom verb as part of path segment,
+// which can be captured in a wildcard.
 TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
   JsonTranscoderConfig config(
       getProtoConfig(TestEnvironment::runfilesPath("test/proto/bookstore.descriptor"),
@@ -343,6 +344,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, UnregisteredCustomVerb) {
       *api_);
 
   // It is matched to PostWildcard `POST /wildcard/{arg=**}`.
+  // ":unknown" was not treated as custom verb but as part of path segment,
+  // so it matches *.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/wildcard/random:unknown"}};
 
@@ -366,7 +369,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, RegisteredCustomVerb) {
       *api_);
 
   // Now, the `verb` is registered by PostCustomVerb `POST /foo/bar:verb`,
-  // so the transcoder will strictly match this custom verb.
+  // so the transcoder will strictly match `verb`.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"}, {":path", "/wildcard/random:verb"}};
 
   TranscoderInputStreamImpl request_in, response_in;
@@ -389,8 +392,8 @@ TEST_F(GrpcJsonTranscoderConfigTest, MatchUnregisteredCustomVerb) {
   proto_config.set_match_unregistered_custom_verb(true);
   JsonTranscoderConfig config(proto_config, *api_);
 
-  // Even though the `unknown` is not registered, the transcoder will still strictly
-  // try to match it.
+  // Even though the `unknown` is not registered, but as match_unregistered_custom_verb=true, the
+  // transcoder will strictly try to match it.
   Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
                                          {":path", "/wildcard/random:unknown"}};
 

@@ -224,6 +224,16 @@ message GrpcJsonTranscoder {
 
   // If true, try to match the custom verb even if it is unregistered. By
   // default, only match when it is registered.
+  //
+  // According to the http template syntax(https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231),
+  // the custom verb is `":" LITERAL` at the end of http template. Only when a
+  // http template has a custom verb defined, it can can only match a request
+  // with custom verb. However, in the current implementation, for http template
+  // `/foo/{x=*}`, it can match a request 'foo/bar:baz' where x=bar:baz, which is
+  // against the spec.
+  //
+  // With flag set, the custom verb will be strictly matched and the example above
+  // won't happen.
   bool match_unregistered_custom_verb = 13;
 
   // Configure the behavior when handling requests that cannot be transcoded.
