@@ -6374,5 +6374,277 @@ TEST_F(RouterTest, RequestResponseSize) { testRequestResponseSize(false); }
 // when there are trailers in both the request/response.
 TEST_F(RouterTest, RequestResponseSizeWithTrailers) { testRequestResponseSize(true); }
 
+TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
+  auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
+  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+      retry_options_predicate);
+
+  setIncludeAttemptCountInRequest(true);
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                         {"x-envoy-internal", "true"},
+                                         {"x-envoy-upstream-rq-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(50));
+
+  // Initial request has 1 attempt.
+  EXPECT_EQ(1, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
+  EXPECT_EQ(200, atoi(std::string(headers.getEnvoyExpectedRequestTimeoutMsValue()).c_str()));
+
+  // 5xx response.
+  router_.retry_state_->expectHeadersRetry();
+  Upstream::RetryOptionsPredicate::UpdateOptionsReturn update_options_return{
+      std::make_shared<Network::Socket::Options>()};
+  EXPECT_CALL(*retry_options_predicate, updateOptions(_)).WillOnce(Return(update_options_return));
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(503));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Verify retry options predicate return values have been updated.
+  EXPECT_EQ(update_options_return.new_upstream_socket_options_.value(),
+            router_.upstreamSocketOptions());
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  router_.retry_state_->callback_();
+  EXPECT_EQ(2U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // The retry should cause the header to increase to 2.
+  EXPECT_EQ(2, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
+  // We already used 50ms of our 200ms timeout before the retry was triggered
+  EXPECT_EQ(150, atoi(std::string(headers.getEnvoyExpectedRequestTimeoutMsValue()).c_str()));
+
+  // Normal response.
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
+}
+
+TEST_F(RouterTest, ExpectedUpstreamTimeoutNotUpdatedDuringRetriesWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.update_expected_rq_timeout_on_retry", "false"}});
+
+  auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
+  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+      retry_options_predicate);
+
+  setIncludeAttemptCountInRequest(true);
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder1, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                         {"x-envoy-internal", "true"},
+                                         {"x-envoy-upstream-rq-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ(1U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  test_time_.advanceTimeWait(std::chrono::milliseconds(50));
+
+  // Initial request has 1 attempt.
+  EXPECT_EQ(1, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
+  EXPECT_EQ(200, atoi(std::string(headers.getEnvoyExpectedRequestTimeoutMsValue()).c_str()));
+
+  // 5xx response.
+  router_.retry_state_->expectHeadersRetry();
+  Upstream::RetryOptionsPredicate::UpdateOptionsReturn update_options_return{
+      std::make_shared<Network::Socket::Options>()};
+  EXPECT_CALL(*retry_options_predicate, updateOptions(_)).WillOnce(Return(update_options_return));
+  Http::ResponseHeaderMapPtr response_headers1(
+      new Http::TestResponseHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(503));
+  // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
+  response_decoder->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // Verify retry options predicate return values have been updated.
+  EXPECT_EQ(update_options_return.new_upstream_socket_options_.value(),
+            router_.upstreamSocketOptions());
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockRequestEncoder> encoder2;
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke(
+          [&](Http::ResponseDecoder& decoder,
+              Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
+            response_decoder = &decoder;
+            callbacks.onPoolReady(encoder2, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  upstream_stream_info_, Http::Protocol::Http10);
+            return nullptr;
+          }));
+  router_.retry_state_->callback_();
+  EXPECT_EQ(2U,
+            callbacks_.route_->route_entry_.virtual_cluster_.stats().upstream_rq_total_.value());
+
+  // The retry should cause the header to increase to 2.
+  EXPECT_EQ(2, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
+  // We already used 50ms of our 200ms timeout before the retry was triggered,
+  // but with the guard disabled this should not change the header.
+  EXPECT_EQ(200, atoi(std::string(headers.getEnvoyExpectedRequestTimeoutMsValue()).c_str()));
+
+  // Normal response.
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _)).WillOnce(Return(RetryStatus::No));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->health_checker_, setUnhealthy(_))
+      .Times(0);
+  Http::ResponseHeaderMapPtr response_headers2(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putHttpResponseCode(200));
+  response_decoder->decodeHeaders(std::move(response_headers2), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
+  EXPECT_EQ(2, callbacks_.stream_info_.attemptCount().value());
+}
+
+TEST(RouterFilterUtilityTest, SetTimeoutHeaders) {
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+
+    FilterUtility::setTimeoutHeaders(0, timeout, route, headers, true, false, false);
+    EXPECT_EQ("200",
+              headers.get_(
+                  "x-envoy-expected-rq-timeout-ms")); // No per try configured, use global timeout
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+
+    FilterUtility::setTimeoutHeaders(150, timeout, route, headers, true, false, false);
+    EXPECT_EQ("50", headers.get_("x-envoy-expected-rq-timeout-ms")); // Remains of global timeout
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(0, timeout, route, headers, true, false, false);
+    EXPECT_EQ("150", headers.get_("x-envoy-expected-rq-timeout-ms")); // Per try timeout
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(25, timeout, route, headers, true, false, false);
+    EXPECT_EQ("150", headers.get_("x-envoy-expected-rq-timeout-ms")); // Per try timeout
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(150, timeout, route, headers, true, false, false);
+    EXPECT_EQ("50", headers.get_("x-envoy-expected-rq-timeout-ms")); // Remains of global timeout
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+
+    FilterUtility::setTimeoutHeaders(300, timeout, route, headers, true, false, false);
+    EXPECT_EQ("1", headers.get_("x-envoy-expected-rq-timeout-ms")); // Over time
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(0, timeout, route, headers, true, false, true);
+    EXPECT_EQ("200", headers.get_("x-envoy-expected-rq-timeout-ms")); // Global timeout as hedged
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(25, timeout, route, headers, true, false, true);
+    EXPECT_EQ("175", headers.get_(
+                         "x-envoy-expected-rq-timeout-ms")); // Remains of global timeout as hedged
+  }
+  {
+    NiceMock<MockRouteEntry> route;
+    Http::TestRequestHeaderMapImpl headers;
+    FilterUtility::TimeoutData timeout;
+    timeout.global_timeout_ = std::chrono::milliseconds(200);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
+
+    FilterUtility::setTimeoutHeaders(150, timeout, route, headers, true, false, true);
+    EXPECT_EQ("50", headers.get_(
+                        "x-envoy-expected-rq-timeout-ms")); // Remains of global timeout as hedged
+  }
+}
+
 } // namespace Router
 } // namespace Envoy

@@ -205,29 +205,55 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::RequestHeaderMap& req
     timeout.per_try_timeout_ = std::chrono::milliseconds(0);
   }
 
+  setTimeoutHeaders(0, timeout, route, request_headers, insert_envoy_expected_request_timeout_ms,
+                    grpc_request, per_try_timeout_hedging_enabled);
+
+  return timeout;
+}
+
+void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time,
+                                      const FilterUtility::TimeoutData& timeout,
+                                      const RouteEntry& route,
+                                      Http::RequestHeaderMap& request_headers,
+                                      bool insert_envoy_expected_request_timeout_ms,
+                                      bool grpc_request, bool per_try_timeout_hedging_enabled) {
+
+  const uint64_t global_timeout = timeout.global_timeout_.count();
+
   // See if there is any timeout to write in the expected timeout header.
   uint64_t expected_timeout = timeout.per_try_timeout_.count();
+
   // Use the global timeout if no per try timeout was specified or if we're
   // doing hedging when there are per try timeouts. Either of these scenarios
   // mean that the upstream server can use the full global timeout.
   if (per_try_timeout_hedging_enabled || expected_timeout == 0) {
-    expected_timeout = timeout.global_timeout_.count();
+    expected_timeout = global_timeout;
   }
 
-  if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
-    request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
-  }
-
-  // If we've configured max_grpc_timeout, override the grpc-timeout header with
-  // the expected timeout. This ensures that the optional per try timeout is reflected
-  // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
-  if (grpc_request && !route.usingNewTimeouts() && route.maxGrpcTimeout() &&
-      expected_timeout != 0) {
-    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
-  }
+  if (expected_timeout > 0) {
 
-  return timeout;
+    if (global_timeout > 0) {
+      if (elapsed_time >= global_timeout) {
+        // We are out of time, but 0 would be an infinite timeout. So instead we send a 1ms timeout
+        // and assume the timers armed by onRequestComplete() will fire very soon.
+        expected_timeout = 1;
+      } else {
+        expected_timeout = std::min(expected_timeout, global_timeout - elapsed_time);
+      }
+    }
+
+    if (insert_envoy_expected_request_timeout_ms) {
+      request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
+    }
+
+    // If we've configured max_grpc_timeout, override the grpc-timeout header with
+    // the expected timeout. This ensures that the optional per try timeout is reflected
+    // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
+    if (grpc_request && !route.usingNewTimeouts() && route.maxGrpcTimeout()) {
+      Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
+    }
+  }
 }
 
 absl::optional<std::chrono::milliseconds>
@@ -1696,6 +1722,25 @@ void Filter::doRetry() {
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);
+  }
+
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.update_expected_rq_timeout_on_retry")) {
+    // If not enabled, then it will re-use the previous headers (if any.)
+
+    // The request timeouts only account for time elapsed since the downstream request completed
+    // which might not have happened yet (in which case zero time has elapsed.)
+    std::chrono::milliseconds elapsed_time = std::chrono::milliseconds::zero();
+
+    if (DateUtil::timePointValid(downstream_request_complete_time_)) {
+      Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+      elapsed_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+          dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+    }
+
+    FilterUtility::setTimeoutHeaders(elapsed_time.count(), timeout_, *route_entry_,
+                                     *downstream_headers_, !config_.suppress_envoy_headers_,
+                                     grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
   }
 
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
