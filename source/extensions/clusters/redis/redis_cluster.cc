@@ -350,24 +350,24 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(ClusterSlotsPt
     }
     // Resolve all replicas of the slot, one replica at a time
     if (!slot.replicas_to_resolve_.empty()) {
-      const std::string& host = slot.replicas_to_resolve_.back().first;
-      uint16_t port = slot.replicas_to_resolve_.back().second;
+      const auto replica = slot.replicas_to_resolve_.back();
       slot.replicas_to_resolve_.pop_back();
-      ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", host);
+      ENVOY_LOG(trace, "starting async DNS resolution for replica address {}", replica.first);
       parent_.dns_resolver_->resolve(
-          host, parent_.dns_lookup_family_,
-          [this, &slot, &slots, port, host](Network::DnsResolver::ResolutionStatus status,
-                                            std::list<Network::DnsResponse>&& response) -> void {
-            ENVOY_LOG(trace, "async DNS resolution complete for {}", host);
+          replica.first, parent_.dns_lookup_family_,
+          [this, &slot, &slots, &replica](Network::DnsResolver::ResolutionStatus status,
+                                          std::list<Network::DnsResponse>&& response) -> void {
+            ENVOY_LOG(trace, "async DNS resolution complete for {}", replica.first);
             updateDnsStats(status, response.empty());
             if (status != Network::DnsResolver::ResolutionStatus::Success) {
               // Failed
-              ENVOY_LOG(debug, "Unable to resolve cluster replica address {}", host);
+              ENVOY_LOG(debug, "Unable to resolve cluster replica address {}", replica.first);
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
             }
             // Replica resolved
-            slot.addReplica(Network::Utility::getAddressWithPort(*response.front().address_, port));
+            slot.addReplica(
+                Network::Utility::getAddressWithPort(*response.front().address_, replica.second));
             // Continue resolving slot's addresses until everything is resolved
             resolveClusterHostnames(std::move(slots));
           });
