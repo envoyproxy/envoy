@@ -96,8 +96,6 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
         log_manager, dispatcher.timeSource(), health_check_config.event_log_path());
   }
   switch (health_check_config.health_checker_case()) {
-  case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
-    FALLTHRU;
   case envoy::config::core::v3::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
     return std::make_shared<ProdHttpHealthCheckerImpl>(cluster, health_check_config, dispatcher,
                                                        runtime, api.randomGenerator(),
@@ -121,6 +119,8 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
         new HealthCheckerFactoryContextImpl(cluster, runtime, dispatcher, std::move(event_logger),
                                             validation_visitor, api));
     return factory.createCustomHealthChecker(health_check_config, *context);
+  case envoy::config::core::v3::HealthCheck::HealthCheckerCase::HEALTH_CHECKER_NOT_SET:
+    break;
   }
   }
   throw EnvoyException("invalid cluster config");
