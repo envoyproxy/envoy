@@ -360,7 +360,7 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 void CryptoMbQueue::processRequests() {
   if (type_ == KeyType::Rsa) {
     // Increment correct queue size statistic.
-    stats_.getQueueSizeCounters()[request_queue_.size() - 1].get().inc();
+    stats_.queueSizeCounters()[request_queue_.size() - 1].get().inc();
     processRsaRequests();
   }
   request_queue_.clear();

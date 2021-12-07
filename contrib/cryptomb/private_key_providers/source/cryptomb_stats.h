@@ -20,7 +20,7 @@ class CryptoMbStats {
 public:
   CryptoMbStats(Stats::Scope& scope, uint32_t max_queue_size, absl::string_view stats_prefix,
                 absl::string_view queue_size_stat_prefix);
-  std::vector<StatsCounterRef>& getQueueSizeCounters() { return queue_size_counters_; }
+  std::vector<StatsCounterRef>& queueSizeCounters() { return queue_size_counters_; }
 
 private:
   Stats::StatNamePool stat_name_pool_;
