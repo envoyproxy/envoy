@@ -470,7 +470,8 @@ void testUtil(const TestUtilOptions& options) {
                   server_connection->ssl()->urlEncodedPemEncodedPeerCertificateChain());
       }
       if (!options.expectedSni().empty()) {
-        EXPECT_EQ(options.expectedSni(), server_connection->ssl()->requestedServerName());
+        EXPECT_EQ(options.expectedSni(),
+                  server_connection->connectionInfoProvider().requestedServerName());
       }
 
       const SslHandshakerImpl* ssl_socket =

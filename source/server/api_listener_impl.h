@@ -121,7 +121,10 @@ protected:
       void readDisable(bool) override {}
       void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       bool readEnabled() const override { return true; }
-      const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+      Network::ConnectionInfoSetter& connectionInfoProvider() override {
+        return *connection_info_provider_;
+      }
+      const Network::ConnectionInfoProvider& connectionInfoProvider() const override {
         return *connection_info_provider_;
       }
       Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {

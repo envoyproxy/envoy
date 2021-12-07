@@ -142,11 +142,6 @@ public:
    * @return std::string the protocol negotiated via ALPN.
    **/
   virtual const std::string& alpn() const PURE;
-
-  /**
-   * @return const std::string& the Server Name Indication (SNI) supplied by the TLS client.
-   **/
-  virtual const std::string& requestedServerName() const PURE;
 };
 
 using ConnectionInfoConstSharedPtr = std::shared_ptr<const ConnectionInfo>;
