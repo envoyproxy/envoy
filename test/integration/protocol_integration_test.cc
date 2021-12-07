@@ -3556,8 +3556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
-  // TODO(danzh) set to true.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // For HTTP/3 since the packets are black holed, there is no client side
