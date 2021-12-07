@@ -418,9 +418,16 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   conn_buffer_helper.writeToBuffer(absl::StrCat(numeric_status));
   conn_buffer_helper.writeToBuffer(' ');
 
-  const char* status_string = CodeUtility::toString(static_cast<Code>(numeric_status));
-  uint32_t status_string_len = strlen(status_string);
-  conn_buffer_helper.writeToBuffer(status_string, status_string_len);
+  StatefulHeaderKeyFormatterOptConstRef formatter(headers.formatter());
+
+  if (formatter.has_value() && !formatter->getReasonPhrase().empty()) {
+    conn_buffer_helper.reserveBuffer(formatter->getReasonPhrase().size());
+    conn_buffer_helper.writeToBuffer(formatter->getReasonPhrase());
+  } else {
+    const char* status_string = CodeUtility::toString(static_cast<Code>(numeric_status));
+    uint32_t status_string_len = strlen(status_string);
+    conn_buffer_helper.writeToBuffer(status_string, status_string_len);
+  }
 
   conn_buffer_helper.writeToBuffer('\r');
   conn_buffer_helper.writeToBuffer('\n');
@@ -1314,6 +1321,16 @@ RequestEncoder& ClientConnectionImpl::newStream(ResponseDecoder& response_decode
   pending_response_.emplace(*this, std::move(bytes_meter_before_stream_), &response_decoder);
   pending_response_done_ = false;
   return pending_response_.value().encoder_;
+}
+
+Status ClientConnectionImpl::onStatus(const char* data, size_t length) {
+  auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
+  StatefulHeaderKeyFormatterOptRef formatter(headers->formatter());
+  if (formatter.has_value()) {
+    formatter->setReasonPhrase(absl::string_view(data, length));
+  }
+
+  return okStatus();
 }
 
 Envoy::StatusOr<ParserStatus> ClientConnectionImpl::onHeadersCompleteBase() {

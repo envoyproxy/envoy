@@ -152,6 +152,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestedServerNameVariable)
   testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name);
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithVirtualClusterNameVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for empty VC
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", "");
+
+  // Validate for a valid VC
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", virtual_cluster_name);
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -847,6 +858,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%REQUESTED_SERVER_NAME%", {"foo.bar"}, {}},
+      {"%VIRTUAL_CLUSTER_NAME%", {"authN"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
@@ -946,6 +958,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   const std::string requested_server_name = "foo.bar";
   stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
