@@ -924,12 +924,6 @@ void Filter::onDestroy() {
 void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
 
-  // If we had an upstream request that got a "good" response, save its
-  // upstream timing information into the downstream stream info.
-  if (final_upstream_request_) {
-    callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstreamTiming());
-  }
-
   // Reset any upstream requests that are still in flight.
   while (!upstream_requests_.empty()) {
     UpstreamRequestPtr upstream_request =
@@ -1193,7 +1187,6 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                        ? ", transport failure reason: "
                        : "",
                    transport_failure_reason);
-  callbacks_->streamInfo().setUpstreamTransportFailureReason(transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
@@ -1436,14 +1429,8 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
-  // In upstream request hedging scenarios the upstream connection ID set in onPoolReady might not
-  // be the connection ID of the upstream connection that ended up receiving upstream headers. Thus
-  // reset the upstream connection ID here with the ID of the connection that ultimately was the
-  // transport for the final upstream request.
-  if (final_upstream_request_->streamInfo().upstreamConnectionId().has_value()) {
-    callbacks_->streamInfo().setUpstreamConnectionId(
-        final_upstream_request_->streamInfo().upstreamConnectionId().value());
-  }
+  // Make sure that for request hedging, we end up with the correct final upstream info.
+  callbacks_->streamInfo().setUpstreamInfo(final_upstream_request_->streamInfo().upstreamInfo());
   resetOtherUpstreams(upstream_request);
   if (end_stream) {
     onUpstreamComplete(upstream_request);
@@ -1500,8 +1487,6 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
     upstream_request.resetStream();
   }
-  callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstreamTiming());
-
   Event::Dispatcher& dispatcher = callbacks_->dispatcher();
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);

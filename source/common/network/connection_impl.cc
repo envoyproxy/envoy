@@ -848,6 +848,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
@@ -891,7 +892,7 @@ void ClientConnectionImpl::connect() {
                  socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
-  stream_info_.upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -921,7 +922,7 @@ void ClientConnectionImpl::connect() {
 }
 
 void ClientConnectionImpl::onConnected() {
-  stream_info_.upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
   ConnectionImpl::onConnected();
 }
 

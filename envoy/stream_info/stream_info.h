@@ -358,13 +358,6 @@ public:
    */
   virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
-  /**
-   * Sets the upstream timing information for this stream. This is useful for
-   * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins".
-   */
-  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
-
   /*
    * @return the upstream timing for this stream
    * */
@@ -452,11 +445,6 @@ public:
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
-   * @param host the selected upstream host for the request.
-   */
-  virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
-
-  /**
    * @param std::string name denotes the name of the route.
    */
   virtual void setRouteName(absl::string_view name) PURE;
@@ -523,19 +511,6 @@ public:
   virtual MonotonicTime startTimeMonotonic() const PURE;
 
   /**
-   * @return the duration between the last byte of the request was received and the start of the
-   * request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived() const PURE;
-
-  /**
-   * Sets the upstream timing information for this stream. This is useful for
-   * when multiple upstream requests are issued and we want to save timing
-   * information for the one that "wins".
-   */
-  virtual void setUpstreamTiming(const UpstreamTiming& upstream_timing) PURE;
-
-  /**
    * Sets the upstream information for this stream.
    */
   virtual void setUpstreamInfo(std::shared_ptr<UpstreamInfo>) PURE;
@@ -545,50 +520,6 @@ public:
    */
   virtual std::shared_ptr<UpstreamInfo> upstreamInfo() PURE;
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
-
-  /**
-   * Returns the upstream timing information for this stream.
-   * It is not expected that the fields in upstreamTiming() will be set until
-   * the upstream request is complete.
-   */
-  virtual UpstreamTiming& upstreamTiming() PURE;
-
-  /**
-   * @return the duration between the first byte of the request was sent upstream and the start of
-   * the request. There may be a considerable delta between lastDownstreamByteReceived and this
-   * value due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the request was sent upstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the first byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is received from upstream and the
-   * start of the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const PURE;
-  /**
-   * @return the duration between the first byte of the response is sent downstream and the start of
-   * the request. There may be a considerable delta between lastUpstreamByteReceived and this value
-   * due to filters.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const PURE;
-
-  /**
-   * @return the duration between the last byte of the response is sent downstream and the start of
-   * the request.
-   */
-  virtual absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const PURE;
 
   /**
    * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
@@ -606,6 +537,7 @@ public:
    * @return the downstream timing information.
    */
   virtual DownstreamTiming& downstreamTiming() PURE;
+  virtual OptRef<const DownstreamTiming> downstreamTiming() const PURE;
 
   /**
    * @param bytes_sent denotes the number of bytes to add to total sent bytes.
@@ -633,23 +565,6 @@ public:
   virtual uint64_t responseFlags() const PURE;
 
   /**
-   * @return upstream host description.
-   */
-  virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
-
-  /**
-   * @param upstream_local_address sets the local address of the upstream connection. Note that it
-   * can be different than the local address of the downstream connection.
-   */
-  virtual void setUpstreamLocalAddress(
-      const Network::Address::InstanceConstSharedPtr& upstream_local_address) PURE;
-
-  /**
-   * @return the upstream local address.
-   */
-  virtual const Network::Address::InstanceConstSharedPtr& upstreamLocalAddress() const PURE;
-
-  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;
@@ -663,18 +578,6 @@ public:
    * @return the downstream connection info provider.
    */
   virtual const Network::ConnectionInfoProvider& downstreamAddressProvider() const PURE;
-
-  /**
-   * @param connection_info sets the upstream ssl connection.
-   */
-  virtual void
-  setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) PURE;
-
-  /**
-   * @return the upstream SSL connection. This will be nullptr if the upstream
-   * connection does not use SSL.
-   */
-  virtual Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const PURE;
 
   /**
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
@@ -704,25 +607,6 @@ public:
    */
   virtual const FilterStateSharedPtr& filterState() PURE;
   virtual const FilterState& filterState() const PURE;
-
-  /**
-   * Filter State object to be shared between upstream and downstream filters.
-   * @param pointer to upstream connections filter state.
-   * @return pointer to filter state to be used by upstream connections.
-   */
-  virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
-  virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
-
-  /**
-   * @param failure_reason the upstream transport failure reason.
-   */
-  virtual void setUpstreamTransportFailureReason(absl::string_view failure_reason) PURE;
-
-  /**
-   * @return const std::string& the upstream transport failure reason, e.g. certificate validation
-   *         failed.
-   */
-  virtual const std::string& upstreamTransportFailureReason() const PURE;
 
   /**
    * @param headers request headers.
@@ -777,16 +661,6 @@ public:
    * @return Network filter chain name of the downstream connection.
    */
   virtual const std::string& filterChainName() const PURE;
-
-  /**
-   * @param connection ID of the upstream connection.
-   */
-  virtual void setUpstreamConnectionId(uint64_t id) PURE;
-
-  /**
-   * @return the ID of the upstream connection, or absl::nullopt if not available.
-   */
-  virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
    * @param attempt_count, the number of times the request was attempted upstream.
