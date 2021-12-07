@@ -14,8 +14,8 @@ envoy.distribution.distrotest>=0.0.5
 envoy.distribution.release
 envoy.distribution.verify>=0.0.6
 envoy.docs.sphinx-runner>=0.0.3
-envoy.gpg.identity>=0.0.3
-envoy.gpg.sign>=0.0.5
+envoy.gpg.identity>=0.0.6
+envoy.gpg.sign>=0.0.7
 flake8
 frozendict
 gitpython

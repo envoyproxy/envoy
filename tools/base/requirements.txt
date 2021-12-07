@@ -330,15 +330,15 @@ envoy.github.abstract==0.0.16 \
 envoy.github.release==0.0.8 \
     --hash=sha256:fbc4354030137eb565b8c4d679965e4ef60b01de0c09310441836e592ca0cd19
     # via envoy.distribution.release
-envoy.gpg.identity==0.0.3 \
-    --hash=sha256:26fb7fae674d252da67bf4abac7db948824219840ae5864eb9e5b871f665613a \
-    --hash=sha256:46b2a36ee7cdd643db7cad945a119a71f84eec3c6237635bb135d510a86169dc
+envoy.gpg.identity==0.0.6 \
+    --hash=sha256:2195e09aaacbaa8d6588378ad96d206708ffaf863aead38445eb3e54e4223c34 \
+    --hash=sha256:93032dd82c9c422c2145dbf426fd93c3673c53ba03cca2eab13f5fb8cf24f47c
     # via
     #   -r requirements.in
     #   envoy.gpg.sign
-envoy.gpg.sign==0.0.5 \
-    --hash=sha256:1d1b844d481f34f678e177bc0a0d1d7429d9e3424eade2166f21157ebe638b12 \
-    --hash=sha256:65e56e0e7d6158ffcbfa2d85c18398dce83fe715cd7a64f327291dcab6332914
+envoy.gpg.sign==0.0.7 \
+    --hash=sha256:898907dc76627802ab248576d2fb7d12ed4cce75148b5b070382bb51d25e6504 \
+    --hash=sha256:d61165d631d92c9726129ae72ddbb409d2514de3540a829d9ed9a090c165459e
     # via -r requirements.in
 flake8==4.0.1 \
     --hash=sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d \

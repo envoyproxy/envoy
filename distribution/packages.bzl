@@ -52,9 +52,20 @@ def envoy_pkg_distros(
     native.genrule(
         name = name,
         cmd = """
-        $(location //tools/distribution:sign) \
+        SIGNING_ARGS=() \
+        && if [[ -n $${PACKAGES_GEN_KEY+x} ]]; then \
+               SIGNING_ARGS+=("--gen-key"); \
+           fi \
+        && if [[ -n $${PACKAGES_MAINTAINER_NAME+x} ]]; then \
+               SIGNING_ARGS+=("--maintainer-name" "$${PACKAGES_MAINTAINER_NAME}"); \
+           fi \
+        && if [[ -n $${PACKAGES_MAINTAINER_EMAIL+x} ]]; then \
+               SIGNING_ARGS+=("--maintainer-email" "$${PACKAGES_MAINTAINER_EMAIL}"); \
+           fi \
+        && $(location //tools/distribution:sign) \
             --extract \
             --tar $@ \
+            "$${SIGNING_ARGS[@]}" \
             $(location :distro_packages)
         """,
         outs = ["%s.tar.gz" % name],

@@ -217,29 +217,21 @@ if [[ "$CI_TARGET" == "bazel.release" ]]; then
 
   exit 0
 elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
+  echo "Building distro packages..."
+
   setup_clang_toolchain
 
+  # By default the packages will be signed by the first available key.
+  # If there is no key available, a throwaway key is created
+  # and the packages signed with it, for the purpose of testing only.
   if ! gpg --list-secret-keys "*"; then
-      # create a throwaway key to sign the packages with
-      # packages will otherwise be signed by the first available key
-      KEYDATA=$(cat <<EOF
-%echo Creating CI dev snakeoil key
-Key-Type: 1
-Key-Length: 2048
-Subkey-Type: 1
-Subkey-Length: 2048
-Name-Real: Envoy CI dev
-Name-Email: envoy-ci@snake.oil
-Expire-Date: 0
-%no-protection
-%commit
-%echo Key created
-EOF
-  )
-      echo "$KEYDATA" | gpg --gen-key --batch --
+      export PACKAGES_MAINTAINER_NAME="Envoy CI"
+      export PACKAGES_MAINTAINER_EMAIL="envoy@snake.oil"
+      BAZEL_BUILD_OPTIONS+=(
+          "--action_env=PACKAGES_GEN_KEY=1"
+          "--action_env=PACKAGES_MAINTAINER_NAME"
+          "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
-
-  echo "Building distro packages..."
 
   # TODO(phlax): remove MakeDeb once issue with changes file is resolved
   BAZEL_BUILD_OPTIONS+=(
