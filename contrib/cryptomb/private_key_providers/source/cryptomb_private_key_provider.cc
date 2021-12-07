@@ -20,7 +20,7 @@ CryptoMbContext::CryptoMbContext(Event::Dispatcher& dispatcher,
     : status_(RequestStatus::Retry), dispatcher_(dispatcher), cb_(cb) {}
 
 void CryptoMbContext::scheduleCallback(enum RequestStatus status) {
-  schedulable_ = dispatcher_.createSchedulableCallback([this, status]() -> void {
+  schedulable_ = dispatcher_.createSchedulableCallback([this, status]() {
     // The status can't be set beforehand, because the callback asserts
     // if someone else races to call doHandshake() and the status goes to
     // HandshakeComplete.
@@ -332,7 +332,7 @@ ssl_private_key_result_t rsaPrivateKeyDecryptForTest(CryptoMbPrivateKeyConnectio
 CryptoMbQueue::CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                              IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
     : us_(std::chrono::duration_cast<std::chrono::microseconds>(poll_delay)), type_(type),
-      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() -> void { processRequests(); })),
+      key_size_(keysize), ipp_(ipp), timer_(d.createTimer([this]() { processRequests(); })),
       stats_(stats) {
   request_queue_.reserve(MULTIBUFF_BATCH);
 }
