@@ -89,7 +89,10 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
   // Set error tag when status is not OK.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
   if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+    span.setTag(
+        Tracing::Tags::get().Error,
+        fmt::format("failed with gRPC status code {}", grpc_status_code.value());
+        );
   }
 }
 
@@ -236,8 +239,18 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
     annotateVerbose(span, stream_info);
   }
 
-  if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
-    span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+  if (!stream_info.responseCode()) {
+    span.setTag(
+        Tracing::Tags::get().Error,
+        fmt::format("failed to get response from upstream, response flag: {}", StreamInfo::ResponseFlagUtils::toShortString(stream_info));
+        );
+  }
+
+  if (Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
+    span.setTag(
+        Tracing::Tags::get().Error,
+        fmt::format("upstream failed with HTTP status {}", stream_info.responseCode().value());
+        );
   }
 }
 
