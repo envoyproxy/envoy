@@ -726,8 +726,7 @@ Filter::createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster) {
                           cluster_->upstreamConfig().value().DebugString()));
   }
   if (!factory) {
-    factory = &Envoy::Config::Utility::getAndCheckFactoryByName<GenericConnPoolFactory>(
-        "envoy.filters.connection_pools.http.generic");
+    factory = &config_.router_context_.genericConnPoolFactory();
   }
 
   bool should_tcp_proxy = false;
