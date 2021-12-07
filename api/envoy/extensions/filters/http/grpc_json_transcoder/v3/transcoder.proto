@@ -225,7 +225,7 @@ message GrpcJsonTranscoder {
   // If true, try to match the custom verb even if it is unregistered. By
   // default, only match when it is registered.
   //
-  // According to the http template syntax(https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231),
+  // According to the http template syntax<https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231>,
   // the custom verb is `":" LITERAL` at the end of http template. Only when a
   // http template has a custom verb defined, it can can only match a request
   // with custom verb. However, in the current implementation, for http template
