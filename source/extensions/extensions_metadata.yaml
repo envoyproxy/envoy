@@ -519,6 +519,11 @@ envoy.request_id.uuid:
   - envoy.request_id
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
+envoy.resource_monitors.downstream_connections:
+  categories:
+  - envoy.resource_monitors
+  security_posture: data_plane_agnostic
+  status: alpha
 envoy.resource_monitors.fixed_heap:
   categories:
   - envoy.resource_monitors
