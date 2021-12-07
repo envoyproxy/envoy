@@ -52,8 +52,8 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
     case envoy::config::cluster::v3::Cluster::EDS:
       cluster_type = "envoy.cluster.eds";
       break;
-    case SENTINAL_VALUES_USED:
-      PANIC_DUE_TO_SENTINAL_VALUE;
+    case SENTINEL_VALUES_USED:
+      PANIC_DUE_TO_SENTINEL_VALUE;
     }
   } else {
     cluster_type = cluster.cluster_type().name();
