@@ -3,9 +3,11 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <list>
 #include <memory>
 #include <string>
+#include <type_traits>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/scope_tracker.h"
@@ -195,20 +197,77 @@ class FineGrainedBufferWriteHelper {
 public:
   static constexpr uint64_t DefaultReservationSize = 4096;
 
+  /**
+   * @param buffer the buffer that all data will eventually need to be written.
+   */
   FineGrainedBufferWriteHelper(Buffer::Instance& buffer) : buffer_(buffer) {}
 
+  /**
+   * Reserve enough memeory for the argument pack and write all the arguments to the buffer helper.
+   * This template method can accept variable-length argument pack containing different types of
+   * data. But currently only string related types or char can be supported.
+   *
+   * This method is preferred instead of directly using the `reserveBuffer` and `writeTobuffer`
+   * methods.
+   *
+   * @param args variable-length argument pack to write.
+   * @return the size of the data written.
+   */
+  template <class... Args> size_t reserveAndWrite(Args&&... args) {
+    size_t size_to_write = 0;
+    if constexpr (sizeof...(args) > 0) {
+      size_to_write = (bytesSize(args) + ...);
+      reserveBuffer(size_to_write);
+      (writeToBuffer(args), ...);
+    }
+    return size_to_write;
+  }
+
+  /**
+   * Write data with specified size to the buffer.
+   * @param data the address of the data to be written.
+   * @param size the size of the data to be written.
+   */
   void writeToBuffer(const char* data, uint64_t size) {
     ASSERT(remaining() >= size);
     memcpy(current_pos_, data, size); // NOLINT(safe-memcpy)
     current_pos_ += size;
   }
+
+  /**
+   * Write data without specified size to the buffer.
+   * @param data the address of the data to be written. Copy data to buffer until the first '\0'
+   * character is encountered.
+   */
+  void writeToBuffer(const char* data) {
+    const size_t size = bytesSize(data);
+    writeToBuffer(data, size);
+  }
+
+  /**
+   * Write string view the buffer.
+   * @param data the string view to be written.
+   */
   void writeToBuffer(absl::string_view data) { writeToBuffer(data.data(), data.size()); }
+
+  /**
+   * Write single char to buffer.
+   * @param c the sigle char to be written.
+   */
   void writeToBuffer(char c) {
     ASSERT(remaining() >= 1);
     *current_pos_ = c;
     current_pos_++;
   }
 
+  /**
+   * Reserve enough local buffer. After that, the data can be copied directly to the buffer without
+   * additional checking. Before calling `writeToBuffer`, this method should be called to ensure
+   * that the local buffer has enough memory space. The common scenario is to call this method once
+   * to reserve a big enough buffer, and then call writeToBuffer multiple times.
+   *
+   * @param size local buffer size to reserve.
+   */
   void reserveBuffer(uint64_t size) {
     ASSERT(size > 0);
 
@@ -225,6 +284,9 @@ public:
     initializeReservation(size);
   }
 
+  /**
+   * Write all the contents in the local buffer to the backend buffer.
+   */
   void commitToBuffer() {
     if (reservation_ == nullptr) {
       return;
@@ -245,6 +307,18 @@ public:
   uint64_t remainingForTest() { return remaining(); }
 
 private:
+  template <class T> size_t bytesSize(T&& arg) {
+    if constexpr (std::is_same_v<char, std::remove_reference_t<T>>) {
+      return 1;
+    } else if constexpr (std::is_same_v<const char*, std::remove_reference_t<T>>) {
+      return strlen(arg);
+    } else if constexpr (std::is_array_v<std::remove_reference_t<T>>) {
+      return sizeof(arg);
+    } else {
+      return arg.size();
+    }
+  }
+
   uint64_t remaining() { return raw_slice_.len_ - hasFilled(); }
 
   uint64_t hasFilled() {

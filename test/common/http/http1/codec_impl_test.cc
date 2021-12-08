@@ -3492,6 +3492,18 @@ TEST(FineGrainedBufferWriteHelperTest, FineGrainedBufferWriteHelperTest) {
 
     EXPECT_EQ(1024, buffer.length());
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    Http1::FineGrainedBufferWriteHelper helper(buffer);
+
+    helper.reserveAndWrite("aaaaa", absl::string_view("bbbbb"), 'c', std::string("ddddd"));
+
+    EXPECT_EQ(helper.remainingForTest(), 4096 - 16);
+
+    helper.commitToBuffer();
+    EXPECT_EQ("aaaaabbbbbcddddd", buffer.toString());
+  }
 }
 
 } // namespace Http

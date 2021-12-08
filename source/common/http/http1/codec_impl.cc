@@ -104,16 +104,8 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   ASSERT(!key.empty());
 
-  const uint64_t header_size = key.size() + value.size() + 4;
-
-  auto& conn_buffer_helper = connection_.bufferHelper();
-  conn_buffer_helper.reserveBuffer(header_size);
-
-  conn_buffer_helper.writeToBuffer(key);
-  conn_buffer_helper.writeToBuffer(':');
-  conn_buffer_helper.writeToBuffer(' ');
-  conn_buffer_helper.writeToBuffer(value);
-  conn_buffer_helper.writeToBuffer(CRLF);
+  const uint64_t header_size =
+      connection_.bufferHelper().reserveAndWrite(key, ':', ' ', value, CRLF);
 
   bytes_meter_->addHeaderBytesSent(header_size);
 }
@@ -280,10 +272,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   // https://tools.ietf.org/html/rfc7230#section-4.4
   if (chunk_encoding_) {
     // Finalize the body
-    auto& conn_buffer_helper = connection_.bufferHelper();
-
-    conn_buffer_helper.reserveBuffer(LAST_CHUNK.size());
-    conn_buffer_helper.writeToBuffer(LAST_CHUNK);
+    connection_.bufferHelper().reserveAndWrite(LAST_CHUNK);
 
     // TODO(mattklein123): Wire up the formatter if someone actually asks for this (very unlikely).
     trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
@@ -292,10 +281,9 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    conn_buffer_helper.reserveBuffer(CRLF.size());
-    conn_buffer_helper.writeToBuffer(CRLF);
+    connection_.bufferHelper().reserveAndWrite(CRLF);
 
-    conn_buffer_helper.commitToBuffer();
+    connection_.bufferHelper().commitToBuffer();
 
     flushOutput();
   }
@@ -407,30 +395,26 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
   ASSERT(headers.Status() != nullptr);
   uint64_t numeric_status = Utility::getResponseStatus(headers);
 
-  auto& conn_buffer_helper = connection_.bufferHelper();
-  conn_buffer_helper.reserveBuffer(4096);
-
+  absl::string_view response_prefix;
   if (connection_.protocol() == Protocol::Http10 && connection_.supportsHttp10()) {
-    conn_buffer_helper.writeToBuffer(HTTP_10_RESPONSE_PREFIX);
+    response_prefix = HTTP_10_RESPONSE_PREFIX;
   } else {
-    conn_buffer_helper.writeToBuffer(RESPONSE_PREFIX);
+    response_prefix = RESPONSE_PREFIX;
   }
-  conn_buffer_helper.writeToBuffer(absl::StrCat(numeric_status));
-  conn_buffer_helper.writeToBuffer(' ');
 
   StatefulHeaderKeyFormatterOptConstRef formatter(headers.formatter());
 
+  absl::string_view reason_phrase;
   if (formatter.has_value() && !formatter->getReasonPhrase().empty()) {
-    conn_buffer_helper.reserveBuffer(formatter->getReasonPhrase().size());
-    conn_buffer_helper.writeToBuffer(formatter->getReasonPhrase());
+    reason_phrase = formatter->getReasonPhrase();
   } else {
     const char* status_string = CodeUtility::toString(static_cast<Code>(numeric_status));
     uint32_t status_string_len = strlen(status_string);
-    conn_buffer_helper.writeToBuffer(status_string, status_string_len);
+    reason_phrase = {status_string, status_string_len};
   }
 
-  conn_buffer_helper.writeToBuffer('\r');
-  conn_buffer_helper.writeToBuffer('\n');
+  connection_.bufferHelper().reserveAndWrite(response_prefix, absl::StrCat(numeric_status), ' ',
+                                             reason_phrase, CRLF);
 
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
@@ -464,24 +448,17 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     upgrade_request_ = true;
   }
 
-  auto& conn_buffer_helper = connection_.bufferHelper();
-
-  const uint64_t basic_header_size = method->value().size() + (host ? host->value().size() : 0) +
-                                     (path ? path->value().size() : 0);
-
-  conn_buffer_helper.reserveBuffer(4096 + basic_header_size);
-
-  conn_buffer_helper.writeToBuffer(method->value().getStringView());
-  conn_buffer_helper.writeToBuffer(' ');
-
+  absl::string_view host_or_path_view;
   if (is_connect) {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    conn_buffer_helper.writeToBuffer(host->value().getStringView());
+    host_or_path_view = host->value().getStringView();
   } else {
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
-    conn_buffer_helper.writeToBuffer(path->value().getStringView());
+    host_or_path_view = path->value().getStringView();
   }
-  conn_buffer_helper.writeToBuffer(REQUEST_POSTFIX);
+
+  connection_.bufferHelper().reserveAndWrite(method->value().getStringView(), ' ',
+                                             host_or_path_view, REQUEST_POSTFIX);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
