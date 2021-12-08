@@ -248,7 +248,8 @@ ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError
     if (!proxy_status_config.remove_response_flags() && stream_info.hasAnyResponseFlag()) {
       details.push_back(ResponseFlagUtils::toShortString(stream_info));
     }
-    retval.push_back(absl::StrFormat("details='%s'", absl::StrJoin(details, "; ")));
+    retval.push_back(
+        absl::StrFormat("details=\"%s\"", StringUtil::escape(absl::StrJoin(details, "; "))));
   }
 
   return absl::StrJoin(retval, "; ");
