@@ -83,6 +83,16 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   return options;
 }
 
+bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
+  struct ares_addr_port_node* servers{};
+  int result = ares_get_servers_ports(channel_, &servers);
+  RELEASE_ASSERT(result == ARES_SUCCESS, "failure in ares_get_servers_ports");
+  // as determined in init_by_defaults in ares_init.c.
+  return servers == NULL || (servers->next == NULL && servers->family == AF_INET &&
+                             servers->addr.addr4.s_addr == htonl(INADDR_LOOPBACK) &&
+                             servers->udp_port == 0 && servers->tcp_port == 0);
+}
+
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   dirty_channel_ = false;
 
@@ -94,10 +104,10 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
 
   if (resolvers_csv_.has_value()) {
     bool use_resolvers = true;
-    if (use_resolvers_as_fallback_) {
-      struct ares_addr_node* next_server;
-      ares_get_servers(channel_, &next_server);
-      use_resolvers = next_server == NULL ? true : false;
+    // If the only name server available is c-ares' default then fallback to the user defined
+    // resolvers. Otherwise, use the resolvers provided by c-ares.
+    if (use_resolvers_as_fallback_ && !isCaresDefaultTheOnlyNameserver()) {
+      use_resolvers = false;
     }
 
     if (use_resolvers) {

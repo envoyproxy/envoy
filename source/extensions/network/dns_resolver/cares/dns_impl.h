@@ -116,6 +116,8 @@ private:
   void onAresSocketStateChange(os_fd_t fd, int read, int write);
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
+  // Check if the only nameserver available is the c-ares default.
+  bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
   // Return default AresOptions.
