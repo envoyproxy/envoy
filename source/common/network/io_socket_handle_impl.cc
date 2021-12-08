@@ -587,34 +587,17 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
     return absl::nullopt;
   }
 
-  struct ifaddrs* ifaddr;
-  struct ifaddrs* ifa;
-
-  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(&ifaddr);
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
   RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
 
   absl::optional<std::string> selected_interface_name{};
-  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
+  for (const auto& interface_address : interface_addresses) {
+    if (!interface_address.interface_addr_) {
       continue;
     }
 
-    if ((socket_address->ip()->version() == Address::IpVersion::v4 &&
-         ifa->ifa_addr->sa_family == AF_INET) ||
-        (socket_address->ip()->version() == Address::IpVersion::v6 &&
-         ifa->ifa_addr->sa_family == AF_INET6)) {
-
-      const struct sockaddr_storage* addr =
-          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      Address::InstanceConstSharedPtr interface_address = Address::addressFromSockAddrOrThrow(
-          *addr,
-          (ifa->ifa_addr->sa_family == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-
-      // Address::addressFromSockAddrOrThrow above only errors in the forms of assertions. The only
-      // reason it throws is for an unexpected sa_family; which the if statement guards for AF_INET
-      // or AF_INET6. Therefore, it is an error for the address obtained to be null.
-      ASSERT(interface_address);
-
+    if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
       // Compare address _without port_.
       // TODO: create common addressAsStringWithoutPort method to simplify code here.
       absl::uint128 socket_address_value;
@@ -622,25 +605,21 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
       switch (socket_address->ip()->version()) {
       case Address::IpVersion::v4:
         socket_address_value = socket_address->ip()->ipv4()->address();
-        interface_address_value = interface_address->ip()->ipv4()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
         break;
       case Address::IpVersion::v6:
         socket_address_value = socket_address->ip()->ipv6()->address();
-        interface_address_value = interface_address->ip()->ipv6()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
         NOT_REACHED_GCOVR_EXCL_LINE;
       }
 
       if (socket_address_value == interface_address_value) {
-        selected_interface_name = std::string{ifa->ifa_name};
+        selected_interface_name = interface_address.interface_name_;
         break;
       }
     }
-  }
-
-  if (ifaddr) {
-    os_syscalls_singleton.freeifaddrs(ifaddr);
   }
 
   return selected_interface_name;

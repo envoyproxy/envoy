@@ -106,7 +106,7 @@ TEST(IoSocketHandleImpl, InterfaceNameWithPipe) {
   const mode_t mode = 0777;
   Address::PipeInstance pipe(path, mode);
   Address::InstanceConstSharedPtr address = std::make_shared<Address::PipeInstance>(pipe);
-  SocketImpl socket(Socket::Type::Stream, address, nullptr);
+  SocketImpl socket(Socket::Type::Stream, address, nullptr, {});
 
   EXPECT_TRUE(socket.ioHandle().isOpen()) << pipe.asString();
 
@@ -145,16 +145,10 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
             return {0, 0};
           }));
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .WillOnce(Invoke([&](struct ifaddrs** ifap) -> Api::SysCallIntResult {
-        ifaddrs* ifap_heap = new ifaddrs;
-        ifap_heap->ifa_addr = nullptr;
-        ifap_heap->ifa_next = nullptr;
-        *ifap = ifap_heap;
+      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
         return {0, 0};
       }));
-  EXPECT_CALL(os_sys_calls, freeifaddrs(_)).WillOnce(Invoke([&](struct ifaddrs* ifp) -> void {
-    os_syscalls_singleton.freeifaddrs(ifp);
-  }));
+
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
