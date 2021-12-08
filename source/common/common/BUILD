@@ -323,6 +323,7 @@ envoy_cc_library(
         ":assert_lib",
         "//envoy/common:regex_interface",
         "//envoy/registry",
+        "//source/common/config:registry_utils_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",

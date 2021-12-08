@@ -8,6 +8,7 @@
 #include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/config/registry_utils.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stats/symbol_table_impl.h"
 
@@ -90,6 +91,27 @@ public:
     // Google Re is the only currently supported engine.
     ASSERT(matcher.has_google_re2());
     return std::make_unique<CompiledGoogleReMatcher>(matcher.regex(), matcher.google_re2());
+  }
+
+  /**
+   * Construct a compiled regex matcher from a match config.
+   */
+  template <class RegexMatcherType = xds::type::matcher::v3::RegexMatcher>
+  static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+    // Fall back to deprecated google_re2 field.
+    if (matcher.has_google_re2()) {
+      return parseRegex(matcher);
+    }
+
+    auto* factory = Config::RegistryUtils::getFactory<CompiledMatcherFactory>(matcher.engine());
+    ASSERT(factory);
+
+    ProtobufTypes::MessagePtr message = Config::RegistryUtils::translateAnyToFactoryConfig(
+        matcher.engine().typed_config(), validation_visitor, *factory);
+    auto regex_matcher = factory->createCompiledMatcherFactoryCb(*message, validation_visitor);
+
+    return regex_matcher(matcher.regex());
   }
 };
 
