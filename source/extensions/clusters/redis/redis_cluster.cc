@@ -275,8 +275,10 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
   // Since the address from DNS does not have port, we need to make a new address that has
   // port in it.
   for (const Network::DnsResponse& res : response) {
-    ASSERT(res.address_ != nullptr);
-    discovery_address_list_.push_back(Network::Utility::getAddressWithPort(*(res.address_), port));
+    const auto& addrinfo = res.addrInfo();
+    ASSERT(addrinfo.address_ != nullptr);
+    discovery_address_list_.push_back(
+        Network::Utility::getAddressWithPort(*(addrinfo.address_), port));
   }
 }
 
