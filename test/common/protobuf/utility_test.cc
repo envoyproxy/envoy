@@ -48,8 +48,8 @@ namespace Envoy {
 
 using ::testing::HasSubstr;
 
-template <class M> bool checkProtoEquality(M proto1, std::string text_proto2) {
-  M proto2;
+bool checkProtoEquality(const ProtobufWkt::Value& proto1, std::string text_proto2) {
+  ProtobufWkt::Value proto2;
   if (!Protobuf::TextFormat::ParseFromString(text_proto2, &proto2)) {
     return false;
   }
