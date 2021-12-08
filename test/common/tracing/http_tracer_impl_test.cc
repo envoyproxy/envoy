@@ -11,6 +11,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
