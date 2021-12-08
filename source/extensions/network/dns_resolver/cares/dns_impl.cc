@@ -88,7 +88,7 @@ bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
   int result = ares_get_servers_ports(channel_, &servers);
   RELEASE_ASSERT(result == ARES_SUCCESS, "failure in ares_get_servers_ports");
   // as determined in init_by_defaults in ares_init.c.
-  return servers == NULL || (servers->next == NULL && servers->family == AF_INET &&
+  return servers == nullptr || (servers->next == nullptr && servers->family == AF_INET &&
                              servers->addr.addr4.s_addr == htonl(INADDR_LOOPBACK) &&
                              servers->udp_port == 0 && servers->tcp_port == 0);
 }
