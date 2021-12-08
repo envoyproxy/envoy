@@ -203,7 +203,7 @@ public:
   FineGrainedBufferWriteHelper(Buffer::Instance& buffer) : buffer_(buffer) {}
 
   /**
-   * Reserve enough memeory for the argument pack and write all the arguments to the buffer helper.
+   * Reserve enough memory for the argument pack and write all the arguments to the buffer helper.
    * This template method can accept variable-length argument pack containing different types of
    * data. But currently only string related types or char can be supported.
    *
@@ -252,7 +252,7 @@ public:
 
   /**
    * Write single char to buffer.
-   * @param c the sigle char to be written.
+   * @param c the single char to be written.
    */
   void writeToBuffer(char c) {
     ASSERT(remaining() >= 1);

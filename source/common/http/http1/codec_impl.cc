@@ -224,8 +224,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
-  connection_.bufferHelper().reserveBuffer(CRLF.size());
-  connection_.bufferHelper().writeToBuffer(CRLF);
+  connection_.bufferHelper().reserveAndWrite(CRLF);
 
   connection_.bufferHelper().commitToBuffer();
 
