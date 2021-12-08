@@ -70,10 +70,15 @@ MockTimer::~MockTimer() {
   }
 }
 
-MockSchedulableCallback::~MockSchedulableCallback() = default;
+MockSchedulableCallback::~MockSchedulableCallback() {
+  if (destroy_cb_) {
+    destroy_cb_->Call();
+  }
+}
 
-MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher)
-    : dispatcher_(dispatcher) {
+MockSchedulableCallback::MockSchedulableCallback(MockDispatcher* dispatcher,
+                                                 testing::MockFunction<void()>* destroy_cb)
+    : dispatcher_(dispatcher), destroy_cb_(destroy_cb) {
   EXPECT_CALL(*dispatcher, createSchedulableCallback_(_))
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();

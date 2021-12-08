@@ -614,7 +614,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
@@ -682,7 +682,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
@@ -3556,8 +3556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
-  // TODO(danzh) set to true.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // For HTTP/3 since the packets are black holed, there is no client side
