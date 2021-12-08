@@ -92,8 +92,9 @@ bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
                                           servers->addr.addr4.s_addr == htonl(INADDR_LOOPBACK) &&
                                           servers->udp_port == 0 && servers->tcp_port == 0);
   if (servers != nullptr) {
-    ares_free(servers);
+    ares_free_data(servers);
   }
+  return ret;
 }
 
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
