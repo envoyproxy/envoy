@@ -794,7 +794,6 @@ literal:
   *config_.mutable_common_config()->add_custom_tags() = tag;
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  stream_info.host_ = nullptr;
   stream_info.start_time_ = SystemTime(1h);
 
   expectLog(R"EOF(
@@ -811,6 +810,11 @@ common_properties:
     socket_address:
       address: "127.0.0.1"
       port_value: 0
+  upstream_remote_address:
+    socket_address:
+      address: "10.0.0.1"
+      port_value: 443
+  upstream_cluster: "fake_cluster"
   start_time:
     seconds: 3600
   custom_tags:
@@ -842,8 +846,8 @@ metadata:
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
   metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
       "foo", MessageUtil::keyValueStruct("bar", "baz")));
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   expectLog(R"EOF(
 common_properties:
@@ -893,7 +897,7 @@ metadata:
   stream_info.start_time_ = SystemTime(1h);
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   expectLog(R"EOF(
 common_properties:
