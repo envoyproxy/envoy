@@ -238,8 +238,8 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     const std::vector<Stats::CounterSharedPtr>& counters,
     const std::vector<Stats::GaugeSharedPtr>& gauges,
     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts, Buffer::Instance& response,
-    const bool used_only, const bool export_text_readouts, const absl::optional<std::regex>& regex,
+    const absl::optional<std::vector<Stats::TextReadoutSharedPtr>>& text_readouts,
+    Buffer::Instance& response, const bool used_only, const absl::optional<std::regex>& regex,
     const Stats::CustomStatNamespaces& custom_namespaces) {
 
   uint64_t metric_name_count = 0;
@@ -251,10 +251,10 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
       outputStatType<Stats::Gauge>(response, used_only, regex, gauges,
                                    generateNumericOutput<Stats::Gauge>, "gauge", custom_namespaces);
 
-  if (export_text_readouts) {
+  if (text_readouts.has_value()) {
     // TextReadout stats are returned in gauge format, so "gauge" type is set intentionally.
     metric_name_count +=
-        outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts,
+        outputStatType<Stats::TextReadout>(response, used_only, regex, text_readouts.value(),
                                            generateTextReadoutOutput, "gauge", custom_namespaces);
   }
 

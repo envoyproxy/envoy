@@ -134,13 +134,10 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const Http::Utility::QueryParams params =
       Http::Utility::parseAndDecodeQueryString(path_and_query);
   const bool used_only = params.find("usedonly") != params.end();
+  const bool text_readouts = params.find("text_readouts") != params.end();
 
-  const absl::optional<std::string> export_text_readouts_value =
-      Utility::queryParam(params, "export_text_readouts");
-  const bool export_text_readouts =
-      (export_text_readouts_value.has_value() && export_text_readouts_value.value() == "true")
-          ? true
-          : false;
+  absl::optional<std::vector<Stats::TextReadoutSharedPtr>> textReadouts =
+      text_readouts ? absl::make_optional(server_.stats().textReadouts()) : absl::nullopt;
 
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {
@@ -149,8 +146,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
 
   PrometheusStatsFormatter::statsAsPrometheus(
       server_.stats().counters(), server_.stats().gauges(), server_.stats().histograms(),
-      server_.stats().textReadouts(), response, used_only, export_text_readouts, regex,
-      server_.api().customStatNamespaces());
+      textReadouts, response, used_only, regex, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 

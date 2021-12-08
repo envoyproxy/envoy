@@ -22,14 +22,14 @@ public:
    * the response buffer after sanitizing the metric / label names.
    * @return uint64_t total number of metric types inserted in response.
    */
-  static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
-                                    const std::vector<Stats::GaugeSharedPtr>& gauges,
-                                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
-                                    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
-                                    Buffer::Instance& response, const bool used_only,
-                                    const bool export_text_readouts,
-                                    const absl::optional<std::regex>& regex,
-                                    const Stats::CustomStatNamespaces& custom_namespaces);
+  static uint64_t
+  statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
+                    const std::vector<Stats::GaugeSharedPtr>& gauges,
+                    const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                    const absl::optional<std::vector<Stats::TextReadoutSharedPtr>>& text_readouts,
+                    Buffer::Instance& response, const bool used_only,
+                    const absl::optional<std::regex>& regex,
+                    const Stats::CustomStatNamespaces& custom_namespaces);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.

@@ -813,17 +813,14 @@ public:
 
 class StatsHandlerPrometheusDefaultTest
     : public StatsHandlerPrometheusTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>> {};
+      public testing::TestWithParam<Network::Address::IpVersion> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    IpVersionsAndUrls, StatsHandlerPrometheusDefaultTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values("/stats?format=prometheus",
-                                     "/stats?format=prometheus&export_text_readouts=false",
-                                     "/stats?format=prometheus&export_text_readouts=abc")));
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsHandlerPrometheusDefaultTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-TEST_P(StatsHandlerPrometheusDefaultTest, HandlerStatsPrometheus) {
-  std::string url = std::get<1>(GetParam());
+TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
+  std::string url = "/stats?format=prometheus";
 
   createTestStats();
   std::shared_ptr<MockInstance> instance = setupMockedInstance();
@@ -848,14 +845,18 @@ envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 class StatsHandlerPrometheusWithTextReadoutsTest
     : public StatsHandlerPrometheusTest,
-      public testing::TestWithParam<Network::Address::IpVersion> {};
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>> {};
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, StatsHandlerPrometheusWithTextReadoutsTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndUrls, StatsHandlerPrometheusWithTextReadoutsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values("/stats?format=prometheus&text_readouts",
+                                     "/stats?format=prometheus&text_readouts=true",
+                                     "/stats?format=prometheus&text_readouts=false",
+                                     "/stats?format=prometheus&text_readouts=abc")));
 
-TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTextReadouts) {
-  std::string url = "/stats?format=prometheus&export_text_readouts=true";
+TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTextReadoutsTest) {
+  std::string url = std::get<1>(GetParam());
 
   createTestStats();
   std::shared_ptr<MockInstance> instance = setupMockedInstance();
