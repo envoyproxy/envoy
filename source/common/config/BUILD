@@ -376,10 +376,10 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        ":registry_utils_lib",
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
         "//envoy/local_info:local_info_interface",
-        "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
@@ -395,12 +395,23 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
-        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
-        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "registry_utils_lib",
+    srcs = ["registry_utils.cc"],
+    hdrs = ["registry_utils.h"],
+    deps = [
+        "//envoy/registry",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/type/v3:pkg_cc_proto",
     ],
 )
 

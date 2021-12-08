@@ -10,7 +10,6 @@
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
@@ -24,6 +23,7 @@
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/registry_utils.h"
 #include "source/common/grpc/common.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -249,18 +249,7 @@ public:
    */
   template <class Factory>
   static Factory* getAndCheckFactoryByName(const std::string& name, bool is_optional) {
-    if (name.empty()) {
-      ExceptionUtil::throwEnvoyException("Provided name for static registration lookup was empty.");
-    }
-
-    Factory* factory = Registry::FactoryRegistry<Factory>::getFactory(name);
-
-    if (factory == nullptr && !is_optional) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Didn't find a registered implementation for name: '{}'", name));
-    }
-
-    return factory;
+    return RegistryUtils::getAndCheckFactoryByName<Factory>(name, is_optional);
   }
 
   /**
@@ -270,7 +259,7 @@ public:
    * @return factory the factory requested or nullptr if it does not exist.
    */
   template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
-    return *getAndCheckFactoryByName<Factory>(name, false);
+    return RegistryUtils::getAndCheckFactoryByName<Factory>(name);
   }
 
   /**
@@ -278,11 +267,7 @@ public:
    * @param name string identifier for the particular implementation.
    */
   template <class Factory> static Factory* getFactoryByName(const std::string& name) {
-    if (name.empty()) {
-      return nullptr;
-    }
-
-    return Registry::FactoryRegistry<Factory>::getFactory(name);
+    return RegistryUtils::getFactoryByName<Factory>(name);
   }
 
   /**
@@ -291,12 +276,7 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory* getFactory(const ProtoMessage& message) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return factory;
-    }
-
-    return Utility::getFactoryByName<Factory>(message.name());
+    return RegistryUtils::getFactory<Factory, ProtoMessage>(message);
   }
 
   /**
@@ -308,12 +288,7 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory* getAndCheckFactory(const ProtoMessage& message, bool is_optional) {
-    Factory* factory = Utility::getFactoryByType<Factory>(message.typed_config());
-    if (factory != nullptr) {
-      return factory;
-    }
-
-    return Utility::getAndCheckFactoryByName<Factory>(message.name(), is_optional);
+    return RegistryUtils::getAndCheckFactory<Factory, ProtoMessage>(message, is_optional);
   }
 
   /**
@@ -323,7 +298,7 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    return *getAndCheckFactory<Factory>(message, false);
+    return RegistryUtils::getAndCheckFactory<Factory, ProtoMessage>(message);
   }
 
   /**
@@ -331,25 +306,7 @@ public:
    * @param typed_config for the extension config.
    */
   static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string& typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetDescriptor()->full_name();
-    static const std::string& legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-    // Unpack methods will only use the fully qualified type name after the last '/'.
-    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
-    if (type == typed_struct_type) {
-      xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
-      // Not handling nested structs or typed structs in typed structs
-      return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-    } else if (type == legacy_typed_struct_type) {
-      udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackTo(typed_config, typed_struct);
-      // Not handling nested structs or typed structs in typed structs
-      return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-    }
-    return type;
+    return RegistryUtils::getFactoryType(typed_config);
   }
 
   /**
@@ -357,10 +314,7 @@ public:
    * @param typed_config for the extension config.
    */
   template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
-    if (typed_config.type_url().empty()) {
-      return nullptr;
-    }
-    return Registry::FactoryRegistry<Factory>::getFactoryByType(getFactoryType(typed_config));
+    return RegistryUtils::getFactoryByType<Factory>(typed_config);
   }
 
   /**
@@ -377,16 +331,8 @@ public:
   translateToFactoryConfig(const ProtoMessage& enclosing_message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr, "");
-
-    // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
-
-    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
-    return config;
+    return RegistryUtils::translateToFactoryConfig<ProtoMessage, Factory>(
+        enclosing_message, validation_visitor, factory);
   }
 
   /**
@@ -401,16 +347,8 @@ public:
   translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Factory& factory) {
-    ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-
-    // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr, "");
-
-    // Check that the config type is not google.protobuf.Empty
-    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
-
-    translateOpaqueConfig(typed_config, validation_visitor, *config);
-    return config;
+    return RegistryUtils::translateAnyToFactoryConfig<Factory>(typed_config, validation_visitor,
+                                                               factory);
   }
 
   /**
@@ -462,7 +400,9 @@ public:
    */
   static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto);
+                                    Protobuf::Message& out_proto) {
+    return RegistryUtils::translateOpaqueConfig(typed_config, validation_visitor, out_proto);
+  }
 
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
