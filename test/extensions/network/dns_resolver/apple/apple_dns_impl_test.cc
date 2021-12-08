@@ -493,31 +493,31 @@ public:
 
           if (dns_lookup_family == DnsLookupFamily::Auto) {
             if (address_type == AddressType::V4) {
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv4());
             } else {
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv6());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv6());
             }
           }
 
           if (dns_lookup_family == DnsLookupFamily::V4Preferred) {
             if (address_type == AddressType::V6) {
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv6());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv6());
             } else {
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv4());
             }
           }
 
           if (dns_lookup_family == DnsLookupFamily::All) {
             switch (address_type) {
             case AddressType::V4:
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv4());
               break;
             case AddressType::V6:
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv6());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv6());
               break;
             case AddressType::Both:
-              EXPECT_NE(nullptr, response.addrInfo().front().address_->ip()->ipv4());
-              EXPECT_NE(nullptr, response.addrInfo().back().address_->ip()->ipv6());
+              EXPECT_NE(nullptr, response.front().addrInfo().address_->ip()->ipv4());
+              EXPECT_NE(nullptr, response.back().addrInfo().address_->ip()->ipv6());
               break;
             default:
               NOT_REACHED_GCOVR_EXCL_LINE;
@@ -713,7 +713,7 @@ TEST_F(AppleDnsImplFakeApiTest, QuerySynchronousCompletion) {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
                            EXPECT_EQ(1, response.size());
                            EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.addrInfo().front().ttl_);
+                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
                            dns_callback_executed.Notify();
                          }));
   dns_callback_executed.WaitForNotification();
@@ -892,7 +892,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
                            EXPECT_EQ(1, response.size());
                            EXPECT_EQ("1.2.3.4:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.addrInfo().front().ttl_);
+                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
                            dns_callback_executed.Notify();
                          });
   ASSERT_NE(nullptr, query);
@@ -914,7 +914,7 @@ TEST_F(AppleDnsImplFakeApiTest, MultipleQueries) {
                            EXPECT_EQ(DnsResolver::ResolutionStatus::Success, status);
                            EXPECT_EQ(1, response.size());
                            EXPECT_EQ("5.6.7.8:0", response.front().addrInfo().address_->asString());
-                           EXPECT_EQ(std::chrono::seconds(30), response.addrInfo().front().ttl_);
+                           EXPECT_EQ(std::chrono::seconds(30), response.front().addrInfo().ttl_);
                            dns_callback_executed2.Notify();
                          });
   ASSERT_NE(nullptr, query2);
