@@ -1040,10 +1040,10 @@ Network::ListenSocketFactoryPtr ListenerManagerImpl::createListenSocketFactory(
 void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
   if (!listener.udpListenerConfig().has_value() ||
       listener.udpListenerConfig()->listenerFactory().isTransportConnectionless()) {
-    // Close the listen socket right away to avoid leaving TCP connections in accept queue
-    // already waiting for long timeout. However, connection-oriented UDP listener shouldn't
-    // close the socket because it needs to receive packets on existing connection via the
-    // listen socket.
+    // Close the listen sockets right away to avoid leaving TCP connections in accept queue
+    // already waiting for long timeout. However, connection-oriented UDP listeners shouldn't
+    // close the socket because they need to receive packets for existing connections via the
+    // listen sockets.
     listener.listenSocketFactory().closeAllSockets();
   }
 }
