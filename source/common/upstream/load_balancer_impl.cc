@@ -748,7 +748,6 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
   case HostsSource::SourceType::LocalityDegradedHosts:
     return host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 EdfLoadBalancerBase::EdfLoadBalancerBase(

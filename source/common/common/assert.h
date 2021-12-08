@@ -260,14 +260,12 @@ void resetEnvoyBugCountersForTest();
 
 // It is safer to avoid defaults in switch statements, so that as new enums are added, the compiler
 // checks that new code is added as well. Google's proto library adds 2 sentinel values which should
-// not be used, and these macros allows avoiding using "default:" to handle them and instead using
-// case SENTINEL_VALUES_USED:
-//   PANIC_DUE_TO_SENTINEL_VALUE;
-#define SENTINEL_VALUES_USED                                                                       \
-  std::numeric_limits<int32_t>::max() : FALLTHRU;                                                  \
-  case std::numeric_limits<int32_t>::min()
-
-#define PANIC_DUE_TO_SENTINEL_VALUE PANIC("unexpected sentinel value used")
+// not be used, and this macro allows avoiding using "default:" to handle them.
+#define PANIC_DUE_TO_SENTINEL_VALUE                                                                \
+  case std::numeric_limits<int32_t>::max():                                                        \
+    FALLTHRU;                                                                                      \
+  case std::numeric_limits<int32_t>::min():                                                        \
+    PANIC("unexpected sentinel value used")
 
 // Envoy has a number of switch statements which panic if there's no legal value set.
 // This is not encouraged, as it's too easy to panic using break; instead of return;
