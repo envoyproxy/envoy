@@ -14,10 +14,10 @@ public:
   // Object of this class hold the state determining the IoHandle which
   // should return the supplied return from the `writev` or `sendmsg` calls.
   struct IoHandleMatcher {
-    absl::optional<Network::IoSocketError*> returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
+    Network::IoSocketError* returnOverride(Envoy::Network::TestIoSocketHandle* io_handle) {
       absl::MutexLock lock(&mutex_);
-      if (error_.has_value() && (io_handle->localAddress()->ip()->port() == src_port_ ||
-                                 (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
+      if (error_ && (io_handle->localAddress()->ip()->port() == src_port_ ||
+                     (dst_port_ && io_handle->peerAddress()->ip()->port() == dst_port_))) {
         ASSERT(matched_iohandle_ == nullptr || matched_iohandle_ == io_handle,
                "Matched multiple io_handles, expected at most one to match.");
         matched_iohandle_ = io_handle;
@@ -57,7 +57,7 @@ public:
     mutable absl::Mutex mutex_;
     uint32_t src_port_ ABSL_GUARDED_BY(mutex_) = 0;
     uint32_t dst_port_ ABSL_GUARDED_BY(mutex_) = 0;
-    absl::optional<Network::IoSocketError*> error_ ABSL_GUARDED_BY(mutex_) = nullptr;
+    Network::IoSocketError* error_ ABSL_GUARDED_BY(mutex_) = nullptr;
     Network::TestIoSocketHandle* matched_iohandle_{};
   };
 

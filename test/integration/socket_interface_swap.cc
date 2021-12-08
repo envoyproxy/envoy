@@ -11,9 +11,9 @@ SocketInterfaceSwap::SocketInterfaceSwap() {
           [write_matcher = write_matcher_](Envoy::Network::TestIoSocketHandle* io_handle,
                                            const Buffer::RawSlice*,
                                            uint64_t) -> absl::optional<Api::IoCallUint64Result> {
-            absl::optional<Network::IoSocketError*> error_override = write_matcher->returnOverride(io_handle);
-            if (error_override.has_value()) {
-              return Api::IoCallUint64Result(0, Api::IoErrorPtr(error_override.value(), preserveIoError));
+            Network::IoSocketError* error_override = write_matcher->returnOverride(io_handle);
+            if (error_override) {
+              return Api::IoCallUint64Result(0, Api::IoErrorPtr(error_override, preserveIoError));
             }
             return absl::nullopt;
           }));
