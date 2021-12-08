@@ -82,6 +82,7 @@ New Features
 * listener: added support for opting out listeners from the globally set downstream connection limit via :ref:`ignore_global_conn_limit <envoy_v3_api_field_config.listener.v3.Listener.ignore_global_conn_limit>`.
 * oauth filter: added :ref:`cookie_names <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Credentials.cookie_names>` to allow overriding (default) cookie names (``BearerToken``, ``OauthHMAC``, and ``OauthExpires``) set by the filter.
 * oauth filter: setting IdToken and RefreshToken cookies if they are provided by Identity provider along with AccessToken.
+* perf: added support for [Perfetto](https://perfetto.dev) performance tracing.
 * router: added support for the :ref:`config_http_conn_man_headers_x-forwarded-host` header.
 * tcp: added a :ref:`FilterState <envoy_v3_api_msg_type.v3.HashPolicy.FilterState>` :ref:`hash policy <envoy_v3_api_msg_type.v3.HashPolicy>`, used by :ref:`TCP proxy <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.hash_policy>` to allow hashing load balancer algorithms to hash on objects in filter state.
 * tcp_proxy: added support to populate upstream http connect header values from stream info.

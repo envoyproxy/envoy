@@ -203,8 +203,8 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_(router_context.statNames(), scope, stat_prefix),
+      : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
+        runtime_(runtime), random_(random), stats_(router_context_.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -239,6 +239,7 @@ public:
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
 
+  Router::Context& router_context_;
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;

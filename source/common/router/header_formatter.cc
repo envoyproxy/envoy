@@ -96,8 +96,8 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
 
   return [upstream, params](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
     const envoy::config::core::v3::Metadata* metadata = nullptr;
-    if (upstream) {
-      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamHost();
+    if (upstream && stream_info.upstreamInfo()) {
+      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamInfo()->upstreamHost();
       if (!host) {
         return std::string();
       }
@@ -334,8 +334,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-      if (stream_info.upstreamHost()) {
-        return stream_info.upstreamHost()->address()->asString();
+      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+        return stream_info.upstreamInfo()->upstreamHost()->address()->asString();
       }
       return "";
     };

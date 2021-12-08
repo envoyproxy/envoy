@@ -1149,7 +1149,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     sendLocalReply(
         Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
-                     "{", status.message(), "}"));
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
     return;
   }
 
