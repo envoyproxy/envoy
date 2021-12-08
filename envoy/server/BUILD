@@ -184,6 +184,7 @@ envoy_cc_library(
         "//envoy/access_log:access_log_interface",
         "//envoy/api:api_interface",
         "//envoy/config:typed_config_interface",
+        "//envoy/config:typed_metadata_interface",
         "//envoy/grpc:context_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",
@@ -248,6 +249,7 @@ envoy_cc_library(
         ":guarddog_interface",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
+        "//envoy/network:socket_interface_interface",
         "//envoy/ssl:context_interface",
         "//source/common/protobuf",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
@@ -293,6 +295,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "proactive_resource_monitor_interface",
+    hdrs = ["proactive_resource_monitor.h"],
+    deps = [
+        "//envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "request_id_extension_config_interface",
     hdrs = ["request_id_extension_config.h"],
     deps = [
@@ -307,6 +317,7 @@ envoy_cc_library(
     hdrs = ["resource_monitor_config.h"],
     deps = [
         ":options_interface",
+        ":proactive_resource_monitor_interface",
         ":resource_monitor_interface",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",

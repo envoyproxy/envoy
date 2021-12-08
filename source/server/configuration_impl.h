@@ -192,11 +192,13 @@ private:
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
     std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     std::string profile_path_;
     std::list<AccessLog::InstanceSharedPtr> access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
+    bool ignore_global_conn_limit_;
   };
 
   AdminImpl admin_;

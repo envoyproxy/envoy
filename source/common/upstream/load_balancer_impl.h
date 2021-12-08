@@ -40,6 +40,18 @@ public:
   choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                  const DegradedLoad& degraded_per_priority_load);
 
+  // Pool selection not implemented.
+  absl::optional<Upstream::SelectedPoolAndConnection>
+  selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
+                           const Upstream::Host& /*host*/,
+                           std::vector<uint8_t>& /*hash_key*/) override {
+    return absl::nullopt;
+  }
+  // Lifetime tracking not implemented.
+  OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
+    return {};
+  }
+
 protected:
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the

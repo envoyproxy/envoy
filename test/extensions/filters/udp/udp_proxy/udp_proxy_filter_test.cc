@@ -21,6 +21,7 @@
 using testing::AtLeast;
 using testing::ByMove;
 using testing::DoAll;
+using testing::DoDefault;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
@@ -637,6 +638,176 @@ TEST_F(UdpProxyFilterTest, SocketOptionForUseOriginalSrcIp) {
   InSequence s;
 
   ensureIpTransparentSocketOptions(upstream_address_, "10.0.0.2:80", 1, 0);
+}
+
+// Verify that on second data packet sent from the client, another upstream host is selected.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingBasicFlow) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  // Allow for two sessions.
+  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 0 /*tx_bytes*/, 0 /*tx_datagrams*/);
+  test_sessions_[0].recvDataFromUpstream("world");
+  checkTransferStats(5 /*rx_bytes*/, 1 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
+  auto new_host = createHost(new_host_address);
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
+  expectSessionCreate(new_host_address);
+  test_sessions_[1].expectWriteToUpstream("hello2");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(11 /*rx_bytes*/, 2 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+
+  // On next datagram, first session should be used
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_))
+      .WillRepeatedly(DoDefault());
+  test_sessions_[0].expectWriteToUpstream("hello3");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello3");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+  checkTransferStats(17 /*rx_bytes*/, 3 /*rx_datagrams*/, 5 /*tx_bytes*/, 1 /*tx_datagrams*/);
+}
+
+// Verify that when no host is available, message is dropped.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingFirstInvalidHost) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(0, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+                   .upstream_cx_none_healthy_.value());
+}
+
+// Verify that when on second packet no host is available, message is dropped.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingSecondInvalidHost) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(0, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+                   .upstream_cx_none_healthy_.value());
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(nullptr));
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+  EXPECT_EQ(1, cluster_manager_.thread_local_cluster_.cluster_.info_->stats_
+                   .upstream_cx_none_healthy_.value());
+}
+
+// Verify that all sessions for a host are removed when a host is removed.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveHostSessions) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  cluster_manager_.thread_local_cluster_.cluster_.priority_set_.runUpdateCallbacks(
+      0, {}, {cluster_manager_.thread_local_cluster_.lb_.host_});
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[1].expectWriteToUpstream("hello2");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+}
+
+// Verify that all sessions for hosts in cluster are removed when a cluster is removed.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingRemoveCluster) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  // Allow for two sessions.
+  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(2, 0, 0, 0, 0);
+
+  expectSessionCreate(upstream_address_);
+  test_sessions_[0].expectWriteToUpstream("hello");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(1, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
+
+  auto new_host_address = Network::Utility::parseInternetAddressAndPort("20.0.0.2:443");
+  auto new_host = createHost(new_host_address);
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.lb_, chooseHost(_)).WillOnce(Return(new_host));
+  expectSessionCreate(new_host_address);
+  test_sessions_[1].expectWriteToUpstream("hello2");
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello2");
+  EXPECT_EQ(2, config_->stats().downstream_sess_total_.value());
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+
+  // Remove a cluster we don't care about.
+  cluster_update_callbacks_->onClusterRemoval("other_cluster");
+  EXPECT_EQ(2, config_->stats().downstream_sess_active_.value());
+
+  // Remove the cluster we do care about. This should purge all sessions.
+  cluster_update_callbacks_->onClusterRemoval("fake_cluster");
+  EXPECT_EQ(0, config_->stats().downstream_sess_active_.value());
+}
+
+// Verify that specific stat is included when connection limit is hit.
+TEST_F(UdpProxyFilterTest, PerPacketLoadBalancingCannotCreateConnection) {
+  InSequence s;
+
+  setup(R"EOF(
+stat_prefix: foo
+cluster: fake_cluster
+use_per_packet_load_balancing: true
+  )EOF");
+
+  // Don't allow for any session.
+  cluster_manager_.thread_local_cluster_.cluster_.info_->resetResourceManager(0, 0, 0, 0, 0);
+
+  recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
+  EXPECT_EQ(
+      1,
+      cluster_manager_.thread_local_cluster_.cluster_.info_->stats_.upstream_cx_overflow_.value());
 }
 
 // Make sure socket option is set correctly if use_original_src_ip is set in case of ipv6.

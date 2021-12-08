@@ -22,6 +22,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/route";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.route.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -675,8 +676,8 @@ message RouteAction {
 
     message FilterState {
       // The name of the Object in the per-request filterState, which is an
-      // Envoy::Http::Hashable object. If there is no data associated with the key,
-      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      // Envoy::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Hashable, no hash will be produced.
       string key = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 

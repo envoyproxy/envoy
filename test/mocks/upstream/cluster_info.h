@@ -90,6 +90,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
@@ -216,6 +217,12 @@ class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
   ~MockIdleTimeEnabledClusterInfo() override;
+};
+
+class MockMaxConnectionDurationEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockMaxConnectionDurationEnabledClusterInfo();
+  ~MockMaxConnectionDurationEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

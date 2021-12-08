@@ -110,7 +110,6 @@ const char AdminHtmlEnd[] = R"(
   </table>
 </body>
 )";
-
 } // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
@@ -145,7 +144,8 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
 }
 
-AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
+                     bool ignore_global_conn_limit)
     : server_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
@@ -224,7 +224,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+      local_reply_(LocalReply::Factory::createDefault()),
+      ignore_global_conn_limit_(ignore_global_conn_limit) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,
@@ -356,12 +357,13 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
     std::vector<std::string> params;
     for (const Param& param : handler->params_) {
       switch (param.type_) {
-        case Boolean:
-        case Integer:
-          params.emplace_back();
-        case String:
-          params.emplace_back(fmt::format("<label for='filter'>{}</label><input type='text'"
-                                          "id='{}'>",
+        case Param::Type::Boolean:
+        case Param::Type::Integer:
+          //params.emplace_back();
+        case Param::Type::String:
+          //params.emplace_back(fmt::format("<label for='filter'>{}</label><input type='text'"
+          //                                "id='{}'>"));
+          break;
       }
     }
 

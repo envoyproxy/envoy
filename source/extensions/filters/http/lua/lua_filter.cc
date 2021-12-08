@@ -191,8 +191,9 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
 }
 
 StreamHandleWrapper::StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine,
-                                         Http::HeaderMap& headers, bool end_stream, Filter& filter,
-                                         FilterCallbacks& callbacks, TimeSource& time_source)
+                                         Http::RequestOrResponseHeaderMap& headers, bool end_stream,
+                                         Filter& filter, FilterCallbacks& callbacks,
+                                         TimeSource& time_source)
     : coroutine_(coroutine), headers_(headers), end_stream_(end_stream), filter_(filter),
       callbacks_(callbacks), yield_callback_([this]() {
         if (state_ == State::Running) {
@@ -224,7 +225,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   if (state_ == State::WaitForBodyChunk) {
     ENVOY_LOG(trace, "resuming for next body chunk");
     Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> wrapper(
-        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), data), true);
+        Filters::Common::Lua::BufferWrapper::create(coroutine_.luaState(), headers_, data), true);
     state_ = State::Running;
     coroutine_.resume(1, yield_callback_);
   } else if (state_ == State::WaitForBody && end_stream_) {
@@ -458,9 +459,10 @@ int StreamHandleWrapper::luaBody(lua_State* state) {
           callbacks_.addData(body);
         }
 
-        body_wrapper_.reset(Filters::Common::Lua::BufferWrapper::create(
-                                state, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
-                            true);
+        body_wrapper_.reset(
+            Filters::Common::Lua::BufferWrapper::create(
+                state, headers_, const_cast<Buffer::Instance&>(*callbacks_.bufferedBody())),
+            true);
       }
       return 1;
     }
@@ -720,11 +722,10 @@ void Filter::onDestroy() {
   }
 }
 
-Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
-                                            Filters::Common::Lua::CoroutinePtr& coroutine,
-                                            FilterCallbacks& callbacks, int function_ref,
-                                            PerLuaCodeSetup* setup, Http::HeaderMap& headers,
-                                            bool end_stream) {
+Http::FilterHeadersStatus
+Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& coroutine,
+                  FilterCallbacks& callbacks, int function_ref, PerLuaCodeSetup* setup,
+                  Http::RequestOrResponseHeaderMap& headers, bool end_stream) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }

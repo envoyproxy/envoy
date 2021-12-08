@@ -144,10 +144,19 @@ std::string ConfigHelper::startTlsConfig() {
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
 }
 
-std::string ConfigHelper::tlsInspectorFilter() {
+std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
+  if (!enable_ja3_fingerprinting) {
+    return R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+)EOF";
+  }
+
   return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+  enable_ja3_fingerprinting: true
 )EOF";
 }
 
@@ -620,6 +629,18 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
   auto* static_resources = bootstrap_.mutable_static_resources();
   for (int i = 0; i < static_resources->listeners_size(); ++i) {
     auto* listener = static_resources->mutable_listeners(i);
+    if (listener->mutable_address()->has_envoy_internal_address()) {
+      ENVOY_LOG_MISC(
+          debug, "Listener {} has internal address {}. Will not reset to loop back socket address.",
+          i, listener->mutable_address()->envoy_internal_address().server_listener_name());
+      continue;
+    }
+    if (listener->mutable_address()->has_pipe()) {
+      ENVOY_LOG_MISC(debug,
+                     "Listener {} has pipe address {}. Will not reset to loop back socket address.",
+                     i, listener->mutable_address()->pipe().path());
+      continue;
+    }
     auto* listener_socket_addr = listener->mutable_address()->mutable_socket_address();
     if (listener_socket_addr->address() == "0.0.0.0" || listener_socket_addr->address() == "::") {
       listener_socket_addr->set_address(Network::Test::getAnyAddressString(version));
@@ -652,6 +673,15 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
     admin_layer->mutable_admin_layer();
   }
 }
+
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* static_resources = bootstrap_.mutable_static_resources();
+  ASSERT_TRUE(static_resources->listeners_size() > 0);
+  auto* listener = static_resources->mutable_listeners(0);
+  auto* map = listener->mutable_metadata()->mutable_typed_filter_metadata();
+  (*map)[std::string(key)] = packed_value;
+};
 
 void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
@@ -895,7 +925,6 @@ void ConfigHelper::setDefaultHostAndRoute(const std::string& domains, const std:
 void ConfigHelper::setBufferLimits(uint32_t upstream_buffer_limit,
                                    uint32_t downstream_buffer_limit) {
   RELEASE_ASSERT(!finalized_, "");
-  RELEASE_ASSERT(bootstrap_.mutable_static_resources()->listeners_size() == 1, "");
   auto* listener = bootstrap_.mutable_static_resources()->mutable_listeners(0);
   listener->mutable_per_connection_buffer_limit_bytes()->set_value(downstream_buffer_limit);
   const uint32_t stream_buffer_size = std::max(
@@ -1186,8 +1215,8 @@ void ConfigHelper::initializeTls(
     }
   }
   if (!options.san_matchers_.empty()) {
-    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
-                                                              options.san_matchers_.end()};
+    *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
+                                                                    options.san_matchers_.end()};
   }
 }
 

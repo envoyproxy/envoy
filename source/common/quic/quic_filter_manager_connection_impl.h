@@ -5,26 +5,17 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
-
-#include "quiche/quic/core/quic_connection.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/network/connection_impl_base.h"
-#include "source/common/quic/quic_network_connection.h"
 #include "source/common/quic/envoy_quic_simulated_watermark_buffer.h"
+#include "source/common/quic/quic_network_connection.h"
+#include "source/common/quic/quic_ssl_connection_info.h"
 #include "source/common/quic/send_buffer_monitor.h"
 #include "source/common/stream_info/stream_info_impl.h"
+
+#include "quiche/quic/core/quic_connection.h"
 
 namespace Envoy {
 
@@ -40,7 +31,8 @@ class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase,
 public:
   QuicFilterManagerConnectionImpl(QuicNetworkConnection& connection,
                                   const quic::QuicConnectionId& connection_id,
-                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit);
+                                  Event::Dispatcher& dispatcher, uint32_t send_buffer_limit,
+                                  std::shared_ptr<QuicSslConnectionInfo>&& info);
   // Network::FilterManager
   // Overridden to delegate calls to filter_manager_.
   void addWriteFilter(Network::WriteFilterSharedPtr filter) override;
@@ -69,9 +61,14 @@ public:
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { ASSERT(false); }
   bool readEnabled() const override { return true; }
   const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
+    ENVOY_BUG(network_connection_ && network_connection_->connectionSocket(),
+              "No connection socket.");
     return network_connection_->connectionSocket()->connectionInfoProvider();
   }
   Network::ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    if (!network_connection_ || !network_connection_->connectionSocket()) {
+      return nullptr;
+    }
     return network_connection_->connectionSocket()->connectionInfoProviderSharedPtr();
   }
   absl::optional<Network::Connection::UnixDomainSocketPeerCredentials>
@@ -138,7 +135,7 @@ public:
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
-  void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
+  virtual void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
     http3_options_ = http3_options;
   }
 
@@ -161,14 +158,15 @@ protected:
   virtual bool hasDataToWrite() PURE;
 
   // Returns a QuicConnection interface if initialized_ is true, otherwise nullptr.
-  virtual const quic::QuicConnection* quicConnection() const = 0;
-  virtual quic::QuicConnection* quicConnection() = 0;
+  virtual const quic::QuicConnection* quicConnection() const PURE;
+  virtual quic::QuicConnection* quicConnection() PURE;
 
   QuicNetworkConnection* network_connection_{nullptr};
 
   OptRef<Http::Http3::CodecStats> codec_stats_;
   OptRef<const envoy::config::core::v3::Http3ProtocolOptions> http3_options_;
   bool initialized_{false};
+  std::shared_ptr<QuicSslConnectionInfo> quic_ssl_info_;
 
 private:
   friend class Envoy::TestPauseFilterForQuic;

@@ -48,10 +48,14 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 TEST_P(AdminInstanceTest, Getters) {
   EXPECT_EQ(&admin_.mutableSocket(), &admin_.socket());
   EXPECT_EQ(1, admin_.concurrency());
-  EXPECT_EQ(false, admin_.preserveExternalRequestId());
+  EXPECT_FALSE(admin_.preserveExternalRequestId());
   EXPECT_EQ(nullptr, admin_.tracer());
-  EXPECT_EQ(false, admin_.streamErrorOnInvalidHttpMessaging());
-  EXPECT_EQ(false, admin_.schemeToSet().has_value());
+  EXPECT_FALSE(admin_.streamErrorOnInvalidHttpMessaging());
+  EXPECT_FALSE(admin_.schemeToSet().has_value());
+  EXPECT_EQ(admin_.pathWithEscapedSlashesAction(),
+            envoy::extensions::filters::network::http_connection_manager::v3::
+                HttpConnectionManager::KEEP_UNCHANGED);
+  EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
 }
 
 TEST_P(AdminInstanceTest, WriteAddressToFile) {
@@ -63,7 +67,7 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminAddress) {
   std::string address_out_path = TestEnvironment::temporaryPath("admin.address");
-  AdminImpl admin_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -78,7 +82,7 @@ TEST_P(AdminInstanceTest, AdminAddress) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_);
+  AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
   std::list<AccessLog::InstanceSharedPtr> access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -97,7 +101,7 @@ TEST_P(AdminInstanceTest, CustomHandler) {
                      AdminStream&) -> Http::Code { return Http::Code::Accepted; };
 
   // Test removable handler.
-  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false)));
+  EXPECT_NO_LOGS(EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, true, false, {})));
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
@@ -108,11 +112,11 @@ TEST_P(AdminInstanceTest, CustomHandler) {
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
 
   // Add non removable handler.
-  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_TRUE(admin_.addHandler("/foo/bar", "hello", callback, false, false, {}));
   EXPECT_EQ(Http::Code::Accepted, getCallback("/foo/bar", header_map, response));
 
   // Add again and make sure it is not there twice.
-  EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false));
+  EXPECT_FALSE(admin_.addHandler("/foo/bar", "hello", callback, false, false, {}));
 
   // Try to remove non removable handler, and make sure it is not removed.
   EXPECT_FALSE(admin_.removeHandler("/foo/bar"));
@@ -125,7 +129,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithXss) {
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/foo<script>alert('hi')</script>\" contains invalid character '<'",
                       EXPECT_FALSE(admin_.addHandler("/foo<script>alert('hi')</script>", "hello",
-                                                     callback, true, false)));
+                                                     callback, true, false, {})));
 }
 
 TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
@@ -134,7 +138,7 @@ TEST_P(AdminInstanceTest, RejectHandlerWithEmbeddedQuery) {
   EXPECT_LOG_CONTAINS("error",
                       "filter \"/bar?queryShouldNotBeInPrefix\" contains invalid character '?'",
                       EXPECT_FALSE(admin_.addHandler("/bar?queryShouldNotBeInPrefix", "hello",
-                                                     callback, true, false)));
+                                                     callback, true, false, {})));
 }
 
 TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
@@ -144,7 +148,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   // It's OK to have help text with HTML characters in it, but when we render the home
   // page they need to be escaped.
   const std::string planets = "jupiter>saturn>mars";
-  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false));
+  EXPECT_TRUE(admin_.addHandler("/planets", planets, callback, true, false, {}));
 
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;

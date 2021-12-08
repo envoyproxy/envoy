@@ -101,8 +101,7 @@ public:
     return true;
   }
 
-  void forEachStat(std::function<void(std::size_t)> f_size,
-                   std::function<void(Base&)> f_stat) const {
+  void forEachStat(SizeFn f_size, std::function<void(Base&)> f_stat) const {
     if (f_size != nullptr) {
       f_size(stats_.size());
     }
@@ -216,29 +215,37 @@ public:
     return textReadoutFromStatName(storage.statName());
   }
 
-  void forEachCounter(std::function<void(std::size_t)> f_size,
-                      std::function<void(Stats::Counter&)> f_stat) const override {
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
     counters_.forEachStat(f_size, f_stat);
   }
 
-  void forEachGauge(std::function<void(std::size_t)> f_size,
-                    std::function<void(Stats::Gauge&)> f_stat) const override {
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override {
     gauges_.forEachStat(f_size, f_stat);
   }
 
-  void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                          std::function<void(Stats::TextReadout&)> f_stat) const override {
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     text_readouts_.forEachStat(f_size, f_stat);
   }
 
-  void forEachScope(std::function<void(std::size_t)> f_size,
-                    std::function<void(const Scope&)> f_scope) const override {
+  void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override {
     f_size(1);
     const Scope& scope = *this;
-    f_scope(scope);
+    f_stat(scope);
   }
 
   Stats::StatName prefix() const override { return StatName(); }
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
+    forEachCounter(f_size, f_stat);
+  }
+
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override {
+    forEachGauge(f_size, f_stat);
+  }
+
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+    forEachTextReadout(f_size, f_stat);
+  }
 
 private:
   IsolatedStoreImpl(std::unique_ptr<SymbolTable>&& symbol_table);

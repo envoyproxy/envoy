@@ -54,7 +54,7 @@ public:
   void decodeMetadata(Http::MetadataMapPtr&& metadata_map) override;
 
   // UpstreamToDownstream (Http::ResponseDecoder)
-  void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&& headers) override;
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;
   void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override;
   void dumpState(std::ostream& os, int indent_level) const override;
@@ -104,7 +104,6 @@ public:
     outlier_detection_timeout_recorded_ = recorded;
   }
   bool outlierDetectionTimeoutRecorded() { return outlier_detection_timeout_recorded_; }
-  const StreamInfo::UpstreamTiming& upstreamTiming() { return upstream_timing_; }
   void retried(bool value) { retried_ = value; }
   bool retried() { return retried_; }
   bool grpcRqSuccessDeferred() { return grpc_rq_success_deferred_; }
@@ -119,9 +118,12 @@ public:
   bool encodeComplete() const { return encode_complete_; }
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
-  const StreamInfo::StreamInfo& streamInfo() const { return stream_info_; }
+  StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
 
 private:
+  StreamInfo::UpstreamTiming& upstreamTiming() {
+    return stream_info_.upstreamInfo()->upstreamTiming();
+  }
   bool shouldSendEndStream() {
     // Only encode end stream if the full request has been received, the body
     // has been sent, and any trailers or metadata have also been sent.
@@ -147,7 +149,6 @@ private:
   DownstreamWatermarkManager downstream_watermark_manager_{*this};
   Tracing::SpanPtr span_;
   StreamInfo::StreamInfoImpl stream_info_;
-  StreamInfo::UpstreamTiming upstream_timing_;
   const MonotonicTime start_time_;
   // This is wrapped in an optional, since we want to avoid computing zero size headers when in
   // reality we just didn't get a response back.

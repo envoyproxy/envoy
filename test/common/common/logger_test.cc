@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::Invoke;
 
 namespace Envoy {
@@ -154,11 +155,11 @@ TEST_F(LoggerCustomFlagsTest, LogMessageAsJsonStringEscaped) {
       "\\\"transport: Error while dialing dial tcp [::1]:15012: connect: connection refused\\\"");
 }
 
-struct NamedLogSink : SinkDelegate {
-  NamedLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setDelegate(); }
-  ~NamedLogSink() override { restoreDelegate(); }
+struct MockLogSink : SinkDelegate {
+  MockLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setDelegate(); }
+  ~MockLogSink() override { restoreDelegate(); }
 
-  MOCK_METHOD(void, log, (absl::string_view));
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
   MOCK_METHOD(void, logWithStableName,
               (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
   void flush() override {}
@@ -167,7 +168,7 @@ struct NamedLogSink : SinkDelegate {
 class NamedLogTest : public Loggable<Id::assert>, public testing::Test {};
 
 TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
-  NamedLogSink sink(Envoy::Logger::Registry::getSink());
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
 
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   // Log level is above debug, so we shouldn't get any logs.
@@ -175,14 +176,76 @@ TEST_F(NamedLogTest, NamedLogsAreSentToSink) {
 
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
-  EXPECT_CALL(sink, log(_));
+  EXPECT_CALL(sink, log(_, _));
   EXPECT_CALL(sink, logWithStableName("test_event", "debug", "assert", "test log 1"));
   ENVOY_LOG_EVENT(debug, "test_event", "test {} {}", "log", 1);
 
   // Verify that ENVOY_LOG_EVENT_TO_LOGGER does the right thing.
-  EXPECT_CALL(sink, log(_)).WillOnce(Invoke([](auto log) { EXPECT_TRUE(log.find("[misc]")); }));
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto log, const auto&) {
+    EXPECT_TRUE(log.find("[misc]"));
+  }));
   EXPECT_CALL(sink, logWithStableName("misc_event", "debug", "misc", "log"));
   ENVOY_LOG_EVENT_TO_LOGGER(Registry::getLog(Id::misc), debug, "misc_event", "log");
+}
+
+struct TlsLogSink : SinkDelegate {
+  TlsLogSink(DelegatingLogSinkSharedPtr log_sink) : SinkDelegate(log_sink) { setTlsDelegate(); }
+  ~TlsLogSink() override { restoreTlsDelegate(); }
+
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, logWithStableName,
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+  MOCK_METHOD(void, flush, ());
+};
+
+// Verifies that we can register a thread local sink override.
+TEST(TlsLoggingOverrideTest, OverrideSink) {
+  MockLogSink global_sink(Envoy::Logger::Registry::getSink());
+  testing::InSequence s;
+
+  {
+    TlsLogSink tls_sink(Envoy::Logger::Registry::getSink());
+
+    // Calls on the current thread goes to the TLS sink.
+    EXPECT_CALL(tls_sink, log(_, _));
+    ENVOY_LOG_MISC(info, "hello tls");
+
+    // Calls on other threads should use the global sink.
+    std::thread([&]() {
+      EXPECT_CALL(global_sink, log(_, _));
+      ENVOY_LOG_MISC(info, "hello global");
+    }).join();
+
+    // Sanity checking that we're still using the TLS sink.
+    EXPECT_CALL(tls_sink, log(_, _));
+    ENVOY_LOG_MISC(info, "hello tls");
+
+    // All the logging functions should be delegated to the TLS override.
+    EXPECT_CALL(tls_sink, flush());
+    Registry::getSink()->flush();
+
+    EXPECT_CALL(tls_sink, logWithStableName(_, _, _, _));
+    Registry::getSink()->logWithStableName("foo", "level", "bar", "msg");
+  }
+
+  // Now that the TLS sink is out of scope, log calls on this thread should use the global sink
+  // again.
+  EXPECT_CALL(global_sink, log(_, _));
+  ENVOY_LOG_MISC(info, "hello global 2");
+}
+
+TEST(LoggerTest, LogWithLogDetails) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
+
+  MockLogSink sink(Envoy::Logger::Registry::getSink());
+
+  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+    EXPECT_THAT(msg, HasSubstr("[info]"));
+    EXPECT_THAT(msg, HasSubstr("hello"));
+
+    EXPECT_EQ(log.logger_name, "misc");
+  }));
+  ENVOY_LOG_MISC(info, "hello");
 }
 
 } // namespace Logger

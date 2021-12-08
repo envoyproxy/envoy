@@ -16,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/grpc/common.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/router/context_impl.h"
@@ -76,7 +77,10 @@ public:
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
-    return dispatcher().createDnsResolver({}, envoy::config::core::v3::DnsResolverOptions());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    return dns_resolver_factory.createDnsResolver(dispatcher(), api(), typed_dns_resolver_config);
   }
   void drainListeners() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   DrainManager& drainManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -121,6 +125,7 @@ public:
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
+  void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
@@ -145,11 +150,10 @@ public:
       Configuration::ListenerFactoryContext& context) override {
     return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters, context);
   }
-  Network::SocketSharedPtr createListenSocket(Network::Address::InstanceConstSharedPtr,
-                                              Network::Socket::Type,
-                                              const Network::Socket::OptionsSharedPtr&,
-                                              ListenerComponentFactory::BindType,
-                                              uint32_t) override {
+  Network::SocketSharedPtr
+  createListenSocket(Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                     const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
+                     const Network::SocketCreationOptions&, uint32_t) override {
     // Returned sockets are not currently used so we can return nothing here safely vs. a
     // validation mock.
     // TODO(mattklein123): The fact that this returns nullptr makes the production code more

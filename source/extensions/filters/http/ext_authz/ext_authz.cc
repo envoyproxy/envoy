@@ -13,14 +13,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
 
-struct RcDetailsValues {
-  // The ext_authz filter denied the downstream request.
-  const std::string AuthzDenied = "ext_authz_denied";
-  // The ext_authz filter encountered a failure, and was configured to fail-closed.
-  const std::string AuthzError = "ext_authz_error";
-};
-using RcDetails = ConstSingleton<RcDetailsValues>;
-
 void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   // We only merge context extensions here, and leave boolean flags untouched since those flags are
   // not used from the merged config.
@@ -91,8 +83,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                        *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
       return Http::FilterHeadersStatus::StopIteration;
     }
     return Http::FilterHeadersStatus::Continue;
@@ -154,7 +147,7 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap&) {
   return Http::FilterTrailersStatus::Continue;
 }
 
-Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::ResponseHeaderMap&) {
+Http::FilterHeadersStatus Filter::encode1xxHeaders(Http::ResponseHeaderMap&) {
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -162,7 +155,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   ENVOY_STREAM_LOG(trace,
                    "ext_authz filter has {} response header(s) to add and {} response header(s) to "
                    "set to the encoded response:",
-                   *encoder_callbacks_, response_headers_to_add_.size());
+                   *encoder_callbacks_, response_headers_to_add_.size(),
+                   response_headers_to_set_.size());
   if (!response_headers_to_add_.empty()) {
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
@@ -352,6 +346,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       config_->httpContext().codeStats().chargeResponseStat(info, false);
     }
 
+    // setResponseFlag must be called before sendLocalReply
+    decoder_callbacks_->streamInfo().setResponseFlag(
+        StreamInfo::ResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
         [&headers = response->headers_to_set,
@@ -370,9 +367,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
             response_headers.addCopy(header.first, header.second);
           }
         },
-        absl::nullopt, RcDetails::get().AuthzDenied);
-    decoder_callbacks_->streamInfo().setResponseFlag(
-        StreamInfo::ResponseFlag::UnauthorizedExternalService);
+        absl::nullopt, Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied);
     break;
   }
 
@@ -395,8 +390,9 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           *decoder_callbacks_, enumToInt(config_->statusOnError()));
       decoder_callbacks_->streamInfo().setResponseFlag(
           StreamInfo::ResponseFlag::UnauthorizedExternalService);
-      decoder_callbacks_->sendLocalReply(config_->statusOnError(), EMPTY_STRING, nullptr,
-                                         absl::nullopt, RcDetails::get().AuthzError);
+      decoder_callbacks_->sendLocalReply(
+          config_->statusOnError(), EMPTY_STRING, nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
     }
     break;
   }

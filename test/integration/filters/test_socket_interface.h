@@ -7,6 +7,9 @@
 
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/win32_socket_handle_impl.h"
+
+#include "test/test_common/network_utility.h"
 
 #include "absl/types/optional.h"
 
@@ -16,22 +19,23 @@
 namespace Envoy {
 namespace Network {
 
-class TestIoSocketHandle : public IoSocketHandleImpl {
+class TestIoSocketHandle : public Test::IoSocketHandlePlatformImpl {
 public:
-  using WritevOverrideType = absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle,
-                                                                     const Buffer::RawSlice* slices,
-                                                                     uint64_t num_slice);
-  using WritevOverrideProc = std::function<WritevOverrideType>;
+  using WriteOverrideType = absl::optional<Api::IoCallUint64Result>(TestIoSocketHandle* io_handle,
+                                                                    const Buffer::RawSlice* slices,
+                                                                    uint64_t num_slice);
+  using WriteOverrideProc = std::function<WriteOverrideType>;
 
-  TestIoSocketHandle(WritevOverrideProc writev_override_proc, os_fd_t fd = INVALID_SOCKET,
+  TestIoSocketHandle(WriteOverrideProc write_override_proc, os_fd_t fd = INVALID_SOCKET,
                      bool socket_v6only = false, absl::optional<int> domain = absl::nullopt)
-      : IoSocketHandleImpl(fd, socket_v6only, domain), writev_override_(writev_override_proc) {}
+      : Test::IoSocketHandlePlatformImpl(fd, socket_v6only, domain),
+        write_override_(write_override_proc) {}
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override {
     absl::MutexLock lock(&mutex_);
     dispatcher_ = &dispatcher;
-    IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
+    Test::IoSocketHandlePlatformImpl::initializeFileEvent(dispatcher, cb, trigger, events);
   }
 
   // Schedule resumption on the IoHandle by posting a callback to the IoHandle's dispatcher. Note
@@ -46,9 +50,13 @@ public:
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
+  Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
+                                  const Address::Ip* self_ip,
+                                  const Address::Instance& peer_address) override;
+
   IoHandlePtr duplicate() override;
 
-  const WritevOverrideProc writev_override_;
+  const WriteOverrideProc write_override_;
   absl::Mutex mutex_;
   Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(mutex_) = nullptr;
 };
@@ -64,22 +72,22 @@ private:
 class TestSocketInterface : public SocketInterfaceImpl {
 public:
   /**
-   * Override the behavior of the IoSocketHandleImpl::writev() method.
-   * The supplied callback is invoked with the arguments of the writev method and the index
+   * Override the behavior of the IoSocketHandleImpl::writev() and
+   * IoSocketHandleImpl::sendmsg() methods.
+   * The supplied callback is invoked with the slices arguments of the write method and the index
    * of the accepted socket.
    * Returning absl::nullopt from the callback continues normal execution of the
-   * IoSocketHandleImpl::writev() method. Returning a Api::IoCallUint64Result from callback skips
-   * the IoSocketHandleImpl::writev() with the returned result value.
+   * write methods. Returning a Api::IoCallUint64Result from callback skips
+   * the write methods with the returned result value.
    */
-  TestSocketInterface(TestIoSocketHandle::WritevOverrideProc writev)
-      : writev_override_proc_(writev) {}
+  TestSocketInterface(TestIoSocketHandle::WriteOverrideProc write) : write_override_proc_(write) {}
 
 private:
   // SocketInterfaceImpl
   IoHandlePtr makeSocket(int socket_fd, bool socket_v6only,
                          absl::optional<int> domain) const override;
 
-  const TestIoSocketHandle::WritevOverrideProc writev_override_proc_;
+  const TestIoSocketHandle::WriteOverrideProc write_override_proc_;
 };
 
 } // namespace Network

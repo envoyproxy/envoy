@@ -5,27 +5,16 @@
 
 #include <memory>
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/quic/envoy_quic_utils.h"
 
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
 #include "quiche/spdy/core/spdy_header_block.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_utils.h"
-#include "source/common/quic/envoy_quic_server_session.h"
-
-#include "source/common/buffer/buffer_impl.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/http/header_utility.h"
 
 namespace Envoy {
 namespace Quic {
@@ -50,8 +39,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   // send the correct SETTINGS.
 }
 
-void EnvoyQuicServerStream::encode100ContinueHeaders(const Http::ResponseHeaderMap& headers) {
-  ASSERT(headers.Status()->value() == "100");
+void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
+  ASSERT(Http::HeaderUtility::isSpecial1xx(headers));
   encodeHeaders(headers, false);
 }
 
