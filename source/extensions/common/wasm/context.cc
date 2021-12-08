@@ -201,8 +201,8 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   //    N * null-terminated addresses
   uint32_t s = 4; // length
   for (auto& e : response) {
-    s += 4;                                     // for TTL
-    s += e.address_->asStringView().size() + 1; // null terminated.
+    s += 4;                                                // for TTL
+    s += e.addrInfo().address_->asStringView().size() + 1; // null terminated.
   }
   auto buffer = std::unique_ptr<char[]>(new char[s]);
   char* b = buffer.get();
@@ -210,14 +210,14 @@ void Context::onResolveDns(uint32_t token, Envoy::Network::DnsResolver::Resoluti
   safeMemcpyUnsafeDst(b, &n);
   b += sizeof(uint32_t);
   for (auto& e : response) {
-    uint32_t ttl = e.ttl_.count();
+    uint32_t ttl = e.addrInfo().ttl_.count();
     safeMemcpyUnsafeDst(b, &ttl);
     b += sizeof(uint32_t);
   };
   for (auto& e : response) {
-    memcpy(b, e.address_->asStringView().data(), // NOLINT(safe-memcpy)
-           e.address_->asStringView().size());
-    b += e.address_->asStringView().size();
+    memcpy(b, e.addrInfo().address_->asStringView().data(), // NOLINT(safe-memcpy)
+           e.addrInfo().address_->asStringView().size());
+    b += e.addrInfo().address_->asStringView().size();
     *b++ = 0;
   };
   buffer_.set(std::move(buffer), s);

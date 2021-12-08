@@ -65,7 +65,7 @@ Api::SysCallIntResult FakeConnectionSocket::getSocketOption([[maybe_unused]] int
     static_cast<sockaddr_storage*>(optval)->ss_family = AF_INET;
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   return Api::SysCallIntResult{0, 0};
