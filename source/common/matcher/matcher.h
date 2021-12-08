@@ -35,7 +35,7 @@ public:
 };
 
 struct MaybeMatchResult {
-  const ActionPtr result_;
+  const ActionFactoryCb result_;
   const MatchState match_state_;
 };
 
@@ -56,7 +56,7 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
-  return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
+  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;

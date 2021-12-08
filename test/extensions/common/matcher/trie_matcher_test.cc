@@ -161,6 +161,8 @@ matcher_tree:
           prefix_len: 8
         - address_prefix: 192.0.0.0
           prefix_len: 2
+        - address_prefix: 192.0.0.1
+          prefix_len: 32
         on_match:
           action:
             name: test_action
@@ -173,6 +175,10 @@ matcher_tree:
   {
     auto input = TestDataInputFactory("input", "192.0.100.1");
     validateMatch("foo");
+  }
+  {
+    auto input = TestDataInputFactory("input", "192.0.0.1");
+    validateMatch("bar");
   }
   {
     auto input = TestDataInputFactory("input", "255.0.0.1");
@@ -290,6 +296,79 @@ matcher_tree:
     auto input = TestDataInputFactory("input", "192.0.100.1");
     auto nested = TestDataInputFactory("nested", "");
     validateNoMatch();
+  }
+  {
+    auto input = TestDataInputFactory("input", "128.0.0.1");
+    auto nested = TestDataInputFactory("nested", "");
+    validateMatch("foo");
+  }
+}
+
+TEST_F(TrieMatcherTest, RecursiveMatcherTree) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: ip_matcher
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      range_matchers:
+      - ranges:
+        - address_prefix: 0.0.0.0
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: foo
+      - ranges:
+        - address_prefix: 192.0.0.0
+          prefix_len: 2
+        on_match:
+          matcher:
+            matcher_tree:
+              input:
+                name: nested
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+              exact_match_map:
+                map:
+                  bar:
+                    action:
+                      name: test_action
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: bar
+            on_no_match:
+              matcher:
+                matcher_tree:
+                  input:
+                    name: nested
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.StringValue
+                  exact_match_map:
+                    map:
+                      baz:
+                        action:
+                          name: test_action
+                          typed_config:
+                            "@type": type.googleapis.com/google.protobuf.StringValue
+                            value: baz
+  )EOF";
+  loadConfig(yaml);
+
+  {
+    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto nested = TestDataInputFactory("nested", "baz");
+    validateMatch("baz");
+  }
+  {
+    auto input = TestDataInputFactory("input", "192.0.100.1");
+    auto nested = TestDataInputFactory("nested", "bar");
+    validateMatch("bar");
   }
   {
     auto input = TestDataInputFactory("input", "128.0.0.1");

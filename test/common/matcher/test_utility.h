@@ -56,7 +56,7 @@ struct TestInput : public DataInput<TestData> {
 // Self-injecting factory for TestInput.
 class TestDataInputFactory : public DataInputFactory<TestData> {
 public:
-  explicit TestDataInputFactory(absl::string_view factory_name, DataInputGetResult result)
+  TestDataInputFactory(absl::string_view factory_name, DataInputGetResult result)
       : factory_name_(std::string(factory_name)), result_(result), injection_(*this) {}
   TestDataInputFactory(absl::string_view factory_name, absl::string_view data)
       : TestDataInputFactory(factory_name, {DataInputGetResult::DataAvailability::AllDataAvailable,

@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
 
+#include "source/common/matcher/matcher.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/network/utility.h"
 
@@ -17,6 +18,7 @@ namespace Matcher {
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
+using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
@@ -58,8 +60,8 @@ template <class DataType> struct TrieNodeComparator {
 template <class DataType> class TrieMatcher : public MatchTree<DataType> {
 public:
   TrieMatcher(DataInputPtr<DataType>&& data_input,
-              std::unique_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>&& trie)
-      : data_input_(std::move(data_input)), trie_(std::move(trie)) {}
+              const std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>>& trie)
+      : data_input_(std::move(data_input)), trie_(trie) {}
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
@@ -75,6 +77,8 @@ public:
       return {MatchState::MatchComplete, absl::nullopt};
     }
     auto values = trie_->getData(addr);
+    // The candidates returned by the LC trie are not in any specific order, so we
+    // sort them by prefix length first (longest first), order of declaration second.
     std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
     bool first = true;
     for (const auto node : values) {
@@ -84,12 +88,13 @@ public:
       if (node.on_match_->action_cb_) {
         return {MatchState::MatchComplete, OnMatch<DataType>{node.on_match_->action_cb_, nullptr}};
       }
-      auto matched = node.on_match_->matcher_->match(data);
+      // Resume any subtree matching to preserve backtracking progress.
+      auto matched = evaluateMatch(*node.on_match_->matcher_, data);
       if (matched.match_state_ == MatchState::UnableToMatch) {
-        return matched;
+        return {MatchState::UnableToMatch, absl::nullopt};
       }
-      if (matched.match_state_ == MatchState::MatchComplete && matched.on_match_) {
-        return matched;
+      if (matched.match_state_ == MatchState::MatchComplete && matched.result_) {
+        return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
       }
       if (first) {
         first = false;
@@ -100,7 +105,7 @@ public:
 
 private:
   const DataInputPtr<DataType> data_input_;
-  std::unique_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
+  std::shared_ptr<Network::LcTrie::LcTrie<TrieNode<DataType>>> trie_;
 };
 
 template <class DataType>
@@ -119,22 +124,22 @@ public:
     for (const auto& range_matcher : typed_config.range_matchers()) {
       match_children.push_back(*on_match_factory.createOnMatch(range_matcher.on_match()));
     }
-    return [data_input, typed_config, match_children]() {
-      std::vector<std::pair<TrieNode<DataType>, std::vector<Network::Address::CidrRange>>> data;
-      data.reserve(match_children.size());
-      size_t i = 0;
-      // Ranges might have variable prefix length so we cannot combine them into one node because
-      // then the matched prefix length cannot be determined.
-      for (const auto& range_matcher : typed_config.range_matchers()) {
-        auto on_match = std::make_shared<OnMatch<DataType>>(match_children[i++]());
-        for (const auto& range : range_matcher.ranges()) {
-          TrieNode<DataType> node = {i, range.prefix_len().value(), range_matcher.exclusive(),
-                                     on_match};
-          data.push_back({node, {Network::Address::CidrRange::create(range)}});
-        }
+    std::vector<std::pair<TrieNode<DataType>, std::vector<Network::Address::CidrRange>>> data;
+    data.reserve(match_children.size());
+    size_t i = 0;
+    // Ranges might have variable prefix length so we cannot combine them into one node because
+    // then the matched prefix length cannot be determined.
+    for (const auto& range_matcher : typed_config.range_matchers()) {
+      auto on_match = std::make_shared<OnMatch<DataType>>(match_children[i++]());
+      for (const auto& range : range_matcher.ranges()) {
+        TrieNode<DataType> node = {i, range.prefix_len().value(), range_matcher.exclusive(),
+                                   on_match};
+        data.push_back({node, {Network::Address::CidrRange::create(range)}});
       }
-      return std::make_unique<TrieMatcher<DataType>>(
-          data_input(), std::make_unique<Network::LcTrie::LcTrie<TrieNode<DataType>>>(data));
+    }
+    auto lc_trie = std::make_shared<Network::LcTrie::LcTrie<TrieNode<DataType>>>(data);
+    return [data_input, lc_trie]() {
+      return std::make_unique<TrieMatcher<DataType>>(data_input(), lc_trie);
     };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
