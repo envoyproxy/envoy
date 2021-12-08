@@ -39,6 +39,8 @@ envoy_cc_library(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/stream_info:stream_info_interface",
+        "//source/common/http:default_server_string_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
