@@ -10,6 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.cookie.v3";
 option java_outer_classname = "CookieProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/stateful_session/cookie/v3;cookiev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cookie based stateful session extension]
@@ -41,6 +42,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message CookieBasedSessionState {
   // The name of the cookie that will be used to store the encoded upstream host.
   // The value of the cookie is the upstream host address string encoded with base64.
+  // If in the request process, it will pass through multiple Envoy proxies. And multiple
+  // Envoy proxies use this feature. Please keep the name different so as not to confuse
+  // the content of the cookie.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // If specified, a TTL will be added to new session state cookies in the set-cookie header.
