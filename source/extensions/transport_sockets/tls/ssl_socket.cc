@@ -182,8 +182,13 @@ void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
   auto* sni = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
   callbacks_->connection().connectionInfoProvider().setRequestedServerName(sni);
-  callbacks_->connection().streamInfo().upstreamTiming().onUpstreamHandshakeComplete(
-      callbacks_->connection().dispatcher().timeSource());
+  if (callbacks_->connection().streamInfo().upstreamInfo()) {
+    callbacks_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamTiming()
+        .onUpstreamHandshakeComplete(callbacks_->connection().dispatcher().timeSource());
+  }
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 

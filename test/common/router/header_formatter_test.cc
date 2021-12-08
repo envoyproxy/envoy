@@ -106,7 +106,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestformatWithUpstreamRemoteAddressVariabl
   testFormatting("UPSTREAM_REMOTE_ADDRESS", "10.0.0.1:443");
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-  stream_info.host_.reset();
+  stream_info.upstreamInfo()->setUpstreamHost(nullptr);
   testFormatting(stream_info, "UPSTREAM_REMOTE_ADDRESS", "");
 }
 
@@ -150,6 +150,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestedServerNameVariable)
   const std::string requested_server_name = "foo.bar";
   stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
   testFormatting(stream_info, "REQUESTED_SERVER_NAME", requested_server_name);
+}
+
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithVirtualClusterNameVariable) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  // Validate for empty VC
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", "");
+
+  // Validate for a valid VC
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
+  testFormatting(stream_info, "VIRTUAL_CLUSTER_NAME", virtual_cluster_name);
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithDownstreamPeerUriSanVariableSingleSan) {
@@ -592,7 +603,7 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   EXPECT_EQ(nested_struct.fields().at("list_key").kind_case(), ProtobufWkt::Value::kListValue);
   EXPECT_EQ(nested_struct.fields().at("struct_key").kind_case(), ProtobufWkt::Value::kStructValue);
 
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // Top-level value.
@@ -666,7 +677,7 @@ TEST_F(StreamInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
@@ -847,6 +858,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {R"EOF(%UPSTREAM_METADATA(["\"quoted\"", "\"key\""])%)EOF", {"value"}, {}},
       {"%UPSTREAM_REMOTE_ADDRESS%", {"10.0.0.1:443"}, {}},
       {"%REQUESTED_SERVER_NAME%", {"foo.bar"}, {}},
+      {"%VIRTUAL_CLUSTER_NAME%", {"authN"}, {}},
       {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%REQ(x-request-id)%", {"123"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
@@ -946,12 +958,14 @@ TEST(HeaderParserTest, TestParseInternal) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   const std::string requested_server_name = "foo.bar";
   stream_info.downstream_connection_info_provider_->setRequestedServerName(requested_server_name);
+  const std::string virtual_cluster_name = "authN";
+  stream_info.setVirtualClusterName(virtual_cluster_name);
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(stream_info, protocol()).WillByDefault(ReturnPointee(&protocol));
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   Http::TestRequestHeaderMapImpl request_headers;
   request_headers.addCopy(Http::LowerCaseString(std::string("x-request-id")), 123);
@@ -1127,7 +1141,7 @@ request_headers_to_add:
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_FALSE(header_map.has("x-key"));
@@ -1202,7 +1216,7 @@ request_headers_to_remove: ["x-nope"]
 
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
-  ON_CALL(stream_info, upstreamHost()).WillByDefault(Return(host));
+  stream_info.upstreamInfo()->setUpstreamHost(host);
 
   // Metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>(
