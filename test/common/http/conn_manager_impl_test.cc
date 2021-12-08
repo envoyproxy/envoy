@@ -3693,8 +3693,9 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
 class ProxyStatusTest : public HttpConnectionManagerImplTest {
 public:
   void initialize() {
-    setup(false, servername_, false);
-    setUpEncoderAndDecoder(false, false);
+    setup(/*ssl=*/false, servername_, /*tracing=*/false);
+    setUpEncoderAndDecoder(/*request_with_data_and_trailers=*/false,
+                           /*decode_headers_stop_all=*/false);
     sendRequestHeadersAndData();
   }
   const ResponseHeaderMap*
@@ -3735,7 +3736,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, "foo");
+      sendRequestWith(403, StreamInfo::ResponseFlag::FailedLocalHealthCheck, /*details=*/"foo");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3758,7 +3759,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3783,7 +3784,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "bar");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"bar");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3807,7 +3808,7 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   initialize();
 
   const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz");
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz");
 
   ASSERT_TRUE(altered_headers);
   ASSERT_TRUE(altered_headers->ProxyStatus());
@@ -3829,14 +3830,28 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
 
   initialize();
 
-  const ResponseHeaderMap* altered_headers =
-      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, "baz", "SomeCDN");
+  {
+    const ResponseHeaderMap* altered_headers =
+        sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+                        /*proxy_status=*/"SomeCDN");
 
-  ASSERT_TRUE(altered_headers);
-  ASSERT_TRUE(altered_headers->ProxyStatus());
-  // Expect to see the appended previous value: "SomeCDN; envoy; ...".
-  EXPECT_EQ(altered_headers->getProxyStatusValue(),
-            "SomeCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
+    ASSERT_TRUE(altered_headers);
+    ASSERT_TRUE(altered_headers->ProxyStatus());
+    // Expect to see the appended previous value: "SomeCDN; envoy; ...".
+    EXPECT_EQ(altered_headers->getProxyStatusValue(),
+              "SomeCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
+  }
+  {
+    const ResponseHeaderMap* altered_headers =
+        sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+                        /*proxy_status=*/"SomeCDN, OtherCDN");
+
+    ASSERT_TRUE(altered_headers);
+    ASSERT_TRUE(altered_headers->ProxyStatus());
+    // Expect to see the appended previous value: "SomeCDN; envoy; ...".
+    EXPECT_EQ(altered_headers->getProxyStatusValue(),
+              "SomeCDN, OtherCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
+  }
 
   teardown();
 }
