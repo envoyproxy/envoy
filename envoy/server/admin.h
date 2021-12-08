@@ -74,6 +74,14 @@ public:
  */
 class Admin {
 public:
+  struct Param {
+    enum class Type { Boolean, Integer, String };
+    const Type type_;
+    const std::string name_;
+    const std::string default_value_;
+  };
+  using ParamVec = std::vector<Param>;
+
   virtual ~Admin() = default;
 
   /**
@@ -100,7 +108,8 @@ public:
    * @return bool true if the handler was added, false if it was not added.
    */
   virtual bool addHandler(const std::string& prefix, const std::string& help_text,
-                          HandlerCb callback, bool removable, bool mutates_server_state) PURE;
+                          HandlerCb callback, bool removable, bool mutates_server_state,
+                          const ParamVec& params) PURE;
 
   /**
    * Remove an admin handler if it is removable.

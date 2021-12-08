@@ -82,7 +82,7 @@ public:
   //
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable, bool mutates_server_state) override;
+                  bool removable, bool mutates_server_state, const ParamVec& params) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -217,6 +217,7 @@ private:
     const HandlerCb handler_;
     const bool removable_;
     const bool mutates_server_state_;
+    const ParamVec params_;
   };
 
   /**

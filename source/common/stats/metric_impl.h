@@ -48,6 +48,19 @@ public:
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
 
+  struct LessThan {
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    bool operator()(const Metric* a, const Metric* b) const {
+      return a->constSymbolTable().lessThan(a->statName(), b->statName());
+    }
+    bool operator()(const Metric* a, StatName b) const {
+      return a->constSymbolTable().lessThan(a->statName(), b);
+    }
+    bool operator()(StatName a, const Metric* b) const {
+      return b->constSymbolTable().lessThan(a, b->statName());
+    }
+  };
+
 private:
   StatNameList stat_names_;
 };
