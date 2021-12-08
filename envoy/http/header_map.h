@@ -356,6 +356,7 @@ private:
   HEADER_FUNC(EnvoyDecoratorOperation)                                                             \
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(ProxyConnection)                                                                     \
+  HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
