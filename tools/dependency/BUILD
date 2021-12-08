@@ -24,20 +24,12 @@ py_library(
 
 py_binary(
     name = "cve_scan",
-    srcs = [
-        "cve_scan.py",
-        "utils.py",
-    ],
-    data = [
-        ":exports",
-    ],
-)
-
-py_binary(
-    name = "cve_scan_test",
-    srcs = ["cve_scan_test.py"],
-    data = [
-        ":cve_scan",
+    srcs = ["cve_scan.py"],
+    args = ["$(location :cve.yaml)"],
+    data = [":cve.yaml"],
+    deps = [
+        ":utils",
+        requirement("envoy.dependency.cve_scan"),
     ],
 )
 

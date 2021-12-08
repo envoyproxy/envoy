@@ -9,9 +9,11 @@ Extensions
 
   filter/filter
   accesslog/accesslog
+  accesslog/filters
   rbac/rbac
   health_checker/health_checker
   transport_socket/transport_socket
+  dns_resolver/dns_resolver.rst
   resource_monitor/resource_monitor
   common/common
   compression/compression

@@ -86,9 +86,9 @@ JSON_STRING_TO_MESSAGE_ALLOWLIST = (
 # Histogram names which are allowed to be suffixed with the unit symbol, all of the pre-existing
 # ones were grandfathered as part of PR #8484 for backwards compatibility.
 HISTOGRAM_WITH_SI_SUFFIX_ALLOWLIST = (
-    "downstream_cx_length_ms", "downstream_cx_length_ms", "initialization_time_ms",
-    "loop_duration_us", "poll_delay_us", "request_time_ms", "upstream_cx_connect_ms",
-    "upstream_cx_length_ms")
+    "cx_rtt_us", "cx_rtt_variance_us", "downstream_cx_length_ms", "downstream_cx_length_ms",
+    "initialization_time_ms", "loop_duration_us", "poll_delay_us", "request_time_ms",
+    "upstream_cx_connect_ms", "upstream_cx_length_ms")
 
 # Files in these paths can use std::regex
 STD_REGEX_ALLOWLIST = (
@@ -266,10 +266,8 @@ UNOWNED_EXTENSIONS = {
 
 UNSORTED_FLAGS = {
   "envoy.reloadable_features.activate_timers_next_event_loop",
-  "envoy.reloadable_features.check_ocsp_policy",
   "envoy.reloadable_features.grpc_json_transcoder_adhere_to_buffer_limits",
-  "envoy.reloadable_features.upstream_http2_flood_checks",
-  "envoy.reloadable_features.header_map_correctly_coalesce_cookies",
+  "envoy.reloadable_features.sanitize_http_header_referer",
 }
 # yapf: enable
 
@@ -531,7 +529,8 @@ class FormatChecker:
                 continue
             if "}" in line:
                 break
-
+            if "//" in line:
+                continue
             match = FLAG_REGEX.match(line)
             if not match:
                 error_messages.append("%s does not look like a reloadable flag" % line)
@@ -682,9 +681,11 @@ class FormatChecker:
             if "RealTimeSource" in line or \
               ("RealTimeSystem" in line and not "TestRealTimeSystem" in line) or \
               "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
-              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line):
+              "std::this_thread::sleep_for" in line or self.has_cond_var_wait_for(line) or \
+              " usleep(" in line or "::usleep(" in line:
                 report_error(
-                    "Don't reference real-world time sources from production code; use injection")
+                    "Don't reference real-world time sources; use TimeSystem::advanceTime(Wait|Async)"
+                )
         duration_arg = DURATION_VALUE_REGEX.search(line)
         if duration_arg and duration_arg.group(1) != "0" and duration_arg.group(1) != "0.0":
             # Matching duration(int-const or float-const) other than zero
@@ -1172,7 +1173,7 @@ if __name__ == "__main__":
         owned = []
         maintainers = [
             '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
-            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente'
+            '@yanavlasov', '@junr03', '@dio', '@jmarantz', '@antoniovicente', '@ggreenway'
         ]
 
         try:

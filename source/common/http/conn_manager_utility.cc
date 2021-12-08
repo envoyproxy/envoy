@@ -187,8 +187,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
-  if (!request_headers.Scheme() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!request_headers.Scheme()) {
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
@@ -259,6 +258,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     rid_extension->set(request_headers, force_set);
   }
 
+  if (connection.connecting() && request_headers.get(Headers::get().EarlyData).empty()) {
+    // Add an Early-Data header to indicate that this is a 0-RTT request according to
+    // https://datatracker.ietf.org/doc/html/rfc8470#section-5.1.
+    HeaderString value;
+    value.setCopy("1");
+    request_headers.addViaMove(HeaderString(Headers::get().EarlyData), std::move(value));
+  }
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return {final_remote_address, absl::nullopt};

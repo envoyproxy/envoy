@@ -6,6 +6,7 @@
 #include "source/common/stats/histogram_impl.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Server {
@@ -24,6 +25,22 @@ std::string sanitizeName(const absl::string_view name) {
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   // The initial [a-zA-Z_] constraint is always satisfied by the namespace prefix.
   return promRegex().replaceAll(name, "_");
+}
+
+/**
+ * Take tag values and sanitize it for text serialization, according to
+ * Prometheus conventions.
+ */
+std::string sanitizeValue(const absl::string_view value) {
+  // Removes problematic characters from Prometheus tag values to prevent
+  // text serialization issues. This matches the prometheus text formatting code:
+  // https://github.com/prometheus/common/blob/88f1636b699ae4fb949d292ffb904c205bf542c9/expfmt/text_create.go#L419-L420.
+  // The goal is to replace '\' with "\\", newline with "\n", and '"' with "\"".
+  return absl::StrReplaceAll(value, {
+                                        {R"(\)", R"(\\)"},
+                                        {"\n", R"(\n)"},
+                                        {R"(")", R"(\")"},
+                                    });
 }
 
 /*
@@ -188,7 +205,7 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   std::vector<std::string> buf;
   buf.reserve(tags.size());
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeValue(tag.value_)));
   }
   return absl::StrJoin(buf, ",");
 }

@@ -21,8 +21,8 @@ MSYS_NT-*-x86_64)
 esac
 
 # Bazel magic.
-ROOT=$$(dirname $(rootpath wee8/BUILD.gn))/..
-pushd $$ROOT/wee8
+ROOT=$$(dirname $(rootpath BUILD.gn))
+pushd $$ROOT
 
 # Clean after previous build.
 rm -rf out/wee8
@@ -79,8 +79,9 @@ fi
 
 # Clang or not Clang, that is the question.
 WEE8_BUILD_ARGS+=" is_clang=$$IS_CLANG"
+WEE8_BUILD_ARGS+=" use_lld=$$IS_CLANG"
 # Hack to disable bleeding-edge compiler flags.
-WEE8_BUILD_ARGS+=" use_xcode_clang=true"
+WEE8_BUILD_ARGS+=" use_xcode_clang=$$IS_CLANG"
 # Use local toolchain.
 WEE8_BUILD_ARGS+=" custom_toolchain=\"//build/toolchain/linux/unbundle:default\""
 # Use local stdlibc++ / libc++.
@@ -99,6 +100,11 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
+
+# Disable lld on Darwin since it's not vendored with Xcode
+if [[ $${SYSTEM} == Darwin ]]; then
+  WEE8_BUILD_ARGS+=" use_lld=false"
+fi
 
 # Set target architecture.
 if [[ $${ARCH} == "x86_64" ]]; then
@@ -131,7 +137,7 @@ else
 fi
 
 # Select ninja tool for the current platform.
-if [[ $${PLATFORM} == "Darwin-x86_64" ]]; then
+if [[ $${SYSTEM} == "Darwin" ]]; then
   ninja=third_party/depot_tools/ninja-mac
 elif [[ $${PLATFORM} == "Linux-x86_64" ]]; then
   ninja=third_party/depot_tools/ninja-linux64
@@ -148,4 +154,4 @@ fi
 
 # Move compiled library to the expected destinations.
 popd
-mv $$ROOT/wee8/out/wee8/obj/libwee8.a $(execpath libwee8.a)
+mv $$ROOT/out/wee8/obj/libwee8.a $(execpath libwee8.a)

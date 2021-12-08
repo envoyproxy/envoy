@@ -2,19 +2,9 @@
 
 #include "envoy/buffer/buffer.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Winvalid-offsetof"
-#endif
+#include "source/common/quic/envoy_quic_stream.h"
 
 #include "quiche/quic/core/http/quic_spdy_client_stream.h"
-
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-#include "source/common/quic/envoy_quic_stream.h"
 
 namespace Envoy {
 namespace Quic {
@@ -84,7 +74,7 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 
-  bool decoded_100_continue_{false};
+  bool decoded_1xx_{false};
 };
 
 } // namespace Quic

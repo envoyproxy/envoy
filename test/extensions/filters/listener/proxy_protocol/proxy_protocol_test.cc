@@ -87,6 +87,9 @@ public:
   Network::UdpListenerConfigOptRef udpListenerConfig() override {
     return Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return Network::InternalListenerConfigOptRef();
+  }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -96,6 +99,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   Init::Manager& initManager() override { return *init_manager_; }
+  bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -703,7 +707,7 @@ TEST_P(ProxyProtocolTest, Fragmented) {
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented1) {
-  // A well-formed ipv4/tcp header, delivering part of the signature, then part of
+  // A well-formed ipv4/tcp message, delivering part of the signature, then part of
   // the address, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -725,7 +729,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented1) {
 }
 
 TEST_P(ProxyProtocolTest, V2Fragmented2) {
-  // A well-formed ipv4/tcp header, delivering all of the signature + 1, then the remainder
+  // A well-formed ipv4/tcp message, delivering all of the header + 1, then the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
@@ -746,8 +750,32 @@ TEST_P(ProxyProtocolTest, V2Fragmented2) {
   disconnect();
 }
 
-TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
-  // A well-formed ipv4/tcp header, delivering all of the signature +1, w/ an error
+TEST_P(ProxyProtocolTest, V2Fragmented3) {
+  // A well-formed ipv4/tcp message, delivering all of the header, then the remainder.
+  // Do not mistakenly consider that remote has closed when it happens to only read the
+  // header of the message. See: https://github.com/envoyproxy/envoy/pull/18304
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  connect();
+  write(buffer, 16);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  write(buffer + 16, 10);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  write(buffer + 26, 11);
+
+  expectData("more data");
+
+  EXPECT_EQ(server_connection_->connectionInfoProvider().remoteAddress()->ip()->addressAsString(),
+            "1.2.3.4");
+  EXPECT_TRUE(server_connection_->connectionInfoProvider().localAddressRestored());
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
+  // A well-formed ipv4/tcp message, delivering all of the header +1, w/ an error
   // simulated in recv() on the +1
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -813,8 +841,8 @@ TEST_P(ProxyProtocolTest, V2Fragmented3Error) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
-  // A well-formed ipv4/tcp header, part of the signature with an error introduced
+TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
+  // A well-formed ipv4/tcp message, part of the signature with an error introduced
   // in recv() on the remainder
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -1331,6 +1359,9 @@ public:
   Network::UdpListenerConfigOptRef udpListenerConfig() override {
     return Network::UdpListenerConfigOptRef();
   }
+  Network::InternalListenerConfigOptRef internalListenerConfig() override {
+    return Network::InternalListenerConfigOptRef();
+  }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;
   }
@@ -1340,6 +1371,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   Init::Manager& initManager() override { return *init_manager_; }
+  bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

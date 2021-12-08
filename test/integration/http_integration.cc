@@ -77,11 +77,20 @@ IntegrationCodecClient::IntegrationCodecClient(
     Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
     Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
     Http::CodecType type)
+    : IntegrationCodecClient(dispatcher, random, std::move(conn), std::move(host_description), type,
+                             true) {}
+
+IntegrationCodecClient::IntegrationCodecClient(
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& random,
+    Network::ClientConnectionPtr&& conn, Upstream::HostDescriptionConstSharedPtr host_description,
+    Http::CodecType type, bool wait_till_connected)
     : CodecClientProd(type, std::move(conn), host_description, dispatcher, random),
-      dispatcher_(dispatcher), callbacks_(*this), codec_callbacks_(*this) {
+      dispatcher_(dispatcher), callbacks_(*this, wait_till_connected), codec_callbacks_(*this) {
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  if (wait_till_connected) {
+    dispatcher.run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -203,12 +212,14 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
   parent_.last_connection_event_ = event;
   if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
-    parent_.connection_->dispatcher().exit();
+    if (block_till_connected_) {
+      parent_.connection_->dispatcher().exit();
+    }
   } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
-    if (parent_.type() == Http::CodecType::HTTP3 && !parent_.connected_) {
+    if (parent_.type() == Http::CodecType::HTTP3 && !parent_.connected_ && block_till_connected_) {
       // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
       // connection may fail of INVALID_VERSION if both this client doesn't support any of the
       // versions the server advertised before handshake established. In this case the connection is
@@ -433,11 +444,15 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 void HttpIntegrationTest::sendRequestAndVerifyResponse(
     const Http::TestRequestHeaderMapImpl& request_headers, const int request_size,
     const Http::TestResponseHeaderMapImpl& response_headers, const int response_size,
-    const int backend_idx) {
+    const int backend_idx,
+    absl::optional<const Http::TestResponseHeaderMapImpl> expected_response_headers) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = sendRequestAndWaitForResponse(request_headers, request_size, response_headers,
                                                 response_size, backend_idx);
-  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+  verifyResponse(std::move(response), "200",
+                 (expected_response_headers.has_value()) ? *expected_response_headers
+                                                         : response_headers,
+                 std::string(response_size, 'a'));
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
@@ -940,9 +955,8 @@ void HttpIntegrationTest::testGrpcRetry() {
   }
 }
 
-void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_from_upstream,
-                                                       const std::string& via,
-                                                       bool disconnect_after_100) {
+void HttpIntegrationTest::testEnvoyHandling1xx(bool additional_continue_from_upstream,
+                                               const std::string& via, bool disconnect_after_100) {
   useAccessLog("%RESPONSE_CODE%");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -957,7 +971,7 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   auto response = std::move(encoder_decoder.second);
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   // The continue headers should arrive immediately.
-  response->waitForContinueHeaders();
+  response->waitFor1xxHeaders();
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send the rest of the request.
@@ -976,12 +990,11 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
   if (additional_continue_from_upstream) {
     // Make sure if upstream sends an 100-Continue Envoy doesn't send its own and proxy the one
     // from upstream!
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
+    upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
   }
 
   if (disconnect_after_100) {
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
     codec_client_->close();
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("100"));
     ASSERT_TRUE(fake_upstream_connection_->close());
@@ -993,9 +1006,9 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
-  ASSERT(response->continueHeaders() != nullptr);
-  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
-  EXPECT_EQ(nullptr, response->continueHeaders()->Via());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ("100", response->informationalHeaders()->getStatusValue());
+  EXPECT_EQ(nullptr, response->informationalHeaders()->Via());
   EXPECT_EQ("200", response->headers().getStatusValue());
   if (via.empty()) {
     EXPECT_EQ(nullptr, response->headers().Via());
@@ -1007,7 +1020,8 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 
 void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_complete,
                                                bool with_encoder_filter,
-                                               bool with_multiple_1xx_headers) {
+                                               bool with_multiple_1xx_headers,
+                                               absl::string_view initial_code) {
   if (with_encoder_filter) {
     // Add a filter to make sure 100s play well with them.
     config_helper_.prependFilter("name: passthrough-filter");
@@ -1031,43 +1045,39 @@ void HttpIntegrationTest::testEnvoyProxying1xx(bool continue_before_upstream_com
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
+  // This case tests sending on 100-Continue headers before the client has sent all the
+  // request data.
   if (continue_before_upstream_complete) {
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
-    // This case tests sending on 100-Continue headers before the client has sent all the
-    // request data.
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
   }
   // Send all of the request data and wait for it to be received upstream.
   codec_client_->sendData(*request_encoder_, 10, true);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
+  // This case tests forwarding 100-Continue after the client has sent all data.
   if (!continue_before_upstream_complete) {
+    upstream_request_->encode1xxHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", initial_code.data()}});
     if (with_multiple_1xx_headers) {
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
       upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "102"}}, false);
-      upstream_request_->encode100ContinueHeaders(
-          Http::TestResponseHeaderMapImpl{{":status", "100"}});
+      upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
     }
-    // This case tests forwarding 100-Continue after the client has sent all data.
-    upstream_request_->encode100ContinueHeaders(
-        Http::TestResponseHeaderMapImpl{{":status", "100"}});
-    response->waitForContinueHeaders();
+    response->waitFor1xxHeaders();
   }
   // Now send the rest of the response.
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  ASSERT(response->continueHeaders() != nullptr);
-  EXPECT_EQ("100", response->continueHeaders()->getStatusValue());
+  ASSERT(response->informationalHeaders() != nullptr);
+  EXPECT_EQ(initial_code, response->informationalHeaders()->getStatusValue());
 
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

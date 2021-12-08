@@ -6,6 +6,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/socket_interface_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/types/optional.h"
@@ -96,15 +97,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::readv(uint64_t max_length, Buffer::R
   ASSERT(num_bytes_to_read <= max_length);
   auto result = sysCallResultToIoCallResult(Api::OsSysCallsSingleton::get().readv(
       fd_, iov.begin(), static_cast<int>(num_slices_to_read)));
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
   return result;
 }
 
@@ -120,15 +112,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::read(Buffer::Instance& buffer,
   uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
   ASSERT(bytes_to_commit <= max_length);
   reservation.commit(bytes_to_commit);
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
   return result;
 }
 
@@ -148,15 +131,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::writev(const Buffer::RawSlice* slice
   }
   auto result = sysCallResultToIoCallResult(
       Api::OsSysCallsSingleton::get().writev(fd_, iov.begin(), num_slices_to_write));
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to write without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-    }
-  }
   return result;
 }
 
@@ -166,15 +140,6 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
   Api::IoCallUint64Result result = writev(slices.begin(), slices.size());
   if (result.ok() && result.return_value_ > 0) {
     buffer.drain(static_cast<uint64_t>(result.return_value_));
-  }
-
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    // Some tests try to read without initializing the file_event.
-    if (result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-    }
   }
   return result;
 }
@@ -213,15 +178,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
     message.msg_control = nullptr;
     message.msg_controllen = 0;
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-      }
-    }
-    return io_result;
+    return sysCallResultToIoCallResult(result);
   } else {
     const size_t space_v6 = CMSG_SPACE(sizeof(in6_pktinfo));
     const size_t space_v4 = CMSG_SPACE(sizeof(in_pktinfo));
@@ -263,15 +220,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
       *(reinterpret_cast<absl::uint128*>(pktinfo->ipi6_addr.s6_addr)) = self_ip->ipv6()->address();
     }
     const Api::SysCallSizeResult result = os_syscalls.sendmsg(fd_, &message, flags);
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Write);
-      }
-    }
-    return io_result;
+    return sysCallResultToIoCallResult(result);
   }
 }
 
@@ -343,15 +292,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
   Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recvmsg(fd_, &hdr, messageTruncatedOption());
   if (result.return_value_ < 0) {
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-      }
-    }
-    return io_result;
+    return sysCallResultToIoCallResult(result);
   }
   if ((hdr.msg_flags & MSG_TRUNC) != 0) {
     ENVOY_LOG_MISC(debug, "Dropping truncated UDP packet with size: {}.", result.return_value_);
@@ -442,15 +383,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
                                                messageTruncatedOption() | MSG_WAITFORONE, nullptr);
 
   if (result.return_value_ <= 0) {
-    auto io_result = sysCallResultToIoCallResult(result);
-    // Emulated edge events need to registered if the socket operation did not complete
-    // because the socket would block.
-    if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-      if (io_result.wouldBlock() && file_event_) {
-        file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-      }
-    }
-    return io_result;
+    return sysCallResultToIoCallResult(result);
   }
 
   int num_packets_read = result.return_value_;
@@ -504,15 +437,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
 Api::IoCallUint64Result IoSocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   const Api::SysCallSizeResult result =
       Api::OsSysCallsSingleton::get().recv(fd_, buffer, length, flags);
-  auto io_result = sysCallResultToIoCallResult(result);
-  // Emulated edge events need to registered if the socket operation did not complete
-  // because the socket would block.
-  if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    if (io_result.wouldBlock() && file_event_) {
-      file_event_->registerEventIfEmulatedEdge(Event::FileReadyType::Read);
-    }
-  }
-  return io_result;
+  return sysCallResultToIoCallResult(result);
 }
 
 bool IoSocketHandleImpl::supportsMmsg() const {
@@ -536,8 +461,8 @@ IoHandlePtr IoSocketHandleImpl::accept(struct sockaddr* addr, socklen_t* addrlen
   if (SOCKET_INVALID(result.return_value_)) {
     return nullptr;
   }
-
-  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPtr address) {
@@ -571,7 +496,8 @@ IoHandlePtr IoSocketHandleImpl::duplicate() {
   RELEASE_ASSERT(result.return_value_ != -1,
                  fmt::format("duplicate failed for '{}': ({}) {}", fd_, result.errno_,
                              errorDetails(result.errno_)));
-  return std::make_unique<IoSocketHandleImpl>(result.return_value_, socket_v6only_, domain_);
+  return SocketInterfaceImpl::makePlatformSpecificSocket(result.return_value_, socket_v6only_,
+                                                         domain_);
 }
 
 absl::optional<int> IoSocketHandleImpl::domain() { return domain_; }

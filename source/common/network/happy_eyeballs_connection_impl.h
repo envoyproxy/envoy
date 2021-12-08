@@ -32,7 +32,8 @@ namespace Network {
  * TODO(RyanTheOptimist): Implement the Happy Eyeballs address sorting algorithm
  * either in the class or in the resolution code.
  */
-class HappyEyeballsConnectionImpl : public ClientConnection {
+class HappyEyeballsConnectionImpl : public ClientConnection,
+                                    Logger::Loggable<Logger::Id::happy_eyeballs> {
 public:
   HappyEyeballsConnectionImpl(Event::Dispatcher& dispatcher,
                               const std::vector<Address::InstanceConstSharedPtr>& address_list,
@@ -96,6 +97,14 @@ public:
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  // Returns a new vector containing the contents of |address_list| sorted
+  // with address families interleaved, as per Section 4 of RFC 8305, Happy
+  // Eyeballs v2. It is assumed that the list must already be sorted as per
+  // Section 6 of RFC6724, which happens in the DNS implementations (ares_getaddrinfo()
+  // and Apple DNS).
+  static std::vector<Address::InstanceConstSharedPtr>
+  sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which
@@ -161,7 +170,7 @@ private:
     absl::optional<bool> detect_early_close_when_read_disabled_;
     absl::optional<bool> no_delay_;
     absl::optional<bool> enable_half_close_;
-    OptRef<const ConnectionStats> connection_stats_;
+    std::unique_ptr<ConnectionStats> connection_stats_;
     absl::optional<uint32_t> buffer_limits_;
     absl::optional<bool> start_secure_transport_;
     absl::optional<std::chrono::milliseconds> delayed_close_timeout_;
@@ -195,7 +204,7 @@ private:
   Event::Dispatcher& dispatcher_;
 
   // List of addresses to attempt to connect to.
-  const std::vector<Address::InstanceConstSharedPtr>& address_list_;
+  const std::vector<Address::InstanceConstSharedPtr> address_list_;
   // Index of the next address to use.
   size_t next_address_ = 0;
 

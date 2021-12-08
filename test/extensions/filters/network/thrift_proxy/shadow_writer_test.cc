@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/tcp/conn_pool.h"
 
@@ -38,14 +39,16 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
 class ShadowWriterTest : public testing::Test {
 public:
   ShadowWriterTest() {
-    shadow_writer_ = std::make_shared<ShadowWriterImpl>(cm_, "test", context_.scope(), dispatcher_,
-                                                        context_.threadLocal());
+    stats_ = std::make_shared<const RouterStats>("test", context_.scope(), context_.localInfo());
+    shadow_writer_ =
+        std::make_shared<ShadowWriterImpl>(cm_, *stats_, dispatcher_, context_.threadLocal());
     metadata_ = std::make_shared<MessageMetadata>();
     metadata_->setMethodName("ping");
     metadata_->setMessageType(MessageType::Call);
     metadata_->setSequenceId(1);
-
+    upstream_locality_.set_zone("other_zone_name");
     host_ = std::make_shared<NiceMock<Upstream::MockHost>>();
+    ON_CALL(*host_, locality()).WillByDefault(ReturnRef(upstream_locality_));
   }
 
   void testPoolReady(bool oneway = false) {
@@ -185,19 +188,35 @@ public:
       EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
                          .counterFromString("thrift.upstream_resp_reply")
                          .value());
+      EXPECT_EQ(1UL,
+                cluster_.cluster_.info_->statsScope()
+                    .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_reply")
+                    .value());
       if (success) {
         EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
                            .counterFromString("thrift.upstream_resp_success")
+                           .value());
+        EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
+                           .counterFromString(
+                               "zone.zone_name.other_zone_name.thrift.upstream_resp_success")
                            .value());
       } else {
         EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
                            .counterFromString("thrift.upstream_resp_error")
                            .value());
+        EXPECT_EQ(
+            1UL, cluster_.cluster_.info_->statsScope()
+                     .counterFromString("zone.zone_name.other_zone_name.thrift.upstream_resp_error")
+                     .value());
       }
       break;
     case MessageType::Exception:
       EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
                          .counterFromString("thrift.upstream_resp_exception")
+                         .value());
+      EXPECT_EQ(1UL, cluster_.cluster_.info_->statsScope()
+                         .counterFromString(
+                             "zone.zone_name.other_zone_name.thrift.upstream_resp_exception")
                          .value());
       break;
     default:
@@ -251,6 +270,8 @@ public:
   MessageMetadataSharedPtr metadata_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
   std::shared_ptr<NiceMock<Upstream::MockHost>> host_;
+  envoy::config::core::v3::Locality upstream_locality_;
+  std::shared_ptr<const RouterStats> stats_;
   std::shared_ptr<ShadowWriterImpl> shadow_writer_;
 };
 

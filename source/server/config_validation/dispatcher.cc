@@ -15,14 +15,9 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
                                                              std::move(transport_socket), options);
 }
 
-Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&,
-    const envoy::config::core::v3::DnsResolverOptions&) {
-  return dns_resolver_;
-}
-
 Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&, bool) {
+                                                          Network::TcpListenerCallbacks&, bool,
+                                                          bool) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

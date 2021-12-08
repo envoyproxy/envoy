@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/api/io_error.h"
+#include "envoy/api/os_sys_calls_common.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/file_event.h"
@@ -108,6 +109,7 @@ public:
    * Send a message to the address.
    * @param slices points to the location of data to be sent.
    * @param num_slice indicates number of slices |slices| contains.
+   * @param flags flags to pass to the underlying sendmsg function (see man 2 sendmsg).
    * @param self_ip is the source address whose port should be ignored. Nullptr
    * if caller wants kernel to select source address.
    * @param peer_address is the destination address.
@@ -202,7 +204,6 @@ public:
   /**
    * Bind to address. The handle should have been created with a call to socket()
    * @param address address to bind to.
-   * @param addrlen address length
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */
@@ -220,7 +221,6 @@ public:
    * Accept on listening handle
    * @param addr remote address to be returned
    * @param addrlen remote address length
-   * @param flags flags to be applied to accepted session
    * @return accepted IoHandlePtr
    */
   virtual std::unique_ptr<IoHandle> accept(struct sockaddr* addr, socklen_t* addrlen) PURE;
@@ -229,7 +229,6 @@ public:
    * Connect to address. The handle should have been created with a call to socket()
    * on this object.
    * @param address remote address to connect to.
-   * @param addrlen remote address length
    * @return a Api::SysCallIntResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
    *   is successful, errno_ shouldn't be used.
    */

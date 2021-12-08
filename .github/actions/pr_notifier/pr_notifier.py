@@ -30,6 +30,7 @@ MAINTAINERS = {
     'asraa': 'UKZKCFRTP',
     'davinci26': 'U013608CUDV',
     'rojkov': 'UH5EXLYQK',
+    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # First pass reviewers who are not maintainers should get
@@ -43,7 +44,6 @@ FIRST_PASS = {
     'KBaichoo': 'U016ZPU8KBK',
     'wbpcode': 'U017KF5C0Q6',
     'mathetake': 'UG9TD2FSB',
-    'RyanTheOptimist': 'U01SW3JC8GP',
 }
 
 # Only notify API reviewers who aren't maintainers.

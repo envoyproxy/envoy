@@ -21,9 +21,10 @@ public:
       : failover_timer_(new testing::StrictMock<Event::MockTimer>(&dispatcher_)),
         transport_socket_options_(std::make_shared<TransportSocketOptionsImpl>()),
         options_(std::make_shared<ConnectionSocket::Options>()),
-        address_list_({std::make_shared<Address::Ipv4Instance>("127.0.0.1"),
-                       std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
-                       std::make_shared<Address::Ipv4Instance>("127.0.0.3")}) {
+        raw_address_list_({std::make_shared<Address::Ipv4Instance>("127.0.0.1"),
+                           std::make_shared<Address::Ipv4Instance>("127.0.0.2"),
+                           std::make_shared<Address::Ipv6Instance>("ff02::1", 0)}),
+        address_list_({raw_address_list_[0], raw_address_list_[2], raw_address_list_[1]}) {
     EXPECT_CALL(transport_socket_factory_, createTransportSocket(_));
     EXPECT_CALL(dispatcher_, createClientConnection_(address_list_[0], _, _, _))
         .WillOnce(testing::InvokeWithoutArgs(
@@ -31,8 +32,8 @@ public:
 
     next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
     impl_ = std::make_unique<HappyEyeballsConnectionImpl>(
-        dispatcher_, address_list_, Address::InstanceConstSharedPtr(), transport_socket_factory_,
-        transport_socket_options_, options_);
+        dispatcher_, raw_address_list_, Address::InstanceConstSharedPtr(),
+        transport_socket_factory_, transport_socket_options_, options_);
   }
 
   // Called by the dispatcher to return a MockClientConnection. In order to allow expectations to
@@ -89,11 +90,12 @@ public:
   }
 
 protected:
-  Event::MockDispatcher dispatcher_;
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::StrictMock<Event::MockTimer>* failover_timer_;
   MockTransportSocketFactory transport_socket_factory_;
   TransportSocketOptionsConstSharedPtr transport_socket_options_;
   const ConnectionSocket::OptionsSharedPtr options_;
+  const std::vector<Address::InstanceConstSharedPtr> raw_address_list_;
   const std::vector<Address::InstanceConstSharedPtr> address_list_;
   std::vector<StrictMock<MockClientConnection>*> created_connections_;
   std::vector<ConnectionCallbacks*> connection_callbacks_;
@@ -134,6 +136,7 @@ TEST_F(HappyEyeballsConnectionImplTest, ConnectFailed) {
   EXPECT_CALL(*next_connections_.back(), connect());
   EXPECT_CALL(*created_connections_[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*created_connections_[0], close(ConnectionCloseType::NoFlush));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*failover_timer_, enableTimer(std::chrono::milliseconds(300), nullptr));
   connection_callbacks_[0]->onEvent(ConnectionEvent::RemoteClose);
@@ -686,8 +689,10 @@ TEST_F(HappyEyeballsConnectionImplTest, SetConnectionStats) {
 
   next_connections_.push_back(std::make_unique<StrictMock<MockClientConnection>>());
   // setConnectionStats() should be applied to the newly created connection.
+  // Here, it is using stats latched by the happy eyeballs connection and so
+  // will be its own unique data structure.
   EXPECT_CALL(*next_connections_.back(), setConnectionStats(_))
-      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
+      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_NE(&s, &cs); }));
   timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
@@ -1044,6 +1049,41 @@ TEST_F(HappyEyeballsConnectionImplTest, LastRoundTripTime) {
   absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*created_connections_[0], lastRoundTripTime()).WillOnce(Return(rtt));
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
+}
+
+TEST_F(HappyEyeballsConnectionImplTest, SortAddresses) {
+  auto ip_v4_1 = std::make_shared<Address::Ipv4Instance>("127.0.0.1");
+  auto ip_v4_2 = std::make_shared<Address::Ipv4Instance>("127.0.0.2");
+  auto ip_v4_3 = std::make_shared<Address::Ipv4Instance>("127.0.0.3");
+  auto ip_v4_4 = std::make_shared<Address::Ipv4Instance>("127.0.0.4");
+
+  auto ip_v6_1 = std::make_shared<Address::Ipv6Instance>("ff02::1", 0);
+  auto ip_v6_2 = std::make_shared<Address::Ipv6Instance>("ff02::2", 0);
+  auto ip_v6_3 = std::make_shared<Address::Ipv6Instance>("ff02::3", 0);
+  auto ip_v6_4 = std::make_shared<Address::Ipv6Instance>("ff02::4", 0);
+
+  // All v4 address so unchanged.
+  std::vector<Address::InstanceConstSharedPtr> v4_list = {ip_v4_1, ip_v4_2, ip_v4_3, ip_v4_4};
+  EXPECT_EQ(v4_list, HappyEyeballsConnectionImpl::sortAddresses(v4_list));
+
+  // All v6 address so unchanged.
+  std::vector<Address::InstanceConstSharedPtr> v6_list = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v6_4};
+  EXPECT_EQ(v6_list, HappyEyeballsConnectionImpl::sortAddresses(v6_list));
+
+  std::vector<Address::InstanceConstSharedPtr> v6_then_v4 = {ip_v6_1, ip_v6_2, ip_v4_1, ip_v4_2};
+  std::vector<Address::InstanceConstSharedPtr> interleaved = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2};
+  EXPECT_EQ(interleaved, HappyEyeballsConnectionImpl::sortAddresses(v6_then_v4));
+
+  std::vector<Address::InstanceConstSharedPtr> v6_then_single_v4 = {ip_v6_1, ip_v6_2, ip_v6_3,
+                                                                    ip_v4_1};
+  std::vector<Address::InstanceConstSharedPtr> interleaved2 = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v6_3};
+  EXPECT_EQ(interleaved2, HappyEyeballsConnectionImpl::sortAddresses(v6_then_single_v4));
+
+  std::vector<Address::InstanceConstSharedPtr> mixed = {ip_v6_1, ip_v6_2, ip_v6_3, ip_v4_1,
+                                                        ip_v4_2, ip_v4_3, ip_v4_4, ip_v6_4};
+  std::vector<Address::InstanceConstSharedPtr> interleaved3 = {ip_v6_1, ip_v4_1, ip_v6_2, ip_v4_2,
+                                                               ip_v6_3, ip_v4_3, ip_v6_4, ip_v4_4};
+  EXPECT_EQ(interleaved3, HappyEyeballsConnectionImpl::sortAddresses(mixed));
 }
 
 } // namespace Network

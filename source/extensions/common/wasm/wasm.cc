@@ -6,6 +6,7 @@
 #include "envoy/event/deferred_deletable.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/stats_handler.h"
 
@@ -73,12 +74,12 @@ void Wasm::initializeLifecycle(Server::ServerLifecycleNotifier& lifecycle_notifi
 }
 
 Wasm::Wasm(WasmConfig& config, absl::string_view vm_key, const Stats::ScopeSharedPtr& scope,
-           Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
+           Api::Api& api, Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher)
     : WasmBase(
           createWasmVm(config.config().vm_config().runtime()), config.config().vm_config().vm_id(),
           MessageUtil::anyToBytes(config.config().vm_config().configuration()),
           toStdStringView(vm_key), config.environmentVariables(), config.allowedCapabilities()),
-      scope_(scope), stat_name_pool_(scope_->symbolTable()),
+      scope_(scope), api_(api), stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(cluster_manager), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()), lifecycle_stats_handler_(LifecycleStatsHandler(
@@ -94,7 +95,8 @@ Wasm::Wasm(WasmHandleSharedPtr base_wasm_handle, Event::Dispatcher& dispatcher)
                      "envoy.wasm.runtime.",
                      toAbslStringView(base_wasm_handle->wasm()->wasm_vm()->runtime())));
                }),
-      scope_(getWasm(base_wasm_handle)->scope_), stat_name_pool_(scope_->symbolTable()),
+      scope_(getWasm(base_wasm_handle)->scope_), api_(getWasm(base_wasm_handle)->api_),
+      stat_name_pool_(scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)),
       cluster_manager_(getWasm(base_wasm_handle)->clusterManager()), dispatcher_(dispatcher),
       time_source_(dispatcher.timeSource()),
@@ -174,8 +176,11 @@ Word resolve_dns(Word dns_address_ptr, Word dns_address_size, Word token_ptr) {
     root_context->onResolveDns(token, status, std::move(response));
   };
   if (!context->wasm()->dnsResolver()) {
-    context->wasm()->dnsResolver() = context->wasm()->dispatcher().createDnsResolver(
-        {}, envoy::config::core::v3::DnsResolverOptions());
+    envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDefaultDnsResolverFactory(typed_dns_resolver_config);
+    context->wasm()->dnsResolver() = dns_resolver_factory.createDnsResolver(
+        context->wasm()->dispatcher(), context->wasm()->api(), typed_dns_resolver_config);
   }
   context->wasm()->dnsResolver()->resolve(std::string(address.value()),
                                           Network::DnsLookupFamily::Auto, callback);
@@ -249,12 +254,12 @@ void setTimeOffsetForCodeCacheForTesting(MonotonicTime::duration d) {
 }
 
 static proxy_wasm::WasmHandleFactory
-getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope,
+getWasmHandleFactory(WasmConfig& wasm_config, const Stats::ScopeSharedPtr& scope, Api::Api& api,
                      Upstream::ClusterManager& cluster_manager, Event::Dispatcher& dispatcher,
                      Server::ServerLifecycleNotifier& lifecycle_notifier) {
-  return [&wasm_config, &scope, &cluster_manager, &dispatcher,
+  return [&wasm_config, &scope, &api, &cluster_manager, &dispatcher,
           &lifecycle_notifier](std::string_view vm_key) -> WasmHandleBaseSharedPtr {
-    auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope,
+    auto wasm = std::make_shared<Wasm>(wasm_config, toAbslStringView(vm_key), scope, api,
                                        cluster_manager, dispatcher);
     wasm->initializeLifecycle(lifecycle_notifier);
     return std::static_pointer_cast<WasmHandleBase>(std::make_shared<WasmHandle>(std::move(wasm)));
@@ -375,8 +380,9 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
 
   auto vm_key = proxy_wasm::makeVmKey(vm_config.vm_id(),
                                       MessageUtil::anyToBytes(vm_config.configuration()), code);
-  auto complete_cb = [cb, vm_key, plugin, scope, &cluster_manager, &dispatcher, &lifecycle_notifier,
-                      create_root_context_for_testing, &stats_handler](std::string code) -> bool {
+  auto complete_cb = [cb, vm_key, plugin, scope, &api, &cluster_manager, &dispatcher,
+                      &lifecycle_notifier, create_root_context_for_testing,
+                      &stats_handler](std::string code) -> bool {
     if (code.empty()) {
       cb(nullptr);
       return false;
@@ -385,7 +391,7 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
     auto config = plugin->wasmConfig();
     auto wasm = proxy_wasm::createWasm(
         vm_key, code, plugin,
-        getWasmHandleFactory(config, scope, cluster_manager, dispatcher, lifecycle_notifier),
+        getWasmHandleFactory(config, scope, api, cluster_manager, dispatcher, lifecycle_notifier),
         getWasmHandleCloneFactory(dispatcher, create_root_context_for_testing),
         config.config().vm_config().allow_precompiled());
     Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);

@@ -219,19 +219,6 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
-   * Creates an async DNS resolver. The resolver should only be used on the thread that runs this
-   * dispatcher.
-   * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
-   * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
-   * @param dns_resolver_options supplies the aggregated area options flags needed for dns resolver
-   * init.
-   * @return Network::DnsResolverSharedPtr that is owned by the caller.
-   */
-  virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options) PURE;
-
-  /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
    */
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;
@@ -241,11 +228,13 @@ public:
    * @param socket supplies the socket to listen on.
    * @param cb supplies the callbacks to invoke for listener events.
    * @param bind_to_port controls whether the listener binds to a transport port or not.
+   * @param ignore_global_conn_limit controls whether the listener is limited by the global
+   * connection limit.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
   virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                              Network::TcpListenerCallbacks& cb,
-                                              bool bind_to_port) PURE;
+                                              Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                              bool ignore_global_conn_limit) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.

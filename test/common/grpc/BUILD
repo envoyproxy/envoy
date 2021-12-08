@@ -15,6 +15,7 @@ envoy_cc_test(
     name = "async_client_impl_test",
     srcs = ["async_client_impl_test.cc"],
     deps = [
+        "//source/common/event:dispatcher_lib",
         "//source/common/grpc:async_client_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",
@@ -183,6 +184,21 @@ envoy_cc_test_library(
     data = ["//test/config/integration/certs"],
     deps = [
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "buffered_async_client_test",
+    srcs = ["buffered_async_client_test.cc"],
+    deps = [
+        "//source/common/grpc:async_client_lib",
+        "//source/common/grpc:buffered_async_client_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/tracing:tracing_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

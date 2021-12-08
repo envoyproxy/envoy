@@ -6,8 +6,9 @@ coloredlogs
 coverage
 envoy.base.checker
 envoy.base.runner
-envoy.base.utils
+envoy.base.utils>=0.0.10
 envoy.code_format.python_check>=0.0.4
+envoy.dependency.cve_scan
 envoy.dependency.pip_check>=0.0.4
 envoy.distribution.release
 envoy.distribution.verify
@@ -18,6 +19,7 @@ frozendict
 gitpython
 jinja2
 pep8-naming
+ply
 pygithub
 pyreadline
 pytest
