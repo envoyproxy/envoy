@@ -106,21 +106,27 @@ MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* met
 
 const envoy::config::core::v3::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const StreamInfo::StreamInfo& info = ctx.stream_info;
+  const StreamInfo::StreamInfo& stream_info = ctx.stream_info;
   switch (kind_) {
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
-    return &info.dynamicMetadata();
+    return &stream_info.dynamicMetadata();
   case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    Router::RouteConstSharedPtr route = info.route();
+    Router::RouteConstSharedPtr route = stream_info.route();
     return route ? &route->metadata() : nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
+    if (stream_info.upstreamInfo().has_value() &&
+        stream_info.upstreamInfo().value().get().upstreamHost()) {
+      return &stream_info.upstreamInfo().value().get().upstreamHost()->cluster().metadata();
+    }
+    return nullptr;
   }
   case envoy::type::metadata::v3::MetadataKind::KindCase::kHost: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? hostPtr->metadata().get() : nullptr;
+    if (stream_info.upstreamInfo().has_value() &&
+        stream_info.upstreamInfo().value().get().upstreamHost()) {
+      return stream_info.upstreamInfo().value().get().upstreamHost()->metadata().get();
+    }
+    return nullptr;
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

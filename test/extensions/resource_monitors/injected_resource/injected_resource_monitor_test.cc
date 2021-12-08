@@ -38,7 +38,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class MockedCallbacks : public Server::ResourceMonitor::Callbacks {
+class MockedCallbacks : public Server::ResourceUpdateCallbacks {
 public:
   MOCK_METHOD(void, onSuccess, (const Server::ResourceUsage&));
   MOCK_METHOD(void, onFailure, (const EnvoyException&));

@@ -103,6 +103,7 @@ envoy_cc_library(
         "//envoy/router:context_interface",
         "//envoy/router:router_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:utility_lib",
     ],
 )
 
