@@ -220,6 +220,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     external_http_archive("com_googlesource_code_re2")
     _com_google_cel_cpp()
+    _com_github_google_perfetto()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
@@ -467,6 +468,19 @@ cc_library(
         patch_args = ["-p1"],
         # Patches ASAN violation of initialization fiasco
         patches = ["@envoy//bazel:antlr.patch"],
+    )
+
+def _com_github_google_perfetto():
+    external_http_archive(
+        name = "com_github_google_perfetto",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(
+    name = "perfetto",
+    srcs = ["perfetto.cc"],
+    hdrs = ["perfetto.h"],
+)
+""",
     )
 
 def _com_github_nghttp2_nghttp2():

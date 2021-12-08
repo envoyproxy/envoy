@@ -113,6 +113,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-06-03",
         cpe = "N/A",
     ),
+    # This dependency is built only when performance tracing is enabled with the
+    # option --define=perf_tracing=enabled. It's never built for releases.
+    com_github_google_perfetto = dict(
+        project_name = "Perfetto",
+        project_desc = "Perfetto Tracing SDK",
+        project_url = "https://perfetto.dev/",
+        version = "21.0",
+        sha256 = "8ce7d7c3dd8a2edd6d37092eb139e11bbf9c7e33a9964bab96c0505def6e1ad4",
+        strip_prefix = "perfetto-{version}/sdk",
+        urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-11-02",
+        cpe = "N/A",
+    ),
     com_github_c_ares_c_ares = dict(
         project_name = "c-ares",
         project_desc = "C library for asynchronous DNS requests",

@@ -27,6 +27,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
@@ -274,6 +275,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
+  TRACE_EVENT("core", "ConnectionManagerImpl::newStream");
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
