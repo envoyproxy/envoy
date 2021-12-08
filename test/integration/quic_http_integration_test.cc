@@ -10,6 +10,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -956,6 +957,34 @@ public:
     EXPECT_FALSE(codec_client.sawGoAway());
   }
 };
+
+TEST_P(QuicHttpIntegrationTest, HandleRTO) {
+  SocketInterfaceSwap socket_swap;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Make sure the headers made it through.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  // If we set a non-error override, writes will return a non-error but not actually write.
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+
+  Buffer::OwnedImpl data(std::string(48 * 1024, 'a'));
+  codec_client_->sendData(*downstream_request, data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
 
 INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicInplaceLdsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

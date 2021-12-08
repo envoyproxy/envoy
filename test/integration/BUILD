@@ -1811,6 +1811,7 @@ envoy_cc_test(
     ],
     deps = envoy_select_enable_http3([
         ":http_integration_lib",
+        ":socket_interface_swap_lib",
         "//source/common/quic:client_connection_factory_lib",
         "//source/common/quic:envoy_quic_client_connection_lib",
         "//source/common/quic:envoy_quic_client_session_lib",
