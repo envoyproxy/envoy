@@ -253,22 +253,11 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
   std::string body;
+  MockTimeSystem time_system;
+  auto& upstream_timing = stream_info.upstream_info_->upstreamTiming();
 
   {
     StreamInfoFormatter request_duration_format("REQUEST_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("5", request_duration_format.format(request_headers, response_headers,
-                                                  response_trailers, stream_info, body));
-    EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
-                                                    response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(5.0)));
-  }
-
-  {
-    StreamInfoFormatter request_duration_format("REQUEST_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt, request_duration_format.format(request_headers, response_headers,
                                                             response_trailers, stream_info, body));
     EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
@@ -277,20 +266,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
-    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("15", request_tx_duration_format.format(request_headers, response_headers,
-                                                      response_trailers, stream_info, body));
-    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
-                                                       response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(15.0)));
+    StreamInfoFormatter request_duration_format("REQUEST_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+    stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
+    EXPECT_EQ("5", request_duration_format.format(request_headers, response_headers,
+                                                  response_trailers, stream_info, body));
+    EXPECT_THAT(request_duration_format.formatValue(request_headers, response_headers,
+                                                    response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(5.0)));
   }
 
   {
     StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, lastUpstreamTxByteSent()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt,
               request_tx_duration_format.format(request_headers, response_headers,
                                                 response_trailers, stream_info, body));
@@ -300,20 +288,19 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(10000000);
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
-    EXPECT_EQ("10", response_duration_format.format(request_headers, response_headers,
-                                                    response_trailers, stream_info, body));
-    EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
-                                                     response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(10.0)));
+    StreamInfoFormatter request_tx_duration_format("REQUEST_TX_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(15000000))));
+    upstream_timing.onLastUpstreamTxByteSent(time_system);
+    EXPECT_EQ("15", request_tx_duration_format.format(request_headers, response_headers,
+                                                      response_trailers, stream_info, body));
+    EXPECT_THAT(request_tx_duration_format.formatValue(request_headers, response_headers,
+                                                       response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(15.0)));
   }
 
   {
     StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
-    absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ(absl::nullopt, response_duration_format.format(request_headers, response_headers,
                                                              response_trailers, stream_info, body));
     EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
@@ -322,33 +309,39 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
-    StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
-
-    absl::optional<std::chrono::nanoseconds> dur_upstream = std::chrono::nanoseconds(10000000);
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
-    absl::optional<std::chrono::nanoseconds> dur_downstream = std::chrono::nanoseconds(25000000);
-    EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
-
-    EXPECT_EQ("15", ttlb_duration_format.format(request_headers, response_headers,
-                                                response_trailers, stream_info, body));
-    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
-                                                 response_trailers, stream_info, body),
-                ProtoEq(ValueUtil::numberValue(15.0)));
+    StreamInfoFormatter response_duration_format("RESPONSE_DURATION");
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(10000000))));
+    upstream_timing.onFirstUpstreamRxByteReceived(time_system);
+    EXPECT_EQ("10", response_duration_format.format(request_headers, response_headers,
+                                                    response_trailers, stream_info, body));
+    EXPECT_THAT(response_duration_format.formatValue(request_headers, response_headers,
+                                                     response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(10.0)));
   }
 
   {
     StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
-
-    absl::optional<std::chrono::nanoseconds> dur_upstream;
-    EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
-    absl::optional<std::chrono::nanoseconds> dur_downstream;
-    EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ(absl::nullopt, ttlb_duration_format.format(request_headers, response_headers,
                                                          response_trailers, stream_info, body));
     EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
                                                  response_trailers, stream_info, body),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    StreamInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
+
+    EXPECT_CALL(time_system, monotonicTime)
+        .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(25000000))));
+    stream_info.downstream_timing_.onLastDownstreamTxByteSent(time_system);
+
+    EXPECT_EQ("15", ttlb_duration_format.format(request_headers, response_headers,
+                                                response_trailers, stream_info, body));
+    EXPECT_THAT(ttlb_duration_format.formatValue(request_headers, response_headers,
+                                                 response_trailers, stream_info, body),
+                ProtoEq(ValueUtil::numberValue(15.0)));
   }
 
   {
@@ -536,8 +529,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     const std::string observable_cluster_name = "observability_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_CALL(*cluster_info_mock, observabilityName())
         .WillRepeatedly(ReturnRef(observable_cluster_name));
@@ -556,8 +547,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     const std::string upstream_cluster_name = "cluster_name";
     auto cluster_info_mock = std::make_shared<Upstream::MockClusterInfo>();
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = cluster_info_mock;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_CALL(*cluster_info_mock, name()).WillRepeatedly(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(request_headers, response_headers,
@@ -570,8 +559,6 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info = nullptr;
-    // Make sure that cluster info is obtained without calling upstreamHost.
-    EXPECT_CALL(stream_info, upstreamHost()).Times(0);
     EXPECT_CALL(stream_info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
@@ -582,7 +569,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
-    EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
+    stream_info.upstreamInfo()->setUpstreamHost(nullptr);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -745,8 +732,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason = "SSL error";
-    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
-        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+    stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
+        upstream_transport_failure_reason);
     EXPECT_EQ("SSL error", upstream_format.format(request_headers, response_headers,
                                                   response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -756,8 +743,8 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
     std::string upstream_transport_failure_reason;
-    EXPECT_CALL(stream_info, upstreamTransportFailureReason())
-        .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+    stream_info.upstreamInfo()->setUpstreamTransportFailureReason(
+        upstream_transport_failure_reason);
     EXPECT_EQ(absl::nullopt, upstream_format.format(request_headers, response_headers,
                                                     response_trailers, stream_info, body));
     EXPECT_THAT(upstream_format.formatValue(request_headers, response_headers, response_trailers,
@@ -2658,10 +2645,12 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::string body;
-  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
-      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   ProtobufWkt::Value list;
   list.mutable_list_value()->add_values()->set_bool_value(true);
@@ -2697,7 +2686,7 @@ TEST(SubstitutionFormatterTest, StructFormatterTypedTest) {
 }
 
 TEST(SubstitutionFormatterTest, JsonFormatterTest) {
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestRequestHeaderMapImpl request_header;
   Http::TestResponseHeaderMapImpl response_header;
   Http::TestResponseTrailerMapImpl response_trailer;
@@ -2707,8 +2696,10 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
   populateMetadataTestData(metadata);
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
-  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
-      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
   ProtobufWkt::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
