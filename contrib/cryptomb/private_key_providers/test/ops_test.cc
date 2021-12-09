@@ -111,9 +111,7 @@ TEST(CryptoMbProviderTest, TestRsaPkcs1Signing) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  const BIGNUM *e, *n, *d;
-  RSA_get0_key(rsa, &n, &e, &d);
-  fakeIpp->setRsaKey(n, e, d);
+  fakeIpp->setRsaKey(rsa);
   CryptoMbStats stats(server_stats_store, CryptoMbQueue::MULTIBUFF_BATCH, kStatsPrefix,
                       kQueueSizeStatPrefix);
 
@@ -194,9 +192,7 @@ TEST(CryptoMbProviderTest, TestRsaPssSigning) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  const BIGNUM *e, *n, *d;
-  RSA_get0_key(rsa, &n, &e, &d);
-  fakeIpp->setRsaKey(n, e, d);
+  fakeIpp->setRsaKey(rsa);
   CryptoMbStats stats(server_stats_store, CryptoMbQueue::MULTIBUFF_BATCH, kStatsPrefix,
                       kQueueSizeStatPrefix);
 
@@ -269,9 +265,7 @@ TEST(CryptoMbProviderTest, TestRsaDecrypt) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  const BIGNUM *e, *n, *d;
-  RSA_get0_key(rsa, &n, &e, &d);
-  fakeIpp->setRsaKey(n, e, d);
+  fakeIpp->setRsaKey(rsa);
   CryptoMbStats stats(server_stats_store, CryptoMbQueue::MULTIBUFF_BATCH, kStatsPrefix,
                       kQueueSizeStatPrefix);
 
@@ -404,9 +398,7 @@ TEST(CryptoMbProviderTest, TestRSATimer) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  const BIGNUM *e, *n, *d;
-  RSA_get0_key(rsa, &n, &e, &d);
-  fakeIpp->setRsaKey(n, e, d);
+  fakeIpp->setRsaKey(rsa);
   CryptoMbStats stats(server_stats_store, CryptoMbQueue::MULTIBUFF_BATCH, kStatsPrefix,
                       kQueueSizeStatPrefix);
 
@@ -466,9 +458,7 @@ TEST(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
   bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp = std::make_shared<FakeIppCryptoImpl>(true);
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  const BIGNUM *e, *n, *d;
-  RSA_get0_key(rsa, &n, &e, &d);
-  fakeIpp->setRsaKey(n, e, d);
+  fakeIpp->setRsaKey(rsa);
   CryptoMbStats stats(server_stats_store, CryptoMbQueue::MULTIBUFF_BATCH, kStatsPrefix,
                       kQueueSizeStatPrefix);
 
