@@ -167,7 +167,7 @@ std::string generateNumericOutput(const StatType& metric,
  * Returns the prometheus output for a TextReadout in gauge format.
  * It is a workaround of a limitation of prometheus which stores only numeric metrics.
  * The output is a gauge named the same as a given text-readout. The value of returned gauge is
- * always equal to 1. Returned gauge contains all tags of a given text-readout and one additional
+ * always equal to 0. Returned gauge contains all tags of a given text-readout and one additional
  * tag {"text_value":"textReadout.value"}.
  */
 std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
