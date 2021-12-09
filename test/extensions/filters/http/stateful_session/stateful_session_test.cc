@@ -230,7 +230,7 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  EXPECT_CALL(encoder_callbacks_.stream_info_, upstreamHost()).WillOnce(Return(nullptr));
+  encoder_callbacks_.stream_info_.setUpstreamInfo(nullptr);
   EXPECT_CALL(*raw_session_state, onUpdate(_, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));

@@ -76,11 +76,14 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto host = encoder_callbacks_->streamInfo().upstreamHost();
-  if (host == nullptr) {
-    return Http::FilterHeadersStatus::Continue;
+  if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+      upstream_info != nullptr) {
+    auto host = upstream_info->upstreamHost();
+    if (host != nullptr) {
+      session_state_->onUpdate(*host, headers);
+    }
   }
-  session_state_->onUpdate(*host, headers);
+
   return Http::FilterHeadersStatus::Continue;
 }
 
