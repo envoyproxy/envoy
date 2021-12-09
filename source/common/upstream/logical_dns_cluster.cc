@@ -122,6 +122,7 @@ void LogicalDnsCluster::startResolve() {
         // not stabilize back to 0 hosts.
         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
           info_->stats().update_success_.inc();
+          const auto addrinfo = response.front().addrInfo();
           // TODO(mattklein123): Move port handling into the DNS interface.
           uint32_t port = Network::Utility::portFromTcpUrl(dns_url_);
           ASSERT(response.front().addrInfo().address_ != nullptr);

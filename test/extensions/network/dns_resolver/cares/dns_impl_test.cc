@@ -584,7 +584,7 @@ public:
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
         Network::Test::getCanonicalLoopbackAddress(GetParam()));
-    listener_ = dispatcher_->createListener(socket_, *server_, true);
+    listener_ = dispatcher_->createListener(socket_, *server_, true, false);
     updateDnsResolverOptions();
 
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
@@ -1068,44 +1068,44 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
-  // server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
-  // server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, RecordType::AAAA);
-  // server_->setRecordTtl(std::chrono::seconds(300));
+  server_->addHosts("some.good.domain", {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2", "1::2:3", "1::2:3:4"}, RecordType::AAAA);
+  server_->setRecordTtl(std::chrono::seconds(300));
 
-  // EXPECT_NE(nullptr,
-  //           resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
-  //                                   DnsResolver::ResolutionStatus::Success,
-  //                                   {"201.134.56.7", "123.4.5.6", "6.5.4.3"},
-  //                                   {"1::2", "1::2:3", "1::2:3:4"}, std::chrono::seconds(300)));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Success,
+                                    {"201.134.56.7", "123.4.5.6", "6.5.4.3"},
+                                    {"1::2", "1::2:3", "1::2:3:4"}, std::chrono::seconds(300)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // EXPECT_NE(nullptr, resolveWithExpectations(
-  //                        "some.good.domain", DnsLookupFamily::Auto,
-  //                        DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
-  //                        {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_NE(nullptr, resolveWithExpectations(
+                         "some.good.domain", DnsLookupFamily::Auto,
+                         DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
+                         {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // EXPECT_NE(nullptr, resolveWithExpectations(
-  //                        "some.good.domain", DnsLookupFamily::V6Only,
-  //                        DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
-  //                        {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_NE(nullptr, resolveWithExpectations(
+                         "some.good.domain", DnsLookupFamily::V6Only,
+                         DnsResolver::ResolutionStatus::Success, {"1::2", "1::2:3", "1::2:3:4"},
+                         {"201.134.56.7", "123.4.5.6", "6.5.4.3"}, std::chrono::seconds(300)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // server_->addHosts("domain.onion", {"1.2.3.4"}, RecordType::A);
-  // server_->addHosts("domain.onion.", {"2.3.4.5"}, RecordType::A);
+  server_->addHosts("domain.onion", {"1.2.3.4"}, RecordType::A);
+  server_->addHosts("domain.onion.", {"2.3.4.5"}, RecordType::A);
 
-  // // test onion domain
-  // EXPECT_EQ(nullptr,
-  //           resolveWithExpectations("domain.onion", DnsLookupFamily::V4Only,
-  //                                   DnsResolver::ResolutionStatus::Failure, {}, {},
-  //                                   absl::nullopt));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+  // test onion domain
+  EXPECT_EQ(nullptr,
+            resolveWithExpectations("domain.onion", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {},
+                                    absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-  // EXPECT_EQ(nullptr,
-  //           resolveWithExpectations("domain.onion.", DnsLookupFamily::V4Only,
-  //                                   DnsResolver::ResolutionStatus::Failure, {}, {},
-  //                                   absl::nullopt));
-  // dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(nullptr,
+            resolveWithExpectations("domain.onion.", DnsLookupFamily::V4Only,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {},
+                                    absl::nullopt));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 // Validate that the resolution timeout timer is enabled if we don't resolve

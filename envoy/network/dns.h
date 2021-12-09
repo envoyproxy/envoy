@@ -74,9 +74,9 @@ private:
   absl::variant<AddrInfoResponse, SrvResponse> response_;
 };
 
-enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
-
 enum class RecordType { A, AAAA, SRV };
+
+enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
 
 /**
  * An asynchronous DNS resolver.
@@ -96,7 +96,7 @@ public:
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
   using ResolveCb =
-      std::function<void(ResolutionStatus status, const std::list<DnsResponse>&& response)>;
+      std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.
@@ -108,17 +108,6 @@ public:
    */
   virtual ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                                   ResolveCb callback) PURE;
-
-  /**
-   * Initiate an async DNS query. This function is used for querying specific type of DNS record.
-   * Currently, it supports only SRV record resolution. When looking up A/AAAA record,
-   * we should use DnsResolver::resolve.
-   * @param dns_name supplies the DNS name to lookup.
-   * @param resource_type the DNS resource type.
-   * @return if non-null, a handle that can be used to cancel the resolution.
-   *         This is only valid until the invocation of callback or ~DnsResolver().
-   */
-  virtual ActiveDnsQuery* query(const std::string& dns_name, RecordType resource_type) PURE;
 };
 
 using DnsResolverSharedPtr = std::shared_ptr<DnsResolver>;

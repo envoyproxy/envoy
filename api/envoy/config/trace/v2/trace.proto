@@ -13,3 +13,4 @@ import public "envoy/config/trace/v2/zipkin.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v2";
 option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/trace/v2;tracev2";

@@ -422,12 +422,10 @@ TEST_F(GrpcStatsFilterConfigTest, UpstreamStats) {
       {"content-type", "application/grpc+proto"},
       {":path", "/lyft.users.BadCompanions/GetBadCompanions"}};
 
-  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
-      .WillByDefault(testing::Return(
-          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
-  ON_CALL(stream_info_, lastUpstreamTxByteSent())
-      .WillByDefault(testing::Return(
-          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+  stream_info_.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
+      MonotonicTime(std::chrono::nanoseconds(20000000));
+  stream_info_.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
+      MonotonicTime(std::chrono::nanoseconds(30000000));
 
   EXPECT_CALL(stats_store_,
               deliverHistogramToSinks(
@@ -444,12 +442,10 @@ TEST_F(GrpcStatsFilterConfigTest, UpstreamStatsWithTrailersOnly) {
   config_.set_enable_upstream_stats(true);
   initialize();
 
-  ON_CALL(stream_info_, lastUpstreamRxByteReceived())
-      .WillByDefault(testing::Return(
-          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(30000000))));
-  ON_CALL(stream_info_, lastUpstreamTxByteSent())
-      .WillByDefault(testing::Return(
-          absl::optional<std::chrono::nanoseconds>(std::chrono::nanoseconds(20000000))));
+  stream_info_.upstream_info_->upstreamTiming().last_upstream_tx_byte_sent_ =
+      MonotonicTime(std::chrono::nanoseconds(20000000));
+  stream_info_.upstream_info_->upstreamTiming().last_upstream_rx_byte_received_ =
+      MonotonicTime(std::chrono::nanoseconds(30000000));
 
   EXPECT_CALL(stats_store_,
               deliverHistogramToSinks(

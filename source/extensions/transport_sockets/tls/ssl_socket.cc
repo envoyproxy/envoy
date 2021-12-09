@@ -180,8 +180,13 @@ Network::Connection& SslSocket::connection() const { return callbacks_->connecti
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
-  callbacks_->connection().streamInfo().upstreamTiming().onUpstreamHandshakeComplete(
-      callbacks_->connection().dispatcher().timeSource());
+  if (callbacks_->connection().streamInfo().upstreamInfo()) {
+    callbacks_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamTiming()
+        .onUpstreamHandshakeComplete(callbacks_->connection().dispatcher().timeSource());
+  }
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 

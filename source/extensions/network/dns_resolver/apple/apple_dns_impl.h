@@ -71,9 +71,6 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
-  ActiveDnsQuery* query(const std::string&, RecordType) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 
 private:
   struct PendingResolution;

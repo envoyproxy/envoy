@@ -1215,8 +1215,8 @@ void ConfigHelper::initializeTls(
     }
   }
   if (!options.san_matchers_.empty()) {
-    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
-                                                              options.san_matchers_.end()};
+    *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
+                                                                    options.san_matchers_.end()};
   }
 }
 
