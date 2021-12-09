@@ -57,9 +57,7 @@ public:
   absl::FixedArray<char> buf_;
 };
 
-TEST_F(IoHandleImplTest, InterfaceName) {
-  ASSERT_FALSE(io_handle_->interfaceName().has_value());
-}
+TEST_F(IoHandleImplTest, InterfaceName) { ASSERT_FALSE(io_handle_->interfaceName().has_value()); }
 
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
