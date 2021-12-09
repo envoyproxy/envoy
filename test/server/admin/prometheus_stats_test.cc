@@ -402,7 +402,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   addGauge("promtest.MYAPP.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
   // Metric with invalid prometheus namespace in the custom metric must be excluded in the output.
   addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
-  // Text readout that should be skipped, because argument export_text_readouts is equal to false.
+  // Text readout that should be skipped, because argument text_readouts is a nullopt.
   addTextReadout("control_plane.identifier", "CP-1", {{makeStat("cluster"), makeStat("c1")}});
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
@@ -491,7 +491,7 @@ envoy_cluster_upstream_cx_total_count{cluster="c1"} 0
 envoy_cluster_upstream_cx_total{cluster="c1"} 0
 
 # TYPE envoy_control_plane_identifier gauge
-envoy_control_plane_identifier{cluster="c1",text_value="CP-1"} 1
+envoy_control_plane_identifier{cluster="c1",text_value="CP-1"} 0
 
 )EOF";
 

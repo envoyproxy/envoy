@@ -158,7 +158,7 @@ std::string generateTextReadoutOutput(const Stats::TextReadout& text_readout,
   auto tags = text_readout.tags();
   tags.push_back(Stats::Tag{"text_value", text_readout.value()});
   const std::string formattedTags = PrometheusStatsFormatter::formattedTags(tags);
-  return fmt::format("{0}{{{1}}} 1\n", prefixed_tag_extracted_name, formattedTags);
+  return fmt::format("{0}{{{1}}} 0\n", prefixed_tag_extracted_name, formattedTags);
 }
 
 /*

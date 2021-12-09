@@ -871,7 +871,7 @@ envoy_cluster_upstream_cx_active{cluster="c1"} 11
 envoy_cluster_upstream_cx_active{cluster="c2"} 12
 
 # TYPE envoy_control_plane_identifier gauge
-envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 1
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
 
 )EOF";
 
