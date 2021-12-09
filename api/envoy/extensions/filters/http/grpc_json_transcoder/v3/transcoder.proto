@@ -226,11 +226,11 @@ message GrpcJsonTranscoder {
   // default, only match when it is registered.
   //
   // According to the http template `syntax <https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231>`_,
-  // the custom verb is `":" LITERAL` at the end of http template.
+  // the custom verb is **":" LITERAL** at the end of http template.
   //
-  // For a request with /foo/bar:baz and ":baz" is not registered in any url_template, here is the behavior change
-  // * if the field is not set, ":baz" will not be treated as custom verb, so it will match /foo/{x=*}.
-  // * if the field is set, ":baz" is treated as custom verb,  so it will NOT match /foo/{x=*} since the template doesn't use any custom verb.
+  // For a request with */foo/bar:baz* and *:baz* is not registered in any url_template, here is the behavior change
+  // - if the field is not set, *:baz* will not be treated as custom verb, so it will match **/foo/{x=*}**.
+  // - if the field is set, *:baz* is treated as custom verb,  so it will NOT match **/foo/{x=*}** since the template doesn't use any custom verb.
   bool match_unregistered_custom_verb = 13;
 
   // Configure the behavior when handling requests that cannot be transcoded.
