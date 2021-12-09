@@ -245,6 +245,38 @@ struct UpstreamTiming {
     upstream_handshake_complete_ = time_source.monotonicTime();
   }
 
+  /*
+  * Sets the time when External_Authorization starts
+  */
+  void onExtAuthzStart(TimeSource& time_source) {
+    ext_authz_start_ = time_source.monotonicTime();
+  /*
+  * Sets the time when External_Processing starts
+  */
+  void onExtProcStart(TimeSource& time_source) {
+    ext_proc_start_ = time_source.monotonicTime();
+  }
+
+  /*
+  * Sets the time when External_Authorization completes
+  */
+  void onExtAuthzComplete(TimeSource& time_source) {
+    ext_authz_start_ = time_source.monotonicTime();
+  }
+  /*
+  * Sets the time when External_Processing completes
+  */
+  void onExtProcComplete(TimeSource& time_source) {
+    ext_proc_start_ = time_source.monotonicTime();
+  }
+
+
+  absl::optional<MonotonicTime> ext_authz_start_;
+  absl::optional<MonotonicTime> ext_authz_complete_;
+
+  absl::optional<MonotonicTime> ext_proc_start_;
+  absl::optional<MonotonicTime> ext_proc_complete_;
+
   absl::optional<MonotonicTime> first_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> last_upstream_tx_byte_sent_;
   absl::optional<MonotonicTime> first_upstream_rx_byte_received_;

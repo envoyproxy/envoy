@@ -94,6 +94,10 @@ public:
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
+  absl::optional<std::chrono::nanoseconds> extAuthzStart();
+  absl::optional<std::chrono::nanoseconds> extAuthzComplete();
+  absl::optional<std::chrono::nanoseconds> extProcStart();
+  absl::optional<std::chrono::nanoseconds> extProcComplete();
 
 private:
   const StreamInfo& stream_info_;

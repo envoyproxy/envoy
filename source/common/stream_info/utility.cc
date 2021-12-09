@@ -116,6 +116,34 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteRece
   return duration(timing.value().get().lastDownstreamRxByteReceived(), stream_info_);
 }
 
+absl::optional<std::chrono::nanoseconds> TimingUtility::extAuthzStart() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().ext_authz_start_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::extProcStart() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().ext_proc_start_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::extAuthzComplete() {
+  return duration(timing.value().get().ext_proc_start_, stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::extProcComplete() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().ext_authz_complete_, stream_info_);
+}
+
 const std::string&
 Utility::formatDownstreamAddressNoPort(const Network::Address::Instance& address) {
   if (address.type() == Network::Address::Type::Ip) {
