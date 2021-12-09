@@ -105,6 +105,20 @@ void IntegrationTcpClient::waitForDisconnect(bool ignore_spurious_events) {
   EXPECT_TRUE(disconnected_);
 }
 
+bool IntegrationTcpClient::waitForConnected() {
+  if (connected_event_raised_) {
+    return connected_event_raised_;
+  }
+  Event::TimerPtr timeout_timer =
+      connection_->dispatcher().createTimer([this]() -> void { connection_->dispatcher().exit(); });
+  timeout_timer->enableTimer(TestUtility::DefaultTimeout);
+
+  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  EXPECT_FALSE(disconnected_);
+  EXPECT_TRUE(connected_event_raised_);
+  return connected_event_raised_;
+}
+
 void IntegrationTcpClient::waitForHalfClose() {
   if (payload_reader_->readLastByte()) {
     return;
@@ -149,6 +163,15 @@ AssertionResult IntegrationTcpClient::write(const std::string& data, bool end_st
 }
 
 void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::Connected) {
+    std::cerr << "Got connected event\n";
+    parent_.connected_event_raised_ = true;
+  }
+  if (parent_.waiting_for_connect_) {
+    parent_.waiting_for_connect_ = false;
+    parent_.connection_->dispatcher().exit();
+  }
+
   if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();

@@ -37,6 +37,7 @@ public:
   ABSL_MUST_USE_RESULT AssertionResult
   waitForData(size_t length, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   void waitForDisconnect(bool ignore_spurious_events = false);
+  bool waitForConnected();
   void waitForHalfClose();
   void readDisable(bool disabled);
   ABSL_MUST_USE_RESULT AssertionResult
@@ -63,6 +64,8 @@ private:
   std::shared_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr connection_;
   bool disconnected_{};
+  bool waiting_for_connect_{};
+  bool connected_event_raised_{};
   MockWatermarkBuffer* client_write_buffer_;
 };
 
