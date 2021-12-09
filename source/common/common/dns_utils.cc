@@ -35,7 +35,7 @@ generateAddressList(const std::list<Network::DnsResponse>& responses, uint32_t p
     return addresses;
   }
   for (const auto& response : responses) {
-    auto address = Network::Utility::getAddressWithPort(*(response.address_), port);
+    auto address = Network::Utility::getAddressWithPort(*(response.addrInfo().address_), port);
     if (address) {
       addresses.push_back(address);
     }
