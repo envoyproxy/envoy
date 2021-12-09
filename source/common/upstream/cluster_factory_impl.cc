@@ -37,7 +37,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
-      PANIC_DUE_TO_SENTINEL_VALUE;
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::cluster::v3::Cluster::STATIC:
       cluster_type = "envoy.cluster.static";
       break;

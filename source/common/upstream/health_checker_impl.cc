@@ -123,6 +123,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
     return factory.createCustomHealthChecker(health_check_config, *context);
   }
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
