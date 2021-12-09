@@ -34,7 +34,8 @@ class UpstreamRequest;
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public UpstreamToDownstream,
                         public LinkedObject<UpstreamRequest>,
-                        public GenericConnectionPoolCallbacks {
+                        public GenericConnectionPoolCallbacks,
+                        public Event::DeferredDeletable {
 public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;

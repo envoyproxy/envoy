@@ -1140,7 +1140,10 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
       upstream_request.upstreamHost()->stats().rq_error_.inc();
     }
 
-    upstream_request.removeFromList(upstream_requests_);
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
     return true;
   } else if (retry_status == RetryStatus::NoOverflow) {
     callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -1174,7 +1177,10 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
                                     ? Http::Code::BadGateway
                                     : Http::Code::ServiceUnavailable;
   chargeUpstreamAbort(error_code, dropped, upstream_request);
-  upstream_request.removeFromList(upstream_requests_);
+  auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+    callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+  }
 
   // If there are other in-flight requests that might see an upstream response,
   // don't return anything downstream.
@@ -1285,7 +1291,11 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
 
 void Filter::resetAll() {
   while (!upstream_requests_.empty()) {
-    upstream_requests_.back()->removeFromList(upstream_requests_)->resetStream();
+    auto request_ptr = upstream_requests_.back()->removeFromList(upstream_requests_);
+    request_ptr->resetStream();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
   }
 }
 
@@ -1363,8 +1373,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
         if (!end_stream || !upstream_request.encodeComplete()) {
           upstream_request.resetStream();
         }
-        upstream_request.removeFromList(upstream_requests_);
-
+        auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.allow_upstream_inline_write")) {
+          callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+        }
         return;
       } else if (retry_status == RetryStatus::NoOverflow) {
         callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamOverflow);
@@ -1394,7 +1407,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
     // Reset the stream because there are other in-flight requests that we'll
     // wait around for and we're not interested in consuming any body/trailers.
-    upstream_request.removeFromList(upstream_requests_)->resetStream();
+    auto request_ptr = upstream_request.removeFromList(upstream_requests_);
+    request_ptr->resetStream();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_upstream_inline_write")) {
+      callbacks_->dispatcher().deferredDelete(std::move(request_ptr));
+    }
     return;
   }
 
