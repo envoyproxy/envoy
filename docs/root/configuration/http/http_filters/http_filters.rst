@@ -46,3 +46,4 @@ HTTP filters
   sxg_filter
   tap_filter
   wasm_filter
+  stateful_session_filter

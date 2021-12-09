@@ -14,9 +14,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/stateful_session/v3;stateful_sessionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Stateful Session Filter]
-// This filter sets an override host based on the extensible session state and updates the
-// session state based on the final selected upstream host.
+// [#protodoc-title: Stateful session filter]
+// Stateful session :ref:`configuration overview <config_http_filters_stateful_session>`.
 // [#extension: envoy.filters.http.stateful_session]
 
 // [#comment:TODO(wbpcode): To support global feature enabled or disabled flag.]
