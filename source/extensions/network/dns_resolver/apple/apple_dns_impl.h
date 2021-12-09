@@ -131,6 +131,8 @@ private:
     // be accumulated before firing callback_.
     PendingResponse pending_response_;
     DnsLookupFamily dns_lookup_family_;
+    // Was the query cancelled via cancel()?
+    bool cancelled_{};
   };
 
   Event::Dispatcher& dispatcher_;

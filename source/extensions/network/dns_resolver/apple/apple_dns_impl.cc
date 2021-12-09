@@ -165,6 +165,10 @@ AppleDnsResolverImpl::PendingResolution::~PendingResolution() {
 }
 
 void AppleDnsResolverImpl::PendingResolution::cancel(Network::ActiveDnsQuery::CancelReason) {
+  // Apple's API does not have cancellation, so we just allow the
+  // network events to continue but don't invoke the callback on completion.
+  cancelled_ = true;
+
   // TODO(mattklein123): If cancel reason is timeout, do something more aggressive about destroying
   // and recreating the DNS system to maximize the chance of success in following queries.
   ENVOY_LOG(debug, "Cancelling PendingResolution for {}", dns_name_);
@@ -224,7 +228,12 @@ void AppleDnsResolverImpl::PendingResolution::finishResolve() {
   ENVOY_LOG_EVENT(debug, "apple_dns_resolution_complete",
                   "dns resolution for {} completed with status {}", dns_name_,
                   pending_response_.status_);
-  callback_(pending_response_.status_, std::move(finalAddressList()));
+  if (!cancelled_) {
+    callback_(pending_response_.status_, std::move(finalAddressList()));
+  } else {
+    ENVOY_LOG_EVENT(debug, "apple_dns_callback_cancelled",
+                    "dns resolution callback for {} not issued", dns_name_);
+  }
 
   if (owned_) {
     ENVOY_LOG(debug, "Resolution for {} completed (async)", dns_name_);
