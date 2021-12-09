@@ -206,6 +206,10 @@ void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
+  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+                  "dns resolution for {} completed with status {}", dns_name_,
+                  pending_response_.status_);
+
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
     // Can not convert to use status code as there may be unexpected exceptions in server fuzz
@@ -213,10 +217,6 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     // portFromTcpUrl().
     // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
     // exception in fuzz tests.
-    ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
-                    "dns resolution for {} completed with status {}", dns_name_,
-                    pending_response_.status_);
-
     TRY_NEEDS_AUDIT {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
     }
@@ -232,6 +232,9 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
       ENVOY_LOG(critical, "Unknown exception in c-ares callback");
       dispatcher_.post([] { throw EnvoyException("unknown"); });
     }
+  } else {
+    ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
+                    "dns resolution callback for {} not issued", dns_name_);
   }
   if (owned_) {
     delete this;
