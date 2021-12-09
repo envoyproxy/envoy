@@ -20,13 +20,19 @@ message IoUringSocketInterface {
   // The size of read buffer. If not set, defaults to 8192.
   google.protobuf.UInt32Value read_buffer_size = 1 [(validate.rules).uint32 = {gte: 4096}];
 
-  // The size of ``io_uring`` queues. For heavily loaded processes 300 is a
-  // good enough value. If the load is not high and memory is a constraint
-  // then it's safe to have smaller queues. If not set, defaults to 300.
+  // The size of both submission and completion queues in queue entries. For heavily loaded
+  // processes 300 queue entries is a good enough value. If the load is not high and memory
+  // is a constraint then it's safe to have smaller queues. If not set, defaults to 300
+  // queue entries.
   google.protobuf.UInt32Value io_uring_size = 2 [(validate.rules).uint32 = {gte: 16}];
 
   // When this flag is specified, a kernel thread is created to perform submission queue
-  // polling. An ``io_uring`` instance configured in this way enables ``io_uring`` sockets to issue
-  // I/O without ever context switching into the kernel.
+  // polling. An ``io_uring`` instance configured in this way enables ``io_uring`` sockets to
+  // issue I/O without ever context switching into the kernel and with better latency.
+  //
+  // Please note that the polling kernel thread will waste CPU cycles after the ``io_uring``
+  // instance becomes inactive for a grace period which is set to 1 second currently. The
+  // polling kernel thread will be started automatically as soon as the ``io_uring`` instance
+  // becomes active again.
   bool use_submission_queue_polling = 3;
 }
