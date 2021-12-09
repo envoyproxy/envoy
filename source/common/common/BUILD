@@ -463,6 +463,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "perf_tracing_lib",
+    srcs = ["perf_tracing.cc"],
+    hdrs = ["perf_tracing.h"],
+    deps = select({
+        "//bazel:enable_perf_tracing": [
+            "@com_github_google_perfetto//:perfetto",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+envoy_cc_library(
     name = "scalar_to_byte_vector_lib",
     hdrs = ["scalar_to_byte_vector.h"],
 )
