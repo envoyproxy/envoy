@@ -230,7 +230,7 @@ message GrpcJsonTranscoder {
   //
   // For a request with /foo/bar:baz and ":baz" is not registered in any url_template, here is the behavior change
   // * if the field is not set, ":baz" will not be treated as custom verb, so it will match /foo/{x=*}.
-  // * if the field is set, ":baz" is treated as custom verb,  so it will NOT match /foo{x=*} since the template doesn't use any custom verb.
+  // * if the field is set, ":baz" is treated as custom verb,  so it will NOT match /foo/{x=*} since the template doesn't use any custom verb.
   bool match_unregistered_custom_verb = 13;
 
   // Configure the behavior when handling requests that cannot be transcoded.
