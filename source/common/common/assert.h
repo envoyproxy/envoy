@@ -267,6 +267,8 @@ void resetEnvoyBugCountersForTest();
   case std::numeric_limits<int32_t>::min():                                                        \
     PANIC("unexpected sentinel value used")
 
+#define PANIC_DUE_TO_PROTO_UNSET PANIC("unset oneof")
+
 // Envoy has a number of switch statements which panic if there's no legal value set.
 // This is not encouraged, as it's too easy to panic using break; instead of return;
 // but this macro replaces a less clear crash using NOT_REACHED_GCOVR_EXCL_LINE.

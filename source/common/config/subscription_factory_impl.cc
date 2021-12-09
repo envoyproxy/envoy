@@ -44,6 +44,11 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
                                                             api_config_source);
     Utility::checkTransportVersion(api_config_source);
     switch (api_config_source.api_type()) {
+      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_GRPC");
+    case envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC:
+      throw EnvoyException("Unsupported config source AGGREGATED_DELTA_GRPC");
     case envoy::config::core::v3::ApiConfigSource::DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
@@ -103,8 +108,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           std::move(mux), callbacks, resource_decoder, stats, type_url, dispatcher_,
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
@@ -116,7 +119,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     throw EnvoyException(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(

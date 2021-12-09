@@ -252,9 +252,10 @@ HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& ta
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
   case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
@@ -366,9 +367,10 @@ MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? hostPtr->metadata().get() : nullptr;
   }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::metadata::v3::MetadataKind::KindCase::KIND_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tracing

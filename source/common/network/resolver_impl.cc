@@ -28,11 +28,11 @@ public:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
       return Network::Utility::parseInternetAddress(
           socket_address.address(), socket_address.port_value(), !socket_address.ipv4_compat());
-
-    default:
-      throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
-                                       socket_address.port_specifier_case()));
+    case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kNamedPort:
+      break;
     }
+    throw EnvoyException(fmt::format("IP resolver can't handle port specifier type {}",
+                                     socket_address.port_specifier_case()));
   }
 
   std::string name() const override { return Config::AddressResolverNames::get().IP; }
@@ -55,12 +55,13 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
         kServerListenerName:
       return std::make_shared<EnvoyInternalInstance>(
           address.envoy_internal_address().server_listener_name());
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      case envoy::config::core::v3::EnvoyInternalAddress::AddressNameSpecifierCase::ADDRESS_NAME_SPECIFIER_NOT_SET:
+        break;
     }
-  default:
-    throw EnvoyException("Address must be set: " + address.DebugString());
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    break;
   }
+  throw EnvoyException("Failed to resolve address:" + address.DebugString());
 }
 
 InstanceConstSharedPtr

@@ -176,8 +176,6 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
   case HeaderMatchType::StringMatch:
     match = header_data.string_match_->match(value);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return match != header_data.invert_match_;

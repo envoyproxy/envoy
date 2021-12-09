@@ -48,8 +48,8 @@ HashPolicyImpl::HashPolicyImpl(
   case envoy::type::v3::HashPolicy::PolicySpecifierCase::kFilterState:
     hash_impl_ = std::make_unique<FilterStateHashMethod>(hash_policies[0]->filter_state().key());
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::v3::HashPolicy::PolicySpecifierCase::POLICY_SPECIFIER_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
 }
 

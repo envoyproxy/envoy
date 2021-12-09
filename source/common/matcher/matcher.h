@@ -85,10 +85,10 @@ public:
       return createTreeMatcher(config);
     case MatcherType::kMatcherList:
       return createListMatcher(config);
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case MatcherType::MATCHER_TYPE_NOT_SET:
       return nullptr;
     }
+    return nullptr;
   }
 
 private:
@@ -160,9 +160,10 @@ private:
         return std::make_unique<NotFieldMatcher<DataType>>(matcher_factory());
       };
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case PredicateType::MATCH_TYPE_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   template <class MatcherType>
@@ -190,12 +191,13 @@ private:
       };
     }
     case MatcherType::MatcherTree::kPrefixMatchMap:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("unexpected matcher type");
     case MatcherType::MatcherTree::kCustomMatch:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("unexpected matcher type");
+    case MatcherType::MatcherTree::TREE_TYPE_NOT_SET:
+      PANIC("unexpected matcher type");
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   template <class OnMatchType>
@@ -276,9 +278,10 @@ private:
           server_factory_context_.messageValidationVisitor(), factory);
       return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
     }
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    case SinglePredicateType::MATCHER_NOT_SET:
+      PANIC_DUE_TO_PROTO_UNSET;
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   const std::string stats_prefix_;
