@@ -55,6 +55,10 @@ struct SrvResponse {
   const uint16_t weight_;
 };
 
+enum class RecordType { A, AAAA, SRV };
+
+enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
+
 /**
  * DNS response.
  */
@@ -74,10 +78,6 @@ private:
   absl::variant<AddrInfoResponse, SrvResponse> response_;
 };
 
-enum class RecordType { A, AAAA, SRV };
-
-enum class DnsLookupFamily { V4Only, V6Only, Auto, V4Preferred, All };
-
 /**
  * An asynchronous DNS resolver.
  */
@@ -95,8 +95,7 @@ public:
    * @param status supplies the final status of the resolution.
    * @param response supplies the list of resolved IP addresses and TTLs.
    */
-  using ResolveCb =
-      std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
+  using ResolveCb = std::function<void(ResolutionStatus status, std::list<DnsResponse>&& response)>;
 
   /**
    * Initiate an async DNS resolution.

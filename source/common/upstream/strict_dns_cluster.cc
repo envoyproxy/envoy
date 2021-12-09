@@ -108,7 +108,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status,
-             const std::list<Network::DnsResponse>&& response) -> void {
+             std::list<Network::DnsResponse>&& response) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
 
@@ -140,7 +140,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
             all_new_hosts.emplace(address->asString());
-            ttl_refresh_rate = min(ttl_refresh_rate, resp.addrInfo().ttl_);
+            ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
 
           HostVector hosts_added;

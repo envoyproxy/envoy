@@ -38,7 +38,6 @@ public:
 
 private:
   friend class DnsResolverImplPeer;
-
   class PendingResolution : public ActiveDnsQuery {
   public:
     void cancel(CancelReason) override {
@@ -115,7 +114,6 @@ private:
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
     // perform resolutions on both families concurrently.
     bool dual_resolution_ = false;
-
     // Whether or not to lookup both V4 and V6 address.
     bool lookup_all_ = false;
     int family_ = AF_INET;

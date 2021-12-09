@@ -1,9 +1,10 @@
+#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
+
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
-#include <type_traits>
 
 #include "envoy/common/platform.h"
 #include "envoy/registry/registry.h"
@@ -15,7 +16,6 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
-#include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
 #include "absl/strings/str_join.h"
 #include "ares.h"
@@ -120,7 +120,7 @@ void DnsResolverImpl::PendingResolution::callback(int status, int timeouts, void
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::onSuccess(void* buf, int) {
-  auto addrinfo = reinterpret_cast<ares_addrinfo*>(buf);
+  auto addrinfo = static_cast<ares_addrinfo*>(buf);
   pending_response_.status_ = ResolutionStatus::Success;
 
   if (addrinfo != nullptr && addrinfo->nodes != nullptr) {
@@ -394,7 +394,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
       [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
         static_cast<AddrInfoPendingResolution*>(arg)->callback(
-            status, timeouts, reinterpret_cast<void*>(addrinfo), sizeof(ares_addrinfo));
+            status, timeouts, static_cast<void*>(addrinfo), sizeof(ares_addrinfo));
       },
       this);
 }
@@ -410,7 +410,7 @@ void DnsResolverImpl::SrvPendingResolution::onSuccess(void* buf, int len) {
   bool parse_status = true;
 
   struct ares_srv_reply* record = nullptr;
-  int rc = ares_parse_srv_reply(reinterpret_cast<unsigned char*>(buf), len, &record);
+  int rc = ares_parse_srv_reply(static_cast<unsigned char*>(buf), len, &record);
 
   if (rc != ARES_SUCCESS || !record) {
     ENVOY_LOG(debug, "failed to parse SRV record.");

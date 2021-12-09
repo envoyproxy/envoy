@@ -643,7 +643,7 @@ public:
                                           const absl::optional<std::chrono::seconds> expected_ttl) {
     return resolver_->resolve(
         address, lookup_family,
-        [=](DnsResolver::ResolutionStatus status, const std::list<DnsResponse>&& results) -> void {
+        [=](DnsResolver::ResolutionStatus status, std::list<DnsResponse>&& results) -> void {
           EXPECT_EQ(expected_status, status);
 
           std::list<std::string> address_as_string_list = getAddressAsStringList(results);
@@ -678,7 +678,7 @@ public:
     return resolver_->resolve(
         address, lookup_family,
         [expected_to_execute](DnsResolver::ResolutionStatus status,
-                              const std::list<DnsResponse>&& results) -> void {
+                              std::list<DnsResponse>&& results) -> void {
           if (!expected_to_execute) {
             FAIL();
           }
@@ -692,7 +692,7 @@ public:
                                        const DnsLookupFamily lookup_family, T exception_object) {
     return resolver_->resolve(address, lookup_family,
                               [exception_object](DnsResolver::ResolutionStatus status,
-                                                 const std::list<DnsResponse>&& results) -> void {
+                                                 std::list<DnsResponse>&& results) -> void {
                                 UNREFERENCED_PARAMETER(status);
                                 UNREFERENCED_PARAMETER(results);
                                 throw exception_object;
@@ -1097,14 +1097,12 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
   // test onion domain
   EXPECT_EQ(nullptr,
             resolveWithExpectations("domain.onion", DnsLookupFamily::V4Only,
-                                    DnsResolver::ResolutionStatus::Failure, {}, {},
-                                    absl::nullopt));
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(nullptr,
             resolveWithExpectations("domain.onion.", DnsLookupFamily::V4Only,
-                                    DnsResolver::ResolutionStatus::Failure, {}, {},
-                                    absl::nullopt));
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, absl::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
