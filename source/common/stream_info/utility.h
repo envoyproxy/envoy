@@ -5,6 +5,7 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/http/codes.h"
 
 namespace Envoy {
 namespace StreamInfo {
@@ -156,7 +157,7 @@ public:
   // > Each Proxy Error Type has a Recommended HTTP Status Code. When
   // > generating a HTTP response containing "error", its HTTP status code
   // > SHOULD be set to the Recommended HTTP Status Code.
-  static const absl::optional<uint32_t>
+  static const absl::optional<Http::Code>
   recommendedHttpStatusCode(const ProxyStatusError proxy_status);
 
   constexpr static absl::string_view DNS_TIMEOUT = "dns_timeout";

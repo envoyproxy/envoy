@@ -3830,28 +3830,15 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
 
   initialize();
 
-  {
-    const ResponseHeaderMap* altered_headers =
-        sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
-                        /*proxy_status=*/"SomeCDN");
+  const ResponseHeaderMap* altered_headers =
+      sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
+                      /*proxy_status=*/"SomeCDN");
 
-    ASSERT_TRUE(altered_headers);
-    ASSERT_TRUE(altered_headers->ProxyStatus());
-    // Expect to see the appended previous value: "SomeCDN; envoy; ...".
-    EXPECT_EQ(altered_headers->getProxyStatusValue(),
-              "SomeCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
-  }
-  {
-    const ResponseHeaderMap* altered_headers =
-        sendRequestWith(403, StreamInfo::ResponseFlag::UpstreamRequestTimeout, /*details=*/"baz",
-                        /*proxy_status=*/"SomeCDN, OtherCDN");
-
-    ASSERT_TRUE(altered_headers);
-    ASSERT_TRUE(altered_headers->ProxyStatus());
-    // Expect to see the appended previous value: "SomeCDN; envoy; ...".
-    EXPECT_EQ(altered_headers->getProxyStatusValue(),
-              "SomeCDN, OtherCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
-  }
+  ASSERT_TRUE(altered_headers);
+  ASSERT_TRUE(altered_headers->ProxyStatus());
+  // Expect to see the appended previous value: "SomeCDN; envoy; ...".
+  EXPECT_EQ(altered_headers->getProxyStatusValue(),
+            "SomeCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
 
   teardown();
 }

@@ -1484,10 +1484,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
           ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {
-        if (absl::optional<uint32_t> response_code =
+        if (absl::optional<Http::Code> response_code =
                 StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
             response_code.has_value()) {
-          headers.setStatus(std::to_string(*response_code));
+          headers.setStatus(std::to_string(enumToInt(*response_code)));
         }
       }
     }
