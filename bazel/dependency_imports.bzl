@@ -11,7 +11,7 @@ load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_depend
 load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies", "rules_cc_toolchains")
 
 # go version for rules_go
-GO_VERSION = "1.15.5"
+GO_VERSION = "1.17.1"
 
 def envoy_dependency_imports(go_version = GO_VERSION):
     # TODO: allow building of tools for easier onboarding

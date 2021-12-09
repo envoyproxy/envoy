@@ -13,12 +13,14 @@ envoy_cc_library(
     srcs = [
         "default_validator.cc",
         "factory.cc",
+        "san_matcher.cc",
         "utility.cc",
     ],
     hdrs = [
         "cert_validator.h",
         "default_validator.h",
         "factory.h",
+        "san_matcher.h",
         "utility.h",
     ],
     external_deps = [
@@ -35,9 +37,13 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
         "//source/extensions/transport_sockets/tls:stats_lib",
         "//source/extensions/transport_sockets/tls:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )

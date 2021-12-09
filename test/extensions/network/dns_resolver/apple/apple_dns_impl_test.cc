@@ -125,7 +125,7 @@ public:
                 }
                 break;
               default:
-                NOT_REACHED_GCOVR_EXCL_LINE;
+                PANIC("reached unexpected code");
               }
             }
           }
@@ -519,7 +519,7 @@ public:
               EXPECT_NE(nullptr, response.back().address_->ip()->ipv6());
               break;
             default:
-              NOT_REACHED_GCOVR_EXCL_LINE;
+              PANIC("reached unexpected code");
             }
           }
           dns_callback_executed.Notify();
@@ -543,7 +543,7 @@ public:
                      address_v6.sockAddr(), 30, query);
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
 
     dns_callback_executed.WaitForNotification();

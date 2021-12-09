@@ -412,6 +412,8 @@ TEST_P(Http2MetadataIntegrationTest, ProxyMultipleMetadata) {
   EXPECT_EQ(response->metadataMap().size(), multiple_vecs.size());
 }
 
+// Disabled temporarily see #19040
+#if 0
 TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -440,6 +442,7 @@ TEST_P(Http2MetadataIntegrationTest, ProxyInvalidMetadata) {
   EXPECT_EQ(0, response->metadataMapsDecodedCount());
   EXPECT_EQ(response->metadataMap().size(), 0);
 }
+#endif
 
 void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string> keys) {
   for (const auto& key : keys) {
@@ -507,7 +510,7 @@ TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
 
   waitForNextUpstreamRequest();
   upstream_request_->encode1xxHeaders(Http::TestResponseHeaderMapImpl{{":status", "100"}});
-  response->waitForContinueHeaders();
+  response->waitFor1xxHeaders();
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(100, true);
 

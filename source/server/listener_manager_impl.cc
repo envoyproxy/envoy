@@ -170,8 +170,6 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-  ASSERT(address->type() == Network::Address::Type::Ip ||
-         address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -192,6 +190,11 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
+  } else if (address->type() == Network::Address::Type::EnvoyInternal) {
+    // Listener manager should have validated that envoy internal address doesn't work with udp
+    // listener yet.
+    ASSERT(socket_type == Network::Socket::Type::Stream);
+    return std::make_shared<Network::InternalListenSocket>(address);
   }
 
   const std::string scheme = (socket_type == Network::Socket::Type::Stream)
@@ -329,11 +332,12 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
-  RELEASE_ASSERT(
-      !config.address().has_envoy_internal_address(),
-      fmt::format("listener {} has envoy internal address {}. Internal address cannot be used by "
-                  "listener yet",
-                  config.name(), config.address().envoy_internal_address().DebugString()));
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address")) {
+    RELEASE_ASSERT(
+        !config.address().has_envoy_internal_address(),
+        fmt::format("listener {} has envoy internal address {}. This runtime feature is disabled.",
+                    config.name(), config.address().envoy_internal_address().DebugString()));
+  }
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
@@ -957,13 +961,13 @@ Network::DrainableFilterChainSharedPtr ListenerFilterChainFactoryBuilder::buildF
 void ListenerManagerImpl::setNewOrDrainingSocketFactory(
     const std::string& name, const envoy::config::core::v3::Address& proto_address,
     ListenerImpl& listener) {
-  // Typically we catch address issues when we try to bind to the same address multiple times.
-  // However, for listeners that do not bind we must check to make sure we are not duplicating. This
-  // is an edge case and nothing will explicitly break, but there is no possibility that two
-  // listeners that do not bind will ever be used. Only the first one will be used when searched for
-  // by address. Thus we block it.
-  if (!listener.bindToPort() && (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
-                                 hasListenerWithCompatibleAddress(active_listeners_, listener))) {
+  // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
+  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
+  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
+  // different listeners receiving connections destined for the same port.
+  if ((!listener.bindToPort() || listener.config().address().socket_address().port_value() != 0) &&
+      (hasListenerWithCompatibleAddress(warming_listeners_, listener) ||
+       hasListenerWithCompatibleAddress(active_listeners_, listener))) {
     const std::string message =
         fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
                     name, listener.address()->asString());
