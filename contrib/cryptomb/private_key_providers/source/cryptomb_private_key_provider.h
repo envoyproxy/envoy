@@ -122,7 +122,6 @@ private:
   // Timer to trigger queue processing if eight requests are not received in time.
   Event::TimerPtr timer_{};
 
-  // Reference to statistics.
   CryptoMbStats& stats_;
 };
 

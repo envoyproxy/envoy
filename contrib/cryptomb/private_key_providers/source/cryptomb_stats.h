@@ -24,8 +24,6 @@ public:
 
 private:
   Stats::StatNamePool stat_name_pool_;
-  const Stats::StatName stats_prefix_;
-  // Vector for queue size statistics.
   std::vector<StatsCounterRef> queue_size_counters_;
 };
 
