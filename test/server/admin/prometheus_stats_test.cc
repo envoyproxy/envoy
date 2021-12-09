@@ -479,14 +479,18 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithTextReadoutsInGaugeFormat) {
 
   addCounter("cluster.upstream_cx_total_count", {{makeStat("cluster"), makeStat("c1")}});
   addGauge("cluster.upstream_cx_total", {{makeStat("cluster"), makeStat("c1")}});
-  // Text readout that should be returned in gauge format.
+  // Text readouts that should be returned in gauge format.
   addTextReadout("control_plane.identifier", "CP-1", {{makeStat("cluster"), makeStat("c1")}});
+  addTextReadout("invalid_tag_values", "test",
+                 {{makeStat("tag1"), makeStat(R"(\)")},
+                  {makeStat("tag2"), makeStat("\n")},
+                  {makeStat("tag3"), makeStat(R"(")")}});
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
       counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
-  EXPECT_EQ(3UL, size);
+  EXPECT_EQ(4UL, size);
 
   const std::string expected_output = R"EOF(# TYPE envoy_cluster_upstream_cx_total_count counter
 envoy_cluster_upstream_cx_total_count{cluster="c1"} 0
@@ -496,6 +500,9 @@ envoy_cluster_upstream_cx_total{cluster="c1"} 0
 
 # TYPE envoy_control_plane_identifier gauge
 envoy_control_plane_identifier{cluster="c1",text_value="CP-1"} 0
+
+# TYPE envoy_invalid_tag_values gauge
+envoy_invalid_tag_values{tag1="\\",tag2="\n",tag3="\"",text_value="test"} 0
 
 )EOF";
 
