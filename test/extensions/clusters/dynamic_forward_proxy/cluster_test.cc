@@ -20,16 +20,17 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/test_runtime.h"
 
-using testing::AtLeast;
-using testing::DoAll;
-using testing::InSequence;
-using testing::Return;
-using testing::SizeIs;
-
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicForwardProxy {
+
+using ::testing::AtLeast;
+using ::testing::Const;
+using ::testing::DoAll;
+using ::testing::InSequence;
+using ::testing::Return;
+using ::testing::SizeIs;
 
 class ClusterTest : public testing::Test,
                     public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
@@ -267,7 +268,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
 
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -300,7 +301,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
 
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h3"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -333,7 +334,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
 
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -365,7 +366,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
 
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("hello"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -393,7 +394,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -423,7 +424,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -452,7 +453,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
@@ -482,7 +483,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
   std::vector<std::string> dns_sans = {"www.example.org", "mail.example.org"};
@@ -516,7 +517,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetime_callbacks =
       lb_->lifetimeCallbacks();
   ASSERT_TRUE(lifetime_callbacks.has_value());
-  EXPECT_CALL(connection, connectionInfoProvider()).Times(testing::AnyNumber());
+  EXPECT_CALL(Const(connection), connectionInfoProvider()).Times(testing::AnyNumber());
   EXPECT_CALL(connection, nextProtocol()).WillRepeatedly(Return("h2"));
   auto ssl_info = nullptr;
   EXPECT_CALL(connection, ssl()).WillRepeatedly(Return(ssl_info));
