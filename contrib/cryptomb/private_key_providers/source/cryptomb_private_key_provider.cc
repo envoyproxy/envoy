@@ -483,6 +483,7 @@ void CryptoMbPrivateKeyMethodProvider::unregisterPrivateKeyMethod(SSL* ssl) {
   delete ops;
 }
 
+// The CryptoMbPrivateKeyMethodProvider is not created in response to requests.
 CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     const envoy::extensions::private_key_providers::cryptomb::v3alpha::
         CryptoMbPrivateKeyMethodConfig& conf,
