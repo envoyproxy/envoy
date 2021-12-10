@@ -1,3 +1,5 @@
+#include <ares.h>
+
 #include <list>
 #include <memory>
 #include <string>
@@ -133,19 +135,23 @@ private:
         // We only expect resources of type A or AAAA.
         const int q_type = DNS_QUESTION_TYPE(question + name_len);
 
+        auto lookup_name = std::string(name);
+
         auto encoded_name = TestDnsServerQuery::encodeDnsName(name);
         std::string encoded_cname;
-        const auto cname = lookupCname(name);
+        const auto cname = lookupCname(lookup_name);
 
         if (!cname.empty()) {
           ASSERT_TRUE(cname.size() <= 253);
-          name = const_cast<char*>(cname.c_str());
+          lookup_name = const_cast<char*>(cname.c_str());
           encoded_cname = TestDnsServerQuery::encodeDnsName(cname);
         }
 
+        ares_free_string(name);
+
         ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
         if (q_type == T_A || q_type == T_AAAA) {
-          const auto addrs = getAddrs(q_type, name);
+          const auto addrs = getAddrs(q_type, lookup_name);
           auto buf = createAddrResolutionBuffer(q_type, addrs, request, name_len, encoded_cname,
                                                 encoded_name);
           parent_.connection_->write(buf, false);
@@ -164,7 +170,7 @@ private:
     uint16_t size_ = 0;
     Buffer::OwnedImpl buffer_;
 
-    std::string lookupCname(char* name) {
+    std::string lookupCname(const std::string& name) {
       std::string cname;
       // check if we have a cname. If so, we will need to send a response element with the cname
       // and lookup the ips of the cname and send back those ips (if any) too
@@ -176,7 +182,7 @@ private:
       return cname;
     }
 
-    const std::list<std::string> getAddrs(const int q_type, const char* name) {
+    const std::list<std::string> getAddrs(const int q_type, const std::string& name) {
       std::list<std::string> ips;
       if (q_type == T_A) {
         auto it = parent_.hosts_a_.find(name);
