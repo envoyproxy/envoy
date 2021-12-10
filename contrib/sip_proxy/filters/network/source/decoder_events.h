@@ -7,6 +7,17 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SipProxy {
 
+enum class QueryStatus {
+  // Do grpc query
+  Pending,
+
+  // Existed in local cache
+  Continue,
+
+  // Not existed in local cache and not do grpc query
+  Stop
+};
+
 enum class FilterStatus {
   // Continue filter chain iteration.
   Continue,

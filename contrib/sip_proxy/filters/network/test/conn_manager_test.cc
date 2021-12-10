@@ -80,7 +80,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(),
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
         transaction_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();

@@ -18,13 +18,14 @@ class SipFilterNameValues {
 public:
   // Router filter
   const std::string ROUTER = "envoy.filters.sip.router";
+  const std::string SipProxy = "envoy.filters.network.sip_proxy";
 };
 
 using SipFilterNames = ConstSingleton<SipFilterNameValues>;
 
 } // namespace SipFilters
 
-const std::string SipProxy = "envoy.filters.network.sip_proxy";
+// const std::string SipProxy = "envoy.filters.network.sip_proxy";
 
 } // namespace SipProxy
 } // namespace NetworkFilters

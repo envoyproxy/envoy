@@ -81,7 +81,7 @@ public:
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_ = std::make_unique<ConnectionManager>(
-        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(),
+        *config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), context_,
         transaction_infos_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
@@ -414,8 +414,8 @@ TEST_F(SipDecoderTest, DecodeEMPTY) {
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1U, store_.counter("test.request").value());
-  EXPECT_EQ(1U, stats_.request_active_.value());
+  EXPECT_EQ(0U, store_.counter("test.request").value());
+  EXPECT_EQ(0U, stats_.request_active_.value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
 }
 

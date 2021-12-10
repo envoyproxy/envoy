@@ -17,6 +17,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/rocketmq_proxy/v3:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
         "//contrib/envoy/extensions/vcl/v3alpha:pkg",
