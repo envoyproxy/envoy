@@ -68,8 +68,9 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
   ASSERT(read_buf_ != nullptr);
   auto fragment = new Buffer::BufferFragmentImpl(
-      read_buf_.get(), bytes_to_read_,
-      [](const void* /*data*/, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
+      read_buf_.release(), bytes_to_read_,
+      [](const void* data, size_t /*len*/, const Buffer::BufferFragmentImpl* this_fragment) {
+        delete[] reinterpret_cast<const uint8_t*>(data);
         delete this_fragment;
       });
   buffer.addBufferFragment(*fragment);
@@ -234,9 +235,6 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   }
 
   cb_ = std::move(cb);
-  read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
-  iov_.iov_base = read_buf_.get();
-  iov_.iov_len = read_buffer_size_;
 }
 
 Network::IoHandlePtr IoUringSocketHandleImpl::duplicate() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -268,7 +266,11 @@ void IoUringSocketHandleImpl::addReadRequest() {
     return;
   }
 
+  ASSERT(read_buf_ == nullptr);
   is_read_added_ = true; // don't add READ if it's been already added.
+  read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
+  iov_.iov_base = read_buf_.get();
+  iov_.iov_len = read_buffer_size_;
   io_uring_factory_.getOrCreateUring().prepareRead(fd_, *this, &iov_);
 }
 
