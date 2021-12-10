@@ -438,7 +438,7 @@ public:
       EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
     } break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 
@@ -759,7 +759,7 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
-        EXPECT_TRUE(end_stream);
+        EXPECT_FALSE(end_stream);
       }));
   context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_.poolFailure(
       ConnectionPool::PoolFailureReason::Overflow, true);
@@ -1618,7 +1618,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
     EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));

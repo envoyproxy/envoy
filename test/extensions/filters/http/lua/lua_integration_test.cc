@@ -1163,5 +1163,21 @@ typed_config:
   testRewriteResponse(FILTER_AND_CODE);
 }
 
+TEST_P(LuaIntegrationTest, RewriteResponseBufferWithoutHeaderReplaceContentLength) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local content_length = response_handle:body():setBytes("ok")
+      response_handle:logTrace(content_length)
+    end
+)EOF";
+
+  testRewriteResponse(FILTER_AND_CODE);
+}
+
 } // namespace
 } // namespace Envoy

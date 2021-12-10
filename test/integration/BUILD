@@ -501,6 +501,7 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_protocol_integration_lib",
+        ":socket_interface_swap_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/common/http/http2:http2_frame",
@@ -514,6 +515,7 @@ envoy_cc_test_library(
         "//test/integration/filters:random_pause_filter_lib",
         "//test/integration/filters:remove_response_headers_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",

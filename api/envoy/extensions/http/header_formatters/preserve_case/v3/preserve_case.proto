@@ -7,6 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.http.header_formatters.preserve_case.v3";
 option java_outer_classname = "PreserveCaseProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/header_formatters/preserve_case/v3;preserve_casev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Preserve case header formatter]
@@ -16,4 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // See the :ref:`header casing <config_http_conn_man_header_casing>` configuration guide for more
 // information.
 message PreserveCaseFormatterConfig {
+  // Allows forwarding reason phrase text.
+  // This is off by default, and a standard reason phrase is used for a corresponding HTTP response code.
+  bool forward_reason_phrase = 1;
 }

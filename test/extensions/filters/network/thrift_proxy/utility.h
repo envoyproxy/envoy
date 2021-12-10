@@ -72,7 +72,7 @@ transportTypeToProto(TransportType transport_type) {
   case TransportType::Header:
     return envoy::extensions::filters::network::thrift_proxy::v3::HEADER;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 
@@ -84,7 +84,7 @@ protocolTypeToProto(ProtocolType protocol_type) {
   case ProtocolType::Compact:
     return envoy::extensions::filters::network::thrift_proxy::v3::COMPACT;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 }
 

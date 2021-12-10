@@ -1013,11 +1013,16 @@ void FilterManager::sendDirectLocalReply(
             state_.non_100_response_headers_encoded_ = true;
             filter_manager_callbacks_.encodeHeaders(*filter_manager_callbacks_.responseHeaders(),
                                                     end_stream);
-
+            if (state_.saw_downstream_reset_) {
+              return;
+            }
             maybeEndEncode(end_stream);
           },
           [&](Buffer::Instance& data, bool end_stream) -> void {
             filter_manager_callbacks_.encodeData(data, end_stream);
+            if (state_.saw_downstream_reset_) {
+              return;
+            }
             maybeEndEncode(end_stream);
           }},
       Utility::LocalReplyData{state_.is_grpc_request_, code, body, grpc_status, is_head_request});
@@ -1144,13 +1149,16 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     sendLocalReply(
         Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
         absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
-                     "{", status.message(), "}"));
+                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
     return;
   }
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
   state_.non_100_response_headers_encoded_ = true;
   filter_manager_callbacks_.encodeHeaders(headers, modified_end_stream);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(modified_end_stream);
 
   if (!modified_end_stream) {
@@ -1290,6 +1298,9 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
   const bool modified_end_stream = end_stream && trailers_added_entry == encoder_filters_.end();
   filter_manager_callbacks_.encodeData(data, modified_end_stream);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(modified_end_stream);
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
@@ -1332,6 +1343,9 @@ void FilterManager::encodeTrailers(ActiveStreamEncoderFilter* filter,
   }
 
   filter_manager_callbacks_.encodeTrailers(trailers);
+  if (state_.saw_downstream_reset_) {
+    return;
+  }
   maybeEndEncode(true);
 }
 

@@ -295,7 +295,7 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   ENVOY_LOG_EVENT(debug, "dns_cache_finish_resolve",
                   "main thread resolve complete for host '{}': {}", host,
                   accumulateToString<Network::DnsResponse>(response, [](const auto& dns_response) {
-                    return dns_response.address_->asString();
+                    return dns_response.addrInfo().address_->asString();
                   }));
   const bool from_cache = resolution_time.has_value();
 
@@ -325,10 +325,10 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   // If the DNS resolver successfully resolved with an empty response list, the dns cache does not
   // update. This ensures that a potentially previously resolved address does not stabilize back to
   // 0 hosts.
-  const auto new_address = !response.empty()
-                               ? Network::Utility::getAddressWithPort(*(response.front().address_),
-                                                                      primary_host_info->port_)
-                               : nullptr;
+  const auto new_address =
+      !response.empty() ? Network::Utility::getAddressWithPort(
+                              *(response.front().addrInfo().address_), primary_host_info->port_)
+                        : nullptr;
   auto address_list = DnsUtils::generateAddressList(response, primary_host_info->port_);
 
   // Only the change the address if:
@@ -349,11 +349,12 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (new_address) {
     // Update the cache entry and staleness any time the ttl changes.
     if (!from_cache) {
-      addCacheEntry(host, new_address, address_list, response.front().ttl_);
+      addCacheEntry(host, new_address, address_list, response.front().addrInfo().ttl_);
     }
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_dns_ttl")) {
       // Arbitrarily cap DNS re-resolution at 5s to avoid constant DNS queries.
-      dns_ttl = std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().ttl_);
+      dns_ttl =
+          std::max<std::chrono::seconds>(std::chrono::seconds(5), response.front().addrInfo().ttl_);
     }
     primary_host_info->host_info_->updateStale(resolution_time.value(), dns_ttl);
   }
@@ -543,7 +544,7 @@ void DnsCacheImpl::loadCacheEntries(
     if (responses.empty()) {
       return KeyValueStore::Iterate::Break;
     }
-    createHost(key, responses.front().address_->ip()->port());
+    createHost(key, responses.front().addrInfo().address_->ip()->port());
     finishResolve(key, Network::DnsResolver::ResolutionStatus::Success, std::move(responses),
                   resolution_time);
     stats_.cache_load_.inc();
