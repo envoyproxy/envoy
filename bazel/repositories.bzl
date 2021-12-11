@@ -204,7 +204,7 @@ def envoy_dependencies(skip_targets = []):
     _io_opencensus_cpp()
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
-    _com_googlesource_chromium_v8()
+    _v8()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
@@ -806,16 +806,15 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
         actual = "@envoy//bazel/foreign_cc:curl",
     )
 
-def _com_googlesource_chromium_v8():
+def _v8():
     external_genrule_repository(
-        name = "com_googlesource_chromium_v8",
+        name = "v8",
         genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
-        build_file = "@envoy//bazel/external:wee8.BUILD",
         patches = ["@envoy//bazel/external:wee8.patch"],
     )
     native.bind(
         name = "wee8",
-        actual = "@com_googlesource_chromium_v8//:wee8",
+        actual = "@v8//:wee8",
     )
 
 def _com_github_google_quiche():

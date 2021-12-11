@@ -823,7 +823,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-11-10",
         cpe = "cpe:2.3:a:haxx:libcurl:*",
     ),
-    com_googlesource_chromium_v8 = dict(
+    v8 = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
