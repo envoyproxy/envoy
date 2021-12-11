@@ -62,6 +62,10 @@ Filter::StreamOpenState Filter::openStream() {
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
   }
+  if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
+    decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming().onExtProcStart(
+        decoder_callbacks_->dispatcher().timeSource());
+  }
   return StreamOpenState::Ok;
 }
 
@@ -70,6 +74,10 @@ void Filter::closeStream() {
     ENVOY_LOG(debug, "Calling close on stream");
     if (stream_->close()) {
       stats_.streams_closed_.inc();
+    }
+    if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
+      decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming().onExtProcComplete(
+          decoder_callbacks_->dispatcher().timeSource());
     }
     stream_.reset();
   } else {

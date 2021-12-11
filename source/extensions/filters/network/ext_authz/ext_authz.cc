@@ -46,7 +46,7 @@ Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
     // sufficient information to fill out the checkRequest_.
     callCheck();
     filter_callbacks_->connection().streamInfo().upstreamInfo()->upstreamTiming().onExtAuthzStart(
-      filter_callbacks_->connection().dispatcher().timeSource());
+        filter_callbacks_->connection().dispatcher().timeSource());
   }
   return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration
                                               : Network::FilterStatus::Continue;
@@ -76,8 +76,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   switch (response->status) {
   case Filters::Common::ExtAuthz::CheckStatus::OK:
     config_->stats().ok_.inc();
-    filter_callbacks_->connection().streamInfo().upstreamInfo()->upstreamTiming().onExtAuthzComplete(
-      filter_callbacks_->connection().dispatcher().timeSource());
+    filter_callbacks_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamTiming()
+        .onExtAuthzComplete(filter_callbacks_->connection().dispatcher().timeSource());
     break;
   case Filters::Common::ExtAuthz::CheckStatus::Error:
     config_->stats().error_.inc();

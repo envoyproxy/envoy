@@ -61,9 +61,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
 
   if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
     decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming().onExtAuthzStart(
-      decoder_callbacks_->dispatcher().timeSource());
+        decoder_callbacks_->dispatcher().timeSource());
   }
-  
+
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
@@ -330,7 +330,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     continueDecoding();
     if (decoder_callbacks_->streamInfo().upstreamInfo() != nullptr) {
       decoder_callbacks_->streamInfo().upstreamInfo()->upstreamTiming().onExtAuthzStart(
-        decoder_callbacks_->dispatcher().timeSource());
+          decoder_callbacks_->dispatcher().timeSource());
     }
     break;
   }

@@ -246,30 +246,24 @@ struct UpstreamTiming {
   }
 
   /*
-  * Sets the time when External_Authorization starts
-  */
-  void onExtAuthzStart(TimeSource& time_source) {
-    ext_authz_start_ = time_source.monotonicTime();
+   * Sets the time when External_Authorization starts
+   */
+  void onExtAuthzStart(TimeSource& time_source) { ext_authz_start_ = time_source.monotonicTime(); }
   /*
-  * Sets the time when External_Processing starts
-  */
-  void onExtProcStart(TimeSource& time_source) {
-    ext_proc_start_ = time_source.monotonicTime();
-  }
+   * Sets the time when External_Processing starts
+   */
+  void onExtProcStart(TimeSource& time_source) { ext_proc_start_ = time_source.monotonicTime(); }
 
   /*
-  * Sets the time when External_Authorization completes
-  */
+   * Sets the time when External_Authorization completes
+   */
   void onExtAuthzComplete(TimeSource& time_source) {
     ext_authz_start_ = time_source.monotonicTime();
   }
   /*
-  * Sets the time when External_Processing completes
-  */
-  void onExtProcComplete(TimeSource& time_source) {
-    ext_proc_start_ = time_source.monotonicTime();
-  }
-
+   * Sets the time when External_Processing completes
+   */
+  void onExtProcComplete(TimeSource& time_source) { ext_proc_start_ = time_source.monotonicTime(); }
 
   absl::optional<MonotonicTime> ext_authz_start_;
   absl::optional<MonotonicTime> ext_authz_complete_;
@@ -481,8 +475,8 @@ public:
 
   /**
    * @param response_flags the response_flags to intersect with.
-   * @return true if the intersection of the response_flags argument and the currently set response
-   * flags is non-empty.
+   * @return true if the intersection of the response_flags argument and the currently set
+   * response flags is non-empty.
    */
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
@@ -564,8 +558,8 @@ public:
   virtual OptRef<const UpstreamInfo> upstreamInfo() const PURE;
 
   /**
-   * @return the total duration of the request (i.e., when the request's ActiveStream is destroyed)
-   * and may be longer than lastDownstreamTxByteSent.
+   * @return the total duration of the request (i.e., when the request's ActiveStream is
+   * destroyed) and may be longer than lastDownstreamTxByteSent.
    */
   virtual absl::optional<std::chrono::nanoseconds> requestComplete() const PURE;
 
@@ -636,14 +630,14 @@ public:
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
-   * @param value the struct to set on the namespace. A merge will be performed with new values for
-   * the same key overriding existing.
+   * @param value the struct to set on the namespace. A merge will be performed with new values
+   * for the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
-   * Object on which filters can share data on a per-request basis. For singleton data objects, only
-   * one filter can produce a named data object. List data objects can be updated by multiple
+   * Object on which filters can share data on a per-request basis. For singleton data objects,
+   * only one filter can produce a named data object. List data objects can be updated by multiple
    * filters (append only). Both object types can be consumed by multiple filters.
    * @return the filter state associated with this request.
    */

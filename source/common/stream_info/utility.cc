@@ -133,6 +133,10 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::extProcStart() {
 }
 
 absl::optional<std::chrono::nanoseconds> TimingUtility::extAuthzComplete() {
+  OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
+  if (!timing) {
+    return absl::nullopt;
+  }
   return duration(timing.value().get().ext_proc_start_, stream_info_);
 }
 
