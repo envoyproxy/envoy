@@ -48,8 +48,10 @@ public:
   Network::FilterStatus onNewConnection() override;
 
   static std::shared_ptr<StartTlsSwitchFilter>
-  newInstance(Upstream::ClusterManager& cluster_manager) {
-    auto p = std::shared_ptr<StartTlsSwitchFilter>(new StartTlsSwitchFilter(cluster_manager));
+  newInstance(Upstream::ClusterManager& cluster_manager,
+              Network::ConnectionCallbacks* upstream_callbacks) {
+    auto p = std::shared_ptr<StartTlsSwitchFilter>(
+        new StartTlsSwitchFilter(cluster_manager, upstream_callbacks));
     p->self_ = p;
     return p;
   }
@@ -79,13 +81,15 @@ public:
   };
 
 private:
-  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager)
-      : cluster_manager_(cluster_manager) {}
+  StartTlsSwitchFilter(Upstream::ClusterManager& cluster_manager,
+                       Network::ConnectionCallbacks* upstream_callbacks)
+      : upstream_connection_cb_(upstream_callbacks), cluster_manager_(cluster_manager) {}
 
   std::weak_ptr<StartTlsSwitchFilter> self_{};
   Network::ReadFilterCallbacks* read_callbacks_{};
   Network::WriteFilterCallbacks* write_callbacks_{};
   Network::ClientConnectionPtr upstream_connection_{};
+  Network::ConnectionCallbacks* upstream_connection_cb_;
   Upstream::ClusterManager& cluster_manager_;
 };
 
@@ -94,6 +98,7 @@ Network::FilterStatus StartTlsSwitchFilter::onNewConnection() {
   auto h = c->loadBalancer().chooseHost(nullptr);
   upstream_connection_ =
       h->createConnection(read_callbacks_->connection().dispatcher(), nullptr, nullptr).connection_;
+  upstream_connection_->addConnectionCallbacks(*upstream_connection_cb_);
   upstream_connection_->addReadFilter(std::make_shared<UpstreamReadFilter>(self_));
   upstream_connection_->connect();
   return Network::FilterStatus::Continue;
@@ -127,7 +132,9 @@ void StartTlsSwitchFilter::onCommand(Buffer::Instance& buf) {
 class StartTlsSwitchFilterConfigFactory : public Extensions::NetworkFilters::Common::FactoryBase<
                                               test::integration::starttls::StartTlsFilterConfig> {
 public:
-  explicit StartTlsSwitchFilterConfigFactory(const std::string& name) : FactoryBase(name) {}
+  explicit StartTlsSwitchFilterConfigFactory(const std::string& name,
+                                             Network::ConnectionCallbacks& upstream_callbacks)
+      : FactoryBase(name), upstream_callbacks_(&upstream_callbacks) {}
   bool isTerminalFilterByProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::FactoryContext&) override {
     return true;
@@ -137,7 +144,8 @@ public:
   createFilterFactoryFromProtoTyped(const test::integration::starttls::StartTlsFilterConfig&,
                                     Server::Configuration::FactoryContext& context) override {
     return [&](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(StartTlsSwitchFilter::newInstance(context.clusterManager()));
+      filter_manager.addReadFilter(
+          StartTlsSwitchFilter::newInstance(context.clusterManager(), upstream_callbacks_));
     };
   }
 
@@ -145,6 +153,7 @@ public:
 
 private:
   const std::string name_;
+  Network::ConnectionCallbacks* upstream_callbacks_;
 };
 
 // Fixture class for integration tests.
@@ -156,8 +165,10 @@ public:
         stream_info_(timeSystem(), nullptr) {}
   void initialize() override;
 
+  NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
+
   // Config factory for StartTlsSwitchFilter.
-  StartTlsSwitchFilterConfigFactory config_factory_{"startTls"};
+  StartTlsSwitchFilterConfigFactory config_factory_{"startTls", upstream_callbacks_};
   Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory>
       registered_config_factory_{config_factory_};
 
@@ -242,6 +253,9 @@ void StartTlsIntegrationTest::initialize() {
 // which is resent to the client in clear-text.
 TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
   initialize();
+
+  // The upstream connection should only report a single connected event
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::Connected)).Times(1);
 
   // Open clear-text connection.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("starttls_test"));
