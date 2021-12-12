@@ -128,6 +128,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 }
 
 TEST_F(AsyncClientManagerImplTest, DisableRawAsyncClientCache) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.enable_grpc_async_client_cache", "false"}});
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
@@ -146,9 +149,6 @@ TEST_F(AsyncClientManagerImplTest, DisableRawAsyncClientCache) {
 }
 
 TEST_F(AsyncClientManagerImplTest, EnableRawAsyncClientCache) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.enable_grpc_async_client_cache", "true"}});
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
