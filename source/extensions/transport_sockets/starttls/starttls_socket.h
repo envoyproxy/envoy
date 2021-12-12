@@ -3,6 +3,7 @@
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -22,8 +23,8 @@ public:
       : active_socket_(std::move(raw_socket)), tls_socket_(std::move(tls_socket)) {}
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override {
-    active_socket_->setTransportSocketCallbacks(callbacks);
     callbacks_ = &callbacks;
+    active_socket_->setTransportSocketCallbacks(callbacks_);
   }
 
   std::string protocol() const override { return "starttls"; }
@@ -50,6 +51,36 @@ public:
   bool startSecureTransport() override;
 
 private:
+  // This is a proxy for wrapping the transport callback object passed from the consumer
+  // Its primary purpose is to filter Connected events to ensure they only happen once per open
+  class CallbackProxy : public Network::TransportSocketCallbacks {
+  public:
+    CallbackProxy(Network::TransportSocketCallbacks* callbacks) : parent_(callbacks) {}
+
+    Network::IoHandle& ioHandle() override { return parent_->ioHandle(); }
+    const Network::IoHandle& ioHandle() const override { return parent_->ioHandle(); }
+    Network::Connection& connection() override { return parent_->connection(); }
+    bool shouldDrainReadBuffer() override { return parent_->shouldDrainReadBuffer(); }
+    void setTransportSocketIsReadable() override { return parent_->setTransportSocketIsReadable(); }
+    void raiseEvent(Network::ConnectionEvent event) override {
+      if (event == Network::ConnectionEvent::Connected) {
+        // Don't send the connected event if we're already open
+        if (isopen_)
+          return;
+        isopen_ = true;
+      } else {
+        isopen_ = false;
+      }
+
+      parent_->raiseEvent(event);
+    }
+    void flushWriteBuffer() override { parent_->flushWriteBuffer(); }
+
+  private:
+    Network::TransportSocketCallbacks* parent_;
+    bool isopen_{false};
+  };
+
   // Socket used in all transport socket operations.
   // initially it is set to use raw buffer socket but
   // can be converted to use tls.
@@ -58,7 +89,7 @@ private:
   //  when startSecureTransport is called.
   Network::TransportSocketPtr tls_socket_;
 
-  Network::TransportSocketCallbacks* callbacks_{};
+  CallbackProxy callbacks_{nullptr};
 
   bool using_tls_{false};
 };
