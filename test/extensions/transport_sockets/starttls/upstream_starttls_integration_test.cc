@@ -256,7 +256,7 @@ TEST_P(StartTlsIntegrationTest, SwitchToTlsFromClient) {
 
   // The upstream connection should only report a single connected event
   EXPECT_CALL(upstream_callbacks_, onEvent(_));
-  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::Connected)).Times(1);
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::Connected));
 
   // Open clear-text connection.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("starttls_test"));
