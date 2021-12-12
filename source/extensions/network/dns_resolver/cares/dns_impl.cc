@@ -98,8 +98,8 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   }
 }
 
-void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
-                                                                   ares_addrinfo* addrinfo) {
+void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
+    int status, int timeouts, ares_addrinfo* addrinfo) {
   if (status != ARES_SUCCESS) {
     ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
                     "dns resolution for {} failed with c-ares status {}", dns_name_, status);
@@ -194,9 +194,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // that the first lookup failed to return any addresses. Note that DnsLookupFamily::All issues
     // both lookups concurrently so there is no need to fire a second lookup here.
     if (dns_lookup_family_ == DnsLookupFamily::Auto) {
-      getAddrInfo(AF_INET);
+      startResolutionImpl(AF_INET);
     } else if (dns_lookup_family_ == DnsLookupFamily::V4Preferred) {
-      getAddrInfo(AF_INET6);
+      startResolutionImpl(AF_INET6);
     }
 
     // Note: Nothing can follow this call to getAddrInfo due to deletion of this
@@ -296,32 +296,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  auto pending_resolution = std::make_unique<PendingResolution>(
+  auto pending_resolution = std::make_unique<AddrInfoPendingResolution>(
       *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
-  if (dns_lookup_family == DnsLookupFamily::Auto ||
-      dns_lookup_family == DnsLookupFamily::V4Preferred ||
-      dns_lookup_family == DnsLookupFamily::All) {
-    pending_resolution->dual_resolution_ = true;
-  }
-
-  switch (dns_lookup_family) {
-  case DnsLookupFamily::V4Only:
-  case DnsLookupFamily::V4Preferred:
-    pending_resolution->getAddrInfo(AF_INET);
-    break;
-  case DnsLookupFamily::V6Only:
-  case DnsLookupFamily::Auto:
-    pending_resolution->getAddrInfo(AF_INET6);
-    break;
-  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
-  // are being requested.
-  case DnsLookupFamily::All:
-    pending_resolution->getAddrInfo(AF_INET);
-    pending_resolution->getAddrInfo(AF_INET6);
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  pending_resolution->startResolution();
 
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
@@ -339,7 +316,46 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
-void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
+DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
+    DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+    ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
+    : PendingResolution(parent, callback, dispatcher, channel, dns_name),
+      dns_lookup_family_(dns_lookup_family) {
+  if (dns_lookup_family == DnsLookupFamily::Auto ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred ||
+      dns_lookup_family == DnsLookupFamily::All) {
+    dual_resolution_ = true;
+  }
+
+  switch (dns_lookup_family_) {
+  case DnsLookupFamily::V4Only:
+  case DnsLookupFamily::V4Preferred:
+    family_ = AF_INET;
+    break;
+  case DnsLookupFamily::V6Only:
+  case DnsLookupFamily::Auto:
+    family_ = AF_INET6;
+    break;
+  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
+  // are being requested.
+  case DnsLookupFamily::All:
+    lookup_all_ = true;
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
+  if (lookup_all_) {
+    startResolutionImpl(AF_INET);
+    startResolutionImpl(AF_INET6);
+  } else {
+    startResolutionImpl(family_);
+  }
+}
+
+void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
 
@@ -352,7 +368,8 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   ares_getaddrinfo(
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
       [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
-        static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts, addrinfo);
+        static_cast<AddrInfoPendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts,
+                                                                                addrinfo);
       },
       this);
 }
