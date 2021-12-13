@@ -428,8 +428,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   RETURN_IF_ERROR(HeaderUtility::checkRequiredRequestHeaders(headers));
 
   const HeaderEntry* method = headers.Method();
-  const HeaderEntry* path = headers.Path(); // NOLINT(clang-analyzer-core.CallAndMessage)
-  const HeaderEntry* host = headers.Host(); // NOLINT(clang-analyzer-core.CallAndMessage)
+  const HeaderEntry* path = headers.Path();
+  const HeaderEntry* host = headers.Host();
   bool is_connect = HeaderUtility::isConnect(headers);
   const Http::HeaderValues& header_values = Http::Headers::get();
 
@@ -446,10 +446,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
 
   absl::string_view host_or_path_view;
   if (is_connect) {
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     host_or_path_view = host->value().getStringView();
   } else {
-    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     host_or_path_view = path->value().getStringView();
   }
 
