@@ -223,7 +223,6 @@ public:
   uint64_t flushOutput(bool end_encode = false);
 
   Buffer::Instance& buffer() { return *output_buffer_; }
-  Buffer::FineGrainedBufferWriteHelper& bufferHelper() { return output_buffer_helper_; }
 
   void readDisable(bool disable) {
     if (connection_.state() == Network::Connection::State::Open) {
@@ -436,9 +435,6 @@ private:
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
   const uint32_t max_headers_count_;
-
-  // Output buffer helper to speed up buffer write.
-  Buffer::FineGrainedBufferWriteHelper output_buffer_helper_;
 };
 
 /**

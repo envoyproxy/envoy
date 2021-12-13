@@ -88,6 +88,9 @@ static constexpr absl::string_view CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
 static constexpr absl::string_view LAST_CHUNK = "0\r\n";
 
+static constexpr absl::string_view COLON = ":";
+static constexpr absl::string_view SPACE = " ";
+
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
     : connection_(connection), disable_chunk_encoding_(false), chunk_encoding_(true),
@@ -104,8 +107,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   ASSERT(!key.empty());
 
-  const uint64_t header_size =
-      connection_.bufferHelper().reserveAndWrite(key, ':', ' ', value, CRLF);
+  const uint64_t header_size = connection_.buffer().addFragments(key, COLON, SPACE, value, CRLF);
 
   bytes_meter_->addHeaderBytesSent(header_size);
 }
@@ -224,9 +226,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
-  connection_.bufferHelper().reserveAndWrite(CRLF);
-
-  connection_.bufferHelper().commitToBuffer();
+  connection_.buffer().addFragments(CRLF);
 
   if (end_stream) {
     endEncode();
@@ -271,7 +271,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   // https://tools.ietf.org/html/rfc7230#section-4.4
   if (chunk_encoding_) {
     // Finalize the body
-    connection_.bufferHelper().reserveAndWrite(LAST_CHUNK);
+    connection_.buffer().addFragments(LAST_CHUNK);
 
     // TODO(mattklein123): Wire up the formatter if someone actually asks for this (very unlikely).
     trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
@@ -280,9 +280,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    connection_.bufferHelper().reserveAndWrite(CRLF);
-
-    connection_.bufferHelper().commitToBuffer();
+    connection_.buffer().addFragments(CRLF);
 
     flushOutput();
   }
@@ -297,8 +295,7 @@ void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
-    connection_.buffer().add(LAST_CHUNK);
-    connection_.buffer().add(CRLF);
+    connection_.buffer().addFragments(LAST_CHUNK, CRLF);
   }
 
   flushOutput(true);
@@ -412,8 +409,8 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     reason_phrase = {status_string, status_string_len};
   }
 
-  connection_.bufferHelper().reserveAndWrite(response_prefix, absl::StrCat(numeric_status), ' ',
-                                             reason_phrase, CRLF);
+  connection_.buffer().addFragments(response_prefix, absl::StrCat(numeric_status), SPACE,
+                                    reason_phrase, CRLF);
 
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
@@ -456,8 +453,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     host_or_path_view = path->value().getStringView();
   }
 
-  connection_.bufferHelper().reserveAndWrite(method->value().getStringView(), ' ',
-                                             host_or_path_view, REQUEST_POSTFIX);
+  connection_.buffer().addFragments(method->value().getStringView(), SPACE, host_or_path_view,
+                                    REQUEST_POSTFIX);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
@@ -498,8 +495,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           [&]() -> void { this->onBelowLowWatermark(); },
           [&]() -> void { this->onAboveHighWatermark(); },
           []() -> void { /* TODO(adisuissa): Handle overflow watermark */ })),
-      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count),
-      output_buffer_helper_(*output_buffer_) {
+      max_headers_kb_(max_headers_kb), max_headers_count_(max_headers_count) {
   output_buffer_->setWatermarks(connection.bufferLimit());
   parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
 }
