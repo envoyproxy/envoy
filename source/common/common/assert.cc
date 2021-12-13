@@ -88,7 +88,7 @@ public:
   // understand and debug, and test behavior is predictable.
   static bool shouldLogAndInvoke(absl::string_view bug_name) {
     // Increment counter, inserting first if counter does not exist.
-    uint64_t counter_value = EnvoyBugState::get().inc(bug_name);
+    const uint64_t counter_value = EnvoyBugState::get().inc(bug_name);
 
     // Check if counter is power of two by its bitwise representation.
     return (counter_value & (counter_value - 1)) == 0;
