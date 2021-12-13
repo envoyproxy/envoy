@@ -1619,7 +1619,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // Keep track of hosts we're adding (or replacing)
   absl::flat_hash_set<std::string> new_hosts_for_current_priority(new_hosts.size());
   // Keep track of hosts for which locality is changed.
-  absl::flat_hash_set<std::string> existing_hosts_for_current_priority_locality_changed(
+  absl::flat_hash_set<std::string> hosts_with_updated_locality_for_current_priority(
       current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
@@ -1643,11 +1643,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
     const bool locality_changed =
         (existing_host_found &&
-         ((host->locality().region() != existing_host->second->locality().region()) ||
-          (host->locality().zone() != existing_host->second->locality().zone()) ||
-          (host->locality().sub_zone() != existing_host->second->locality().sub_zone())));
+         (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
     if (locality_changed) {
-      existing_hosts_for_current_priority_locality_changed.emplace(existing_host->first);
+      hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
     }
 
     const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
@@ -1764,11 +1762,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     erase_from =
         std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
                        [&all_new_hosts, &new_hosts_for_current_priority,
-                        &existing_hosts_for_current_priority_locality_changed, &final_hosts,
+                        &hosts_with_updated_locality_for_current_priority, &final_hosts,
                         &max_host_weight](const HostSharedPtr& p) {
-                         // This host is being added as a new host, total replacement
-                         // remove the older host
-                         if (existing_hosts_for_current_priority_locality_changed.contains(
+                         // This host has already been added as a new host in the
+                         // new_hosts_for_current_priority. Return false here to make sure that host
+                         // reference with older locality gets cleaned up from the priority.
+                         if (hosts_with_updated_locality_for_current_priority.contains(
                                  p->address()->asString())) {
                            return false;
                          }
