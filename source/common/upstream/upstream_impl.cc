@@ -1391,7 +1391,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::config::cluster::v3::Cluste
   Stats::StatName priority_stat_name;
   std::string priority_name;
   switch (priority) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::core::v3::DEFAULT:
     priority_stat_name = circuit_breakers_stat_names_.default_;
     priority_name = "default";
@@ -1779,7 +1779,7 @@ getDnsLookupFamilyFromCluster(const envoy::config::cluster::v3::Cluster& cluster
 Network::DnsLookupFamily
 getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily family) {
   switch (family) {
-      PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::cluster::v3::Cluster::V6_ONLY:
     return Network::DnsLookupFamily::V6Only;
   case envoy::config::cluster::v3::Cluster::V4_ONLY:

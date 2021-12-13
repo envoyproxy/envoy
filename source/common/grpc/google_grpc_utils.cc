@@ -124,10 +124,10 @@ GoogleGrpcUtils::channelArgsFromConfig(const envoy::config::core::v3::GrpcServic
     case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::kIntValue:
       args.SetInt(channel_arg.first, channel_arg.second.int_value());
       break;
-    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::VALUE_SPECIFIER_NOT_SET:
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::ChannelArgs::Value::
+        VALUE_SPECIFIER_NOT_SET:
       PANIC_DUE_TO_PROTO_UNSET;
     }
-
   }
   return args;
 }

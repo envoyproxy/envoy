@@ -618,7 +618,7 @@ SnapshotImplPtr LoaderImpl::createNewSnapshot() {
       break;
     }
     case envoy::config::bootstrap::v3::RuntimeLayer::LayerSpecifierCase::LAYER_SPECIFIER_NOT_SET:
-        PANIC_DUE_TO_PROTO_UNSET;
+      PANIC_DUE_TO_PROTO_UNSET;
     }
   }
   stats_.num_layers_.set(layers.size());

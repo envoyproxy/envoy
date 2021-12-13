@@ -87,7 +87,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
       return factory.createFilter(config.extension_filter(), runtime, random);
     }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::FILTER_SPECIFIER_NOT_SET:
-  PANIC_DUE_TO_PROTO_UNSET;
+    PANIC_DUE_TO_PROTO_UNSET;
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }

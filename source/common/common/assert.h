@@ -261,7 +261,7 @@ void resetEnvoyBugCountersForTest();
 // It is safer to avoid defaults in switch statements, so that as new enums are added, the compiler
 // checks that new code is added as well. Google's proto library adds 2 sentinel values which should
 // not be used, and this macro allows avoiding using "default:" to handle them.
-#define PANIC_ON_PROTO_ENUM_SENTINEL_VALUES                                                                \
+#define PANIC_ON_PROTO_ENUM_SENTINEL_VALUES                                                        \
   case std::numeric_limits<int32_t>::max():                                                        \
     FALLTHRU;                                                                                      \
   case std::numeric_limits<int32_t>::min():                                                        \

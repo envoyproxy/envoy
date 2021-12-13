@@ -488,7 +488,7 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
-    PANIC("internal address not supported");  // TODO(lambdai) fix.
+    PANIC("internal address not supported"); // TODO(lambdai) fix.
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
