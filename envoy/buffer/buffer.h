@@ -459,6 +459,31 @@ public:
   }
 
   /**
+   * Copy multiple arguments to the buffer. In order to improve performance, all the arguments in
+   * each call will be stored in contiguous memory. So this method is mainly used when a large
+   * amount of fine-grained data needs to be written to the buffer. The type of arguments must be
+   * automatically converted to `absl::string_view`.
+   * @param args A set of arguments with variable length and type. The arguments must be guaranteed
+   * to be safely converted to `absl::string_view`.
+   * @return The total size of the data copied to the buffer.
+   */
+  template <class... Args> size_t addFragments(Args&&... args) {
+    size_t total_size_to_write = 0;
+    if constexpr (sizeof...(args) > 0) {
+      constexpr auto WriteHelper = [](uint8_t** dst, absl::string_view v) {
+        memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
+        *dst += v.size();
+      };
+
+      total_size_to_write = (absl::string_view(args).size() + ...);
+      auto* dst_memory_to_write = inlineReserve(total_size_to_write);
+      (WriteHelper(&dst_memory_to_write, absl::string_view(args)), ...);
+      inlineCommit(total_size_to_write);
+    }
+    return total_size_to_write;
+  }
+
+  /**
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
    * watermark. Setting the high watermark to 0 disables watermark functionality.
    * @param watermark supplies the buffer high watermark size threshold, in bytes.
@@ -478,6 +503,23 @@ public:
    * the low watermark.
    */
   virtual bool highWatermarkTriggered() const PURE;
+
+protected:
+  /**
+   * Reserve contiguous memory segment with specific size. The first address of this memory segment
+   * will be returned.
+   * @param expected contiguous memory segment size.
+   * @return the first address of this memory segment.
+   */
+  virtual uint8_t* inlineReserve(size_t size) PURE;
+
+  /**
+   * Increase the length of buffer directly. This method can only be used after calling
+   * `inlineReserve`. And there should not be any other Buffer API calls between `inlineReserve` and
+   * this method.
+   * @param size the increased size of buffer length.
+   */
+  virtual void inlineCommit(size_t size) PURE;
 
 private:
   friend Reservation;

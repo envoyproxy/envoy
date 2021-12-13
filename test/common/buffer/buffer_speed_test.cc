@@ -473,4 +473,310 @@ BENCHMARK(bufferStartsWithMatch)
     ->Args({16384, 256})
     ->Args({65536, 4096});
 
+static void helperVsWatermarkBufferVsAddFragments(benchmark::State& state) {
+  size_t buffer_type = state.range(0);
+  size_t data_size = state.range(1);
+  size_t data_step = state.range(2);
+  std::string data_unit(data_step, 'c');
+  absl::string_view data_unit_view(data_unit);
+
+  size_t reserve_cycle = state.range(3);
+
+  for (auto _ : state) { // NOLINT
+    if (buffer_type == 0) {
+      Buffer::WatermarkBuffer buffer(nullptr, nullptr, nullptr);
+      Buffer::FineGrainedBufferWriteHelper helper(buffer);
+      if (reserve_cycle == 1) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view);
+          i += data_step;
+        }
+      } else if (reserve_cycle == 3) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view, data_unit_view, data_unit_view);
+          i += 3 * data_step;
+        }
+      } else if (reserve_cycle == 5) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
+                                 data_unit_view);
+          i += 5 * data_step;
+        }
+      }
+    } else if (buffer_type == 1) {
+      Buffer::WatermarkBuffer buffer(nullptr, nullptr, nullptr);
+      for (size_t i = 0; i < data_size;) {
+        for (size_t e = 0; e < reserve_cycle; e++) {
+          buffer.add(data_unit_view);
+        }
+        i += reserve_cycle * data_step;
+      }
+    } else {
+      Buffer::WatermarkBuffer buffer(nullptr, nullptr, nullptr);
+      if (reserve_cycle == 1) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view);
+          i += data_step;
+        }
+      } else if (reserve_cycle == 3) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view, data_unit_view, data_unit_view);
+          i += 3 * data_step;
+        }
+      } else if (reserve_cycle == 5) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
+                              data_unit_view);
+          i += 5 * data_step;
+        }
+      }
+    }
+  }
+}
+
+BENCHMARK(helperVsWatermarkBufferVsAddFragments)
+    ->Args({0, 64 * 1024 * 1024, 1, 1})
+    ->Args({0, 64 * 1024 * 1024, 8, 1})
+    ->Args({0, 64 * 1024 * 1024, 16, 1})
+    ->Args({0, 64 * 1024 * 1024, 32, 1})
+    ->Args({0, 64 * 1024 * 1024, 64, 1})
+    ->Args({0, 64 * 1024 * 1024, 128, 1})
+    ->Args({0, 64 * 1024 * 1024, 256, 1})
+    ->Args({0, 64 * 1024 * 1024, 1024, 1})
+    ->Args({0, 64 * 1024 * 1024, 4096, 1})
+    ->Args({0, 64 * 1024 * 1024, 8192, 1})
+    ->Args({1, 64 * 1024 * 1024, 1, 1})
+    ->Args({1, 64 * 1024 * 1024, 8, 1})
+    ->Args({1, 64 * 1024 * 1024, 16, 1})
+    ->Args({1, 64 * 1024 * 1024, 32, 1})
+    ->Args({1, 64 * 1024 * 1024, 64, 1})
+    ->Args({1, 64 * 1024 * 1024, 128, 1})
+    ->Args({1, 64 * 1024 * 1024, 256, 1})
+    ->Args({1, 64 * 1024 * 1024, 1024, 1})
+    ->Args({1, 64 * 1024 * 1024, 4096, 1})
+    ->Args({1, 64 * 1024 * 1024, 8192, 1})
+    ->Args({2, 64 * 1024 * 1024, 1, 1})
+    ->Args({2, 64 * 1024 * 1024, 8, 1})
+    ->Args({2, 64 * 1024 * 1024, 16, 1})
+    ->Args({2, 64 * 1024 * 1024, 32, 1})
+    ->Args({2, 64 * 1024 * 1024, 64, 1})
+    ->Args({2, 64 * 1024 * 1024, 128, 1})
+    ->Args({2, 64 * 1024 * 1024, 256, 1})
+    ->Args({2, 64 * 1024 * 1024, 1024, 1})
+    ->Args({2, 64 * 1024 * 1024, 4096, 1})
+    ->Args({2, 64 * 1024 * 1024, 8192, 1})
+    ->Args({0, 64 * 1024 * 1024, 1, 3})
+    ->Args({0, 64 * 1024 * 1024, 8, 3})
+    ->Args({0, 64 * 1024 * 1024, 16, 3})
+    ->Args({0, 64 * 1024 * 1024, 32, 3})
+    ->Args({0, 64 * 1024 * 1024, 64, 3})
+    ->Args({0, 64 * 1024 * 1024, 128, 3})
+    ->Args({0, 64 * 1024 * 1024, 256, 3})
+    ->Args({0, 64 * 1024 * 1024, 1024, 3})
+    ->Args({0, 64 * 1024 * 1024, 4096, 3})
+    ->Args({0, 64 * 1024 * 1024, 8192, 3})
+    ->Args({1, 64 * 1024 * 1024, 1, 3})
+    ->Args({1, 64 * 1024 * 1024, 8, 3})
+    ->Args({1, 64 * 1024 * 1024, 16, 3})
+    ->Args({1, 64 * 1024 * 1024, 32, 3})
+    ->Args({1, 64 * 1024 * 1024, 64, 3})
+    ->Args({1, 64 * 1024 * 1024, 128, 3})
+    ->Args({1, 64 * 1024 * 1024, 256, 3})
+    ->Args({1, 64 * 1024 * 1024, 1024, 3})
+    ->Args({1, 64 * 1024 * 1024, 4096, 3})
+    ->Args({1, 64 * 1024 * 1024, 8192, 3})
+    ->Args({2, 64 * 1024 * 1024, 1, 3})
+    ->Args({2, 64 * 1024 * 1024, 8, 3})
+    ->Args({2, 64 * 1024 * 1024, 16, 3})
+    ->Args({2, 64 * 1024 * 1024, 32, 3})
+    ->Args({2, 64 * 1024 * 1024, 64, 3})
+    ->Args({2, 64 * 1024 * 1024, 128, 3})
+    ->Args({2, 64 * 1024 * 1024, 256, 3})
+    ->Args({2, 64 * 1024 * 1024, 1024, 3})
+    ->Args({2, 64 * 1024 * 1024, 4096, 3})
+    ->Args({2, 64 * 1024 * 1024, 8192, 3})
+    ->Args({0, 64 * 1024 * 1024, 1, 5})
+    ->Args({0, 64 * 1024 * 1024, 8, 5})
+    ->Args({0, 64 * 1024 * 1024, 16, 5})
+    ->Args({0, 64 * 1024 * 1024, 32, 5})
+    ->Args({0, 64 * 1024 * 1024, 64, 5})
+    ->Args({0, 64 * 1024 * 1024, 128, 5})
+    ->Args({0, 64 * 1024 * 1024, 256, 5})
+    ->Args({0, 64 * 1024 * 1024, 1024, 5})
+    ->Args({0, 64 * 1024 * 1024, 4096, 5})
+    ->Args({0, 64 * 1024 * 1024, 8192, 5})
+    ->Args({1, 64 * 1024 * 1024, 1, 5})
+    ->Args({1, 64 * 1024 * 1024, 8, 5})
+    ->Args({1, 64 * 1024 * 1024, 16, 5})
+    ->Args({1, 64 * 1024 * 1024, 32, 5})
+    ->Args({1, 64 * 1024 * 1024, 64, 5})
+    ->Args({1, 64 * 1024 * 1024, 128, 5})
+    ->Args({1, 64 * 1024 * 1024, 256, 5})
+    ->Args({1, 64 * 1024 * 1024, 1024, 5})
+    ->Args({1, 64 * 1024 * 1024, 4096, 5})
+    ->Args({1, 64 * 1024 * 1024, 8192, 5})
+    ->Args({2, 64 * 1024 * 1024, 1, 5})
+    ->Args({2, 64 * 1024 * 1024, 8, 5})
+    ->Args({2, 64 * 1024 * 1024, 16, 5})
+    ->Args({2, 64 * 1024 * 1024, 32, 5})
+    ->Args({2, 64 * 1024 * 1024, 64, 5})
+    ->Args({2, 64 * 1024 * 1024, 128, 5})
+    ->Args({2, 64 * 1024 * 1024, 256, 5})
+    ->Args({2, 64 * 1024 * 1024, 1024, 5})
+    ->Args({2, 64 * 1024 * 1024, 4096, 5})
+    ->Args({2, 64 * 1024 * 1024, 8192, 5});
+
+static void helperVsBufferVsAddFragments(benchmark::State& state) {
+  size_t buffer_type = state.range(0);
+  size_t data_size = state.range(1);
+  size_t data_step = state.range(2);
+  std::string data_unit(data_step, 'c');
+  absl::string_view data_unit_view(data_unit);
+
+  size_t reserve_cycle = state.range(3);
+
+  for (auto _ : state) { // NOLINT
+    if (buffer_type == 0) {
+      Buffer::OwnedImpl buffer;
+      Buffer::FineGrainedBufferWriteHelper helper(buffer);
+      if (reserve_cycle == 1) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view);
+          i += data_step;
+        }
+      } else if (reserve_cycle == 3) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view, data_unit_view, data_unit_view);
+          i += 3 * data_step;
+        }
+      } else if (reserve_cycle == 5) {
+        for (size_t i = 0; i < data_size;) {
+          helper.reserveAndWrite(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
+                                 data_unit_view);
+          i += 5 * data_step;
+        }
+      }
+    } else if (buffer_type == 1) {
+      Buffer::OwnedImpl buffer;
+      for (size_t i = 0; i < data_size;) {
+        for (size_t e = 0; e < reserve_cycle; e++) {
+          buffer.add(data_unit_view);
+        }
+        i += reserve_cycle * data_step;
+      }
+    } else {
+      Buffer::OwnedImpl buffer;
+      if (reserve_cycle == 1) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view);
+          i += data_step;
+        }
+      } else if (reserve_cycle == 3) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view, data_unit_view, data_unit_view);
+          i += 3 * data_step;
+        }
+      } else if (reserve_cycle == 5) {
+        for (size_t i = 0; i < data_size;) {
+          buffer.addFragments(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
+                              data_unit_view);
+          i += 5 * data_step;
+        }
+      }
+    }
+  }
+}
+
+BENCHMARK(helperVsBufferVsAddFragments)
+    ->Args({0, 64 * 1024 * 1024, 1, 1})
+    ->Args({0, 64 * 1024 * 1024, 8, 1})
+    ->Args({0, 64 * 1024 * 1024, 16, 1})
+    ->Args({0, 64 * 1024 * 1024, 32, 1})
+    ->Args({0, 64 * 1024 * 1024, 64, 1})
+    ->Args({0, 64 * 1024 * 1024, 128, 1})
+    ->Args({0, 64 * 1024 * 1024, 256, 1})
+    ->Args({0, 64 * 1024 * 1024, 1024, 1})
+    ->Args({0, 64 * 1024 * 1024, 4096, 1})
+    ->Args({0, 64 * 1024 * 1024, 8192, 1})
+    ->Args({1, 64 * 1024 * 1024, 1, 1})
+    ->Args({1, 64 * 1024 * 1024, 8, 1})
+    ->Args({1, 64 * 1024 * 1024, 16, 1})
+    ->Args({1, 64 * 1024 * 1024, 32, 1})
+    ->Args({1, 64 * 1024 * 1024, 64, 1})
+    ->Args({1, 64 * 1024 * 1024, 128, 1})
+    ->Args({1, 64 * 1024 * 1024, 256, 1})
+    ->Args({1, 64 * 1024 * 1024, 1024, 1})
+    ->Args({1, 64 * 1024 * 1024, 4096, 1})
+    ->Args({1, 64 * 1024 * 1024, 8192, 1})
+    ->Args({2, 64 * 1024 * 1024, 1, 1})
+    ->Args({2, 64 * 1024 * 1024, 8, 1})
+    ->Args({2, 64 * 1024 * 1024, 16, 1})
+    ->Args({2, 64 * 1024 * 1024, 32, 1})
+    ->Args({2, 64 * 1024 * 1024, 64, 1})
+    ->Args({2, 64 * 1024 * 1024, 128, 1})
+    ->Args({2, 64 * 1024 * 1024, 256, 1})
+    ->Args({2, 64 * 1024 * 1024, 1024, 1})
+    ->Args({2, 64 * 1024 * 1024, 4096, 1})
+    ->Args({2, 64 * 1024 * 1024, 8192, 1})
+    ->Args({0, 64 * 1024 * 1024, 1, 3})
+    ->Args({0, 64 * 1024 * 1024, 8, 3})
+    ->Args({0, 64 * 1024 * 1024, 16, 3})
+    ->Args({0, 64 * 1024 * 1024, 32, 3})
+    ->Args({0, 64 * 1024 * 1024, 64, 3})
+    ->Args({0, 64 * 1024 * 1024, 128, 3})
+    ->Args({0, 64 * 1024 * 1024, 256, 3})
+    ->Args({0, 64 * 1024 * 1024, 1024, 3})
+    ->Args({0, 64 * 1024 * 1024, 4096, 3})
+    ->Args({0, 64 * 1024 * 1024, 8192, 3})
+    ->Args({1, 64 * 1024 * 1024, 1, 3})
+    ->Args({1, 64 * 1024 * 1024, 8, 3})
+    ->Args({1, 64 * 1024 * 1024, 16, 3})
+    ->Args({1, 64 * 1024 * 1024, 32, 3})
+    ->Args({1, 64 * 1024 * 1024, 64, 3})
+    ->Args({1, 64 * 1024 * 1024, 128, 3})
+    ->Args({1, 64 * 1024 * 1024, 256, 3})
+    ->Args({1, 64 * 1024 * 1024, 1024, 3})
+    ->Args({1, 64 * 1024 * 1024, 4096, 3})
+    ->Args({1, 64 * 1024 * 1024, 8192, 3})
+    ->Args({2, 64 * 1024 * 1024, 1, 3})
+    ->Args({2, 64 * 1024 * 1024, 8, 3})
+    ->Args({2, 64 * 1024 * 1024, 16, 3})
+    ->Args({2, 64 * 1024 * 1024, 32, 3})
+    ->Args({2, 64 * 1024 * 1024, 64, 3})
+    ->Args({2, 64 * 1024 * 1024, 128, 3})
+    ->Args({2, 64 * 1024 * 1024, 256, 3})
+    ->Args({2, 64 * 1024 * 1024, 1024, 3})
+    ->Args({2, 64 * 1024 * 1024, 4096, 3})
+    ->Args({2, 64 * 1024 * 1024, 8192, 3})
+    ->Args({0, 64 * 1024 * 1024, 1, 5})
+    ->Args({0, 64 * 1024 * 1024, 8, 5})
+    ->Args({0, 64 * 1024 * 1024, 16, 5})
+    ->Args({0, 64 * 1024 * 1024, 32, 5})
+    ->Args({0, 64 * 1024 * 1024, 64, 5})
+    ->Args({0, 64 * 1024 * 1024, 128, 5})
+    ->Args({0, 64 * 1024 * 1024, 256, 5})
+    ->Args({0, 64 * 1024 * 1024, 1024, 5})
+    ->Args({0, 64 * 1024 * 1024, 4096, 5})
+    ->Args({0, 64 * 1024 * 1024, 8192, 5})
+    ->Args({1, 64 * 1024 * 1024, 1, 5})
+    ->Args({1, 64 * 1024 * 1024, 8, 5})
+    ->Args({1, 64 * 1024 * 1024, 16, 5})
+    ->Args({1, 64 * 1024 * 1024, 32, 5})
+    ->Args({1, 64 * 1024 * 1024, 64, 5})
+    ->Args({1, 64 * 1024 * 1024, 128, 5})
+    ->Args({1, 64 * 1024 * 1024, 256, 5})
+    ->Args({1, 64 * 1024 * 1024, 1024, 5})
+    ->Args({1, 64 * 1024 * 1024, 4096, 5})
+    ->Args({1, 64 * 1024 * 1024, 8192, 5})
+    ->Args({2, 64 * 1024 * 1024, 1, 5})
+    ->Args({2, 64 * 1024 * 1024, 8, 5})
+    ->Args({2, 64 * 1024 * 1024, 16, 5})
+    ->Args({2, 64 * 1024 * 1024, 32, 5})
+    ->Args({2, 64 * 1024 * 1024, 64, 5})
+    ->Args({2, 64 * 1024 * 1024, 128, 5})
+    ->Args({2, 64 * 1024 * 1024, 256, 5})
+    ->Args({2, 64 * 1024 * 1024, 1024, 5})
+    ->Args({2, 64 * 1024 * 1024, 4096, 5})
+    ->Args({2, 64 * 1024 * 1024, 8192, 5});
+
 } // namespace Envoy

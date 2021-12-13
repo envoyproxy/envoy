@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <limits>
 
 #include "envoy/common/exception.h"
@@ -1073,6 +1074,23 @@ TEST(BufferHelperTest, WriteBEI64) {
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
+  }
+}
+TEST(BufferHelperTest, AddFragments) {
+  {
+    // Add some string fragments.
+    Buffer::OwnedImpl buffer;
+    buffer.addFragments("aaaaa", absl::string_view("bbbbb"));
+    EXPECT_EQ("aaaaabbbbb", buffer.toString());
+  }
+
+  {
+    // Add string fragments cyclically.
+    Buffer::OwnedImpl buffer;
+    for (size_t i = 0; i < 1024; i++) {
+      buffer.addFragments("aaaaa", "bbbbb", "ccccc", "ddddd");
+    }
+    EXPECT_EQ(buffer.length(), 20 * 1024);
   }
 }
 

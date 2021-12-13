@@ -53,6 +53,12 @@ protected:
   virtual void checkHighAndOverflowWatermarks();
   virtual void checkLowWatermark();
 
+protected:
+  void inlineCommit(size_t size) override {
+    OwnedImpl::inlineCommit(size);
+    checkHighAndOverflowWatermarks();
+  }
+
 private:
   void commit(uint64_t length, absl::Span<RawSlice> slices,
               ReservationSlicesOwnerPtr slices_owner) override;

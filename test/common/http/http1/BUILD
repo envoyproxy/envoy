@@ -1,7 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_package",
 )
@@ -67,20 +65,4 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
-)
-
-envoy_cc_benchmark_binary(
-    name = "codec_impl_speed_test_binary",
-    srcs = ["codec_impl_speed_test.cc"],
-    external_deps = [
-        "benchmark",
-    ],
-    deps = [
-        "//source/common/http/http1:codec_lib",
-    ],
-)
-
-envoy_benchmark_test(
-    name = "codec_impl_speed_test",
-    benchmark_binary = "codec_impl_speed_test_binary",
 )

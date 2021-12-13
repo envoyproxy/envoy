@@ -189,163 +189,6 @@ private:
 };
 
 /**
- * Helper class for fine grained buffer write. This class can be used to speed up some scenarios
- * where small pieces of data are frequently written to the buffer, such as the encoding of HTTP
- * Headers.
- */
-class FineGrainedBufferWriteHelper {
-public:
-  static constexpr uint64_t DefaultReservationSize = 4096;
-
-  /**
-   * @param buffer the buffer that all data will eventually need to be written.
-   */
-  FineGrainedBufferWriteHelper(Buffer::Instance& buffer) : buffer_(buffer) {}
-
-  /**
-   * Reserve enough memory for the argument pack and write all the arguments to the buffer helper.
-   * This template method can accept variable-length argument pack containing different types of
-   * data. But currently only string related types or char can be supported.
-   *
-   * This method is preferred instead of directly using the `reserveBuffer` and `writeTobuffer`
-   * methods.
-   *
-   * @param args variable-length argument pack to write.
-   * @return the size of the data written.
-   */
-  template <class... Args> size_t reserveAndWrite(Args&&... args) {
-    size_t size_to_write = 0;
-    if constexpr (sizeof...(args) > 0) {
-      size_to_write = (bytesSize(args) + ...);
-      reserveBuffer(size_to_write);
-      (writeToBuffer(args), ...);
-    }
-    return size_to_write;
-  }
-
-  /**
-   * Write data with specified size to the buffer.
-   * @param data the address of the data to be written.
-   * @param size the size of the data to be written.
-   */
-  void writeToBuffer(const char* data, uint64_t size) {
-    ASSERT(remaining() >= size);
-    memcpy(current_pos_, data, size); // NOLINT(safe-memcpy)
-    current_pos_ += size;
-  }
-
-  /**
-   * Write data without specified size to the buffer.
-   * @param data the address of the data to be written. Copy data to buffer until the first '\0'
-   * character is encountered.
-   */
-  void writeToBuffer(const char* data) {
-    const size_t size = bytesSize(data);
-    writeToBuffer(data, size);
-  }
-
-  /**
-   * Write string view the buffer.
-   * @param data the string view to be written.
-   */
-  void writeToBuffer(absl::string_view data) { writeToBuffer(data.data(), data.size()); }
-
-  /**
-   * Write single char to buffer.
-   * @param c the single char to be written.
-   */
-  void writeToBuffer(char c) {
-    ASSERT(remaining() >= 1);
-    *current_pos_ = c;
-    current_pos_++;
-  }
-
-  /**
-   * Reserve enough local buffer. After that, the data can be copied directly to the buffer without
-   * additional checking. Before calling `writeToBuffer`, this method should be called to ensure
-   * that the local buffer has enough memory space. The common scenario is to call this method once
-   * to reserve a big enough buffer, and then call writeToBuffer multiple times.
-   *
-   * @param size local buffer size to reserve.
-   */
-  void reserveBuffer(uint64_t size) {
-    ASSERT(size > 0);
-
-    if (reservation_ == nullptr) {
-      initializeReservation(size);
-      return;
-    }
-
-    if (remaining() >= size) {
-      return;
-    }
-
-    commitToBuffer();
-    initializeReservation(size);
-  }
-
-  /**
-   * Write all the contents in the local buffer to the backend buffer.
-   */
-  void commitToBuffer() {
-    if (reservation_ == nullptr) {
-      return;
-    }
-
-    size_t filled = hasFilled();
-
-    if (filled > 0) {
-      reservation_->commit(filled);
-    }
-
-    reservation_ = nullptr;
-    raw_slice_ = {nullptr, 0};
-    current_pos_ = nullptr;
-  }
-
-  // Method only used for test.
-  uint64_t remainingForTest() { return remaining(); }
-
-private:
-  template <class T> size_t bytesSize(T&& arg) {
-    if constexpr (std::is_same_v<char, std::remove_reference_t<T>>) {
-      return 1;
-    } else if constexpr (std::is_same_v<const char*, std::remove_reference_t<T>>) {
-      return strlen(arg);
-    } else if constexpr (std::is_array_v<std::remove_reference_t<T>>) {
-      return sizeof(arg);
-    } else {
-      return arg.size();
-    }
-  }
-
-  uint64_t remaining() { return raw_slice_.len_ - hasFilled(); }
-
-  uint64_t hasFilled() {
-    ASSERT(raw_slice_.mem_ != nullptr);
-    ASSERT(current_pos_ != nullptr);
-    ASSERT(current_pos_ >= static_cast<char*>(raw_slice_.mem_));
-    return current_pos_ - (static_cast<char*>(raw_slice_.mem_));
-  }
-
-  void initializeReservation(uint64_t size) {
-    reservation_ = std::make_unique<Buffer::ReservationSingleSlice>(
-        buffer_.reserveSingleSlice(std::max(DefaultReservationSize, size)));
-
-    raw_slice_ = reservation_->slice();
-
-    ASSERT(raw_slice_.mem_ != nullptr);
-    current_pos_ = static_cast<char*>(raw_slice_.mem_);
-  }
-
-  Buffer::Instance& buffer_;
-
-  std::unique_ptr<Buffer::ReservationSingleSlice> reservation_;
-  Buffer::RawSlice raw_slice_;
-  char* current_pos_{};
-};
-
-/**
  * Base class for HTTP/1.1 client and server connections.
  * Handles the callbacks of http_parser with its own base routine and then
  * virtual dispatches to its subclasses.
@@ -380,7 +223,7 @@ public:
   uint64_t flushOutput(bool end_encode = false);
 
   Buffer::Instance& buffer() { return *output_buffer_; }
-  FineGrainedBufferWriteHelper& bufferHelper() { return output_buffer_helper_; }
+  Buffer::FineGrainedBufferWriteHelper& bufferHelper() { return output_buffer_helper_; }
 
   void readDisable(bool disable) {
     if (connection_.state() == Network::Connection::State::Open) {
@@ -595,7 +438,7 @@ private:
   const uint32_t max_headers_count_;
 
   // Output buffer helper to speed up buffer write.
-  FineGrainedBufferWriteHelper output_buffer_helper_;
+  Buffer::FineGrainedBufferWriteHelper output_buffer_helper_;
 };
 
 /**
