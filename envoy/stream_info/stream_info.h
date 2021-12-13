@@ -411,8 +411,8 @@ public:
    * For downstream connections this is latched at the time the upstream stream
    * is assigned.
    */
-  virtual void setUpstreamNumStreams(size_t num_streams) PURE;
-  virtual size_t upstreamNumStreams() const PURE;
+  virtual void setUpstreamNumStreams(uint64_t num_streams) PURE;
+  virtual uint64_t upstreamNumStreams() const PURE;
 };
 
 /**

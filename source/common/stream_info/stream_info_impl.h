@@ -68,8 +68,8 @@ struct UpstreamInfoImpl : public UpstreamInfo {
     os << spaces << "UpstreamInfoImpl " << this << DUMP_OPTIONAL_MEMBER(upstream_connection_id_)
        << "\n";
   }
-  void setUpstreamNumStreams(size_t num_streams) override { num_streams_ = num_streams; }
-  size_t upstreamNumStreams() const override { return num_streams_; }
+  void setUpstreamNumStreams(uint64_t num_streams) override { num_streams_ = num_streams; }
+  uint64_t upstreamNumStreams() const override { return num_streams_; }
 
   Upstream::HostDescriptionConstSharedPtr upstream_host_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
