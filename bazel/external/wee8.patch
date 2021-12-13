@@ -6,6 +6,7 @@
 6. Replace @zlib with //external:zlib and fix include path (https://crrev.com/c/3333633).
 7. Fix #include brackets (https://crrev.com/c/3334336).
 8. Fix ASan build (https://crrev.com/c/3295743).
+9. Fix "bazel query deps" presubmit (https://crrev.com/c/3336502).
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
@@ -366,6 +367,32 @@
              "//conditions:default": ":torque",
          }),
      )
+--- bazel/v8-non-pointer-compression.bzl
++++ bazel/v8-non-pointer-compression.bzl
+@@ -1,12 +1,12 @@
+ def _v8_disable_pointer_compression(settings, attr):
+     return {
+-        "//third_party/v8/HEAD:v8_enable_pointer_compression": "False",
++        "//:v8_enable_pointer_compression": "False",
+     }
+
+ v8_disable_pointer_compression = transition(
+     implementation = _v8_disable_pointer_compression,
+     inputs = [],
+-    outputs = ["//third_party/v8/HEAD:v8_enable_pointer_compression"],
++    outputs = ["//:v8_enable_pointer_compression"],
+ )
+
+ # The implementation of transition_rule: all this does is copy the
+@@ -51,7 +51,7 @@
+         # consequences for your build. The whitelist defaults to "everything".
+         # But you can redefine it more strictly if you feel that's prudent.
+         "_allowlist_function_transition": attr.label(
+-            default = "//tools/allowlists/function_transition_allowlist",
++            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
+         ),
+     },
+     # Making this executable means it works with "$ bazel run".
 --- src/heap/cppgc/default-platform.cc
 +++ src/heap/cppgc/default-platform.cc
 @@ -2,7 +2,7 @@
