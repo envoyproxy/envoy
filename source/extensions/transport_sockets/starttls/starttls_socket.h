@@ -65,8 +65,9 @@ private:
     void raiseEvent(Network::ConnectionEvent event) override {
       if (event == Network::ConnectionEvent::Connected) {
         // Don't send the connected event if we're already open
-        if (isopen_)
+        if (isopen_) {
           return;
+        }
         isopen_ = true;
       } else {
         isopen_ = false;
