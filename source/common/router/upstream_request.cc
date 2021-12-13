@@ -428,15 +428,16 @@ void UpstreamRequest::onPoolReady(
     stream_info_.protocol(protocol.value());
   }
 
+  StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
   if (info.upstreamInfo().has_value()) {
     auto& upstream_timing = info.upstreamInfo().value().get().upstreamTiming();
     upstreamTiming().upstream_connect_start_ = upstream_timing.upstream_connect_start_;
     upstreamTiming().upstream_connect_complete_ = upstream_timing.upstream_connect_complete_;
     upstreamTiming().upstream_handshake_complete_ = upstream_timing.upstream_handshake_complete_;
+    upstream_info.setUpstreamNumStreams(info.upstreamInfo().value().get().upstreamNumStreams());
   }
 
-  StreamInfo::UpstreamInfo& upstream_info = *stream_info_.upstreamInfo();
   upstream_info.setUpstreamFilterState(std::make_shared<StreamInfo::FilterStateImpl>(
       info.filterState().parent()->parent(), StreamInfo::FilterState::LifeSpan::Request));
   upstream_info.setUpstreamLocalAddress(upstream_local_address);

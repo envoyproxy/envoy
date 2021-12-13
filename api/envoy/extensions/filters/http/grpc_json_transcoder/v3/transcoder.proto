@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
 // [#extension: envoy.filters.http.grpc_json_transcoder]
 
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 // GrpcJsonTranscoder filter configuration.
 // The filter itself can be used per route / per virtual host or on the general level. The most
 // specific one is being used for a given route. If the list of services is empty - filter
@@ -221,6 +221,17 @@ message GrpcJsonTranscoder {
   // If true, unescape '+' to space when extracting variables in query parameters.
   // This is to support `HTML 2.0 <https://tools.ietf.org/html/rfc1866#section-8.2.1>`_
   bool query_param_unescape_plus = 12;
+
+  // If true, try to match the custom verb even if it is unregistered. By
+  // default, only match when it is registered.
+  //
+  // According to the http template `syntax <https://github.com/googleapis/googleapis/blob/master/google/api/http.proto#L226-L231>`_,
+  // the custom verb is **":" LITERAL** at the end of http template.
+  //
+  // For a request with */foo/bar:baz* and *:baz* is not registered in any url_template, here is the behavior change
+  // - if the field is not set, *:baz* will not be treated as custom verb, so it will match **/foo/{x=*}**.
+  // - if the field is set, *:baz* is treated as custom verb,  so it will NOT match **/foo/{x=*}** since the template doesn't use any custom verb.
+  bool match_unregistered_custom_verb = 13;
 
   // Configure the behavior when handling requests that cannot be transcoded.
   //

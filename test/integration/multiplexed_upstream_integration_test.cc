@@ -156,8 +156,11 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
   ASSERT_FALSE(
       response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_handshake_complete")).empty());
+
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
+  EXPECT_EQ(
+      "1",
+      response->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
@@ -562,10 +565,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
-                                     {AutonomousStream::NO_END_STREAM, ""}});
+                                     {AutonomousStream::NO_END_STREAM, "true"}});
   // Wait until the response is sent to ensure the SETTINGS frame has been read
   // by Envoy.
   response->waitForHeaders();
+  ASSERT_FALSE(response->complete());
 
   // Now send a second request and make sure it is processed. Previously it
   // would be queued on the original connection, as Envoy would ignore the
@@ -574,6 +578,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   FakeStreamPtr upstream_request2;
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response2->waitForEndStream());
+  cleanupUpstreamAndDownstream();
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933

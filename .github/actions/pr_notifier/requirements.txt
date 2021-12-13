@@ -111,9 +111,9 @@ six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
     # via pynacl
-slack_sdk==3.12.0 \
-    --hash=sha256:a384d91c10229f94a9b2cae2ec5af2a683a3d5aee1287c01238630ab42747287 \
-    --hash=sha256:f779ff3dc266491b02ad056d28038ec5d708b2a438a3a8f8794fb1121d8274e2
+slack_sdk==3.13.0 \
+    --hash=sha256:54f2a5f7419f1ab932af9e3200f7f2f93db96e0f0eb8ad7d3b4214aa9f124641 \
+    --hash=sha256:aae6ce057e286a5e7fe7a9f256e85b886eee556def8e04b82b08f699e64d7f67
     # via -r requirements.in
 urllib3==1.26.6 \
     --hash=sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4 \
