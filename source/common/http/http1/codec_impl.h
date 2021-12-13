@@ -1,13 +1,10 @@
 #pragma once
 
 #include <array>
-#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <list>
 #include <memory>
 #include <string>
-#include <type_traits>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/scope_tracker.h"
