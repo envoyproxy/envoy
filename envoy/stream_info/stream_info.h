@@ -404,6 +404,15 @@ public:
    */
   virtual const FilterStateSharedPtr& upstreamFilterState() const PURE;
   virtual void setUpstreamFilterState(const FilterStateSharedPtr& filter_state) PURE;
+
+  /**
+   * Getters and setters for the number of streams started on this connection.
+   * For upstream connections this is updated as streams are created.
+   * For downstream connections this is latched at the time the upstream stream
+   * is assigned.
+   */
+  virtual void setUpstreamNumStreams(uint64_t num_streams) PURE;
+  virtual uint64_t upstreamNumStreams() const PURE;
 };
 
 /**
