@@ -71,7 +71,7 @@ public:
 
   virtual bool sessionAffinity() const PURE;
   virtual bool registrationAffinity() const PURE;
-  virtual const std::vector<CustomizedAffinity>& CustomizedAffinityList() const PURE;
+  virtual const std::vector<CustomizedAffinity>& customizedAffinityList() const PURE;
 };
 
 class ConnectionManager;

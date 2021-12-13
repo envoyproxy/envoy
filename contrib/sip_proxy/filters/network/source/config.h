@@ -28,7 +28,7 @@ public:
 
   bool sessionAffinity() const override;
   bool registrationAffinity() const override;
-  const std::vector<CustomizedAffinity>& CustomizedAffinityList() const override;
+  const std::vector<CustomizedAffinity>& customizedAffinityList() const override;
 
 private:
   bool session_affinity_;

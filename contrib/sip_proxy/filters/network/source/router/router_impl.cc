@@ -96,11 +96,11 @@ void Router::setDecoderFilterCallbacks(SipFilters::DecoderFilterCallbacks& callb
 
 QueryStatus Router::handleCustomizedAffinity(std::string type, std::string key,
                                              MessageMetadataSharedPtr metadata) {
-  QueryStatus ret;
+  QueryStatus ret = QueryStatus::Stop;
   std::string host;
 
   if (type == "ep") {
-    for (auto dest : metadata->destinationList()) {
+    for (auto const& dest : metadata->destinationList()) {
       ret = QueryStatus::Stop;
       if (dest.first == type) {
         host = key;
@@ -112,7 +112,7 @@ QueryStatus Router::handleCustomizedAffinity(std::string type, std::string key,
     ret = callbacks_->traHandler()->retrieveTrafficRoutingAssistant(type, key, host);
   }
 
-  if (ret == QueryStatus::Continue) {
+  if (QueryStatus::Continue == ret) {
     metadata->setDestination(host);
     ENVOY_LOG(debug, "Set destination from local cache {} = {} ", type, metadata->destination());
   }
@@ -142,8 +142,8 @@ FilterStatus Router::handleAffinity() {
   }
 
   if ((options->registrationAffinity() || options->sessionAffinity()) &&
-      !options->CustomizedAffinityList().empty() && !metadata->paramMap().empty()) {
-    for (const auto& aff : options->CustomizedAffinityList()) {
+      !options->customizedAffinityList().empty() && !metadata->paramMap().empty()) {
+    for (const auto& aff : options->customizedAffinityList()) {
       for (auto [param, value] : metadata->paramMap()) {
         if (param == aff.name()) {
           metadata->addDestination(param, value);
@@ -231,7 +231,7 @@ Router::messageHandlerWithLoadbalancer(std::shared_ptr<TransactionInfo> transact
 
   // check the host ip is equal to dest. If false, then return StopIteration
   // if this function return StopIteration, then continue with next affinity
-  if (dest != "" && dest != host->address()->ip()->addressAsString()) {
+  if (!dest.empty() && dest != host->address()->ip()->addressAsString()) {
     return FilterStatus::StopIteration;
   }
   if (auto upstream_request =

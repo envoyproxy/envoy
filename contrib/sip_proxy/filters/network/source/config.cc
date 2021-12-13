@@ -41,7 +41,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
 
 bool ProtocolOptionsConfigImpl::sessionAffinity() const { return session_affinity_; }
 bool ProtocolOptionsConfigImpl::registrationAffinity() const { return registration_affinity_; }
-const std::vector<CustomizedAffinity>& ProtocolOptionsConfigImpl::CustomizedAffinityList() const {
+const std::vector<CustomizedAffinity>& ProtocolOptionsConfigImpl::customizedAffinityList() const {
   return customized_affinity_list_;
 }
 

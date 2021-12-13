@@ -692,17 +692,17 @@ void Decoder::getParamFromHeader(absl::string_view header, MessageMetadataShared
     std::string value = "";
     re2::RE2::FullMatch(static_cast<std::string>(str), pattern, &param, &value);
 
-    if (param.size() > 0 && value.size() > 0) {
+    if (!param.empty() && !value.empty()) {
       if (value.find("sip:") != absl::string_view::npos) {
         value = value.substr(std::strlen("sip:"));
       }
-      if (value.size() > 0) {
-        std::size_t comma = value.find(":");
+      if (!value.empty()) {
+        std::size_t comma = value.find(':');
         if (comma != absl::string_view::npos) {
           value = value.substr(0, comma);
         }
       }
-      if (value.size() > 0) {
+      if (!value.empty()) {
         ENVOY_LOG(debug, "{} = {}", param, value);
         if (param == "opaque") {
           metadata->addParam("ep", value);

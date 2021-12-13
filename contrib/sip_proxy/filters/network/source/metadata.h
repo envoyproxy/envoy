@@ -32,7 +32,7 @@ public:
   MsgType msgType() { return msg_type_; }
   MethodType methodType() { return method_type_; }
   MethodType respMethodType() { return resp_method_type_; }
-  absl::optional<absl::string_view> EP() { return ep_; }
+  absl::optional<absl::string_view> ep() { return ep_; }
   std::vector<Operation>& operationList() { return operation_list_; }
   absl::optional<std::pair<std::string, std::string>> pCookieIpMap() { return p_cookie_ip_map_; }
 
@@ -64,12 +64,12 @@ public:
 
   void setRequestURI(absl::string_view data) { request_uri_ = data; }
   void setTopRoute(absl::string_view data) { top_route_ = data; }
-  void setDomain(absl::string_view header, std::string domainMatchParamName) {
-    domain_ = getDomain(header, domainMatchParamName);
+  void setDomain(absl::string_view header, std::string domain_matched_param_name) {
+    domain_ = getDomain(header, domain_matched_param_name);
   }
 
-  void addEPOperation(size_t rawOffset, absl::string_view& header, std::string ownDomain,
-                      std::string domainMatchParamName) {
+  void addEPOperation(size_t raw_offset, absl::string_view& header, std::string own_domain,
+                      std::string domain_matched_param_name) {
     if (header.find(";ep=") != absl::string_view::npos) {
       // already Contact have ep
       return;
@@ -81,39 +81,39 @@ public:
     }
 
     // Get domain
-    absl::string_view domain = getDomain(header, domainMatchParamName);
+    absl::string_view domain = getDomain(header, domain_matched_param_name);
 
     // Compare the domain
-    if (domain != ownDomain) {
+    if (domain != own_domain) {
       ENVOY_LOG(trace, "header {} domain:{} is not equal to own_domain:{}, don't add EP.", header,
-                domain, ownDomain);
+                domain, own_domain);
       return;
     }
 
-    setOperation(Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue(";ep=")));
+    setOperation(Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(";ep=")));
   }
 
-  void addOpaqueOperation(size_t rawOffset, absl::string_view& header) {
+  void addOpaqueOperation(size_t raw_offset, absl::string_view& header) {
     if (header.find(",opaque=") != absl::string_view::npos) {
       // already has opaque
       return;
     }
     auto pos = header.length();
     setOperation(
-        Operation(OperationType::Insert, rawOffset + pos, InsertOperationValue(",opaque=")));
+        Operation(OperationType::Insert, raw_offset + pos, InsertOperationValue(",opaque=")));
   }
 
-  void deleteInstipOperation(size_t rawOffset, absl::string_view& header) {
+  void deleteInstipOperation(size_t raw_offset, absl::string_view& header) {
     // Delete inst-ip and remove "sip:" in x-suri
     if (auto pos = header.find(";inst-ip="); pos != absl::string_view::npos) {
       setOperation(
-          Operation(OperationType::Delete, rawOffset + pos,
+          Operation(OperationType::Delete, raw_offset + pos,
                     DeleteOperationValue(
                         header.substr(pos, header.find_first_of(";>", pos + 1) - pos).size())));
       // auto xsuri = header.find("sip:pcsf-cfed");
       auto xsuri = header.find("x-suri=sip:");
       if (xsuri != absl::string_view::npos) {
-        setOperation(Operation(OperationType::Delete, rawOffset + xsuri + strlen("x-suri="),
+        setOperation(Operation(OperationType::Delete, raw_offset + xsuri + strlen("x-suri="),
                                DeleteOperationValue(4)));
       }
     }
@@ -169,20 +169,21 @@ private:
 
   std::string raw_msg_{};
 
-  absl::string_view getDomain(absl::string_view header, std::string domainMatchParamName) {
-    // ENVOY_LOG(error, "header: {}\ndomainMatchParamName: {}", header, domainMatchParamName);
+  absl::string_view getDomain(absl::string_view header, std::string domain_matched_param_name) {
+    // ENVOY_LOG(error, "header: {}\ndomain_matched_param_name: {}", header,
+    // domain_matched_param_name);
 
     // Get domain
     absl::string_view domain = "";
 
-    if (domainMatchParamName != "host") {
-      auto start = header.find(domainMatchParamName);
+    if (domain_matched_param_name != "host") {
+      auto start = header.find(domain_matched_param_name);
       if (start == absl::string_view::npos) {
         domain = "";
       } else {
-        // domainMatchParamName + "="
-        // start = start + strlen(domainMatchParamName.c_str()) + strlen("=") ;
-        start = start + domainMatchParamName.length() + strlen("=");
+        // domain_matched_param_name + "="
+        // start = start + strlen(domain_matched_param_name.c_str()) + strlen("=") ;
+        start = start + domain_matched_param_name.length() + strlen("=");
         if ("sip:" == header.substr(start, strlen("sip:"))) {
           start += strlen("sip:");
         }
@@ -197,7 +198,7 @@ private:
     }
 
     // Still get host if mapped domain is empty
-    if (domainMatchParamName == "host" || domain == "") {
+    if (domain_matched_param_name == "host" || domain == "") {
       auto start = header.find("sip:");
       if (start == absl::string_view::npos) {
         return "";
