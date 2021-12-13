@@ -57,9 +57,6 @@ using IpList = std::list<std::string>;
 using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
-// Represents a single TestDnsServer query state and lifecycle. This implements
-// just enough of RFC 1035 to handle queries we generate in the tests below.
-enum class RecordType { A, AAAA };
 
 class TestDnsServerQuery {
 public:
@@ -625,7 +622,7 @@ public:
     std::list<Address::InstanceConstSharedPtr> address;
 
     for_each(response.begin(), response.end(),
-             [&](DnsResponse resp) { address.emplace_back(resp.address_); });
+             [&](DnsResponse resp) { address.emplace_back(resp.addrInfo().address_); });
     return address;
   }
 
@@ -633,7 +630,7 @@ public:
     std::list<std::string> address;
 
     for_each(response.begin(), response.end(), [&](DnsResponse resp) {
-      address.emplace_back(resp.address_->ip()->addressAsString());
+      address.emplace_back(resp.addrInfo().address_->ip()->addressAsString());
     });
     return address;
   }
@@ -667,7 +664,7 @@ public:
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (const auto& address : results) {
-              EXPECT_EQ(address.ttl_, expected_ttl.value());
+              EXPECT_EQ(address.addrInfo().ttl_, expected_ttl.value());
             }
           }
 
