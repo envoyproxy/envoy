@@ -45,6 +45,7 @@ message RegexMatcher {
     //
     // This field is deprecated; regexp validation should be performed on the management server
     // instead of being done by each individual client.
+    //
     // .. note::
     //
     //  The program size is still checked against the runtime value.
