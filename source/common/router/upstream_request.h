@@ -40,6 +40,9 @@ public:
   UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
   ~UpstreamRequest() override;
 
+  // To be called from the destructor, or prior to deferred delete.
+  void cleanUp();
+
   void encodeHeaders(bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
   void encodeTrailers(const Http::RequestTrailerMap& trailers);
@@ -179,6 +182,8 @@ private:
   // Sentinel to indicate if timeout budget tracking is configured for the cluster,
   // and if so, if the per-try histogram should record a value.
   bool record_timeout_budget_ : 1;
+  // Track if one time clean up has been performed.
+  bool cleaned_up_ : 1;
 
   Event::TimerPtr max_stream_duration_timer_;
 };
