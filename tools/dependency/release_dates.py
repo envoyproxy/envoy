@@ -270,10 +270,10 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
         release_date = None
         # Obtain release information from GitHub API.
         github_release = utils.get_github_release_from_urls(metadata['urls'])
-        print('github_release: ', github_release)
         if not github_release:
             print(f'{dep} is not a GitHub repository')
             continue
+        print('github_release: ', github_release)
         repo = github_instance.get_repo(f'{github_release.organization}/{github_release.project}')
         if github_release.tagged:
             release_date = get_tagged_release_date(repo, metadata['version'], github_release)
