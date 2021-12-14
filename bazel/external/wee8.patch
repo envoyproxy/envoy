@@ -8,6 +8,7 @@
 8. Fix ASan build (https://crrev.com/c/3295743).
 9. Fix "bazel query deps" presubmit (https://crrev.com/c/3336502).
 10. Fix build on Linux/aarch64 (https://crrev.com/c/3337367).
+11. Link statically (https://crrev.com/c/3295460).
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
@@ -367,7 +368,28 @@
              "//conditions:default": ["-Wl,--no-as-needed -ldl"],
          }) + select({
              ":should_add_rdynamic": ["-rdynamic"],
-@@ -216,7 +217,7 @@
+@@ -191,6 +192,7 @@
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
++            linkstatic = 1,
+             **kwargs
+         )
+         native.cc_library(
+@@ -201,6 +203,7 @@
+             copts = copts + default.copts + ENABLE_I18N_SUPPORT_DEFINES,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
++            linkstatic = 1,
+             **kwargs
+         )
+     else:
+@@ -212,11 +215,12 @@
+             copts = copts + default.copts,
+             linkopts = linkopts + default.linkopts,
+             alwayslink = 1,
++            linkstatic = 1,
+             **kwargs
          )
 
  def _torque_impl(ctx):
@@ -376,7 +398,7 @@
      prefix = ctx.attr.prefix
 
      # Arguments
-@@ -281,7 +282,7 @@
+@@ -281,7 +285,7 @@
          args = args,
          extras = extras,
          tool = select({
@@ -385,7 +407,7 @@
              "//conditions:default": ":torque",
          }),
      )
-@@ -292,7 +293,7 @@
+@@ -292,7 +296,7 @@
          args = args,
          extras = extras,
          tool = select({
