@@ -10,7 +10,7 @@ namespace Extensions {
 namespace TransportSockets {
 namespace TcpStats {
 
-class TcpStatsSocketFactory : public Network::TransportSocketFactory {
+class TcpStatsSocketFactory : public PassthroughFactory {
 public:
   TcpStatsSocketFactory(Server::Configuration::TransportSocketFactoryContext& context,
                         const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
@@ -18,11 +18,8 @@ public:
 
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override;
 
 private:
-  Network::TransportSocketFactoryPtr inner_factory_;
 #if defined(__linux__)
   ConfigConstSharedPtr config_;
 #endif
