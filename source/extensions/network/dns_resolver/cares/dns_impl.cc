@@ -363,12 +363,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
       if (!available_interfaces_.v4_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
         onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+        return;
       }
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
         onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+        return;
       }
       break;
     default:
