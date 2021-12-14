@@ -4,11 +4,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "bazel-compilation-database",
         project_desc = "Clang JSON compilation database support for Bazel",
         project_url = "https://github.com/grailbio/bazel-compilation-database",
-        version = "0.4.5",
-        sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
+        version = "0.5.2",
+        sha256 = "d32835b26dd35aad8fd0ba0d712265df6565a3ad860d39e4c01ad41059ea7eda",
         strip_prefix = "bazel-compilation-database-{version}",
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
-        release_date = "2020-08-01",
+        release_date = "2021-09-10",
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
@@ -119,12 +119,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Perfetto",
         project_desc = "Perfetto Tracing SDK",
         project_url = "https://perfetto.dev/",
-        version = "21.0",
-        sha256 = "8ce7d7c3dd8a2edd6d37092eb139e11bbf9c7e33a9964bab96c0505def6e1ad4",
+        version = "22.1",
+        sha256 = "013ba743019a1ca04627f7ce8bf424b60ed7f0f57e232eff719ae879be4c90fd",
         strip_prefix = "perfetto-{version}/sdk",
         urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2021-11-02",
+        release_date = "2021-12-07",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
@@ -417,7 +417,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
-        # and https://github.com/lyft/envoy-mobile/issues/215.
+        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
         # This also includes the fixes for Phantom events with EV_ET (see
         # https://github.com/libevent/libevent/issues/984).
         # This also includes the wepoll backend for Windows (see
@@ -652,24 +652,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "6acdde98c94b70453b39a81fe7bf59b847188fc3",
-        sha256 = "a076ca60fca2719b505c49dc1175fd27485dc76deaaef21581e6bd37c84da890",
+        version = "bdd203e981d5ec25166aa5f5df6b443986eea556",
+        sha256 = "2ce3a6306b245cf46834a3538bcac327359fc4b1f8b0e2d4881c9ff0acfe5ba5",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2021-11-04",
+        release_date = "2021-12-03",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.28.0",
-        sha256 = "8e968b5fcea1d2d64071872b12737bbb5514524ee5f0a4f54f5920266c261acb",
+        version = "0.29.0",
+        sha256 = "2b1641428dff9018f9e85c0384f03ec6c10660d935b750e3fa1492a281a53b0f",
         urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2021-07-07",
+        release_date = "2021-10-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -1130,13 +1130,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "VPP Comms Library",
         project_desc = "FD.io Vector Packet Processor (VPP) Comms Library",
         project_url = "https://fd.io/",
-        version = "596c45b22211c9af243b624dc037f58c0aa1c302",
-        sha256 = "e4c3fad7e1a6952e5c081cfe25f1f091d97fae8e75c5f03205def37d34c27741",
+        version = "7c3275e84b64ade4e20d00e4457bd4e437b1894f",
+        sha256 = "d456d37bbb7f90ec1ef166c1387e788b4c3078d38303f12ab41f1d0ac1a1cfc0",
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
         use_category = ["other"],
         extensions = ["envoy.bootstrap.vcl"],
-        release_date = "2021-09-13",
+        release_date = "2021-12-10",
         cpe = "N/A",
     ),
 )
