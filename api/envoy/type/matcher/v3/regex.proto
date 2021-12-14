@@ -49,7 +49,7 @@ message RegexMatcher {
     // .. note::
     //
     //  Although this field is deprecated, the program size will still be checked against the
-    //  ``max_program_size`` runtime value.
+    //  global ``re2.max_program_size.error_level`` runtime value.
     //
     google.protobuf.UInt32Value max_program_size = 1
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
