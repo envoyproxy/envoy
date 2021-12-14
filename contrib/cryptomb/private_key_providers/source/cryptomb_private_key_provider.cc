@@ -546,9 +546,9 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
 
     BIGNUM e_check;
     // const BIGNUMs, memory managed by BoringSSL in RSA key structure.
-    const BIGNUM *e = nullptr;
-    const BIGNUM *n = nullptr;
-    const BIGNUM *d = nullptr;
+    const BIGNUM* e = nullptr;
+    const BIGNUM* n = nullptr;
+    const BIGNUM* d = nullptr;
     RSA_get0_key(rsa, &n, &e, &d);
     BN_init(&e_check);
     BN_add_word(&e_check, 65537);

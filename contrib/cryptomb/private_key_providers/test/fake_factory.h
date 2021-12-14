@@ -25,9 +25,7 @@ public:
                               int expected_rsa_bitsize) override;
   bool mbxGetSts(uint32_t status, unsigned req_num) override;
 
-  void setRsaKey(RSA* rsa) {
-    RSA_get0_key(rsa, &n_, &e_, &d_);
-  };
+  void setRsaKey(RSA* rsa) { RSA_get0_key(rsa, &n_, &e_, &d_); };
 
   void injectErrors(bool enabled) { inject_errors_ = enabled; }
 
