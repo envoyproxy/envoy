@@ -1,4 +1,4 @@
-1. Generation inspector files using genrule_cmd.
+1. Generate inspector files using genrule_cmd.
 2. Set v8_enable_handle_zapping=False to regain performance.
 3. Fix v8_torque when V8 is imported as an external repository.
 4. Make wee8 library consumable (export headers and set visibility).
@@ -7,7 +7,7 @@
 7. Fix #include brackets (https://crrev.com/c/3334336).
 8. Fix ASan build (https://crrev.com/c/3295743).
 9. Fix "bazel query deps" presubmit (https://crrev.com/c/3336502).
-10. Fix build on Linux/aarch64.
+10. Fix build on Linux/aarch64 (https://crrev.com/c/3337367).
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
