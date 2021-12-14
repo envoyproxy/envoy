@@ -27,13 +27,16 @@ public:
   os_fd_t registerEventfd() override;
   void unregisterEventfd() override;
   bool isEventfdRegistered() const override;
-  void forEveryCompletion(std::function<void(Request&, int32_t)> completion_cb) override;
-  void prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len) override;
-  void prepareConnect(os_fd_t fd, IoUringSocketHandleImpl& iohandle,
-                      const Network::Address::InstanceConstSharedPtr& address) override;
-  void prepareRead(os_fd_t fd, IoUringSocketHandleImpl& iohandle, struct iovec* iov) override;
-  void prepareWrite(os_fd_t fd, std::list<Buffer::SliceDataPtr>&& slices) override;
-  void prepareClose(os_fd_t fd) override;
+  void forEveryCompletion(CompletionCb completion_cb) override;
+  void prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
+                     void* user_data) override;
+  void prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
+                      void* user_data) override;
+  void prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
+                    void* user_data) override;
+  void prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
+                     void* user_data) override;
+  void prepareClose(os_fd_t fd, void* user_data) override;
   void submit() override;
 
 private:

@@ -37,7 +37,8 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
-  io_uring_factory_.getOrCreateUring().prepareClose(fd_);
+  auto req = new Request{absl::nullopt, RequestType::Close};
+  io_uring_factory_.getOrCreateUring().prepareClose(fd_, req);
   if (isLeader()) {
     io_uring_factory_.getOrCreateUring().unregisterEventfd();
     file_event_adapter_.reset();
@@ -90,12 +91,28 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
   auto length = buffer.length();
   ASSERT(length > 0);
-  std::list<Buffer::SliceDataPtr> slice_data;
+
+  std::list<Buffer::SliceDataPtr> slices;
   while (buffer.length() > 0) {
+    // The buffer must not own the data after it has been extracted and put into
+    // the `io-uring` submission queue to avoid freeing it before the writev
+    // operation is completed.
     Buffer::SliceDataPtr data = buffer.extractMutableFrontSlice();
-    slice_data.push_back(std::move(data));
+    slices.push_back(std::move(data));
   }
-  io_uring_factory_.getOrCreateUring().prepareWrite(fd_, std::move(slice_data));
+
+  uint32_t nr_vecs = slices.size();
+  struct iovec* iovecs = new struct iovec[slices.size()];
+  struct iovec* iov = iovecs;
+  for (auto& slice : slices) {
+    absl::Span<uint8_t> mdata = slice->getMutableData();
+    iov->iov_base = mdata.data();
+    iov->iov_len = mdata.size();
+    iov++;
+  }
+
+  auto req = new Request{absl::nullopt, RequestType::Write, iovecs, std::move(slices)};
+  io_uring_factory_.getOrCreateUring().prepareWritev(fd_, iovecs, nr_vecs, 0, req);
   return Api::IoCallUint64Result(length,
                                  Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
 }
@@ -146,7 +163,8 @@ Network::IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, sock
 
 Api::SysCallIntResult
 IoUringSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
-  io_uring_factory_.getOrCreateUring().prepareConnect(fd_, *this, address);
+  auto req = new Request{*this, RequestType::Connect};
+  io_uring_factory_.getOrCreateUring().prepareConnect(fd_, address, req);
   if (isLeader()) {
     io_uring_factory_.getOrCreateUring().submit();
   }
@@ -271,7 +289,8 @@ void IoUringSocketHandleImpl::addReadRequest() {
   read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
   iov_.iov_base = read_buf_.get();
   iov_.iov_len = read_buffer_size_;
-  io_uring_factory_.getOrCreateUring().prepareRead(fd_, *this, &iov_);
+  auto req = new Request{*this, RequestType::Read};
+  io_uring_factory_.getOrCreateUring().prepareReadv(fd_, &iov_, 1, 0, req);
 }
 
 Network::IoHandlePtr IoUringSocketHandleImpl::FileEventAdapter::accept(struct sockaddr* addr,
@@ -329,8 +348,11 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
   IoUring& uring = io_uring_factory_.getOrCreateUring();
-  uring.forEveryCompletion(
-      [this](Request& req, int32_t result) { onRequestCompletion(req, result); });
+  uring.forEveryCompletion([this](void* user_data, int32_t result) {
+    auto req = static_cast<Request*>(user_data);
+    onRequestCompletion(*req, result);
+    delete req;
+  });
   uring.submit();
 }
 
@@ -350,7 +372,8 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
 
 void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest() {
   is_accept_added_ = true;
-  io_uring_factory_.getOrCreateUring().prepareAccept(fd_, &remote_addr_, &remote_addr_len_);
+  auto req = new Request{absl::nullopt, RequestType::Accept};
+  io_uring_factory_.getOrCreateUring().prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
 }
 
 } // namespace IoUring

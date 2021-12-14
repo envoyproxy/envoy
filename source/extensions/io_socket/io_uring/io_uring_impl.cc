@@ -2,13 +2,14 @@
 
 #include <sys/eventfd.h>
 
+#include "source/common/common/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
 
-IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size,
-                                       bool use_submission_queue_polling)
+IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling) {}
 
 IoUring& IoUringFactoryImpl::getOrCreateUring() const {
@@ -44,7 +45,7 @@ void IoUringImpl::unregisterEventfd() {
 
 bool IoUringImpl::isEventfdRegistered() const { return SOCKET_VALID(event_fd_); }
 
-void IoUringImpl::forEveryCompletion(std::function<void(Request&, int32_t)> completion_cb) {
+void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   ASSERT(SOCKET_VALID(event_fd_));
 
   eventfd_t v;
@@ -56,56 +57,44 @@ void IoUringImpl::forEveryCompletion(std::function<void(Request&, int32_t)> comp
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
     RELEASE_ASSERT(cqe->res >= 0, fmt::format("async request failed: {}", errorDetails(-cqe->res)));
-    auto req = reinterpret_cast<Request*>(cqe->user_data);
-    completion_cb(*req, cqe->res);
-    delete req;
+    completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
   }
   io_uring_cq_advance(&ring_, count);
 }
 
 void IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                                socklen_t* remote_addr_len) {
+                                socklen_t* remote_addr_len, void* user_data) {
   struct io_uring_sqe* sqe = getSqe();
   io_uring_prep_accept(sqe, fd, remote_addr, remote_addr_len, 0);
-  auto req = new Request{absl::nullopt, RequestType::Accept};
-  io_uring_sqe_set_data(sqe, req);
+  io_uring_sqe_set_data(sqe, user_data);
 }
 
-void IoUringImpl::prepareConnect(os_fd_t fd, IoUringSocketHandleImpl& iohandle,
-                                 const Network::Address::InstanceConstSharedPtr& address) {
+void IoUringImpl::prepareConnect(os_fd_t fd,
+                                 const Network::Address::InstanceConstSharedPtr& address,
+                                 void* user_data) {
   struct io_uring_sqe* sqe = getSqe();
   io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
-  auto req = new Request{iohandle, RequestType::Connect};
-  io_uring_sqe_set_data(sqe, req);
+  io_uring_sqe_set_data(sqe, user_data);
 }
 
-void IoUringImpl::prepareRead(os_fd_t fd, IoUringSocketHandleImpl& iohandle, struct iovec* iov) {
+void IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                               off_t offset, void* user_data) {
   struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_readv(sqe, fd, iov, 1, 0);
-  auto req = new Request{iohandle, RequestType::Read};
-  io_uring_sqe_set_data(sqe, req);
+  io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset);
+  io_uring_sqe_set_data(sqe, user_data);
 }
 
-void IoUringImpl::prepareWrite(os_fd_t fd, std::list<Buffer::SliceDataPtr>&& slices) {
-  struct iovec* iov = new struct iovec[slices.size()];
+void IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                                off_t offset, void* user_data) {
   struct io_uring_sqe* sqe = getSqe();
-  uint32_t count{0};
-  for (auto& slice : slices) {
-    absl::Span<uint8_t> mdata = slice->getMutableData();
-    iov[count].iov_base = mdata.data();
-    iov[count].iov_len = mdata.size();
-    count++;
-  }
-  io_uring_prep_writev(sqe, fd, iov, slices.size(), 0);
-  auto req = new Request{absl::nullopt, RequestType::Write, iov, std::move(slices)};
-  io_uring_sqe_set_data(sqe, req);
+  io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
+  io_uring_sqe_set_data(sqe, user_data);
 }
 
-void IoUringImpl::prepareClose(os_fd_t fd) {
+void IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
   struct io_uring_sqe* sqe = getSqe();
   io_uring_prep_close(sqe, fd);
-  auto req = new Request{absl::nullopt, RequestType::Close};
-  io_uring_sqe_set_data(sqe, req);
+  io_uring_sqe_set_data(sqe, user_data);
 }
 
 void IoUringImpl::submit() { io_uring_submit(&ring_); }

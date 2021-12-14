@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 
 #include "source/common/network/address_impl.h"
@@ -10,19 +9,7 @@ namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
 
-enum class RequestType { Accept, Connect, Read, Write, Close, Unknown };
-
-class IoUringSocketHandleImpl;
-
-using IoUringSocketHandleImplOptRef =
-    absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
-
-struct Request {
-  IoUringSocketHandleImplOptRef iohandle_{absl::nullopt};
-  RequestType type_{RequestType::Unknown};
-  struct iovec* iov_{nullptr};
-  std::list<Buffer::SliceDataPtr> slices_{};
-};
+using CompletionCb = std::function<void(void*, int32_t)>;
 
 class IoUring {
 public:
@@ -31,14 +18,16 @@ public:
   virtual os_fd_t registerEventfd() PURE;
   virtual void unregisterEventfd() PURE;
   virtual bool isEventfdRegistered() const PURE;
-  virtual void forEveryCompletion(std::function<void(Request&, int32_t)> completion_cb) PURE;
-  virtual void prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                             socklen_t* remote_addr_len) PURE;
-  virtual void prepareConnect(os_fd_t fd, IoUringSocketHandleImpl& iohandle,
-                              const Network::Address::InstanceConstSharedPtr& address) PURE;
-  virtual void prepareRead(os_fd_t fd, IoUringSocketHandleImpl& iohandle, struct iovec* iov) PURE;
-  virtual void prepareWrite(os_fd_t fd, std::list<Buffer::SliceDataPtr>&& slices) PURE;
-  virtual void prepareClose(os_fd_t fd) PURE;
+  virtual void forEveryCompletion(CompletionCb completion_cb) PURE;
+  virtual void prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
+                             void* user_data) PURE;
+  virtual void prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
+                              void* user_data) PURE;
+  virtual void prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
+                            void* user_data) PURE;
+  virtual void prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
+                             void* user_data) PURE;
+  virtual void prepareClose(os_fd_t fd, void* user_data) PURE;
   virtual void submit() PURE;
 };
 

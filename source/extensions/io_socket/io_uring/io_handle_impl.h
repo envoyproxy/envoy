@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/network/io_handle.h"
 
 #include "source/common/common/logger.h"
@@ -10,7 +11,19 @@ namespace IoSocket {
 namespace IoUring {
 
 class IoUringFactory;
-struct Request;
+class IoUringSocketHandleImpl;
+
+enum class RequestType { Accept, Connect, Read, Write, Close, Unknown };
+
+using IoUringSocketHandleImplOptRef =
+    absl::optional<std::reference_wrapper<IoUringSocketHandleImpl>>;
+
+struct Request {
+  IoUringSocketHandleImplOptRef iohandle_{absl::nullopt};
+  RequestType type_{RequestType::Unknown};
+  struct iovec* iov_{nullptr};
+  std::list<Buffer::SliceDataPtr> slices_{};
+};
 
 /**
  * IoHandle derivative for sockets.
