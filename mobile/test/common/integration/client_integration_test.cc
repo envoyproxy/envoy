@@ -25,7 +25,7 @@ Http::ResponseHeaderMapPtr toResponseHeaders(envoy_headers headers) {
       Http::ResponseHeaderMapImpl::create();
   transformed_headers->setFormatter(
       std::make_unique<
-          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>());
+          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(false));
   Http::Utility::toEnvoyHeaders(*transformed_headers, headers);
   return transformed_headers;
 }
@@ -335,7 +335,7 @@ TEST_P(ClientIntegrationTest, CaseSensitive) {
   Http::TestRequestHeaderMapImpl headers{{"FoO", "bar"}};
   headers.header_map_->setFormatter(
       std::make_unique<
-          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>());
+          Extensions::Http::HeaderFormatters::PreserveCase::PreserveCaseHeaderFormatter>(false));
   headers.header_map_->formatter().value().get().processKey("FoO");
   HttpTestUtility::addDefaultHeaders(headers);
   envoy_headers c_headers = Http::Utility::toBridgeHeaders(headers);

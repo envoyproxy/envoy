@@ -4,6 +4,7 @@
 
 #include "envoy/common/platform.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/scalar_to_byte_vector.h"
 #include "source/common/common/utility.h"
@@ -49,10 +50,6 @@
 
 #define DEFAULT_IP_TTL 64
 
-#ifdef SUPPORTS_GETIFADDRS
-#include <ifaddrs.h>
-#endif
-
 // Prefixes used to prefer well-known interface names.
 #if defined(__APPLE__)
 constexpr absl::string_view WlanPrefix = "en";
@@ -68,16 +65,6 @@ constexpr absl::string_view WwanPrefix = "";
 
 namespace Envoy {
 namespace Network {
-
-#if !defined(SUPPORTS_GETIFADDRS) && defined(INCLUDE_IFADDRS)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wold-style-cast"
-namespace {
-#include "third_party/android/ifaddrs-android.h"
-}
-#pragma clang diagnostic pop
-#define SUPPORTS_GETIFADDRS
-#endif
 
 SINGLETON_MANAGER_REGISTRATION(network_configurator);
 
@@ -329,33 +316,28 @@ Configurator::enumerateInterfaces([[maybe_unused]] unsigned short family,
                                   [[maybe_unused]] unsigned int reject_flags) {
   std::vector<InterfacePair> pairs{};
 
-#ifdef SUPPORTS_GETIFADDRS
-  struct ifaddrs* interfaces = nullptr;
-  struct ifaddrs* ifa = nullptr;
-
-  const int rc = getifaddrs(&interfaces);
-  RELEASE_ASSERT(!rc, "getifaddrs failed");
-
-  for (ifa = interfaces; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != family) {
-      continue;
-    }
-    if ((ifa->ifa_flags & (select_flags ^ reject_flags)) != select_flags) {
-      continue;
-    }
-
-    const sockaddr_storage* ss = reinterpret_cast<sockaddr_storage*>(ifa->ifa_addr);
-    size_t ss_len = family == AF_INET ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
-    StatusOr<Address::InstanceConstSharedPtr> address =
-        Address::addressFromSockAddr(*ss, ss_len, family == AF_INET6);
-    if (!address.ok()) {
-      continue;
-    }
-    pairs.push_back(std::make_pair(std::string{ifa->ifa_name}, *address));
+  if (!Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    return pairs;
   }
 
-  freeifaddrs(interfaces);
-#endif // SUPPORTS_GETIFADDRS
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+
+  for (const auto& interface_address : interface_addresses) {
+    const auto family_version = family == AF_INET ? Envoy::Network::Address::IpVersion::v4
+                                                  : Envoy::Network::Address::IpVersion::v6;
+    if (interface_address.interface_addr_->ip()->version() != family_version) {
+      continue;
+    }
+
+    if ((interface_address.interface_flags_ & (select_flags ^ reject_flags)) != select_flags) {
+      continue;
+    }
+
+    pairs.push_back(
+        std::make_pair(interface_address.interface_name_, interface_address.interface_addr_));
+  }
 
   return pairs;
 }
