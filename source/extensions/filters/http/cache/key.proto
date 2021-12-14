@@ -10,13 +10,13 @@ message Key {
   string query = 4;
   // True for http://, false for https://.
   bool clear_http = 5 [deprecated = true]; // Use scheme instead.
-  // Cache implementations can store arbitrary content in these fields; never set by cache filter.
-  repeated bytes custom_fields = 6;
-  repeated int64 custom_ints = 7;
   enum Scheme {
     UNSPECIFIED = 0;
     HTTP = 1;
     HTTPS = 2;
   }
   Scheme scheme = 8;
+  // Cache implementations can store arbitrary content in these fields; never set by cache filter.
+  repeated bytes custom_fields = 6;
+  repeated int64 custom_ints = 7;
 };
