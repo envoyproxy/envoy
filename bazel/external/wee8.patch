@@ -17,17 +17,17 @@
  )
  load(":bazel/v8-non-pointer-compression.bzl", "v8_binary_non_pointer_compression")
 +load(":genrule_cmd.bzl", "genrule_cmd")
-
+ 
  config_setting(
      name = "is_debug",
 @@ -118,7 +119,7 @@
-
+ 
  v8_flag(
      name = "v8_enable_handle_zapping",
 -    default = True,
 +    default = False,
  )
-
+ 
  v8_flag(name = "v8_enable_hugepage")
 @@ -200,7 +201,7 @@
      name = "v8_target_x64_default_pointer_compression",
@@ -37,7 +37,7 @@
 +        "@v8//bazel/config:v8_target_x64",
      ],
  )
-
+ 
 @@ -209,7 +210,7 @@
      name = "v8_target_arm64_default_pointer_compression",
      match_all = [
@@ -46,7 +46,7 @@
 +        "@v8//bazel/config:v8_target_arm64",
      ],
  )
-
+ 
 @@ -254,7 +255,7 @@
  selects.config_setting_group(
      name = "should_add_rdynamic",
@@ -207,7 +207,7 @@
 +        "@v8//bazel/config:is_arm64": ["src/heap/base/asm/arm64/push_registers_asm.cc"],
      }),
  )
-
+ 
 @@ -2927,16 +2929,16 @@
      srcs = [
          "src/init/setup-isolate-deserialize.cc",
@@ -228,7 +228,7 @@
 +        "@v8//bazel/config:v8_target_x64": [":noicu/generated_snapshot_files"],
      }),
  )
-
+ 
 @@ -2945,16 +2947,16 @@
      srcs = [
          "src/init/setup-isolate-deserialize.cc",
@@ -249,7 +249,7 @@
 +        "@v8//bazel/config:v8_target_x64": [":icu/generated_snapshot_files"],
      }),
  )
-
+ 
 @@ -2980,7 +2982,7 @@
          ":is_v8_annotate_torque_ir": ["-annotate-ir"],
          "//conditions:default": [],
@@ -276,7 +276,7 @@
 +        "//external:zlib",
      ],
  )
-
+ 
 @@ -3194,7 +3196,27 @@
  v8_library(
      name = "wee8",
@@ -304,7 +304,7 @@
 +    ],
 +    strip_include_prefix = "third_party",
  )
-
+ 
  alias(
 @@ -3253,7 +3275,7 @@
      copts = ["-fexceptions"],
@@ -327,29 +327,29 @@
 --- bazel/config/BUILD.bazel
 +++ bazel/config/BUILD.bazel
 @@ -27,7 +27,7 @@
-
+ 
  config_setting(
      name = "platform_cpu_arm64",
 -    constraint_values = ["@platforms//cpu:arm"],
 +    constraint_values = ["@platforms//cpu:aarch64"],
  )
-
+ 
  config_setting(
 @@ -58,12 +58,12 @@
  )
-
+ 
  v8_configure_target_cpu(
 -    name = "arm",
 +    name = "arm64",
      matching_configs = [":platform_cpu_arm64"],
  )
-
+ 
  v8_configure_target_cpu(
 -    name = "arm64",
 +    name = "arm",
      matching_configs = [":platform_cpu_arm"],
  )
-
+ 
 --- bazel/defs.bzl
 +++ bazel/defs.bzl
 @@ -92,6 +92,7 @@
@@ -419,12 +419,12 @@
 +            linkstatic = 1,
              **kwargs
          )
-
+ 
  def _torque_impl(ctx):
 -    v8root = "."
 +    v8root = "external/v8"
      prefix = ctx.attr.prefix
-
+ 
      # Arguments
 @@ -281,7 +306,7 @@
          args = args,
@@ -452,14 +452,14 @@
 -        "//third_party/v8/HEAD:v8_enable_pointer_compression": "False",
 +        "//:v8_enable_pointer_compression": "False",
      }
-
+ 
  v8_disable_pointer_compression = transition(
      implementation = _v8_disable_pointer_compression,
      inputs = [],
 -    outputs = ["//third_party/v8/HEAD:v8_enable_pointer_compression"],
 +    outputs = ["//:v8_enable_pointer_compression"],
  )
-
+ 
  # The implementation of transition_rule: all this does is copy the
 @@ -51,7 +51,7 @@
          # consequences for your build. The whitelist defaults to "everything".
@@ -475,20 +475,20 @@
 @@ -2,7 +2,7 @@
  // Use of this source code is governed by a BSD-style license that can be
  // found in the LICENSE file.
-
+ 
 -#include <include/cppgc/default-platform.h>
 +#include "include/cppgc/default-platform.h"
-
+ 
  namespace cppgc {
-
+ 
 --- src/snapshot/snapshot-utils.cc
 +++ src/snapshot/snapshot-utils.cc
 @@ -5,7 +5,7 @@
  #include "src/snapshot/snapshot-utils.h"
-
+ 
  #include "src/base/sanitizer/msan.h"
 -#include "third_party/zlib/zlib.h"
 +#include "zlib.h"
-
+ 
  namespace v8 {
  namespace internal {
