@@ -13,7 +13,7 @@ class PassthroughFactory : public Network::TransportSocketFactory {
 public:
   PassthroughFactory(Network::TransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {
-    ASSERT(transport_socket_factory_.get());
+    ASSERT(transport_sockiet_factory_ != nullptr);
   }
 
   bool implementsSecureTransport() const override {
@@ -25,7 +25,7 @@ public:
   }
 
 protected:
-  // The wrapped factory
+  // The wrapped factory.
   Network::TransportSocketFactoryPtr transport_socket_factory_;
 };
 
