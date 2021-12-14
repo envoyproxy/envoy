@@ -7,6 +7,7 @@
 7. Fix #include brackets (https://crrev.com/c/3334336).
 8. Fix ASan build (https://crrev.com/c/3295743).
 9. Fix "bazel query deps" presubmit (https://crrev.com/c/3336502).
+10. Fix build on Linux/aarch64.
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
@@ -321,6 +322,32 @@
          "//conditions:default": [],
      }),
      noicu_deps = [":noicu/v8_libshared"],
+--- bazel/config/BUILD.bazel
++++ bazel/config/BUILD.bazel
+@@ -27,7 +27,7 @@
+
+ config_setting(
+     name = "platform_cpu_arm64",
+-    constraint_values = ["@platforms//cpu:arm"],
++    constraint_values = ["@platforms//cpu:aarch64"],
+ )
+
+ config_setting(
+@@ -58,12 +58,12 @@
+ )
+
+ v8_configure_target_cpu(
+-    name = "arm",
++    name = "arm64",
+     matching_configs = [":platform_cpu_arm64"],
+ )
+
+ v8_configure_target_cpu(
+-    name = "arm64",
++    name = "arm",
+     matching_configs = [":platform_cpu_arm"],
+ )
+
 --- bazel/defs.bzl
 +++ bazel/defs.bzl
 @@ -92,6 +92,7 @@
