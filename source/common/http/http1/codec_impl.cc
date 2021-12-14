@@ -88,8 +88,8 @@ static constexpr absl::string_view CRLF = "\r\n";
 // Last chunk as defined here https://tools.ietf.org/html/rfc7230#section-4.1
 static constexpr absl::string_view LAST_CHUNK = "0\r\n";
 
-static constexpr absl::string_view COLON = ":";
 static constexpr absl::string_view SPACE = " ";
+static constexpr absl::string_view COLON_SPACE = ": ";
 
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
                                      StreamInfo::BytesMeterSharedPtr&& bytes_meter)
@@ -107,7 +107,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   ASSERT(!key.empty());
 
-  const uint64_t header_size = connection_.buffer().addFragments(key, COLON, SPACE, value, CRLF);
+  const uint64_t header_size = connection_.buffer().addFragments(key, COLON_SPACE, value, CRLF);
 
   bytes_meter_->addHeaderBytesSent(header_size);
 }
@@ -271,7 +271,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
   // https://tools.ietf.org/html/rfc7230#section-4.4
   if (chunk_encoding_) {
     // Finalize the body
-    connection_.buffer().addFragments(LAST_CHUNK);
+    connection_.buffer().add(LAST_CHUNK);
 
     // TODO(mattklein123): Wire up the formatter if someone actually asks for this (very unlikely).
     trailers.iterate([this](const HeaderEntry& header) -> HeaderMap::Iterate {
@@ -280,7 +280,7 @@ void StreamEncoderImpl::encodeTrailersBase(const HeaderMap& trailers) {
       return HeaderMap::Iterate::Continue;
     });
 
-    connection_.buffer().addFragments(CRLF);
+    connection_.buffer().add(CRLF);
 
     flushOutput();
   }

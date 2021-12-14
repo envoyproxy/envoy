@@ -1087,10 +1087,20 @@ TEST(BufferHelperTest, AddFragments) {
   {
     // Add string fragments cyclically.
     Buffer::OwnedImpl buffer;
+    std::string str;
     for (size_t i = 0; i < 1024; i++) {
       buffer.addFragments("aaaaa", "bbbbb", "ccccc", "ddddd");
+      str += "aaaaabbbbbcccccddddd";
     }
     EXPECT_EQ(buffer.length(), 20 * 1024);
+    EXPECT_EQ(str, buffer.toString());
+
+    auto slice_vec = buffer.getRawSlices();
+
+    for (size_t i = 0; i < 5; i++) {
+      EXPECT_EQ(4080, slice_vec[i].len_);
+    }
+    EXPECT_EQ(80, slice_vec[5].len_);
   }
 }
 
