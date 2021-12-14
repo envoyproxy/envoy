@@ -665,6 +665,8 @@ public:
   MOCK_METHOD(void, setWatermarks, (uint32_t), (override));
   MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
   MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
+  MOCK_METHOD(uint8_t*, inlineReserve, (uint64_t size));
+  MOCK_METHOD(void, inlineCommit, (uint64_t size));
 };
 
 // Test verifies that decoder calls Buffer::linearize method
