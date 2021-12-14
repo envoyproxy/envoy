@@ -9,6 +9,7 @@
 9. Fix "bazel query deps" presubmit (https://crrev.com/c/3336502).
 10. Fix build on Linux/aarch64 (https://crrev.com/c/3337367).
 11. Link statically (https://crrev.com/c/3295460).
+12. Fix build with GCC (https://crrev.com/c/3333635).
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
@@ -359,7 +360,34 @@
              "-Wno-bitwise-instead-of-logical",
              "-Wno-builtin-assume-aligned-alignment",
              "-Wno-unused-parameter",
-@@ -105,7 +106,7 @@
+@@ -100,12 +101,33 @@
+             "-Wno-non-virtual-dtor",
+             "-std=c++17",
+             "-isystem .",
+-        ],
++        ] + select({
++            "@envoy//bazel:gcc_build": [
++                "-fno-strict-aliasing",
++                "-Wno-extra",
++                "-Wno-int-in-bool-context",
++                "-Wno-class-memaccess",
++                "-Wno-comments",
++                "-Wno-deprecated-declarations",
++                "-Wno-implicit-fallthrough",
++                "-Wno-maybe-uninitialized",
++                "-Wno-mismatched-new-delete",
++                "-Wno-redundant-move",
++                "-Wno-return-type",
++                # Use GNU dialect, because GCC doesn't allow using
++                # ##__VA_ARGS__ when in standards-conforming mode.
++                "-std=gnu++17",
++                # "always_inline" fails without optimizations, use
++                # -O2 that matches Bazel's --compilation_mode opt.
++                "-O2",
++            ],
++            "//conditions:default": [],
++        }),
+         includes = ["include"],
          linkopts = [
              "-pthread",
          ] + select({
@@ -368,7 +396,7 @@
              "//conditions:default": ["-Wl,--no-as-needed -ldl"],
          }) + select({
              ":should_add_rdynamic": ["-rdynamic"],
-@@ -191,6 +192,7 @@
+@@ -191,6 +213,7 @@
              copts = copts + default.copts,
              linkopts = linkopts + default.linkopts,
              alwayslink = 1,
@@ -376,7 +404,7 @@
              **kwargs
          )
          native.cc_library(
-@@ -201,6 +203,7 @@
+@@ -201,6 +224,7 @@
              copts = copts + default.copts + ENABLE_I18N_SUPPORT_DEFINES,
              linkopts = linkopts + default.linkopts,
              alwayslink = 1,
@@ -384,7 +412,7 @@
              **kwargs
          )
      else:
-@@ -212,11 +215,12 @@
+@@ -212,11 +236,12 @@
              copts = copts + default.copts,
              linkopts = linkopts + default.linkopts,
              alwayslink = 1,
@@ -398,7 +426,7 @@
      prefix = ctx.attr.prefix
 
      # Arguments
-@@ -281,7 +285,7 @@
+@@ -281,7 +306,7 @@
          args = args,
          extras = extras,
          tool = select({
@@ -407,7 +435,7 @@
              "//conditions:default": ":torque",
          }),
      )
-@@ -292,7 +296,7 @@
+@@ -292,7 +317,7 @@
          args = args,
          extras = extras,
          tool = select({
