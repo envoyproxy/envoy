@@ -417,7 +417,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
-        # and https://github.com/lyft/envoy-mobile/issues/215.
+        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
         # This also includes the fixes for Phantom events with EV_ET (see
         # https://github.com/libevent/libevent/issues/984).
         # This also includes the wepoll backend for Windows (see

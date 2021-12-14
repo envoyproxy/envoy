@@ -211,7 +211,7 @@ envoy_cmake(
         # options, and they cannot be nested.
         # If https://github.com/bazelbuild/rules_foreign_cc/issues/289 is fixed
         # this can be removed.
-        # More details https://github.com/lyft/envoy-mobile/issues/116
+        # More details https://github.com/envoyproxy/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
     lib_source = "@com_github_libevent_libevent//:all",
@@ -219,7 +219,7 @@ envoy_cmake(
         # macOS organization of libevent is different from Windows/Linux.
         # Including libevent_core is a requirement on those platforms, but
         # results in duplicate symbols when built on macOS.
-        # See https://github.com/lyft/envoy-mobile/issues/677 for details.
+        # See https://github.com/envoyproxy/envoy-mobile/issues/677 for details.
         "//bazel:apple": [
             "libevent.a",
             "libevent_pthreads.a",

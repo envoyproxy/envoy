@@ -20,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // compatibility with existing management servers. New development in discovery
 // services should proceed in the package `envoy.service.discovery.v2`.
 
-// See https://github.com/lyft/envoy-api#apis for a description of the role of
+// See https://github.com/envoyproxy/envoy-api#apis for a description of the role of
 // ADS and how it is intended to be used by a management server. ADS requests
 // have the same structure as their singleton xDS counterparts, but can
 // multiplex many resource types on a single stream. The type_url in the
