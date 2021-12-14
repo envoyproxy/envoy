@@ -67,6 +67,8 @@ def get_latest_release(repo, version_min):
     latest_version = current_version
     latest_release = None
     for release in repo.get_releases():
+        if release.prerelease:
+            continue
         version = parse_version(release.tag_name)
         if not version:
             continue
