@@ -56,8 +56,7 @@ public:
 
 private:
   absl::Mutex mutex_;
-  using EnvoyBugMap = absl::flat_hash_map<std::string, uint64_t>;
-  EnvoyBugMap counters_ ABSL_GUARDED_BY(mutex_);
+  absl::flat_hash_map<std::string, uint64_t> counters_ ABSL_GUARDED_BY(mutex_);
 };
 
 // This class implements the logic for triggering ENVOY_BUG logs and actions. Logging and actions
