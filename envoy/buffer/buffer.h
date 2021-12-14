@@ -511,7 +511,7 @@ protected:
    * @param expected contiguous memory segment size.
    * @return the first address of this memory segment.
    */
-  virtual uint8_t* inlineReserve(size_t size) PURE;
+  virtual uint8_t* inlineReserve(uint64_t size) PURE;
 
   /**
    * Increase the length of buffer directly. This method can only be used after calling
@@ -519,7 +519,7 @@ protected:
    * this method.
    * @param size the increased size of buffer length.
    */
-  virtual void inlineCommit(size_t size) PURE;
+  virtual void inlineCommit(uint64_t size) PURE;
 
 private:
   friend Reservation;

@@ -54,7 +54,7 @@ protected:
   virtual void checkLowWatermark();
 
 protected:
-  void inlineCommit(size_t size) override {
+  void inlineCommit(uint64_t size) override {
     OwnedImpl::inlineCommit(size);
     checkHighAndOverflowWatermarks();
   }
