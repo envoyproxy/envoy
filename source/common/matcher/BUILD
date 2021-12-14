@@ -18,10 +18,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "value_input_matcher_lib",
+    srcs = ["value_input_matcher.cc"],
     hdrs = ["value_input_matcher.h"],
     deps = [
         "//envoy/matcher:matcher_interface",
         "//source/common/common:matchers_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 

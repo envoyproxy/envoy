@@ -9,7 +9,8 @@ namespace Matcher {
 
 template <class StringMatcherType> class StringInputMatcher : public InputMatcher {
 public:
-  explicit StringInputMatcher(const StringMatcherType& matcher) : matcher_(matcher) {}
+  explicit StringInputMatcher(const StringMatcherType& matcher,
+                              ProtobufMessage::ValidationVisitor&);
 
   bool match(absl::optional<absl::string_view> input) override {
     if (!input) {

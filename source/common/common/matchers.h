@@ -102,6 +102,9 @@ public:
     }
   }
 
+  explicit StringMatcherImpl(const StringMatcherType& matcher, ProtobufMessage::ValidationVisitor&)
+      : StringMatcherImpl(matcher) {}
+
   // StringMatcher
   bool match(const absl::string_view value) const override {
     switch (matcher_.match_pattern_case()) {
