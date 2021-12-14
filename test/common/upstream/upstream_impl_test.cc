@@ -3801,6 +3801,157 @@ TEST_F(ClusterInfoImplTest, Http3BadConfig) {
 }
 #endif // ENVOY_ENABLE_QUIC
 
+TEST_F(ClusterInfoImplTest, Http2Auto) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string auto_http2 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        auto_config:
+          http2_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  auto auto_h2 = makeCluster(yaml + auto_http2);
+  EXPECT_EQ(Http::Protocol::Http2,
+            auto_h2->info()->upstreamHttpProtocol({Http::Protocol::Http10})[0]);
+}
+
+TEST_F(ClusterInfoImplTest, Http2AutoNoAlpn) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string auto_http2 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        auto_config:
+          http2_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml + auto_http2), EnvoyException,
+                          ".*which has a non-ALPN transport socket:.*");
+}
+
+TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcher) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: MAGLEV
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+    transport_socket_matches:
+    - match:
+      name: insecure-mode
+      transport_socket:
+        name: envoy.transport_sockets.raw_buffer
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+            private_key:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster1 = makeCluster(yaml);
+  ASSERT_TRUE(cluster1->info()->idleTimeout().has_value());
+  EXPECT_EQ(std::chrono::hours(1), cluster1->info()->idleTimeout().value());
+
+  const std::string auto_http2 = R"EOF(
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        auto_config:
+          http2_protocol_options: {}
+        common_http_protocol_options:
+          idle_timeout: 1s
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml + auto_http2), EnvoyException,
+                          ".*which has a non-ALPN transport socket matcher:.*");
+}
+
 // Validate empty singleton for HostsPerLocalityImpl.
 TEST(HostsPerLocalityImpl, Empty) {
   EXPECT_FALSE(HostsPerLocalityImpl::empty()->hasLocalLocality());
