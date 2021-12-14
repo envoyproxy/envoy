@@ -216,6 +216,15 @@ public:
   static Stats::GaugeSharedPtr findGauge(Stats::Store& store, const std::string& name);
 
   /**
+   * Find a histogram in a stats store.
+   * @param store supplies the stats store.
+   * @param name supplies the name to search for.
+   * @return Stats::ParentHistogramSharedPtr the histogram or nullptr if there is none.
+   */
+  static Stats::ParentHistogramSharedPtr findHistogram(Stats::Store& store,
+                                                       const std::string& name);
+
+  /**
    * Wait for a counter to == a given value.
    * @param store supplies the stats store.
    * @param name supplies the name of the counter to wait for.
@@ -764,7 +773,7 @@ public:
     case envoy::config::core::v3::ApiVersion::V3:
       return "V3";
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 };

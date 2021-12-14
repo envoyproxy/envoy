@@ -20,6 +20,7 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,7 +39,7 @@
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/memory/stats.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
@@ -149,6 +150,16 @@ InstanceImpl::~InstanceImpl() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+
+#ifdef ENVOY_PERFETTO
+  if (tracing_session_ != nullptr) {
+    // Flush the trace data.
+    perfetto::TrackEvent::Flush();
+    // Disable tracing and block until tracing has stopped.
+    tracing_session_->StopBlocking();
+    close(tracing_fd_);
+  }
+#endif
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() {
@@ -168,7 +179,7 @@ void InstanceImpl::failHealthcheck(bool fail) {
 }
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
-  store.forEachCounter(
+  store.forEachSinkedCounter(
       [this](std::size_t size) mutable {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
@@ -178,7 +189,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
         counters_.push_back({counter.latch(), counter});
       });
 
-  store.forEachGauge(
+  store.forEachSinkedGauge(
       [this](std::size_t size) mutable {
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
@@ -195,7 +206,7 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_sou
     histograms_.push_back(*histogram);
   }
 
-  store.forEachTextReadout(
+  store.forEachSinkedTextReadout(
       [this](std::size_t size) mutable {
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
@@ -379,6 +390,36 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
                                     messageValidationContext().staticValidationVisitor(), *api_);
   bootstrap_config_update_time_ = time_source_.systemTime();
 
+#ifdef ENVOY_PERFETTO
+  perfetto::TracingInitArgs args;
+  // Include in-process events only.
+  args.backends = perfetto::kInProcessBackend;
+  perfetto::Tracing::Initialize(args);
+  perfetto::TrackEvent::Register();
+
+  // Prepare a configuration for a new "Perfetto" tracing session.
+  perfetto::TraceConfig cfg;
+  // TODO(rojkov): make the tracer configurable with either "Perfetto"'s native
+  // message or custom one embedded into Bootstrap.
+  cfg.add_buffers()->set_size_kb(1024);
+  auto* ds_cfg = cfg.add_data_sources()->mutable_config();
+  ds_cfg->set_name("track_event");
+
+  const std::string pftrace_path =
+      PROTOBUF_GET_STRING_OR_DEFAULT(bootstrap_, perf_tracing_file_path, "envoy.pftrace");
+  // Instantiate a new tracing session.
+  tracing_session_ = perfetto::Tracing::NewTrace();
+  tracing_fd_ = open(pftrace_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+  if (tracing_fd_ == -1) {
+    throw EnvoyException(
+        fmt::format("unable to open tracing file {}: {}", pftrace_path, errorDetails(errno)));
+  }
+  // Configure the tracing session.
+  tracing_session_->Setup(cfg, tracing_fd_);
+  // Enable tracing and block until tracing has started.
+  tracing_session_->StartBlocking();
+#endif
+
   // Immediate after the bootstrap has been loaded, override the header prefix, if configured to
   // do so. This must be set before any other code block references the HeaderValues ConstSingleton.
   if (!bootstrap_.header_prefix().empty()) {
@@ -397,7 +438,7 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
-  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_));
+  stats_store_.setTagProducer(Config::Utility::createTagProducer(bootstrap_, options_.statsTags()));
   stats_store_.setStatsMatcher(
       Config::Utility::createStatsMatcher(bootstrap_, stats_store_.symbolTable()));
   stats_store_.setHistogramSettings(Config::Utility::createHistogramSettings(bootstrap_));
@@ -487,7 +528,8 @@ void InstanceImpl::initialize(Network::Address::InstanceConstSharedPtr local_add
     // This is needed so that we don't read the value until runtime is fully initialized.
     enable_reuse_port_default_ = ReusePortDefault::Runtime;
   }
-  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this);
+  admin_ = std::make_unique<AdminImpl>(initial_config.admin().profilePath(), *this,
+                                       initial_config.admin().ignoreGlobalConnLimit());
 
   loadServerFlags(initial_config.flagsPath());
 
@@ -920,7 +962,7 @@ InstanceImpl::registerCallback(Stage stage, StageCallbackWithCompletion callback
 }
 
 void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion_cb) {
-  ASSERT(Thread::MainThread::isMainOrTestThread());
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   const auto it = stage_callbacks_.find(stage);
   if (it != stage_callbacks_.end()) {
     for (const StageCallback& callback : it->second) {

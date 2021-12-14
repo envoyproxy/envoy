@@ -194,7 +194,7 @@ public:
    */
   template <class Proto> static void checkTransportVersion(const Proto& api_config_source) {
     const auto transport_api_version = api_config_source.transport_api_version();
-    ASSERT(Thread::MainThread::isMainOrTestThread());
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (transport_api_version == envoy::config::core::v3::ApiVersion::AUTO ||
         transport_api_version == envoy::config::core::v3::ApiVersion::V2) {
       Runtime::LoaderSingleton::getExisting()->countDeprecatedFeatureUse();
@@ -422,10 +422,12 @@ public:
    * Create TagProducer instance. Check all tag names for conflicts to avoid
    * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.
+   * @param cli_tags tags that are provided by the cli
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                    const Stats::TagVector& cli_tags);
 
   /**
    * Create StatsMatcher instance.

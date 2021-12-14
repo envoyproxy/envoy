@@ -90,10 +90,6 @@ Envoy::Http::FilterFactoryCb MatchWrapperConfig::createFilterFactoryFromProtoTyp
     const envoy::extensions::common::matching::v3::ExtensionWithMatcher& proto_config,
     const std::string& prefix, Server::Configuration::FactoryContext& context) {
 
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api")) {
-    throw EnvoyException("Experimental matching API is not enabled");
-  }
-
   ASSERT(proto_config.has_extension_config());
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(

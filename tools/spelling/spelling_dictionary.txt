@@ -11,6 +11,7 @@ ALS
 AMZ
 APC
 API
+ARRAYSIZE
 ARN
 ASAN
 ASCII
@@ -148,7 +149,6 @@ GSS
 GTEST
 GURL
 Grabbit
-Hashable
 HC
 HCM
 HDS
@@ -206,6 +206,7 @@ MD
 MERCHANTABILITY
 Merkle
 MGET
+MPTCP
 MQ
 MSDN
 MSET
@@ -257,6 +258,7 @@ PEM
 PERF
 PGV
 PID
+PKCS12
 PKTINFO
 PNG
 Pointwise
@@ -402,6 +404,7 @@ absl
 accesslog
 accessor
 accessors
+acked
 ackless
 acks
 acls
@@ -579,6 +582,7 @@ dedup
 dedupe
 deduplicate
 deduplicates
+deduplication
 deflater
 deletable
 deleter
@@ -641,6 +645,7 @@ evbuffer
 evbuffers
 evconnlistener
 evented
+eventfd
 evwatch
 exe
 execlp
@@ -705,6 +710,7 @@ handshaker
 hardcoded
 hardcodes
 hardcoding
+hashable
 hasher
 hashtagging
 hd
@@ -772,6 +778,7 @@ keyder
 kqueue
 kubernetes
 kv
+kvlist
 kvs
 lala
 latencies
@@ -821,6 +828,7 @@ megamiss
 mem
 memcmp
 memcpy
+memset
 memoize
 mergeable
 messagename
@@ -864,6 +872,7 @@ nan
 nanos
 natively
 ndk
+negative
 netblock
 netblocks
 netfilter
@@ -1009,6 +1018,7 @@ rebalancer
 rebalancing
 rebuffer
 rebuilder
+receival
 reconnection
 recurse
 recv
@@ -1104,6 +1114,7 @@ siginfo
 signalstack
 siloed
 sim
+sinked
 sizeof
 smatch
 snapshotted
@@ -1312,3 +1323,4 @@ ep
 suri
 transid
 routable
+vhosts

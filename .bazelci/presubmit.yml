@@ -16,6 +16,8 @@ tasks:
     name: "Coverage"
     platform: ubuntu1804
     shell_commands:
+    - "sudo apt -y update && sudo apt -y install automake autotools-dev cmake libtool m4 ninja-build"
+    - "wget https://apt.llvm.org/llvm.sh && sudo bash llvm.sh 10"
     - "bazel/setup_clang.sh /usr/lib/llvm-10"
     test_targets:
     - "//test/common/common/..."

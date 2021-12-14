@@ -245,7 +245,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoConnections) {
   std::vector<uint8_t> hash_key = {1, 2, 3};
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   EXPECT_FALSE(selection.has_value());
 }
@@ -276,7 +276,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnection) {
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
   EXPECT_EQ(&pool, &selection->pool_);
@@ -309,7 +309,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolMatchingConnectionHttp3) {
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_TRUE(selection.has_value());
   EXPECT_EQ(&pool, &selection->pool_);
@@ -343,7 +343,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoMatchingConnectionAfterDraining) {
   lifetime_callbacks->onConnectionDraining(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -372,7 +372,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolInvalidAlpn) {
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -402,7 +402,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolSanMismatch) {
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -431,7 +431,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolHashMismatch) {
 
   hash_key[0]++;
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -461,7 +461,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolIpMismatch) {
   EXPECT_CALL(*ssl_info, dnsSansPeerCertificate()).WillRepeatedly(Return(dns_sans));
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -495,7 +495,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolEmptyHostname) {
   EXPECT_CALL(empty_host, hostname()).WillRepeatedly(testing::ReturnRef(empty_hostname));
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, empty_host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, empty_host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }
@@ -523,7 +523,7 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
   lifetime_callbacks->onConnectionOpen(pool, hash_key, connection);
 
   absl::optional<Upstream::SelectedPoolAndConnection> selection =
-      lb_->selectPool(&lb_context_, host, hash_key);
+      lb_->selectExistingConnection(&lb_context_, host, hash_key);
 
   ASSERT_FALSE(selection.has_value());
 }

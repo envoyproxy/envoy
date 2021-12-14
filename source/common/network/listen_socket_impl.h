@@ -58,8 +58,10 @@ template <> struct NetworkSocketTrait<Socket::Type::Datagram> {
 template <typename T> class NetworkListenSocket : public ListenSocketImpl {
 public:
   NetworkListenSocket(const Address::InstanceConstSharedPtr& address,
-                      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port)
-      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address) : nullptr,
+                      const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                      const SocketCreationOptions& creation_options = {})
+      : ListenSocketImpl(bind_to_port ? Network::ioHandleForAddr(T::type, address, creation_options)
+                                      : nullptr,
                          address) {
     // Prebind is applied if the socket is bind to port.
     if (bind_to_port) {
@@ -151,6 +153,30 @@ public:
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 };
 
+// This socket type adapts the ListenerComponentFactory.
+class InternalListenSocket : public ListenSocketImpl {
+public:
+  InternalListenSocket(const Address::InstanceConstSharedPtr& address)
+      : ListenSocketImpl(/* io_handle= */ nullptr, address) {}
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
+
+  // InternalListenSocket cannot be duplicated.
+  SocketPtr duplicate() override {
+    return std::make_unique<InternalListenSocket>(connectionInfoProvider().localAddress());
+  }
+
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override {
+    // internal listener socket does not support bind semantic.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  void close() override { ASSERT(io_handle_ == nullptr); }
+  bool isOpen() const override {
+    ASSERT(io_handle_ == nullptr);
+    return false;
+  }
+};
+
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
@@ -159,8 +185,9 @@ public:
       : SocketImpl(std::move(io_handle), local_address, remote_address) {}
 
   ConnectionSocketImpl(Socket::Type type, const Address::InstanceConstSharedPtr& local_address,
-                       const Address::InstanceConstSharedPtr& remote_address)
-      : SocketImpl(type, local_address, remote_address) {
+                       const Address::InstanceConstSharedPtr& remote_address,
+                       const SocketCreationOptions& options)
+      : SocketImpl(type, local_address, remote_address, options) {
     connection_info_provider_->setLocalAddress(local_address);
   }
 
@@ -190,6 +217,11 @@ public:
   absl::string_view requestedServerName() const override {
     return connectionInfoProvider().requestedServerName();
   }
+
+  void setJA3Hash(absl::string_view ja3_hash) override {
+    connectionInfoProvider().setJA3Hash(ja3_hash);
+  }
+  absl::string_view ja3Hash() const override { return connectionInfoProvider().ja3Hash(); }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();
@@ -233,7 +265,7 @@ class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
                    const OptionsSharedPtr& options)
-      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address),
+      : ConnectionSocketImpl(Network::ioHandleForAddr(Socket::Type::Stream, remote_address, {}),
                              nullptr, remote_address) {
     if (options) {
       addOptions(options);
