@@ -27,7 +27,7 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher,
+  DnsResolverImpl(Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                   const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
   ~DnsResolverImpl() override;
@@ -132,6 +132,8 @@ private:
   void onAresSocketStateChange(os_fd_t fd, int read, int write);
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
+  // Check if the only nameserver available is the c-ares default.
+  bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
   // Return default AresOptions.
@@ -144,6 +146,7 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
+  const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
 };
 

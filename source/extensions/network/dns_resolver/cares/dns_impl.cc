@@ -24,12 +24,13 @@ namespace Envoy {
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
-    Event::Dispatcher& dispatcher,
+    Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(dns_resolver_options),
+      use_resolvers_as_fallback_(use_resolvers_as_fallback),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
@@ -82,6 +83,21 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   return options;
 }
 
+bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
+  struct ares_addr_port_node* servers{};
+  int result = ares_get_servers_ports(channel_, &servers);
+  RELEASE_ASSERT(result == ARES_SUCCESS, "failure in ares_get_servers_ports");
+  // as determined in init_by_defaults in ares_init.c.
+  const bool has_only_default_nameserver =
+      servers == nullptr || (servers->next == nullptr && servers->family == AF_INET &&
+                             servers->addr.addr4.s_addr == htonl(INADDR_LOOPBACK) &&
+                             servers->udp_port == 0 && servers->tcp_port == 0);
+  if (servers != nullptr) {
+    ares_free_data(servers);
+  }
+  return has_only_default_nameserver;
+}
+
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   dirty_channel_ = false;
 
@@ -91,10 +107,18 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   options->sock_state_cb_data = this;
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 
-  // Ensure that the channel points to custom resolvers, if they exist.
   if (resolvers_csv_.has_value()) {
-    int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    bool use_resolvers = true;
+    // If the only name server available is c-ares' default then fallback to the user defined
+    // resolvers. Otherwise, use the resolvers provided by c-ares.
+    if (use_resolvers_as_fallback_ && !isCaresDefaultTheOnlyNameserver()) {
+      use_resolvers = false;
+    }
+
+    if (use_resolvers) {
+      int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+      RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    }
   }
 }
 
@@ -403,7 +427,8 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(dispatcher, cares.use_resolvers_as_fallback(),
+                                                      resolvers, dns_resolver_options);
   }
 };
 
