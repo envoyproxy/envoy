@@ -1165,7 +1165,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
               name, cluster_manager.thread_local_dispatcher_.name());
     // This worker thread has already requested a discovery of a cluster with this name, so nothing
     // more left to do here.
-    return std::move(handle);
+    return handle;
   }
   ENVOY_LOG(
       debug,
@@ -1206,7 +1206,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
         {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
   });
 
-  return std::move(handle);
+  return handle;
 }
 
 void ClusterManagerImpl::notifyMissingCluster(absl::string_view name) {

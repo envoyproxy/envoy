@@ -123,7 +123,7 @@ public:
    * cluster. When the requested cluster is added and warmed up, the passed callback will be invoked
    * in the same thread that invoked this function.
    *
-   * The returned handle can be destroyed to prevent the callback to be invoked. Note that the
+   * The returned handle can be destroyed to prevent the callback from being invoked. Note that the
    * handle can only be destroyed in the same thread that invoked the function. Destroying the
    * handle might not stop the discovery process, though. As soon as the callback is invoked,
    * destroying the handle does nothing. It is a responsibility of the caller to make sure that the
@@ -134,7 +134,7 @@ public:
    * @param name is the name of the cluster to be discovered.
    * @param callback will be called when the discovery is finished.
    * @param timeout describes how long the operation may take before failing.
-   * @return ClusterDiscoveryCallbackHandlePtr the discovery process handle.
+   * @return the discovery process handle.
    */
   virtual ClusterDiscoveryCallbackHandlePtr
   requestOnDemandClusterDiscovery(absl::string_view name, ClusterDiscoveryCallbackPtr callback,

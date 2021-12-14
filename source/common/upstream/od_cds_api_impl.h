@@ -34,6 +34,8 @@ class OdCdsApi {
 public:
   virtual ~OdCdsApi() = default;
 
+  // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
+  // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
 };
 

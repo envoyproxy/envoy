@@ -403,6 +403,8 @@ protected:
    * thread. Used for tests only.
    *
    * Protected, so tests can use it.
+   *
+   * @return the previous cluster discovery manager.
    */
   ClusterDiscoveryManager createAndSwapClusterDiscoveryManager(std::string thread_name);
 
