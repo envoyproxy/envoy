@@ -8,6 +8,7 @@ envoy_cc_library(
     name = "configurator_lib",
     srcs = [
         "configurator.cc",
+        "android.cc",
     ] + select({
         "//bazel:include_ifaddrs": [
             "//third_party:android/ifaddrs-android.h",
@@ -16,7 +17,10 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
-    hdrs = ["configurator.h"],
+    hdrs = [
+        "android.h",
+        "configurator.h",
+    ],
     copts = select({
         "//bazel:include_ifaddrs": ["-DINCLUDE_IFADDRS"],
         "//conditions:default": [],

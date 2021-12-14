@@ -7,6 +7,7 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/config/internal.h"
 #include "library/common/data/utility.h"
+#include "library/common/network/android.h"
 #include "library/common/stats/utility.h"
 
 namespace Envoy {
@@ -104,6 +105,7 @@ envoy_status_t Engine::main(const std::string config, const std::string log_leve
 
           network_configurator_ =
               Network::ConfiguratorFactory{server_->serverFactoryContext()}.get();
+          Envoy::Network::Android::Utility::setAlternateGetifaddrs();
           auto v4_interfaces = network_configurator_->enumerateV4Interfaces();
           auto v6_interfaces = network_configurator_->enumerateV6Interfaces();
           logInterfaces("netconf_get_v4_interfaces", v4_interfaces);
