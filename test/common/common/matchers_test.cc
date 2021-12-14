@@ -375,6 +375,43 @@ TEST(StringMatcher, SafeRegexValueIgnoreCase) {
                             "ignore_case has no effect for safe_regex.");
 }
 
+TEST(StringMatcher, XDSSafeRegexValue) {
+  const std::string yaml_string = R"EOF(
+safe_regex:
+  engine:
+    name: google-re2
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.RegexMatcher.GoogleRE2
+  regex: foo.*
+)EOF";
+  xds::type::matcher::v3::StringMatcher matcher;
+  TestUtility::loadFromYaml(yaml_string, matcher);
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, ProtobufMessage::getStrictValidationVisitor())
+                  .match("foo"));
+  EXPECT_TRUE(Matchers::StringMatcherImpl(matcher, ProtobufMessage::getStrictValidationVisitor())
+                  .match("foobar"));
+  EXPECT_FALSE(Matchers::StringMatcherImpl(matcher, ProtobufMessage::getStrictValidationVisitor())
+                   .match("bar"));
+}
+
+TEST(StringMatcher, XDSSafeRegexValueIgnoreCase) {
+  const std::string yaml_string = R"EOF(
+safe_regex:
+  engine:
+    name: google-re2
+    typed_config:
+      "@type": type.googleapis.com/envoy.type.matcher.v3.RegexMatcher.GoogleRE2
+  regex: foo.*
+ignore_case: true
+)EOF";
+  xds::type::matcher::v3::StringMatcher matcher;
+  TestUtility::loadFromYaml(yaml_string, matcher);
+  EXPECT_THROW_WITH_MESSAGE(
+      Matchers::StringMatcherImpl(matcher, ProtobufMessage::getStrictValidationVisitor())
+          .match("foo"),
+      EnvoyException, "ignore_case has no effect for safe_regex.");
+}
+
 TEST(PathMatcher, MatchExactPath) {
   const auto matcher = Envoy::Matchers::PathMatcher::createExact("/exact", false);
 
