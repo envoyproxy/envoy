@@ -9,6 +9,7 @@
 #include "envoy/common/platform.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
@@ -320,7 +321,7 @@ DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
     DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
     ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
     : PendingResolution(parent, callback, dispatcher, channel, dns_name),
-      dns_lookup_family_(dns_lookup_family) {
+      dns_lookup_family_(dns_lookup_family), available_interfaces_(availableInterfaces()) {
   if (dns_lookup_family == DnsLookupFamily::Auto ||
       dns_lookup_family == DnsLookupFamily::V4Preferred ||
       dns_lookup_family == DnsLookupFamily::All) {
@@ -356,6 +357,25 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
+  if (filter_unroutable_families_) {
+    switch (family) {
+    case AF_INET:
+      if (!available_interfaces_.v4_available_) {
+        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
+        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+      }
+      break;
+    case AF_INET6:
+      if (!available_interfaces_.v6_available_) {
+        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
+        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+      }
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
 
@@ -372,6 +392,35 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
                                                                                 addrinfo);
       },
       this);
+}
+
+DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces
+DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+
+  DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
+                                                                                       false};
+  for (const auto& interface_address : interface_addresses) {
+    switch (interface_address.interface_addr_->ip()->version()) {
+    case Network::Address::IpVersion::v4:
+      available_interfaces.v4_available_ = true;
+      if (available_interfaces.v6_available_) {
+        return available_interfaces;
+      }
+      break;
+    case Network::Address::IpVersion::v6:
+      available_interfaces.v6_available_ = true;
+      if (available_interfaces.v4_available_) {
+        return available_interfaces;
+      }
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+  return available_interfaces;
 }
 
 // c-ares DNS resolver factory

@@ -107,6 +107,13 @@ private:
   private:
     void startResolutionImpl(int family);
 
+    struct AvailableInterfaces {
+      bool v4_available_;
+      bool v6_available_;
+    };
+
+    static AvailableInterfaces availableInterfaces();
+
     // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred
     // or Auto: perform a second resolution if the first one fails. If dns_lookup_family_ is All:
     // perform resolutions on both families concurrently.
@@ -115,6 +122,8 @@ private:
     bool lookup_all_ = false;
     int family_ = AF_INET;
     const DnsLookupFamily dns_lookup_family_;
+    const AvailableInterfaces available_interfaces_;
+    const bool filter_unroutable_families_{true};
   };
 
   struct AresOptions {
