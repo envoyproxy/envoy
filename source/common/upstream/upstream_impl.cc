@@ -1640,12 +1640,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     const bool health_check_address_changed =
         (health_checker_ != nullptr && existing_host_found &&
          *existing_host->second->healthCheckAddress() != *host->healthCheckAddress());
-
-    const bool locality_changed =
-        (existing_host_found &&
-         (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
-    if (locality_changed) {
-      hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
+    bool locality_changed = false;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.fix_locality_update_for_eds_cluster_endpoints")) {
+      locality_changed =
+          (existing_host_found &&
+           (!LocalityEqualTo()(host->locality(), existing_host->second->locality())));
+      if (locality_changed) {
+        hosts_with_updated_locality_for_current_priority.emplace(existing_host->first);
+      }
     }
 
     const bool skip_inplace_host_update = health_check_address_changed || locality_changed;
@@ -1759,42 +1762,41 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
-    erase_from =
-        std::remove_if(current_priority_hosts.begin(), current_priority_hosts.end(),
-                       [&all_new_hosts, &new_hosts_for_current_priority,
-                        &hosts_with_updated_locality_for_current_priority, &final_hosts,
-                        &max_host_weight](const HostSharedPtr& p) {
-                         // This host has already been added as a new host in the
-                         // new_hosts_for_current_priority. Return false here to make sure that host
-                         // reference with older locality gets cleaned up from the priority.
-                         if (hosts_with_updated_locality_for_current_priority.contains(
-                                 p->address()->asString())) {
-                           return false;
-                         }
+    erase_from = std::remove_if(
+        current_priority_hosts.begin(), current_priority_hosts.end(),
+        [&all_new_hosts, &new_hosts_for_current_priority,
+         &hosts_with_updated_locality_for_current_priority, &final_hosts,
+         &max_host_weight](const HostSharedPtr& p) {
+          // This host has already been added as a new host in the
+          // new_hosts_for_current_priority. Return false here to make sure that host
+          // reference with older locality gets cleaned up from the priority.
+          if (hosts_with_updated_locality_for_current_priority.contains(p->address()->asString())) {
+            return false;
+          }
 
-                         if (all_new_hosts.contains(p->address()->asString()) &&
-                             !new_hosts_for_current_priority.contains(p->address()->asString())) {
-                           // If the address is being completely deleted from this priority, but is
-                           // referenced from another priority, then we assume that the other
-                           // priority will perform an in-place update to re-use the existing Host.
-                           // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
-                           // instead remove it immediately from this priority.
-                           // Example: health check address changed and priority also changed
-                           return false;
-                         }
+          if (all_new_hosts.contains(p->address()->asString()) &&
+              !new_hosts_for_current_priority.contains(p->address()->asString())) {
+            // If the address is being completely deleted from this priority, but is
+            // referenced from another priority, then we assume that the other
+            // priority will perform an in-place update to re-use the existing Host.
+            // We should therefore not mark it as PENDING_DYNAMIC_REMOVAL, but
+            // instead remove it immediately from this priority.
+            // Example: health check address changed and priority also changed
+            return false;
+          }
 
-                         if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
-                               p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
-                           if (p->weight() > max_host_weight) {
-                             max_host_weight = p->weight();
-                           }
+          if (!(p->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC) ||
+                p->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH))) {
+            if (p->weight() > max_host_weight) {
+              max_host_weight = p->weight();
+            }
 
-                           final_hosts.push_back(p);
-                           p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
-                           return true;
-                         }
-                         return false;
-                       });
+            final_hosts.push_back(p);
+            p->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+            return true;
+          }
+          return false;
+        });
     current_priority_hosts.erase(erase_from, current_priority_hosts.end());
   }
 
