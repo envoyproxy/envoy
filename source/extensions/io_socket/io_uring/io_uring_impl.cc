@@ -7,8 +7,8 @@ namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
 
-IoUringFactoryImpl::IoUringFactoryImpl(const uint32_t io_uring_size,
-                                       const bool use_submission_queue_polling)
+IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size,
+                                       bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling) {}
 
 IoUring& IoUringFactoryImpl::getOrCreateUring() const {
@@ -16,7 +16,7 @@ IoUring& IoUringFactoryImpl::getOrCreateUring() const {
   return uring;
 }
 
-IoUringImpl::IoUringImpl(const uint32_t io_uring_size, const bool use_submission_queue_polling)
+IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), cqes_(io_uring_size_, nullptr) {
   unsigned flags{0};
   if (use_submission_queue_polling) {

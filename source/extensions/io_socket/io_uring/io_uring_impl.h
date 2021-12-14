@@ -11,7 +11,7 @@ namespace IoUring {
 
 class IoUringFactoryImpl : public IoUringFactory {
 public:
-  IoUringFactoryImpl(const uint32_t io_uring_size, const bool use_submission_queue_polling);
+  IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   IoUring& getOrCreateUring() const override;
 
 private:
@@ -21,7 +21,7 @@ private:
 
 class IoUringImpl : public IoUring {
 public:
-  IoUringImpl(const uint32_t io_uring_size, const bool use_submission_queue_polling);
+  IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
   ~IoUringImpl() override;
 
   os_fd_t registerEventfd() override;
