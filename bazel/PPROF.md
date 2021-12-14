@@ -17,6 +17,7 @@
       * [On-CPU analysis](#on-cpu-analysis)
       * [Memory analysis](#memory-analysis)
    * [Performance annotations](#performance-annotations)
+   * [Performance analysis with Perfetto](#performance-analysis-with-perfetto)
 
 # CPU or memory consumption testing with `gperftools` and `pprof`
 
@@ -327,3 +328,78 @@ private:
   PERF_OWNER(perf_operation_);
 };
 ```
+
+# Performance analysis with Perfetto
+
+Similar results can be achieved with [Perfetto tracing macros](https://github.com/envoyproxy/envoy/blob/main/source/common/common/perf_tracing.h) enabled with
+
+```
+bazel --define=perf_tracing=enabled ...
+```
+
+[Pefetto](https://perfetto.dev/) is a production-grade open-source stack for
+performance instrumentation and trace analysis. It offers services and libraries
+for recording system-level and app-level traces, a library for analyzing traces
+using SQL and a web-based UI to visualize and explore multi-GB traces.
+
+Currently when the Perfetto support is enabled the tracing data in binary Protobuf
+format is dumped into `envoy.pftrace` upon process termination. The file
+can be analyzed online at https://ui.perfetto.dev/ or with a custom tool.
+
+To generate a scoped trace event which uses C++ RAII under the hood add the
+`TRACE_EVENT` macro to the block of your interest:
+
+```c++
+#include "source/common/common/perf_tracing.h"
+
+RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
+                                                 bool is_internally_created) {
+  TRACE_EVENT("core", "ConnectionManagerImpl::newStream"); // Begin "ConnectionManagerImpl::newStream" slice.
+  ...
+
+  // End "ConnectionManagerImpl::newStream" slice.
+}
+```
+
+For events that don't follow function scoping, use `TRACE_EVENT_BEGIN` and
+`TRACE_EVENT_END`. Please be careful with these events as all events on a given
+thread share the same stack. This means that it's not recommended to have a matching
+pair of `TRACE_EVENT_BEGIN` and `TRACE_EVENT_END` markers in separate functions,
+since an unrelated event might terminate the original event unexpectedly; for events
+that cross function boundaries it's usually best to emit them on a separate track.
+Below is an example for a trace event covering an object's life span:
+
+```c++
+#include "source/common/common/perf_tracing.h"
+
+Http::Request::Request(int request_id)
+ : request_id_(request_id) {
+  TRACE_EVENT_BEGIN("core", "Http::Request",
+                    perfetto::Track(request_id_, perfetto::ThreadTrack::Current()));
+  ...
+}
+
+Http::Request::~Request() {
+  ...
+
+  TRACE_EVENT_END("core", perfetto::Track(request_id_, perfetto::ThreadTrack::Current()));
+}
+
+```
+
+Unfortunately this may lead to excessive number of tracks if they are unique for every
+pair of emitted events. The existing visualization tools may not work well if the number
+of tracks is too big. In this case the resulting trace data needs to be processed
+differently. Alternatively, if you are interested in benchmarking only and don't need
+any tracing capabilities, then you can resort to the Performance Annotation system mentioned
+above which supports cross-scoped events too, but doesn't require any post-processing to get
+a benchmark's final report.
+
+Time-varying numeric data can be recorded with the `TRACE_COUNTER` macro:
+
+```c++
+TRACE_COUNTER("extensions", "MemoryAllocated",
+              tcmalloc::MallocExtension::GetNumericProperty("generic.current_allocated_bytes"));
+```
+
+For more details please refer https://perfetto.dev/docs/instrumentation/track-events.

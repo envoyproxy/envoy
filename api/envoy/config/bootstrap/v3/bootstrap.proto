@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -326,6 +326,10 @@ message Bootstrap {
   //
   // Note that the 'set-cookie' header cannot be registered as inline header.
   repeated CustomInlineHeader inline_headers = 32;
+
+  // Optional path to a file with performance tracing data created by "Perfetto" SDK in binary
+  // ProtoBuf format. The default value is "envoy.pftrace".
+  string perf_tracing_file_path = 33;
 }
 
 // Administration interface :ref:`operations documentation
