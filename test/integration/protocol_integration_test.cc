@@ -82,6 +82,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterNotFoundBodyNoBuffer) {
 // Add a route that uses unknown cluster (expect 404 Not Found).
 TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
+  config_helper_.addConfigModifier(configureProxyStatus());
   auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
       envoy::config::route::v3::RouteAction::NOT_FOUND);
@@ -92,6 +93,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
       lookupPort("http"), "GET", "/unknown", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_unavailable; details=\"cluster_not_found; NC\"");
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, TestHostWhitespacee) {

@@ -158,8 +158,9 @@ TEST_F(ProxyStatusTest, ToStringNoResponseFlags) {
   EXPECT_THAT(
       ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                  /*node_id=*/"UNUSED", proxy_status_config_),
-      AllOf(HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
-            Not(HasSubstr("DI"))));
+      AllOf(
+          HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
+          Not(HasSubstr("DI"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
@@ -173,8 +174,9 @@ TEST_F(ProxyStatusTest, ToStringAbsentResponseFlags) {
   EXPECT_THAT(
       ProxyStatusUtils::toString(stream_info_, ProxyStatusError::ProxyConfigurationError,
                                  /*node_id=*/"UNUSED", proxy_status_config_),
-      AllOf(HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
-            Not(HasSubstr("DI"))));
+      AllOf(
+          HasSubstr("details=\"some_response_code_details; some_connection_termination_details\""),
+          Not(HasSubstr("DI"))));
 }
 
 TEST_F(ProxyStatusTest, ToStringNoServerName) {

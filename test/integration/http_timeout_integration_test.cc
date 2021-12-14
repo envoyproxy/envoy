@@ -13,6 +13,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, HttpTimeoutIntegrationTest,
 // Sends a request with a global timeout specified, sleeps for longer than the
 // timeout, and ensures that a timeout is received.
 TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
+  config_helper_.addConfigModifier(configureProxyStatus());
   initialize();
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -47,6 +48,8 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("504", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=connection_timeout; details=\"upstream_response_timeout; UT\"");
 }
 
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress

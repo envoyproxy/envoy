@@ -4,8 +4,8 @@
 #include <cstdint>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
-#include "envoy/stream_info/stream_info.h"
 #include "envoy/http/codes.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
 namespace StreamInfo {

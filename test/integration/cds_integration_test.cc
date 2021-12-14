@@ -147,6 +147,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDelta, CdsIntegrationTest,
 // 7) We send Envoy a request, which we verify is properly proxied to and served by that cluster.
 TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
   // Calls our initialize(), which includes establishing a listener, route, and cluster.
+  config_helper_.addConfigModifier(configureProxyStatus());
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex1, "/cluster1");
   test_server_->waitForCounterGe("cluster_manager.cluster_added", 1);
 
@@ -163,6 +164,8 @@ TEST_P(CdsIntegrationTest, CdsClusterUpDownUp) {
       lookupPort("http"), "GET", "/cluster1", "", downstream_protocol_, version_, "foo.com");
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_EQ(response->headers().getProxyStatusValue(),
+            "envoy; error=destination_unavailable; details=\"cluster_not_found; NC\"");
 
   cleanupUpstreamAndDownstream();
   ASSERT_TRUE(codec_client_->waitForDisconnect());
