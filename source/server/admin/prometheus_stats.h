@@ -25,6 +25,7 @@ public:
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
                                     Buffer::Instance& response, const bool used_only,
                                     const absl::optional<std::regex>& regex,
                                     const Stats::CustomStatNamespaces& custom_namespaces);

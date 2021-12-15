@@ -25,6 +25,7 @@ public:
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
     end_time_ = now + std::chrono::milliseconds(3);
+    setUpstreamInfo(std::make_shared<Envoy::StreamInfo::UpstreamInfoImpl>());
   }
 
   SystemTime startTime() const override { return start_time_; }
@@ -32,6 +33,10 @@ public:
 
   const Network::ConnectionInfoSetter& downstreamAddressProvider() const override {
     return *downstream_connection_info_provider_;
+  }
+
+  const absl::optional<std::string>& virtualClusterName() const override {
+    return virtual_cluster_name_;
   }
 
   void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
@@ -54,6 +59,7 @@ public:
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
   absl::optional<MonotonicTime> end_time_;
+  absl::optional<std::string> virtual_cluster_name_;
   Network::ConnectionInfoSetterSharedPtr downstream_connection_info_provider_{
       std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr)};
   Envoy::Event::SimulatedTimeSystem test_time_;
