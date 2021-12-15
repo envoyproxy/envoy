@@ -1,5 +1,6 @@
 #include "source/server/admin/stats_handler.h"
 
+#include <functional>
 #include <vector>
 
 #include "envoy/admin/v3/mutex_stats.pb.h"
@@ -136,8 +137,8 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const bool used_only = params.find("usedonly") != params.end();
   const bool text_readouts = params.find("text_readouts") != params.end();
 
-  absl::optional<std::vector<Stats::TextReadoutSharedPtr>> textReadouts =
-      text_readouts ? absl::make_optional(server_.stats().textReadouts()) : absl::nullopt;
+  std::vector<Stats::TextReadoutSharedPtr> textReadouts =
+      text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
 
   absl::optional<std::regex> regex;
   if (!Utility::filterParam(params, response, regex)) {

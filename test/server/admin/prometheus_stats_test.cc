@@ -191,7 +191,7 @@ TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(2UL, size);
 }
@@ -214,7 +214,7 @@ TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(4UL, size);
 }
@@ -232,7 +232,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNoValuesAndNoTags) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -280,7 +280,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithNonDefaultBuckets) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -321,7 +321,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithScaledPercent) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -357,7 +357,7 @@ TEST_F(PrometheusStatsFormatterTest, HistogramWithHighCounts) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -406,8 +406,6 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
   addGauge("promtest.MYAPP.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
   // Metric with invalid prometheus namespace in the custom metric must be excluded in the output.
   addGauge("promtest.1234abcd.test.bar", {{makeStat("tag_name"), makeStat("tag-value")}});
-  // Text readout that should be skipped, because argument text_readouts is a nullopt.
-  addTextReadout("control_plane.identifier", "CP-1", {{makeStat("cluster"), makeStat("c1")}});
 
   const std::vector<uint64_t> h1_values = {50, 20, 30, 70, 100, 5000, 200};
   HistogramWrapper h1_cumulative;
@@ -423,7 +421,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithAllMetricTypes) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(7UL, size);
 
@@ -541,7 +539,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputSortedByMetricName) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false, absl::nullopt,
+      counters_, gauges_, histograms_, textReadouts_, response, false, absl::nullopt,
       custom_namespaces);
   EXPECT_EQ(6UL, size);
 
@@ -731,7 +729,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnly) {
 
   Buffer::OwnedImpl response;
   const uint64_t size =
-      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, absl::nullopt,
+      PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, histograms_, textReadouts_,
                                                   response, true, absl::nullopt, custom_namespaces);
   EXPECT_EQ(1UL, size);
 
@@ -784,7 +782,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-        counters_, gauges_, histograms_, absl::nullopt, response, used_only, absl::nullopt,
+        counters_, gauges_, histograms_, textReadouts_, response, used_only, absl::nullopt,
         custom_namespaces);
     EXPECT_EQ(0UL, size);
   }
@@ -795,7 +793,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithUsedOnlyHistogram) {
 
     Buffer::OwnedImpl response;
     const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-        counters_, gauges_, histograms_, absl::nullopt, response, used_only, absl::nullopt,
+        counters_, gauges_, histograms_, textReadouts_, response, used_only, absl::nullopt,
         custom_namespaces);
     EXPECT_EQ(1UL, size);
   }
@@ -825,7 +823,7 @@ TEST_F(PrometheusStatsFormatterTest, OutputWithRegexp) {
 
   Buffer::OwnedImpl response;
   const uint64_t size = PrometheusStatsFormatter::statsAsPrometheus(
-      counters_, gauges_, histograms_, absl::nullopt, response, false,
+      counters_, gauges_, histograms_, textReadouts_, response, false,
       absl::optional<std::regex>{std::regex("cluster.test_1.upstream_cx_total")},
       custom_namespaces);
   EXPECT_EQ(1UL, size);
