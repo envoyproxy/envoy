@@ -137,7 +137,7 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
   const bool used_only = params.find("usedonly") != params.end();
   const bool text_readouts = params.find("text_readouts") != params.end();
 
-  std::vector<Stats::TextReadoutSharedPtr> text_readouts_vec =
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
       text_readouts ? server_.stats().textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
 
   absl::optional<std::regex> regex;
