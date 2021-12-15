@@ -7,8 +7,17 @@
 namespace Envoy {
 namespace Io {
 
+thread_local bool IoUringFactoryImpl::is_instantiated_ = false;
+
 IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
-    : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling) {}
+    : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling) {
+  // TODO(rojkov): Currently only one factory per thread is supported which is
+  // enough for networking, but future IO use cases may need to have multiple
+  // factories supported with different settings: e.g. one factory for
+  // networking and one more for block IO.
+  RELEASE_ASSERT(!is_instantiated_, "only one io_uring per thread is supported now");
+  is_instantiated_ = true;
+}
 
 IoUring& IoUringFactoryImpl::getOrCreateUring() const {
   static thread_local IoUringImpl uring(io_uring_size_, use_submission_queue_polling_);
@@ -17,12 +26,12 @@ IoUring& IoUringFactoryImpl::getOrCreateUring() const {
 
 IoUringImpl::IoUringImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), cqes_(io_uring_size_, nullptr) {
-  unsigned flags{0};
+  struct io_uring_params p {};
   if (use_submission_queue_polling) {
-    flags |= IORING_SETUP_SQPOLL;
+    p.flags |= IORING_SETUP_SQPOLL;
   }
-  int ret = io_uring_queue_init(io_uring_size_, &ring_, flags);
-  RELEASE_ASSERT(ret == 0, fmt::format("Unable to initialize io_uring: {}", errorDetails(-ret)));
+  int ret = io_uring_queue_init_params(io_uring_size_, &ring_, &p);
+  RELEASE_ASSERT(ret == 0, fmt::format("unable to initialize io_uring: {}", errorDetails(-ret)));
 }
 
 IoUringImpl::~IoUringImpl() { io_uring_queue_exit(&ring_); }
@@ -54,7 +63,6 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
 
   for (unsigned i = 0; i < count; ++i) {
     struct io_uring_cqe* cqe = cqes_[i];
-    RELEASE_ASSERT(cqe->res >= 0, fmt::format("async request failed: {}", errorDetails(-cqe->res)));
     completion_cb(reinterpret_cast<void*>(cqe->user_data), cqe->res);
   }
   io_uring_cq_advance(&ring_, count);

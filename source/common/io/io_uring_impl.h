@@ -15,6 +15,8 @@ public:
 private:
   const uint32_t io_uring_size_;
   const bool use_submission_queue_polling_;
+
+  static thread_local bool is_instantiated_;
 };
 
 class IoUringImpl : public IoUring {

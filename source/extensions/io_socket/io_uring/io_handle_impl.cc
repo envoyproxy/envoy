@@ -350,6 +350,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
   Io::IoUring& uring = io_uring_factory_.getOrCreateUring();
   uring.forEveryCompletion([this](void* user_data, int32_t result) {
+    RELEASE_ASSERT(result >= 0, fmt::format("async request failed: {}", errorDetails(-result)));
     auto req = static_cast<Request*>(user_data);
     onRequestCompletion(*req, result);
     delete req;
