@@ -243,12 +243,13 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
-  int64_t idle_network_timeout_ms =
+  const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
-  quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(std::max(1l, idle_network_timeout_ms)));
-  int64_t max_time_before_crypto_handshake_ms =
+  const int64_t minimal_idle_network_timeout_ms = 1;
+  quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(minimal_idle_network_timeout_ms, idle_network_timeout_ms)));
+  const int64_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()
           ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
           : 20000;
