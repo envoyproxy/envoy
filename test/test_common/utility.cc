@@ -74,7 +74,9 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
     lhs_keys.insert(key);
     return Http::HeaderMap::Iterate::Continue;
   });
-  rhs.iterate([&lhs, &rhs, &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  bool values_match = true;
+  rhs.iterate([&values_match, &lhs, &rhs,
+               &rhs_keys](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     const std::string key{header.key().getStringView()};
     // Compare with canonicalized multi-value headers. This ensures we respect order within
     // a header.
@@ -84,12 +86,13 @@ bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
         Http::HeaderUtility::getAllOfHeaderAsString(rhs, Http::LowerCaseString(key));
     ASSERT(rhs_entry.result());
     if (lhs_entry.result() != rhs_entry.result()) {
+      values_match = false;
       return Http::HeaderMap::Iterate::Break;
     }
     rhs_keys.insert(key);
     return Http::HeaderMap::Iterate::Continue;
   });
-  return lhs_keys.size() == rhs_keys.size();
+  return values_match && lhs_keys.size() == rhs_keys.size();
 }
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {

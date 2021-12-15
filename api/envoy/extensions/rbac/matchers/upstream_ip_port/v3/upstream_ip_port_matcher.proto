@@ -10,6 +10,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.rbac.matchers.upstream_ip_port.v3";
 option java_outer_classname = "UpstreamIpPortMatcherProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/rbac/matchers/upstream_ip_port/v3;upstream_ip_portv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: RBAC upstream IP and port matcher plugin]
