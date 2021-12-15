@@ -8,6 +8,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_http1_bridge.v3";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/grpc_http1_bridge/v3;grpc_http1_bridgev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: gRPC HTTP/1.1 Bridge]

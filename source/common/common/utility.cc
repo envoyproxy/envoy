@@ -1,5 +1,6 @@
 #include "source/common/common/utility.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -21,6 +22,7 @@
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/time/time.h"
 #include "spdlog/spdlog.h"
@@ -268,8 +270,6 @@ uint64_t DateUtil::nowToSeconds(TimeSource& time_source) {
       .count();
 }
 
-const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
-
 const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return nullptr;
@@ -378,6 +378,7 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
                                                       bool keep_empty_string,
                                                       bool trim_whitespace) {
   std::vector<absl::string_view> result;
+
   if (keep_empty_string) {
     result = absl::StrSplit(source, absl::ByAnyChar(delimiters));
   } else {
@@ -574,6 +575,26 @@ std::string StringUtil::removeCharacters(const absl::string_view& str,
     pieces.push_back(str.substr(pos));
   }
   return absl::StrJoin(pieces, "");
+}
+
+bool StringUtil::hasEmptySpace(absl::string_view view) {
+  return view.find_first_of(WhitespaceChars) != absl::string_view::npos;
+}
+
+namespace {
+
+using ReplacementMap = absl::flat_hash_map<std::string, std::string>;
+
+const ReplacementMap& emptySpaceReplacement() {
+  CONSTRUCT_ON_FIRST_USE(
+      ReplacementMap,
+      ReplacementMap{{" ", "_"}, {"\t", "_"}, {"\f", "_"}, {"\v", "_"}, {"\n", "_"}, {"\r", "_"}});
+}
+
+} // namespace
+
+std::string StringUtil::replaceAllEmptySpace(absl::string_view view) {
+  return absl::StrReplaceAll(view, emptySpaceReplacement());
 }
 
 bool Primes::isPrime(uint32_t x) {

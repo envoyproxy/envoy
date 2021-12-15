@@ -4,11 +4,11 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "bazel-compilation-database",
         project_desc = "Clang JSON compilation database support for Bazel",
         project_url = "https://github.com/grailbio/bazel-compilation-database",
-        version = "0.4.5",
-        sha256 = "bcecfd622c4ef272fd4ba42726a52e140b961c4eac23025f18b346c968a8cfb4",
+        version = "0.5.2",
+        sha256 = "d32835b26dd35aad8fd0ba0d712265df6565a3ad860d39e4c01ad41059ea7eda",
         strip_prefix = "bazel-compilation-database-{version}",
         urls = ["https://github.com/grailbio/bazel-compilation-database/archive/{version}.tar.gz"],
-        release_date = "2020-08-01",
+        release_date = "2021-09-10",
         use_category = ["build"],
     ),
     bazel_gazelle = dict(
@@ -79,15 +79,15 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/dev release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
-        # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
+        # 3. Find a commit in BoringSSL's "main-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-92.0.4511.0 (linux/dev)
-        version = "75edea1922aefe415e0e60ac576116634b0a94f8",
-        sha256 = "70e9d8737e35d67f94b9e742ca59c02c36f30f1d822d5a3706511a23798d8049",
+        # chromium-94.0.4606.81 (linux/dev)
+        version = "648cbaf033401b7fe7acdce02f275b06a88aab5c",
+        sha256 = "579cb415458e9f3642da0a39a72f79fdfe6dc9c1713b3a823f1e276681b9703e",
         strip_prefix = "boringssl-{version}",
         urls = ["https://github.com/google/boringssl/archive/{version}.tar.gz"],
         use_category = ["controlplane", "dataplane_core"],
-        release_date = "2021-05-13",
+        release_date = "2021-07-15",
         cpe = "cpe:2.3:a:google:boringssl:*",
     ),
     boringssl_fips = dict(
@@ -111,6 +111,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/abseil/abseil-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2021-06-03",
+        cpe = "N/A",
+    ),
+    # This dependency is built only when performance tracing is enabled with the
+    # option --define=perf_tracing=enabled. It's never built for releases.
+    com_github_google_perfetto = dict(
+        project_name = "Perfetto",
+        project_desc = "Perfetto Tracing SDK",
+        project_url = "https://perfetto.dev/",
+        version = "22.1",
+        sha256 = "013ba743019a1ca04627f7ce8bf424b60ed7f0f57e232eff719ae879be4c90fd",
+        strip_prefix = "perfetto-{version}/sdk",
+        urls = ["https://github.com/google/perfetto/archive/v{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2021-12-07",
         cpe = "N/A",
     ),
     com_github_c_ares_c_ares = dict(
@@ -141,12 +155,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "xxHash",
         project_desc = "Extremely fast hash algorithm",
         project_url = "https://github.com/Cyan4973/xxHash",
-        version = "0.8.0",
-        sha256 = "7054c3ebd169c97b64a92d7b994ab63c70dd53a06974f1f630ab782c28db0f4f",
+        version = "0.8.1",
+        sha256 = "3bb6b7d6f30c591dd65aaaff1c8b7a5b94d81687998ca9400082c739a690436c",
         strip_prefix = "xxHash-{version}",
         urls = ["https://github.com/Cyan4973/xxHash/archive/v{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
-        release_date = "2020-07-27",
+        release_date = "2021-11-29",
         cpe = "N/A",
     ),
     com_github_envoyproxy_sqlparser = dict(
@@ -349,13 +363,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Data Collect Protocols of Apache SkyWalking",
         project_url = "https://github.com/apache/skywalking-data-collect-protocol",
         name = "skywalking_data_collect_protocol",
-        sha256 = "d967c1b6e78db017e0c28291211baf4a58c02ff4d4437560285165963dd4a9d0",
+        sha256 = "49bd689b9c1c0ea12064bd35581689cef7835e5ac15d335dc425fbfc2029aa90",
         urls = ["https://github.com/apache/skywalking-data-collect-protocol/archive/v{version}.tar.gz"],
         strip_prefix = "skywalking-data-collect-protocol-{version}",
-        version = "8.6.0",
+        version = "8.9.1",
         use_category = ["observability_ext"],
         extensions = ["envoy.tracers.skywalking"],
-        release_date = "2021-06-07",
+        release_date = "2021-12-11",
         cpe = "cpe:2.3:a:apache:skywalking:*",
     ),
     com_github_skyapm_cpp2sky = dict(
@@ -403,7 +417,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # stats (see https://github.com/libevent/libevent/pull/793) and the fix for a race condition
         # in the watchers (see https://github.com/libevent/libevent/pull/802).
         # This also includes the fixes for https://github.com/libevent/libevent/issues/806
-        # and https://github.com/lyft/envoy-mobile/issues/215.
+        # and https://github.com/envoyproxy/envoy-mobile/issues/215.
         # This also includes the fixes for Phantom events with EV_ET (see
         # https://github.com/libevent/libevent/issues/984).
         # This also includes the wepoll backend for Windows (see
@@ -638,24 +652,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "grpc-httpjson-transcoding",
         project_desc = "Library that supports transcoding so that HTTP/JSON can be converted to gRPC",
         project_url = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
-        version = "6acdde98c94b70453b39a81fe7bf59b847188fc3",
-        sha256 = "a076ca60fca2719b505c49dc1175fd27485dc76deaaef21581e6bd37c84da890",
+        version = "bdd203e981d5ec25166aa5f5df6b443986eea556",
+        sha256 = "2ce3a6306b245cf46834a3538bcac327359fc4b1f8b0e2d4881c9ff0acfe5ba5",
         strip_prefix = "grpc-httpjson-transcoding-{version}",
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.filters.http.grpc_json_transcoder"],
-        release_date = "2021-11-04",
+        release_date = "2021-12-03",
         cpe = "N/A",
     ),
     io_bazel_rules_go = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
-        version = "0.27.0",
-        sha256 = "69de5c704a05ff37862f7e0f5534d4f479418afc21806c887db544a316f3cb6b",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.tar.gz"],
+        version = "0.29.0",
+        sha256 = "2b1641428dff9018f9e85c0384f03ec6c10660d935b750e3fa1492a281a53b0f",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v{version}/rules_go-v{version}.zip"],
         use_category = ["build", "api"],
-        release_date = "2021-03-18",
+        release_date = "2021-10-06",
         implied_untracked_deps = [
             "com_github_golang_protobuf",
             "io_bazel_rules_nogo",
@@ -828,12 +842,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "QUICHE",
         project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
-        version = "7f2d442e3cb02b4ef4892e62b0e9a8ce94a83db2",
-        sha256 = "7de89aa92bb23b66b130891dc4d73b3aa1514271d39d261239fe7eef7744166d",
+        version = "e87010ff958c9397ee861e00d7747de6f3938e19",
+        sha256 = "8b3b6ac35947335a362cc77a43e5a6c3ef699ef5d1f0c73fa068059b4b3fc5b6",
         urls = ["https://github.com/google/quiche/archive/{version}.tar.gz"],
         strip_prefix = "quiche-{version}",
         use_category = ["dataplane_core"],
-        release_date = "2021-11-24",
+        release_date = "2021-12-07",
         cpe = "N/A",
     ),
     com_googlesource_googleurl = dict(
@@ -859,6 +873,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/cel-cpp/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -882,6 +897,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/google/flatbuffers/archive/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1078,6 +1094,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         # ANTLR has a runtime component, so is not purely build.
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1098,6 +1115,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/antlr/antlr4/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = [
+            "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
@@ -1112,13 +1130,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "VPP Comms Library",
         project_desc = "FD.io Vector Packet Processor (VPP) Comms Library",
         project_url = "https://fd.io/",
-        version = "596c45b22211c9af243b624dc037f58c0aa1c302",
-        sha256 = "e4c3fad7e1a6952e5c081cfe25f1f091d97fae8e75c5f03205def37d34c27741",
+        version = "7c3275e84b64ade4e20d00e4457bd4e437b1894f",
+        sha256 = "d456d37bbb7f90ec1ef166c1387e788b4c3078d38303f12ab41f1d0ac1a1cfc0",
         strip_prefix = "vpp-{version}",
         urls = ["https://github.com/FDio/vpp/archive/{version}.tar.gz"],
         use_category = ["other"],
         extensions = ["envoy.bootstrap.vcl"],
-        release_date = "2021-09-13",
+        release_date = "2021-12-10",
         cpe = "N/A",
     ),
 )

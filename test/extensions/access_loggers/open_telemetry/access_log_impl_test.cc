@@ -12,6 +12,7 @@
 #include "source/extensions/access_loggers/open_telemetry/access_log_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -100,7 +101,10 @@ TEST_F(AccessLogTest, Marshalling) {
   InSequence s;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.start_time_ = SystemTime(1h);
-  stream_info.last_downstream_rx_byte_received_ = 2ms;
+  MockTimeSystem time_system;
+  EXPECT_CALL(time_system, monotonicTime)
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(2))));
+  stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
   stream_info.protocol_ = Http::Protocol::Http10;
   stream_info.addBytesReceived(10);
   stream_info.response_code_ = 200;
