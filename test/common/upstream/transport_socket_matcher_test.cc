@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -129,7 +130,7 @@ transport_socket:
 }
 
 TEST_F(TransportSocketMatcherTest, AlpnSupport) {
-  mock_default_factory_.reset(new NiceMock<FakeTransportSocketFactory>("default", true));
+  mock_default_factory_ = std::make_unique<NiceMock<FakeTransportSocketFactory>>("default", true);
   factory_.supports_alpn_ = true;
   init({R"EOF(
 name: "enableFooSocket"
@@ -164,7 +165,7 @@ transport_socket:
 }
 
 TEST_F(TransportSocketMatcherTest, NoMatcherAlpnSupport) {
-  mock_default_factory_.reset(new NiceMock<FakeTransportSocketFactory>("default", true));
+  mock_default_factory_ = std::make_unique<NiceMock<FakeTransportSocketFactory>>("default", true);
   init({R"EOF(
 name: "enableFooSocket"
 match:
