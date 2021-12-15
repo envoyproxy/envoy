@@ -76,3 +76,16 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "internal_listener_registry",
+    srcs = [
+        "internal_listener_registry.cc",
+    ],
+    hdrs = [
+        "internal_listener_registry.h",
+    ],
+    deps = [
+        "//source/server:bootstrap_extension_config_interface",
+    ]
+)
