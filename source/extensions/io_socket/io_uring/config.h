@@ -5,11 +5,14 @@
 #include "source/common/network/socket_interface.h"
 
 namespace Envoy {
+
+namespace Io {
+class IoUringFactory;
+} // namespace Io
+
 namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
-
-class IoUringFactory;
 
 class SocketInterfaceImpl : public Network::SocketInterfaceBase {
 public:
@@ -34,7 +37,7 @@ public:
 
 private:
   uint32_t read_buffer_size_;
-  std::unique_ptr<const IoUringFactory> io_uring_factory_;
+  std::unique_ptr<const Io::IoUringFactory> io_uring_factory_;
 };
 
 DECLARE_FACTORY(SocketInterfaceImpl);

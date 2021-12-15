@@ -1,13 +1,11 @@
 #pragma once
 
-#include "source/extensions/io_socket/io_uring/io_uring.h"
+#include "source/common/io/io_uring.h"
 
 #include "liburing.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace IoSocket {
-namespace IoUring {
+namespace Io {
 
 class IoUringFactoryImpl : public IoUringFactory {
 public:
@@ -48,7 +46,5 @@ private:
   os_fd_t event_fd_{INVALID_SOCKET};
 };
 
-} // namespace IoUring
-} // namespace IoSocket
-} // namespace Extensions
+} // namespace Io
 } // namespace Envoy

@@ -5,9 +5,7 @@
 #include "source/common/network/address_impl.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace IoSocket {
-namespace IoUring {
+namespace Io {
 
 using CompletionCb = std::function<void(void*, int32_t)>;
 
@@ -38,7 +36,5 @@ public:
   virtual IoUring& getOrCreateUring() const PURE;
 };
 
-} // namespace IoUring
-} // namespace IoSocket
-} // namespace Extensions
+} // namespace Io
 } // namespace Envoy

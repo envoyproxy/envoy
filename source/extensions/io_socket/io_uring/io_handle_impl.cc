@@ -8,9 +8,9 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
+#include "source/common/io/io_uring.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
-#include "source/extensions/io_socket/io_uring/io_uring.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +24,9 @@ constexpr socklen_t udsAddressLength() { return sizeof(sa_family_t); }
 } // namespace
 
 IoUringSocketHandleImpl::IoUringSocketHandleImpl(const uint32_t read_buffer_size,
-                                                 const IoUringFactory& io_uring_factory, os_fd_t fd,
-                                                 bool socket_v6only, absl::optional<int> domain)
+                                                 const Io::IoUringFactory& io_uring_factory,
+                                                 os_fd_t fd, bool socket_v6only,
+                                                 absl::optional<int> domain)
     : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd),
       socket_v6only_(socket_v6only), domain_(domain) {}
 
@@ -347,7 +348,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
 }
 
 void IoUringSocketHandleImpl::FileEventAdapter::onFileEvent() {
-  IoUring& uring = io_uring_factory_.getOrCreateUring();
+  Io::IoUring& uring = io_uring_factory_.getOrCreateUring();
   uring.forEveryCompletion([this](void* user_data, int32_t result) {
     auto req = static_cast<Request*>(user_data);
     onRequestCompletion(*req, result);
@@ -364,7 +365,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
                                  "file descriptor. This is not allowed.");
 
   cb_ = std::move(cb);
-  IoUring& uring = io_uring_factory_.getOrCreateUring();
+  Io::IoUring& uring = io_uring_factory_.getOrCreateUring();
   const os_fd_t event_fd = uring.registerEventfd();
   file_event_ = dispatcher.createFileEvent(
       event_fd, [this](uint32_t) { onFileEvent(); }, trigger, events);

@@ -6,11 +6,15 @@
 #include "source/common/common/logger.h"
 
 namespace Envoy {
+
+namespace Io {
+class IoUringFactory;
+} // namespace Io
+
 namespace Extensions {
 namespace IoSocket {
 namespace IoUring {
 
-class IoUringFactory;
 class IoUringSocketHandleImpl;
 
 enum class RequestType { Accept, Connect, Read, Write, Close, Unknown };
@@ -31,7 +35,7 @@ struct Request {
 class IoUringSocketHandleImpl final : public Network::IoHandle,
                                       protected Logger::Loggable<Logger::Id::io> {
 public:
-  IoUringSocketHandleImpl(const uint32_t read_buffer_size, const IoUringFactory&,
+  IoUringSocketHandleImpl(const uint32_t read_buffer_size, const Io::IoUringFactory&,
                           os_fd_t fd = INVALID_SOCKET, bool socket_v6only = false,
                           absl::optional<int> domain = absl::nullopt);
   ~IoUringSocketHandleImpl() override;
@@ -83,7 +87,7 @@ private:
   // FileEventAdapter adapts `io_uring` to libevent.
   class FileEventAdapter {
   public:
-    FileEventAdapter(const uint32_t read_buffer_size, const IoUringFactory& io_uring_factory,
+    FileEventAdapter(const uint32_t read_buffer_size, const Io::IoUringFactory& io_uring_factory,
                      os_fd_t fd)
         : read_buffer_size_(read_buffer_size), io_uring_factory_(io_uring_factory), fd_(fd) {}
     void initialize(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
@@ -96,7 +100,7 @@ private:
     void onRequestCompletion(const Request& req, int32_t result);
 
     const uint32_t read_buffer_size_;
-    const IoUringFactory& io_uring_factory_;
+    const Io::IoUringFactory& io_uring_factory_;
     os_fd_t fd_;
     Event::FileReadyCb cb_;
     Event::FileEventPtr file_event_{nullptr};
@@ -115,7 +119,7 @@ private:
   bool isLeader() const { return file_event_adapter_ != nullptr; }
 
   const uint32_t read_buffer_size_;
-  const IoUringFactory& io_uring_factory_;
+  const Io::IoUringFactory& io_uring_factory_;
   os_fd_t fd_;
   int socket_v6only_;
   const absl::optional<int> domain_;

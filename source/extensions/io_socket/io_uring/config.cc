@@ -7,7 +7,7 @@
 #include "source/extensions/io_socket/io_uring/io_handle_impl.h"
 
 #if defined(__linux__)
-#include "source/extensions/io_socket/io_uring/io_uring_impl.h"
+#include "source/common/io/io_uring_impl.h"
 #endif
 
 namespace Envoy {
@@ -106,7 +106,7 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
   read_buffer_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, read_buffer_size, kDefaultReadBufferSize);
 #if defined(__linux__)
-  io_uring_factory_ = std::make_unique<const IoUringFactoryImpl>(
+  io_uring_factory_ = std::make_unique<const Io::IoUringFactoryImpl>(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, io_uring_size, kDefaultIoUringSize),
       config.use_submission_queue_polling());
 #endif

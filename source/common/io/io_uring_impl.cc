@@ -1,13 +1,11 @@
-#include "source/extensions/io_socket/io_uring/io_uring_impl.h"
+#include "source/common/io/io_uring_impl.h"
 
 #include <sys/eventfd.h>
 
 #include "source/common/common/utility.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace IoSocket {
-namespace IoUring {
+namespace Io {
 
 IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling) {}
@@ -97,12 +95,15 @@ void IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
   io_uring_sqe_set_data(sqe, user_data);
 }
 
-void IoUringImpl::submit() { io_uring_submit(&ring_); }
+void IoUringImpl::submit() {
+  // TODO(rojkov): Handle `EBUSY` in case the completion queue is never reaped.
+  RELEASE_ASSERT(io_uring_submit(&ring_) >= 0, "unable to submit io_uring queue entries");
+}
 
 struct io_uring_sqe* IoUringImpl::getSqe() {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
-    FANCY_LOG(warn, "unable to get a new SQE, submitting existing ones...");
+    FANCY_LOG(warn, "io_uring submission queue is saturated; you may want to increase it");
     submit();
     sqe = io_uring_get_sqe(&ring_);
   }
@@ -110,7 +111,5 @@ struct io_uring_sqe* IoUringImpl::getSqe() {
   return sqe;
 }
 
-} // namespace IoUring
-} // namespace IoSocket
-} // namespace Extensions
+} // namespace Io
 } // namespace Envoy
