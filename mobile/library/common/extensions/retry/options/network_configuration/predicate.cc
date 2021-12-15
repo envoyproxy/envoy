@@ -48,7 +48,9 @@ NetworkConfigurationRetryOptionsPredicate::updateOptions(
   // where a stream received no bytes from the upstream as a network fault. This status is passed to
   // the configurator below when we report network usage, where it may be factored into future
   // socket configuration.
-  bool network_fault = !stream_info.firstUpstreamRxByteReceived().has_value();
+  bool network_fault =
+      !stream_info.upstreamInfo() ||
+      !stream_info.upstreamInfo()->upstreamTiming().first_upstream_rx_byte_received_.has_value();
 
   // Report request status to network configurator, so that socket configuration may be adapted
   // to current network conditions.
