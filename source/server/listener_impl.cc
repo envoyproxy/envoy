@@ -80,7 +80,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
 
   if (local_address_->type() == Network::Address::Type::Ip) {
     if (socket_type == Network::Socket::Type::Datagram) {
-      ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort);
+      ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort || num_sockets == 1u);
     }
   } else {
     if (local_address_->type() == Network::Address::Type::Pipe) {
