@@ -234,7 +234,8 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     }
   } else {
     ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
-                    "dns resolution callback for {} not issued", dns_name_);
+                    "dns resolution callback for {} not issued. Cancelled with reason={}",
+                    dns_name_, cancel_reason_);
   }
   if (owned_) {
     delete this;
