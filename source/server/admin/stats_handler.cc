@@ -1,5 +1,8 @@
 #include "source/server/admin/stats_handler.h"
 
+#include <functional>
+#include <vector>
+
 #include "envoy/admin/v3/mutex_stats.pb.h"
 
 #include "source/common/common/empty_string.h"
@@ -254,9 +257,12 @@ Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query
     server_.flushStats();
   }
   Stats::Store& stats = server_.stats();
+  const bool text_readouts = params.find("text_readouts") != params.end();
+  const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+      text_readouts ? stats.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
-                                              response, params.used_only_, params.filter_,
-                                              server_.api().customStatNamespaces());
+                                              text_readouts_vec, response, params.used_only_,
+                                              params.filter_, server_.api().customStatNamespaces());
   return Http::Code::OK;
 }
 

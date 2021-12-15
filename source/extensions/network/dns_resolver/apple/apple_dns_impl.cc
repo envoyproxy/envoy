@@ -320,11 +320,11 @@ void AppleDnsResolverImpl::PendingResolution::onDNSServiceGetAddrInfoReply(
     ASSERT(address, "invalid to add null address");
     auto dns_response = buildDnsResponse(address, ttl);
     ENVOY_LOG(debug, "Address to add address={}, ttl={}",
-              dns_response.address_->ip()->addressAsString(), ttl);
-    if (dns_response.address_->ip()->ipv4()) {
+              dns_response.addrInfo().address_->ip()->addressAsString(), ttl);
+    if (dns_response.addrInfo().address_->ip()->ipv4()) {
       pending_response_.v4_responses_.push_back(dns_response);
     } else {
-      ASSERT(dns_response.address_->ip()->ipv6());
+      ASSERT(dns_response.addrInfo().address_->ip()->ipv6());
       pending_response_.v6_responses_.push_back(dns_response);
     }
   }

@@ -71,7 +71,7 @@ private:
     absl::optional<std::string> scope_;
   };
 
-  friend class AdminStatsTest;
+  friend class StatsHandlerTest;
 
   static Http::Code stats(const Params& parmams, Stats::Store& stats,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
