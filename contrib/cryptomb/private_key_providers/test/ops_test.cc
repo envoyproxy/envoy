@@ -9,8 +9,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 #include "contrib/cryptomb/private_key_providers/source/cryptomb_private_key_provider.h"
 #include "fake_factory.h"
 #include "gtest/gtest.h"
@@ -50,7 +48,7 @@ protected:
       : api_(Api::createApiForTest(store_, time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
         fakeIpp_(std::make_shared<FakeIppCryptoImpl>(true)),
-        stats_(store_, CryptoMbQueue::MULTIBUFF_BATCH, STATS_PREFIX, QUEUE_SIZE_STAT_PREFIX) {}
+        stats_(generateCryptoMbStats("cryptomb", store_)) {}
 
   bssl::UniquePtr<EVP_PKEY> makeRsaKey() {
     std::string file = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -104,8 +102,7 @@ protected:
   // Size of output in out_ from an operation.
   size_t out_len_ = 0;
 
-  static constexpr absl::string_view STATS_PREFIX = "cryptomb";
-  static constexpr absl::string_view QUEUE_SIZE_STAT_PREFIX = "rsa_queue_size_";
+  const std::string QUEUE_SIZE_HISTOGRAM_NAME = "cryptomb.rsa_queue_sizes";
 };
 
 TEST_F(CryptoMbProviderTest, TestEcdsaSigning) {
@@ -334,14 +331,7 @@ TEST_F(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
                                                                          bssl::UpRef(pkey), queue));
   }
 
-  // Check that all counters are at zero.
-  for (uint32_t i = 1; i <= CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    EXPECT_EQ(store_.counterFromString(absl::StrCat(STATS_PREFIX, ".", QUEUE_SIZE_STAT_PREFIX, i))
-                  .value(),
-              0);
-  }
-
-  // Increment all but the last queue size counter once inside the loop.
+  // Increment all but the last queue size once inside the loop.
   for (uint32_t i = 1; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
     // Create correct amount of signing operations for current index.
     for (uint32_t j = 0; j < i; j++) {
@@ -358,21 +348,13 @@ TEST_F(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
     EXPECT_EQ(res_, ssl_private_key_success);
     EXPECT_NE(out_len_, 0);
 
-    // Check that all thus far incremented queue size counters have been incremented by one.
-    for (uint32_t j = 1; j <= i; j++) {
-      EXPECT_EQ(store_.counterFromString(absl::StrCat(STATS_PREFIX, ".", QUEUE_SIZE_STAT_PREFIX, j))
-                    .value(),
-                1);
-    }
-    // Check that all queue size counters that have not been incremented stay at zero.
-    for (uint32_t j = i + 1; j <= CryptoMbQueue::MULTIBUFF_BATCH; j++) {
-      EXPECT_EQ(store_.counterFromString(absl::StrCat(STATS_PREFIX, ".", QUEUE_SIZE_STAT_PREFIX, j))
-                    .value(),
-                0);
-    }
+    // Check that current queue size is recorded.
+    std::vector<uint64_t> histogram_values(store_.histogramValues(QUEUE_SIZE_HISTOGRAM_NAME, true));
+    EXPECT_EQ(histogram_values.size(), 1);
+    EXPECT_EQ(histogram_values[0], i);
   }
 
-  // Increment last queue size counter once.
+  // Increment last queue size once.
   // Create an amount of signing operations equal to maximum queue size.
   for (uint32_t j = 0; j < CryptoMbQueue::MULTIBUFF_BATCH; j++) {
     res_ = rsaPrivateKeySignForTest(connections[j].get(), nullptr, nullptr, MAX_OUT_LEN,
@@ -388,12 +370,10 @@ TEST_F(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
-  // Check that all queue size counters have been incremented by one.
-  for (uint32_t j = 1; j <= CryptoMbQueue::MULTIBUFF_BATCH; j++) {
-    EXPECT_EQ(store_.counterFromString(absl::StrCat(STATS_PREFIX, ".", QUEUE_SIZE_STAT_PREFIX, j))
-                  .value(),
-              1);
-  }
+  // Check that last queue size is recorded.
+  std::vector<uint64_t> histogram_values(store_.histogramValues(QUEUE_SIZE_HISTOGRAM_NAME, true));
+  EXPECT_EQ(histogram_values.size(), 1);
+  EXPECT_EQ(histogram_values[0], CryptoMbQueue::MULTIBUFF_BATCH);
 }
 
 } // namespace
