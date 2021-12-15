@@ -521,6 +521,12 @@ modify different aspects of the server:
   Text readout stats are returned in gauge format. These gauges always have value 0. Each
   gauge record has additional label named ``text_value`` that contains value of a text readout.
 
+  .. warning::
+    Every unique combination of key-value label pair represents a new time series
+    in Prometheus, which can dramatically increase the amount of data stored.
+    Text readout stats create a new label value every time the value
+    of the text readout stat changes, which could create an unbounded number of time series.
+
 .. http:get:: /stats/recentlookups
 
   This endpoint helps Envoy developers debug potential contention
