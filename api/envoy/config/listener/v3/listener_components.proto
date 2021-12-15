@@ -224,9 +224,6 @@ message FilterChain {
   reserved "tls_context";
 
   // The criteria to use when matching a connection to this filter chain.
-  // Note: :ref:`filter_chain_matcher
-  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
-  // supersedes this field.
   FilterChainMatch filter_chain_match = 1;
 
   // A list of individual network filters that make up the filter chain for
@@ -264,12 +261,12 @@ message FilterChain {
   // establishment, the connection is summarily closed.
   google.protobuf.Duration transport_socket_connect_timeout = 9;
 
-  // Note: :ref:`filter_chain_matcher
-  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
-  // requires that filter chains are uniquely named.
   // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
   // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
   // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
+  // Note: :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`
+  // requires that filter chains are uniquely named.
   string name = 7;
 
   // [#not-implemented-hide:] The configuration to specify whether the filter chain will be built on-demand.
@@ -452,32 +449,6 @@ message PortMatcher {
 
   // Match port by port ranges.
   repeated PortRangeMatcher range_matchers = 2;
-}
-
-// Matches a specific IP address against a set of possibly overlapping subnets.
-// TODO(kuat) Move to cncf/xds.
-message IPMatcher {
-  // Specifies an optional list of IP address ranges and a match action.
-  message IPRangeMatcher {
-    // Optional set of CIDR ranges. An empty set matches any IP address.
-    repeated core.v3.CidrRange ranges = 1;
-
-    // Match action to apply when the IP address is within one of the CIDR ranges.
-    xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
-
-    // Indicates whether this match option should be considered if there is a
-    // more specific matcher. Exclusive matchers are not selected whenever a
-    // more specific matcher exists (e.g. matcher with a longer prefix) even
-    // when the more specific matcher fails its nested match condition.
-    // Non-exclusive matchers are considered if the more specific matcher
-    // exists but its nested match condition does not entirely match.
-    // Non-exclusive matchers are selected in the order of their specificity
-    // first (longest prefix first), then the order of declaration next.
-    bool exclusive = 3;
-  }
-
-  // Match IP address by CIDR ranges.
-  repeated IPRangeMatcher range_matchers = 1;
 }
 
 // Matches a specific server name against of a set of possibly overlapping wildcard domains.
