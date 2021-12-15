@@ -17,7 +17,7 @@ envoy_status_t EngineHandle::runOnEngineDispatcher(envoy_engine_t,
 envoy_engine_t EngineHandle::initEngine(envoy_engine_callbacks callbacks, envoy_logger logger,
                                         envoy_event_tracker event_tracker) {
   // TODO(goaway): return new handle once multiple engine support is in place.
-  // https://github.com/lyft/envoy-mobile/issues/332
+  // https://github.com/envoyproxy/envoy-mobile/issues/332
   strong_engine_ = std::make_shared<Envoy::Engine>(callbacks, logger, event_tracker);
   engine_ = strong_engine_;
   return 1;
@@ -25,7 +25,7 @@ envoy_engine_t EngineHandle::initEngine(envoy_engine_callbacks callbacks, envoy_
 
 envoy_status_t EngineHandle::runEngine(envoy_engine_t, const char* config, const char* log_level) {
   // This will change once multiple engine support is in place.
-  // https://github.com/lyft/envoy-mobile/issues/332
+  // https://github.com/envoyproxy/envoy-mobile/issues/332
   if (auto e = engine()) {
     e->run(config, log_level);
     return ENVOY_SUCCESS;

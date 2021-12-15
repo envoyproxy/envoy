@@ -14,7 +14,7 @@
 
     <name>Envoy Mobile</name>
     <description>Client networking libraries based on the Envoy project.</description>
-    <url>https://github.com/lyft/envoy-mobile</url>
+    <url>https://github.com/envoyproxy/envoy-mobile</url>
 
     <licenses>
         <license>
@@ -46,9 +46,9 @@
         </developer>
     </developers>
     <scm>
-        <url>https://github.com/lyft/envoy-mobile</url>
-        <connection>scm:git:git@github.com:lyft/envoy-mobile.git</connection>
-        <developerConnection>scm:git:git@github.com:lyft/envoy-mobile.git</developerConnection>
+        <url>https://github.com/envoyproxy/envoy-mobile</url>
+        <connection>scm:git:git@github.com:envoyproxy/envoy-mobile.git</connection>
+        <developerConnection>scm:git:git@github.com:envoyproxy/envoy-mobile.git</developerConnection>
         <tag>HEAD</tag>
     </scm>
 

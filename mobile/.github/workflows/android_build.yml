@@ -71,7 +71,7 @@ jobs:
         run: ./ci/mac_start_emulator.sh
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
-      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start java app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
         run: ./ci/mac_start_emulator.sh
       # Return to using:
       #   ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
-      # When https://github.com/lyft/envoy-mobile/issues/853 is fixed.
+      # When https://github.com/envoyproxy/envoy-mobile/issues/853 is fixed.
       - name: 'Start kotlin app'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -39,7 +39,7 @@ static void jvm_on_engine_running(void* context) {
 
   env->DeleteLocalRef(jcls_JvmonEngineRunningContext);
   // TODO(goaway): This isn't re-used by other engine callbacks, so it's safe to delete here.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
   env->DeleteGlobalRef(j_context);
 }
 
@@ -105,7 +105,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   envoy_event_tracker event_tracker = {nullptr, nullptr};
   if (j_event_tracker != nullptr) {
     // TODO(goaway): The retained_context leaks, but it's tied to the life of the engine.
-    // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+    // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
     jobject retained_context = env->NewGlobalRef(j_event_tracker);
     jni_log_fmt("[Envoy]", "retained_context: %p", retained_context);
     event_tracker.track = jvm_on_track;
@@ -868,7 +868,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerFilterFactory(JNIEnv* e
                                                                        jobject j_context) {
 
   // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
   jni_log("[Envoy]", "registerFilterFactory");
   jni_log_fmt("[Envoy]", "j_context: %p", j_context);
   jobject retained_context = env->NewGlobalRef(j_context);
@@ -998,7 +998,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_registerStringAccessor(JNIEnv* 
                                                                         jobject j_context) {
 
   // TODO(goaway): The retained_context leaks, but it's tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
   jobject retained_context = env->NewGlobalRef(j_context);
 
   envoy_string_accessor* string_accessor =

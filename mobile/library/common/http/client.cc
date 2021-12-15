@@ -450,7 +450,7 @@ void Client::sendHeaders(envoy_stream_t stream, envoy_headers headers, bool end_
   // TODO: handle potential race condition with cancellation or failure get a stream in the
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
-  // https://github.com/lyft/envoy-mobile/issues/301
+  // https://github.com/envoyproxy/envoy-mobile/issues/301
   if (direct_stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     RequestHeaderMapPtr internal_headers = Utility::toRequestHeaders(headers);
@@ -497,7 +497,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   // TODO: handle potential race condition with cancellation or failure get a stream in the
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
-  // https://github.com/lyft/envoy-mobile/issues/301
+  // https://github.com/envoyproxy/envoy-mobile/issues/301
   if (direct_stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     // The buffer is moved internally, in a synchronous fashion, so we don't need the lifetime
@@ -535,7 +535,7 @@ void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   // TODO: handle potential race condition with cancellation or failure get a stream in the
   // first place. Additionally it is possible to get a nullptr due to bogus envoy_stream_t
   // from the caller.
-  // https://github.com/lyft/envoy-mobile/issues/301
+  // https://github.com/envoyproxy/envoy-mobile/issues/301
   if (direct_stream) {
     ScopeTrackerScopeState scope(direct_stream.get(), scopeTracker());
     RequestTrailerMapPtr internal_trailers = Utility::toRequestTrailers(trailers);

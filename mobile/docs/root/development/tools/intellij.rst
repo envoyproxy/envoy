@@ -11,7 +11,7 @@ Using IntelliJ with Envoy Mobile
 To get started using IntelliJ with Envoy Mobile:
 
 1. Download a supported `IntelliJ version <https://www.jetbrains.com/idea/download/other.html>`_ supported by the Bazel plugin
-2. Apply local hacks to make IntelliJ work using the branch `hack-for-intellij <https://github.com/lyft/envoy-mobile/tree/hack-for-intellij>`_
+2. Apply local hacks to make IntelliJ work using the branch `hack-for-intellij <https://github.com/envoyproxy/envoy-mobile/tree/hack-for-intellij>`_
 3. Open up the Envoy Mobile project using the Bazel import project wizard
 
 

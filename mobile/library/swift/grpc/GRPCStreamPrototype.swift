@@ -135,7 +135,7 @@ private enum GRPCMessageProcessor {
       }
 
       guard compressionFlag == 0 else {
-        // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501
+        // TODO: Support gRPC compression https://github.com/envoyproxy/envoy-mobile/issues/501
         buffer.removeAll()
         state = .expectingCompressionFlag
         return

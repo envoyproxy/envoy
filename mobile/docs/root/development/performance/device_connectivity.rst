@@ -79,4 +79,4 @@ Open issues
 ~~~~~~~~~~~
 
 For current issues with device conditions, please see issues with the
-`perf/device label <https://github.com/lyft/envoy-mobile/labels/perf%2Fdevice>`_.
+`perf/device label <https://github.com/envoyproxy/envoy-mobile/labels/perf%2Fdevice>`_.

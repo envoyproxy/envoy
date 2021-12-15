@@ -398,7 +398,7 @@ open class EngineBuilder: NSObject {
   /// Add a specific implementation of `EnvoyEngine` to use for starting Envoy.
   /// A new instance of this engine will be created when `build()` is called.
   /// Used for testing, as initializing with `EnvoyEngine.Type` results in a
-  /// segfault: https://github.com/lyft/envoy-mobile/issues/334
+  /// segfault: https://github.com/envoyproxy/envoy-mobile/issues/334
   @discardableResult
   func addEngineType(_ engineType: EnvoyEngine.Type) -> Self {
     self.engineType = engineType

@@ -3,7 +3,7 @@
 Local Stats
 ===========
 
-The `local-stats` `branch <https://github.com/lyft/envoy-mobile/tree/local-stats>`_ allows a
+The `local-stats` `branch <https://github.com/envoyproxy/envoy-mobile/tree/local-stats>`_ allows a
 developer to run a local statsd server, and see stats emissions from a client running in the
 simulator/emulator. Unless network tunneling is set up this is not going to work in a physical
 device, as the statsd server is running on the computer's local network.
@@ -12,9 +12,9 @@ device, as the statsd server is running on the computer's local network.
 Config
 ------
 
-The `config template <https://github.com/lyft/envoy-mobile/blob/local-stats/library/common/config_template.cc>`_
+The `config template <https://github.com/envoyproxy/envoy-mobile/blob/local-stats/library/common/config_template.cc>`_
 has already been updated to use a local statsd server. However, if you are using Android to test,
-the `static address <https://github.com/lyft/envoy-mobile/blob/local-stats/library/common/config_template.cc#L203>`_
+the `static address <https://github.com/envoyproxy/envoy-mobile/blob/local-stats/library/common/config_template.cc#L203>`_
 used for the server should be changed to ``10.0.2.2`` per the `Set up Android Emulator networking <https://developer.android.com/studio/run/emulator-networking>`_
 docs.
 
@@ -28,7 +28,7 @@ Steps
 
     node stats.js config.js
 
-  An example ``config.js`` file. Note that the port must match the port in the `config_template <https://github.com/lyft/envoy-mobile/blob/local-stats/library/common/config_template.cc#L203>`_::
+  An example ``config.js`` file. Note that the port must match the port in the `config_template <https://github.com/envoyproxy/envoy-mobile/blob/local-stats/library/common/config_template.cc#L203>`_::
 
     {
       port: 8125

@@ -4,7 +4,7 @@ Releasing
 =========
 
 The following workflow should be followed to create and publish a new Envoy Mobile
-`release <https://github.com/lyft/envoy-mobile/releases>`_.
+`release <https://github.com/envoyproxy/envoy-mobile/releases>`_.
 
 Prepare for release
 -------------------
@@ -19,7 +19,7 @@ Publish release and artifacts
 -----------------------------
 
 After merging the above changes, a new release may be
-`tagged <https://github.com/lyft/envoy-mobile/releases>`_.
+`tagged <https://github.com/envoyproxy/envoy-mobile/releases>`_.
 
 When tagging a release, it should contain all the artifacts built by CI on the main commit being
 tagged as the new version. These artifacts may be downloaded by clicking on the CI status of the
