@@ -80,6 +80,11 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
   TRY_ASSERT_MAIN_THREAD {
     Json::ObjectSharedPtr parsed_params = Json::Factory::loadFromString(std::string(json));
 
+    // The given json string may be an invalid object.
+    if (!parsed_params) {
+      throw EnvoyException(formatUpstreamMetadataParseException(json));
+    }
+
     for (const auto& param : parsed_params->asObjectArray()) {
       params.emplace_back(param->asString());
     }

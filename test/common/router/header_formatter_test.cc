@@ -682,6 +682,17 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
   testFormatting(stream_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithInvalidUpstreamMetadata) {
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
+  stream_info.upstreamInfo()->setUpstreamHost(host);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      testFormatting(stream_info, "UPSTREAM_METADATA(1)", ""), EnvoyException,
+      "Invalid header configuration. Expected format UPSTREAM_METADATA([\"namespace\", \"k\", "
+      "...]), actual format UPSTREAM_METADATA1");
+}
+
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithRequestMetadata) {
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   envoy::config::core::v3::Metadata metadata;
