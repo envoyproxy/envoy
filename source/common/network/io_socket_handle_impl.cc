@@ -583,7 +583,7 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
   }
 
   Address::InstanceConstSharedPtr socket_address = localAddress();
-  if (!(socket_address && socket_address->type() == Address::Type::Ip)) {
+  if (!socket_address || socket_address->type() != Address::Type::Ip) {
     return absl::nullopt;
   }
 
