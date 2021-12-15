@@ -46,8 +46,11 @@ Http::LocalErrorStatus NetworkConfigurationFilter::onLocalReply(const LocalReply
   // errors, this code interprets any local error where a stream received no bytes from the upstream
   // as a network fault. This status is passed to the configurator below when we report network
   // usage, where it may be factored into future socket configuration.
-  bool network_fault = !success_status &&
-                       !decoder_callbacks_->streamInfo().firstUpstreamRxByteReceived().has_value();
+  bool network_fault = !success_status && (!decoder_callbacks_->streamInfo().upstreamInfo() ||
+                                           !decoder_callbacks_->streamInfo()
+                                                .upstreamInfo()
+                                                ->upstreamTiming()
+                                                .first_upstream_rx_byte_received_.has_value());
   // Report request status to network configurator, so that socket configuration may be adapted
   // to current network conditions.
   network_configurator_->reportNetworkUsage(extra_stream_info_->configuration_key_.value(),

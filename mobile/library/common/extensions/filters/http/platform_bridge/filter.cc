@@ -202,7 +202,9 @@ envoy_stream_intel PlatformBridgeFilter::streamIntel() {
   auto& info = decoder_callbacks_->streamInfo();
   // FIXME: Stream handle cannot currently be set from the filter context.
   envoy_stream_intel stream_intel{-1, -1, 0};
-  stream_intel.connection_id = info.upstreamConnectionId().value_or(-1);
+  if (info.upstreamInfo()) {
+    stream_intel.connection_id = info.upstreamInfo()->upstreamConnectionId().value_or(-1);
+  }
   stream_intel.attempt_count = info.attemptCount().value_or(0);
   return stream_intel;
 }
