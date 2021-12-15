@@ -576,10 +576,10 @@ TEST_F(WatermarkBufferTest, AddFragments) {
 
   buffer.setWatermarks(23);
 
-  buffer.addFragments("aaaaa", "bbbbb", "cccc");
+  buffer.addFragments("aaaaa", "bbbbb");
   EXPECT_EQ(high_watermark_buffer, 0);
 
-  buffer.addFragments("ddddd");
+  buffer.addFragments("ccccc", "ddddd");
   EXPECT_EQ(high_watermark_buffer, 0);
 
   buffer.addFragments("eeeee", "fffff");

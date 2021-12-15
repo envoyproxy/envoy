@@ -226,7 +226,7 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
-  connection_.buffer().addFragments(CRLF);
+  connection_.buffer().add(CRLF);
 
   if (end_stream) {
     endEncode();

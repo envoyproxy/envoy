@@ -462,24 +462,25 @@ public:
    * Copy multiple arguments to the buffer. In order to improve performance, all the arguments in
    * each call will be stored in contiguous memory. So this method is mainly used when a large
    * amount of fine-grained data needs to be written to the buffer. The type of arguments must be
-   * automatically converted to `absl::string_view`.
+   * automatically convertible (e.g. char*, char[], std::string) to `absl::string_view`.
    * @param args A set of arguments with variable length and type. The arguments must be guaranteed
-   * to be safely converted to `absl::string_view`.
+   * to be safely convertible to `absl::string_view`.
    * @return The total size of the data copied to the buffer.
    */
   template <class... Args> size_t addFragments(Args&&... args) {
     size_t total_size_to_write = 0;
-    if constexpr (sizeof...(args) > 0) {
-      constexpr auto WriteHelper = [](uint8_t** dst, absl::string_view v) {
-        memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
-        *dst += v.size();
-      };
 
-      total_size_to_write = (absl::string_view(args).size() + ...);
-      auto* dst_memory_to_write = inlineReserve(total_size_to_write);
-      (WriteHelper(&dst_memory_to_write, absl::string_view(args)), ...);
-      inlineCommit(total_size_to_write);
-    }
+    static_assert(sizeof...(args) >= 2, "At least two arguments");
+
+    constexpr auto WriteHelper = [](uint8_t** dst, absl::string_view v) {
+      memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
+      *dst += v.size();
+    };
+
+    total_size_to_write = (absl::string_view(args).size() + ...);
+    auto* dst_memory_to_write = inlineReserve(total_size_to_write);
+    (WriteHelper(&dst_memory_to_write, absl::string_view(args)), ...);
+    inlineCommit(total_size_to_write);
     return total_size_to_write;
   }
 
