@@ -472,14 +472,14 @@ public:
 
     static_assert(sizeof...(args) >= 2, "At least two arguments");
 
-    constexpr auto WriteHelper = [](uint8_t** dst, absl::string_view v) {
+    constexpr auto write_helper = [](uint8_t** dst, absl::string_view v) {
       memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
       *dst += v.size();
     };
 
     total_size_to_write = (absl::string_view(args).size() + ...);
     auto* dst_memory_to_write = inlineReserve(total_size_to_write);
-    (WriteHelper(&dst_memory_to_write, absl::string_view(args)), ...);
+    (write_helper(&dst_memory_to_write, absl::string_view(args)), ...);
     inlineCommit(total_size_to_write);
     return total_size_to_write;
   }
