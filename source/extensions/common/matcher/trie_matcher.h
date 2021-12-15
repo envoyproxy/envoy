@@ -65,7 +65,7 @@ public:
 
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
-    if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
+    if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
     }
     if (!input.data_) {
@@ -78,7 +78,7 @@ public:
     }
     auto values = trie_->getData(addr);
     // The candidates returned by the LC trie are not in any specific order, so we
-    // sort them by prefix length first (longest first), order of declaration second.
+    // sort them by the prefix length first (longest first), and the order of declaration second.
     std::sort(values.begin(), values.end(), TrieNodeComparator<DataType>());
     bool first = true;
     for (const auto node : values) {
