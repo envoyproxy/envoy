@@ -877,11 +877,11 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
 
   // TODO(davinci26): Mocking should not be used to provide real system calls.
 #ifdef WIN32
-  bool partial_writed = false;
+  bool partial_write = false;
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
-        if (partial_writed) {
+        if (partial_write) {
           ENVOY_LOG_MISC(debug, "inject failure");
           return Api::SysCallSizeResult{-1, 0};
         }
@@ -944,7 +944,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 #ifdef WIN32
-  partial_writed = true;
+  partial_write = true;
 #endif
   write(buffer + 10, 10);
 
