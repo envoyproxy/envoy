@@ -45,6 +45,8 @@ REGISTER_FACTORY(IpResolver, Resolver);
 
 InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Address& address) {
   switch (address.address_case()) {
+  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
+    throw EnvoyException("Address must be set: " + address.DebugString());
   case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return resolveProtoSocketAddress(address.socket_address());
   case envoy::config::core::v3::Address::AddressCase::kPipe:
@@ -59,8 +61,6 @@ InstanceConstSharedPtr resolveProtoAddress(const envoy::config::core::v3::Addres
         ADDRESS_NAME_SPECIFIER_NOT_SET:
       break;
     }
-  case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
-    break;
   }
   throw EnvoyException("Failed to resolve address:" + address.DebugString());
 }
