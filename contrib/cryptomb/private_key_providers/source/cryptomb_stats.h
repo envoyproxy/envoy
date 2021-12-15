@@ -1,31 +1,24 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "envoy/stats/scope.h"
-
-#include "source/common/stats/symbol_table_impl.h"
-
-#include "absl/strings/string_view.h"
+#include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace PrivateKeyMethodProvider {
 namespace CryptoMb {
 
-using StatsCounterRef = std::reference_wrapper<Stats::Counter>;
+#define ALL_CRYPTOMB_STATS(HISTOGRAM)                                              \
+  HISTOGRAM(rsa_queue_sizes, Unspecified)
 
-class CryptoMbStats {
-public:
-  CryptoMbStats(Stats::Scope& scope, uint32_t max_queue_size, absl::string_view stats_prefix,
-                absl::string_view queue_size_stat_prefix);
-  std::vector<StatsCounterRef>& queueSizeCounters() { return queue_size_counters_; }
-
-private:
-  Stats::StatNamePool stat_name_pool_;
-  std::vector<StatsCounterRef> queue_size_counters_;
+/**
+ * CryptoMb stats struct definition. @see stats_macros.h
+ */
+struct CryptoMbStats {
+  ALL_CRYPTOMB_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
+
+CryptoMbStats generateCryptoMbStats(const std::string& prefix, Stats::Scope& scope);
 
 } // namespace CryptoMb
 } // namespace PrivateKeyMethodProvider

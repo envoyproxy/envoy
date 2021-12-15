@@ -94,6 +94,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
     ],

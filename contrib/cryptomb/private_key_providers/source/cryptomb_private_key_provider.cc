@@ -359,8 +359,8 @@ void CryptoMbQueue::addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx) 
 
 void CryptoMbQueue::processRequests() {
   if (type_ == KeyType::Rsa) {
-    // Increment correct queue size statistic.
-    stats_.queueSizeCounters()[request_queue_.size() - 1].get().inc();
+    // Record queue size statistic value for histogram.
+    stats_.rsa_queue_sizes_.recordValue(request_queue_.size());
     processRsaRequests();
   }
   request_queue_.clear();
@@ -490,8 +490,7 @@ CryptoMbPrivateKeyMethodProvider::CryptoMbPrivateKeyMethodProvider(
     Server::Configuration::TransportSocketFactoryContext& factory_context, IppCryptoSharedPtr ipp)
     : api_(factory_context.api()),
       tls_(ThreadLocal::TypedSlot<ThreadLocalData>::makeUnique(factory_context.threadLocal())),
-      stats_(factory_context.scope(), CryptoMbQueue::MULTIBUFF_BATCH, "cryptomb",
-             "rsa_queue_size_") {
+      stats_(generateCryptoMbStats("cryptomb", factory_context.scope())) {
 
   if (!ipp->mbxIsCryptoMbApplicable(0)) {
     throw EnvoyException("Multi-buffer CPU instructions not available.");
