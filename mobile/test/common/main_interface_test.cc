@@ -329,7 +329,7 @@ TEST(MainInterfaceTest, RegisterPlatformApi) {
 
 TEST(MainInterfaceTest, InitEngineReturns1) {
   // TODO(goaway): return new handle once multiple engine support is in place.
-  // https://github.com/lyft/envoy-mobile/issues/332
+  // https://github.com/envoyproxy/envoy-mobile/issues/332
   engine_test_context test_context{};
   envoy_engine_callbacks engine_cbs{[](void* context) -> void {
                                       auto* engine_running =

@@ -39,7 +39,7 @@ following guidelines for all code, APIs, and documentation:
 # Submitting a PR
 
 * Fork the repo.
-* [[TODO: add bootstrap script for prepush hook](https://github.com/lyft/envoy-mobile/issues/185)]
+* [[TODO: add bootstrap script for prepush hook](https://github.com/envoyproxy/envoy-mobile/issues/185)]
 * Create your PR.
 * Tests will automatically run for you.
 * We will **not** merge any PR that is not passing tests.

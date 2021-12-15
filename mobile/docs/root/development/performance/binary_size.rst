@@ -154,7 +154,7 @@ Open issues regarding size
 
 ``perf/size`` is a label tagging all current open issues that can improve
 binary size. Check out the issues `here
-<https://github.com/lyft/envoy-mobile/labels/perf%2Fsize>`_. After performing
+<https://github.com/envoyproxy/envoy-mobile/labels/perf%2Fsize>`_. After performing
 any change that tries to address these issues you should run through the
 analysis pipeline described above, and make sure your changes match
 expectations.

@@ -412,7 +412,7 @@ static void ios_track_event(envoy_map map, const void *context) {
   }
 
   // TODO(Augustyniak): Everything here leaks, but it's all tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332.
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332.
   envoy_event_tracker native_event_tracker = {NULL, NULL};
   if (eventTracker) {
     EnvoyEventTracker *objcEventTracker =
@@ -444,7 +444,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (int)registerFilterFactory:(EnvoyHTTPFilterFactory *)filterFactory {
   // TODO(goaway): Everything here leaks, but it's all be tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
   envoy_http_filter *api = safe_malloc(sizeof(envoy_http_filter));
   api->init_filter = ios_http_filter_init;
   api->on_request_headers = ios_http_filter_on_request_headers;
@@ -469,7 +469,7 @@ static void ios_track_event(envoy_map map, const void *context) {
 
 - (int)registerStringAccessor:(NSString *)name accessor:(EnvoyStringAccessor *)accessor {
   // TODO(goaway): Everything here leaks, but it's all tied to the life of the engine.
-  // This will need to be updated for https://github.com/lyft/envoy-mobile/issues/332
+  // This will need to be updated for https://github.com/envoyproxy/envoy-mobile/issues/332
   envoy_string_accessor *accessorStruct = safe_malloc(sizeof(envoy_string_accessor));
   accessorStruct->get_string = ios_get_string;
   accessorStruct->context = CFBridgingRetain(accessor);
@@ -581,8 +581,8 @@ static void ios_track_event(envoy_map map, const void *context) {
 #pragma mark - Private
 
 - (void)startObservingLifecycleNotifications {
-  // re-enable lifecycle-based stat flushing when https://github.com/lyft/envoy-mobile/issues/748
-  // gets fixed.
+  // re-enable lifecycle-based stat flushing when
+  // https://github.com/envoyproxy/envoy-mobile/issues/748 gets fixed.
   NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
   [notificationCenter addObserver:self
                          selector:@selector(terminateNotification:)

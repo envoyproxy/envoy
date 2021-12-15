@@ -86,7 +86,7 @@ static inline envoy_stats_tags toNativeStatsTags(EnvoyTags *tags) {
 
 static inline NSData *to_ios_data(envoy_data data) {
   // TODO: we are copying from envoy_data to NSData.
-  // https://github.com/lyft/envoy-mobile/issues/398
+  // https://github.com/envoyproxy/envoy-mobile/issues/398
   NSData *platformData = [NSData dataWithBytes:(void *)data.bytes length:data.length];
   release_envoy_data(data);
   return platformData;

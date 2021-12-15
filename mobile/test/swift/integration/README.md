@@ -5,7 +5,7 @@ side via the ` setOnResponse{...}` functions.
 
 TODO: These tests are broken apart into different suites and bazel targets in order to tear down
 app state -- and thus static lifetime objects like the Envoy engine -- between tests. When
-multiple engine support (https://github.com/lyft/envoy-mobile/issues/332) lands, all of these
+multiple engine support (https://github.com/envoyproxy/envoy-mobile/issues/332) lands, all of these
 tests can be collapsed to the same suite/target.
 
 TODO: setOnTrailers is not tested as the neither the `direct_response` pathway, nor the router

@@ -27,7 +27,7 @@ def upstream_envoy_overrides():
         urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.16.0/protobuf-all-3.16.0.tar.gz"],
     )
 
-    # Workaround old NDK version breakages https://github.com/lyft/envoy-mobile/issues/934
+    # Workaround old NDK version breakages https://github.com/envoyproxy/envoy-mobile/issues/934
     http_archive(
         name = "com_github_libevent_libevent",
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
@@ -38,7 +38,7 @@ def upstream_envoy_overrides():
 
     # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
     # Workaround for https://github.com/abseil/abseil-cpp/issues/326.
-    # TODO: Should be removed in https://github.com/lyft/envoy-mobile/issues/136 once rules_android
+    # TODO: Should be removed in https://github.com/envoyproxy/envoy-mobile/issues/136 once rules_android
     # supports platform toolchains.
     http_archive(
         name = "com_google_absl",

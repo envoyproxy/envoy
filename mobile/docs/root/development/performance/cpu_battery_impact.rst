@@ -116,4 +116,4 @@ Open issues
 ~~~~~~~~~~~
 
 For current issues with CPU/battery, please see issues with the
-`perf/cpu label <https://github.com/lyft/envoy-mobile/labels/perf%2Fcpu>`_.
+`perf/cpu label <https://github.com/envoyproxy/envoy-mobile/labels/perf%2Fcpu>`_.

@@ -537,7 +537,7 @@ void PlatformBridgeFilter::resumeDecoding() {
   // 1) adding support to Envoy for (optionally) retaining the dispatcher, or
   // 2) retaining the engine to transitively retain the dispatcher via Envoy's ownership graph, or
   // 3) dispatching via a safe intermediary
-  // Relevant: https://github.com/lyft/envoy-mobile/issues/332
+  // Relevant: https://github.com/envoyproxy/envoy-mobile/issues/332
   dispatcher_.post([weak_self]() -> void {
     if (auto self = weak_self.lock()) {
       // Delegate to base implementation for request and response path.

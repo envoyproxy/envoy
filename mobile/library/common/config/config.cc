@@ -252,7 +252,7 @@ static_resources:
                 // https://github.com/envoyproxy/envoy-mobile/issues/1534
 R"(
                 preresolve_hostnames: *dns_preresolve_hostnames
-)"              // TODO: Support IPV6 https://github.com/lyft/envoy-mobile/issues/1022
+)"              // TODO: Support IPV6 https://github.com/envoyproxy/envoy-mobile/issues/1022
 R"(
                 dns_lookup_family: V4_PREFERRED
 )"              // On mobile, backgrounding might cause the host to be past its TTL without good

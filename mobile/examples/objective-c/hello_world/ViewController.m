@@ -104,7 +104,7 @@ NSString *_REQUEST_SCHEME = @"https";
     [weakSelf addResponseMessage:message headerMessage:headerMessage error:nil];
   }];
   [prototype setOnErrorWithClosure:^(EnvoyError *error, StreamIntel *ignored) {
-    // TODO: expose attemptCount. https://github.com/lyft/envoy-mobile/issues/823
+    // TODO: expose attemptCount. https://github.com/envoyproxy/envoy-mobile/issues/823
     NSString *message =
         [NSString stringWithFormat:@"failed within Envoy library %@", error.message];
     NSLog(@"%@", message);

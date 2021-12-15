@@ -85,7 +85,7 @@ Extensibility:
 - Introduces platform filter interfaces and bridging (:issue:`#795 <795>`, :issue:`#840 <840>`, :issue:`#858 <858>`, :issue:`#913 <913>`, :issue:`#940 <940>`, :issue:`#955 <955>`, :issue:`#943 <943>`, :issue:`#962 <962>`)
 - Introduces Envoy's extension platform (:issue:`#860 <860>`)
 
-Lastly, and perhaps most importantly, we have adopted a formal `inclusive language policy <https://github.com/lyft/envoy-mobile/blob/main/CONTRIBUTING.md#inclusive-language-policy>`_
+Lastly, and perhaps most importantly, we have adopted a formal `inclusive language policy <https://github.com/envoyproxy/envoy-mobile/blob/main/CONTRIBUTING.md#inclusive-language-policy>`_
 (:issue:`#948 <948>`) and updated all necessary locations (:issue:`#944 <944>`, :issue:`#945 <945>`, :issue:`#946 <946>`)
 
 0.3.0 (Mar 26, 2020)

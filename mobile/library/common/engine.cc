@@ -18,12 +18,12 @@ Engine::Engine(envoy_engine_callbacks callbacks, envoy_logger logger,
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()) {
   // Ensure static factory registration occurs on time.
   // TODO: ensure this is only called one time once multiple Engine objects can be allocated.
-  // https://github.com/lyft/envoy-mobile/issues/332
+  // https://github.com/envoyproxy/envoy-mobile/issues/332
   ExtensionRegistry::registerFactories();
 
   // TODO(Augustyniak): Capturing an address of event_tracker_ and registering it in the API
   // registry may lead to crashes at Engine shutdown. To be figured out as part of
-  // https://github.com/lyft/envoy-mobile/issues/332
+  // https://github.com/envoyproxy/envoy-mobile/issues/332
   Envoy::Api::External::registerApi(std::string(envoy_event_tracker_api_name), &event_tracker_);
 }
 

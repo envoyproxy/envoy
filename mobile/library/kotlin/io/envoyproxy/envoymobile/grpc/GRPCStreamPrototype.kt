@@ -151,7 +151,7 @@ private class GRPCMessageProcessor {
         }
 
         val compressionFlag = byteArray[0]
-        // TODO: Support gRPC compression https://github.com/lyft/envoy-mobile/issues/501.
+        // TODO: Support gRPC compression https://github.com/envoyproxy/envoy-mobile/issues/501.
         if (compressionFlag.compareTo(0) != 0) {
           bufferedStream.reset()
         }

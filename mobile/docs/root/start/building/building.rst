@@ -9,13 +9,13 @@ To get started, you can use `this quick start guide
 
 Ensure that the ``envoy`` **submodule** is initialized when cloning by using ``--recursive``:
 
-``git clone https://github.com/lyft/envoy-mobile.git --recursive``
+``git clone https://github.com/envoyproxy/envoy-mobile.git --recursive``
 
 If the repo was not initially cloned recursively, you can manually initialize the Envoy submodule:
 
 ``git submodule update --init``
 
-.. _releases: https://github.com/lyft/envoy-mobile/releases
+.. _releases: https://github.com/envoyproxy/envoy-mobile/releases
 
 ------------------
 Bazel requirements

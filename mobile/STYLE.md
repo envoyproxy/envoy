@@ -42,4 +42,4 @@ to provide some enforced consistency, we've adopted the convention of defining t
 lowest applicable layer (core/bridge) of the library, and then declaring public `extern const`
 values defined in terms of the enumeration, to be shared across bridge and platform code. See,
 for example:
-https://github.com/lyft/envoy-mobile/blob/2a1b53427100d94878551b55bb564e9117f83fe6/library/common/types/c_types.h#L25
+https://github.com/envoyproxy/envoy-mobile/blob/2a1b53427100d94878551b55bb564e9117f83fe6/library/common/types/c_types.h#L25
