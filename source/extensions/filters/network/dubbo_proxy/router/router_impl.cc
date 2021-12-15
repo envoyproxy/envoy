@@ -231,7 +231,7 @@ const Envoy::Router::MetadataMatchCriteria* Router::metadataMatchCriteria() {
   if (metadata_match_ != nullptr) {
     return metadata_match_.get();
   }
-  // The request's metadata,if present,takes precedence over the route's
+  // The request's metadata, if present, takes precedence over the route's.
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
 
