@@ -1165,7 +1165,12 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
               name, cluster_manager.thread_local_dispatcher_.name());
     // This worker thread has already requested a discovery of a cluster with this name, so nothing
     // more left to do here.
-    return handle;
+    //
+    // We can't "just" return handle here, because handle is a part of the structured binding done
+    // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
+    // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here -
+    // it needs to be moved.
+    return std::move(handle);
   }
   ENVOY_LOG(
       debug,
@@ -1206,7 +1211,11 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(OdCdsApiSharedPtr odcds, std
         {std::move(name), ClusterCreation{std::move(odcds), std::move(timer)}});
   });
 
-  return handle;
+  // We can't "just" return handle here, because handle is a part of the structured binding done
+  // above. So it's not really a ClusterDiscoveryCallbackHandlePtr, but more like
+  // ClusterDiscoveryCallbackHandlePtr&, so named return value optimization does not apply here - it
+  // needs to be moved.
+  return std::move(handle);
 }
 
 void ClusterManagerImpl::notifyMissingCluster(absl::string_view name) {
