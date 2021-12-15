@@ -1093,6 +1093,8 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     auto reservation = buf.reserveSingleSlice(1024);
     auto slice = reservation.slice();
     EXPECT_EQ(data.size(), buffer.copyOutToSlices(100, &slice, 1));
+    reservation.commit(data.size());
+    EXPECT_EQ(data, buffer.toString());
   }
 
   {
@@ -1100,12 +1102,16 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     auto reservation = buf.reserveSingleSlice(5);
     auto slice = reservation.slice();
     EXPECT_EQ(5, buffer.copyOutToSlices(100, &slice, 1));
+    reservation.commit(5);
+    EXPECT_EQ("Hello", buf.toString());
   }
 
   {
     Buffer::OwnedImpl buf;
     auto reservation = buf.reserveForRead();
     EXPECT_EQ(5, buffer.copyOutToSlices(5, reservation.slices(), reservation.numSlices()));
+    reservation.commit(5);
+    EXPECT_EQ("Hello", buf.toString());
   }
 
   {
@@ -1113,6 +1119,41 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     auto reservation = buf.reserveForRead();
     EXPECT_EQ(data.size(),
               buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+    reservation.commit(data.size());
+    EXPECT_EQ(data, buffer.toString());
+  }
+  // Test the destination buffer has smaller slice than the source buffer.
+  {
+    Buffer::OwnedImpl buf;
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("aa", 2);
+    buf.appendSliceForTest("a", 1);
+    auto reservation = buf.reserveForRead();
+    EXPECT_EQ(data.size(),
+              buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+    reservation.commit(data.size());
+    EXPECT_EQ(data, buffer.toString());
+  }
+  // Test the source buffer has smaller slice than the destination buffer.
+  {
+    Buffer::OwnedImpl dest_buf;
+    dest_buf.appendSliceForTest("He", 2);
+    dest_buf.appendSliceForTest("ll", 2);
+    dest_buf.appendSliceForTest("o,", 2);
+    dest_buf.appendSliceForTest(" W", 2);
+    dest_buf.appendSliceForTest("or", 2);
+    dest_buf.appendSliceForTest("ld", 2);
+    dest_buf.appendSliceForTest("!", 1);
+    Buffer::OwnedImpl buf;
+    auto reservation = buf.reserveForRead();
+    EXPECT_EQ(data.size(),
+              buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+    reservation.commit(data.size());
+    EXPECT_EQ(data, buffer.toString());
   }
 }
 
