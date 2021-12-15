@@ -222,15 +222,16 @@ void Router::onEvent(Network::ConnectionEvent event) {
 }
 
 const Envoy::Router::MetadataMatchCriteria* Router::metadataMatchCriteria() {
-
-  const Envoy::Router::MetadataMatchCriteria* route_criteria =
-      (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
   // have we been called before? If so,there's no need to recompute because
   // by the time this method is called for the first time,route_entry_ should
   // not change anymore
   if (metadata_match_ != nullptr) {
     return metadata_match_.get();
   }
+
+  const Envoy::Router::MetadataMatchCriteria* route_criteria =
+      (route_entry_ != nullptr) ? route_entry_->metadataMatchCriteria() : nullptr;
+
   // The request's metadata, if present, takes precedence over the route's.
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
