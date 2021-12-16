@@ -352,22 +352,24 @@
  
 --- bazel/defs.bzl
 +++ bazel/defs.bzl
-@@ -92,6 +92,7 @@
+@@ -90,8 +90,10 @@
+         deps = [":define_flags"],
+         copts = [
              "-fPIC",
++            "-fno-strict-aliasing",
              "-Werror",
              "-Wextra",
 +            "-Wno-unknown-warning-option",
              "-Wno-bitwise-instead-of-logical",
              "-Wno-builtin-assume-aligned-alignment",
              "-Wno-unused-parameter",
-@@ -100,12 +101,33 @@
+@@ -100,12 +102,32 @@
              "-Wno-non-virtual-dtor",
              "-std=c++17",
              "-isystem .",
 -        ],
 +        ] + select({
 +            "@envoy//bazel:gcc_build": [
-+                "-fno-strict-aliasing",
 +                "-Wno-extra",
 +                "-Wno-int-in-bool-context",
 +                "-Wno-class-memaccess",
@@ -381,10 +383,10 @@
 +                # Use GNU dialect, because GCC doesn't allow using
 +                # ##__VA_ARGS__ when in standards-conforming mode.
 +                "-std=gnu++17",
-+                # "always_inline" fails without optimizations, use
-+                # -O2 that matches Bazel's --compilation_mode opt.
-+                "-O2",
 +            ],
++            "//conditions:default": [],
++        }) + select({
++            "@envoy//bazel:fastbuild_build": ["-O1"],
 +            "//conditions:default": [],
 +        }),
          includes = ["include"],
