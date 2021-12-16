@@ -698,12 +698,12 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   AccessLog::AccessLogManager& accessLogManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -712,12 +712,12 @@ public:
 
   Server::ServerLifecycleNotifier& lifecycleNotifier() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Init::Manager& initManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Api::Api& api() override { return api_; }

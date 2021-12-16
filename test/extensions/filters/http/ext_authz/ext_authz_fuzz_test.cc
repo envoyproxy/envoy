@@ -48,7 +48,7 @@ Filters::Common::ExtAuthz::CheckStatus resultCaseToCheckStatus(
   }
   default: {
     // Unhandled status.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
   }
   return check_status;

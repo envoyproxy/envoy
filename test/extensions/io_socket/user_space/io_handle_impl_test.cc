@@ -1094,10 +1094,10 @@ TEST_F(IoHandleImplTest, DeathOnEnablingDestroyedEvents) {
                      "Null user_file_event_");
 }
 
-TEST_F(IoHandleImplTest, NotImplementDuplicate) { ASSERT_DEATH(io_handle_->duplicate(), ""); }
+TEST_F(IoHandleImplTest, NotImplementDuplicate) { EXPECT_ENVOY_BUG(io_handle_->duplicate(), ""); }
 
 TEST_F(IoHandleImplTest, NotImplementAccept) {
-  ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
+  EXPECT_ENVOY_BUG(io_handle_->accept(nullptr, nullptr), "");
 }
 
 TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {

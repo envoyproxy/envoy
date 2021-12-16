@@ -59,9 +59,7 @@ public:
 private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
-                      const std::string&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                      const std::string&) override {}
   void onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

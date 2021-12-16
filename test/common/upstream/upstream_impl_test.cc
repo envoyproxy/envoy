@@ -3235,9 +3235,9 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
     return parent_.createEmptyProtocolOptionsProto();
   }
@@ -3260,17 +3260,15 @@ public:
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
   Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
