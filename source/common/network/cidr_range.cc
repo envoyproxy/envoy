@@ -14,7 +14,6 @@
 #include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
@@ -108,10 +107,6 @@ CidrRange CidrRange::create(InstanceConstSharedPtr address, int length) {
 // static
 CidrRange CidrRange::create(const std::string& address, int length) {
   return create(Utility::parseInternetAddress(address), length);
-}
-
-CidrRange CidrRange::create(const envoy::config::core::v3::CidrRange& cidr) {
-  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
 // static

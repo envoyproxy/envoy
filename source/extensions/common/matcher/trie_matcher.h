@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/common/matcher/v3/matcher.pb.h"
-#include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/factory_context.h"
@@ -9,6 +7,9 @@
 #include "source/common/matcher/matcher.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/network/utility.h"
+
+#include "xds/type/matcher/v3/ip.pb.h"
+#include "xds/type/matcher/v3/ip.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -117,7 +118,7 @@ public:
                                DataInputFactoryCb<DataType> data_input,
                                OnMatchFactory<DataType>& on_match_factory) override {
     const auto& typed_config =
-        MessageUtil::downcastAndValidate<const envoy::config::common::matcher::v3::IPMatcher&>(
+        MessageUtil::downcastAndValidate<const xds::type::matcher::v3::IPMatcher&>(
             config, factory_context.messageValidationVisitor());
     std::vector<OnMatchFactoryCb<DataType>> match_children;
     match_children.reserve(typed_config.range_matchers().size());
@@ -143,7 +144,7 @@ public:
     };
   };
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::common::matcher::v3::IPMatcher>();
+    return std::make_unique<xds::type::matcher::v3::IPMatcher>();
   }
   std::string name() const override { return "trie-matcher"; }
 };

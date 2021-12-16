@@ -2,13 +2,11 @@ syntax = "proto3";
 
 package envoy.config.common.matcher.v3;
 
-import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
 import "xds/annotations/v3/status.proto";
-import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -228,40 +226,4 @@ message HttpGenericBodyMatch {
 
   // List of patterns to match.
   repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
-}
-
-// Matches a specific IP address against a set of possibly overlapping subnets.
-// TODO(kuat) Move to xds repository.
-message IPMatcher {
-  // Specifies an optional list of IP address ranges and a match action.
-  message IPRangeMatcher {
-    // A non-empty set of CIDR ranges.
-    repeated core.v3.CidrRange ranges = 1 [(validate.rules).repeated = {min_items: 1}];
-
-    // Match action to apply when the IP address is within one of the CIDR ranges.
-    xds.type.matcher.v3.Matcher.OnMatch on_match = 2;
-
-    // Indicates whether this match option should be considered if there is a
-    // more specific matcher. Exclusive matchers are not selected whenever a
-    // more specific matcher exists (e.g. matcher with a longer prefix) even
-    // when the more specific matcher fails its nested match condition.
-    // Non-exclusive matchers are considered if the more specific matcher
-    // exists but its nested match condition does not entirely match.
-    // Non-exclusive matchers are selected in the order of their specificity
-    // first (longest prefix first), then the order of declaration next.
-    //
-    // For example, consider two range matchers: an exclusive matcher *X* on
-    // ``0.0.0.0/0`` and a matcher *Y* on ``192.0.0.0/2`` with a nested match
-    // condition *Z*. For the input IP ``192.168.0.1`` matcher *Y* is the most
-    // specific. If its nested match condition *Z* does not accept the input,
-    // then the less specific matcher *X* does not apply either despite the
-    // input being within the range, because matcher *X* is exclusive.
-    //
-    // The opposite is true if matcher *X* is not marked as exclusive. In that
-    // case matcher *X* always matches whenever matcher "*Y* rejects the input.
-    bool exclusive = 3;
-  }
-
-  // Match IP address by CIDR ranges.
-  repeated IPRangeMatcher range_matchers = 1;
 }

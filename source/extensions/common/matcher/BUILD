@@ -32,6 +32,6 @@ envoy_cc_library(
         "//source/common/matcher:matcher_lib",
         "//source/common/network:lc_trie_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
+        "@com_github_cncf_udpa//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )

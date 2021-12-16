@@ -90,7 +90,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 192.0.0.0
@@ -141,7 +141,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 128.0.0.0
@@ -196,7 +196,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 0.0.0.0
@@ -254,7 +254,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 0.0.0.0
@@ -314,7 +314,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 0.0.0.0
@@ -387,7 +387,7 @@ matcher_tree:
   custom_match:
     name: ip_matcher
     typed_config:
-      "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+      "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
       range_matchers:
       - ranges:
         - address_prefix: 0.0.0.0
@@ -401,7 +401,7 @@ matcher_tree:
               custom_match:
                 name: ip_matcher
                 typed_config:
-                  "@type": type.googleapis.com/envoy.config.common.matcher.v3.IPMatcher
+                  "@type": type.googleapis.com/xds.type.matcher.v3.IPMatcher
                   range_matchers:
                   - ranges:
                     - address_prefix: 192.0.0.0
