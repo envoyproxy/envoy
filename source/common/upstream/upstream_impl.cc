@@ -1791,6 +1791,7 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
   case envoy::config::cluster::v3::Cluster::ALL:
     return Network::DnsLookupFamily::All;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void reportUpstreamCxDestroy(const Upstream::HostDescriptionConstSharedPtr& host,

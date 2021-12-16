@@ -343,7 +343,7 @@ private:
     case HostAvailability::Degraded:
       return HostsSource::SourceType::LocalityDegradedHosts;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   static HostsSource::SourceType sourceType(HostAvailability host_availability) {
@@ -353,7 +353,7 @@ private:
     case HostAvailability::Degraded:
       return HostsSource::SourceType::DegradedHosts;
     }
-    PANIC_DUE_TO_CORRUPT_ENUM
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
   // The set of local Envoy instances which are load balancing across priority_set_.

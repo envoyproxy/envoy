@@ -492,6 +492,7 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
@@ -519,6 +520,7 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
       return Socket::Type::Datagram;
     }
   }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Socket::Type::Stream;
   case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
@@ -527,6 +529,7 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
   case envoy::config::core::v3::Address::AddressCase::ADDRESS_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
