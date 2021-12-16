@@ -863,36 +863,6 @@ TEST_P(QuicHttpIntegrationTest, Http3DownstreamKeepalive) {
   ASSERT_TRUE(response->complete());
 }
 
-TEST_P(QuicHttpIntegrationTest, NoInitialStreams) {
-  // Set the fake upstream to start with 0 streams available.
-  setUpstreamProtocol(Http::CodecType::HTTP3);
-  envoy::config::listener::v3::QuicProtocolOptions options;
-  options.mutable_quic_protocol_options()->mutable_max_concurrent_streams()->set_value(0);
-  mergeOptions(options);
-  initialize();
-
-  // Create the client connection and send a request.
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), absl::nullopt);
-  IntegrationStreamDecoderPtr response =
-      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // There should now be an upstream connection, but no upstream stream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_FALSE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_,
-                                                           std::chrono::milliseconds(100)));
-
-  // Update the upstream to have 1 stream available. Now Envoy should ship the
-  // original request upstream.
-  fake_upstream_connection_->updateConcurrentStreams(1);
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Make sure the standard request/response pipeline works as expected.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
 TEST_P(QuicHttpIntegrationTest, NoStreams) {
   // Tighten the stream idle timeout, as it defaults to 5m
   config_helper_.addConfigModifier(
