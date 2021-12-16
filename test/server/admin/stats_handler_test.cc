@@ -5,6 +5,7 @@
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
+#include "test/mocks/server/admin_stream.h"
 #include "test/mocks/server/instance.h"
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
