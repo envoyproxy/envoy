@@ -1,4 +1,5 @@
-load("@rules_pkg//:pkg.bzl", "pkg_deb", "pkg_tar")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:deb.bzl", "pkg_deb")
 
 GLIBC_MIN_VERSION = "2.27"
 
@@ -21,7 +22,7 @@ def envoy_pkg_deb(
         **kwargs):
     """Wrapper for `pkg_deb` with Envoy defaults"""
     pkg_deb(
-        name = "%s.deb" % name,
+        name = "%s-deb" % name,
         architecture = architecture,
         data = data,
         depends = depends,
@@ -33,6 +34,17 @@ def envoy_pkg_deb(
         version = version,
         preinst = preinst,
         **kwargs
+    )
+
+    native.filegroup(
+        name = "%s.changes" % name,
+        srcs = ["%s-deb" % name],
+        output_group = "changes",
+    )
+    native.filegroup(
+        name = "%s.deb" % name,
+        srcs = ["%s-deb" % name],
+        output_group = "deb",
     )
 
 def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":envoy-bin-files", config = ":envoy-config"):
@@ -75,35 +87,14 @@ def envoy_pkg_debs(name, version, release_version, maintainer, bin_files = ":env
         maintainer = maintainer,
     )
 
-    # TODO(phlax): Remove this hack
-    #   Due to upstream issues with `OutputGroupInfo` files from `pkg_deb`
-    #   we have to follow the real filepath of the .deb file to find the
-    #   .changes file (~artefact)
-    #   For this hack to work, strategy needs to be `sandbox,local` for the
-    #   following mnemonics:
-    #   - Genrule
-    #   - MakeDeb
-    #
-    #   Upstream issue is here: https://github.com/bazelbuild/rules_pkg/issues/477
-    #
-
-    deb_files = (
-        "envoy_deb1=$$(realpath $(location :envoy.deb)) " +
-        "&& envoy_deb2=$$(realpath $(location :envoy-%s.deb)) \\" % release_version
-    )
-
-    # bundle all debs and changes files into /debs folder of tarball
-    native.genrule(
+    pkg_tar(
         name = name,
-        srcs = ["envoy.deb", "envoy-%s.deb" % release_version],
-        outs = [":debs.tar"],
-        cmd = deb_files + """
-        && tar --transform "flags=r;s|^|deb/|" \
-             -C $$(dirname $$envoy_deb1) \
-             -cf $@ \
-             $$(basename $${envoy_deb1}) \
-             $$(basename $${envoy_deb1%.deb}.changes) \
-             $$(basename $${envoy_deb2}) \
-             $$(basename $${envoy_deb2%.deb}.changes)
-        """,
+        srcs = [
+            "envoy.changes",
+            "envoy.deb",
+            "envoy-%s.changes" % release_version,
+            "envoy-%s.deb" % release_version,
+        ],
+        extension = "tar",
+        package_dir = "deb",
     )

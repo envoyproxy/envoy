@@ -233,9 +233,7 @@ elif [[ "$CI_TARGET" == "bazel.distribution" ]]; then
           "--action_env=PACKAGES_MAINTAINER_EMAIL")
   fi
 
-  # TODO(phlax): remove MakeDeb once issue with changes file is resolved
   BAZEL_BUILD_OPTIONS+=(
-      "--strategy=MakeDeb=sandboxed,local"
       "--strategy=Genrule=sandboxed,local"
       "--strategy=PackageTar=sandboxed,local")
 
