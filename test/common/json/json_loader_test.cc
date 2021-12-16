@@ -219,7 +219,11 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json1 = Factory::loadFromString("[ [ ] , { } ]");
-    EXPECT_EQ(json1->asJsonString(), "[null,null]");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json1->asJsonString(), "[[],{}]");
+    } else {
+      EXPECT_EQ(json1->asJsonString(), "[null,null]");
+    }
   }
 
   {
@@ -234,12 +238,20 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": {}}");
-    EXPECT_EQ(json->getObject("hello")->asJsonString(), "null");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json->getObject("hello")->asJsonString(), "{}");
+    } else {
+      EXPECT_EQ(json->getObject("hello")->asJsonString(), "null");
+    }
   }
 
   {
     ObjectSharedPtr json = Factory::loadFromString("{\"hello\": [] }");
-    EXPECT_EQ(json->asJsonString(), "{\"hello\":null}");
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_json")) {
+      EXPECT_EQ(json->asJsonString(), "{\"hello\":[]}");
+    } else {
+      EXPECT_EQ(json->asJsonString(), "{\"hello\":null}");
+    }
   }
 }
 
