@@ -75,12 +75,13 @@ vhds:
   }
   RouteConfigUpdatePtr
   makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
-    RouteConfigUpdatePtr config_update_info =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context_, OptionalHttpFilters());
+    RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
+        proto_traits_, factory_context_, OptionalHttpFilters());
     config_update_info->onRdsUpdate(rc, "1");
     return config_update_info;
   }
 
+  ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;

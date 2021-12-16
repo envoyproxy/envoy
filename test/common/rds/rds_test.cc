@@ -61,22 +61,20 @@ private:
   envoy::config::route::v3::RouteConfiguration rc_;
 };
 
-class TestConfigTraits : public ConfigTraits {
+class TestTraits : public ConfigTraits, public ProtoTraits {
 public:
   const envoy::config::route::v3::RouteConfiguration& cast(const Protobuf::Message& rc) const {
     return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
   }
 
   std::string resourceType() const override { return "test"; }
-  ConfigConstSharedPtr createConfig() const override {
+  ConfigConstSharedPtr createNullConfig() const override {
     return std::make_shared<const TestConfig>();
   }
-  ProtobufTypes::MessagePtr createProto() const override {
+  ProtobufTypes::MessagePtr createEmptyProto() const override {
     return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   }
-  const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override {
-    return rc;
-  }
+  void validateResourceType(const Protobuf::Message&) const override {}
   const std::string& resourceName(const Protobuf::Message& rc) const override {
     return cast(rc).name();
   }
@@ -92,7 +90,7 @@ class RdsConfigUpdateReceiverTest : public RdsTestBase {
 public:
   void setup() {
     config_update_ =
-        std::make_unique<RouteConfigUpdateReceiverImpl>(config_traits_, server_factory_context_);
+        std::make_unique<RouteConfigUpdateReceiverImpl>(traits_, traits_, server_factory_context_);
   }
 
   const std::string* route(const std::string& path) {
@@ -100,7 +98,7 @@ public:
         ->route(path);
   }
 
-  TestConfigTraits config_traits_;
+  TestTraits traits_;
   RouteConfigUpdatePtr config_update_;
 };
 
@@ -169,7 +167,7 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
 
 class RdsConfigProviderManagerTest : public RdsTestBase {
 public:
-  RdsConfigProviderManagerTest() : manager_(server_factory_context_.admin_, "test") {}
+  RdsConfigProviderManagerTest() : manager_(server_factory_context_.admin_, "test", traits_) {}
 
   RouteConfigProviderSharedPtr createDynamic() {
     envoy::config::core::v3::ConfigSource config_source;
@@ -178,7 +176,7 @@ public:
         config_source, "test_route", outer_init_manager_,
         [&config_source, this](uint64_t manager_identifier) {
           auto config_update = std::make_unique<RouteConfigUpdateReceiverImpl>(
-              config_traits_, server_factory_context_);
+              traits_, traits_, server_factory_context_);
           auto resource_decoder = std::make_unique<Envoy::Config::OpaqueResourceDecoderImpl<
               envoy::config::route::v3::RouteConfiguration>>(
               server_factory_context_.messageValidationContext().dynamicValidationVisitor(),
@@ -195,7 +193,7 @@ public:
   RouteConfigProviderSharedPtr createStatic() {
     return manager_.addStaticProvider([this]() {
       envoy::config::route::v3::RouteConfiguration route_config;
-      return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits_,
+      return std::make_unique<StaticRouteConfigProviderImpl>(route_config, traits_,
                                                              server_factory_context_, manager_);
     });
   }
@@ -222,7 +220,7 @@ public:
   }
 
   NiceMock<Init::MockManager> outer_init_manager_;
-  TestConfigTraits config_traits_;
+  TestTraits traits_;
   RouteConfigProviderManagerImpl manager_;
 };
 

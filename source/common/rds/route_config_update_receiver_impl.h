@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/rds/config_traits.h"
 #include "envoy/rds/route_config_update_receiver.h"
 #include "envoy/server/factory_context.h"
 
@@ -10,7 +11,7 @@ namespace Rds {
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits,
+  RouteConfigUpdateReceiverImpl(ConfigTraits& config_traits, ProtoTraits& proto_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context);
 
   uint64_t getHash(const Protobuf::Message& rc) { return MessageUtil::hash(rc); }
@@ -29,10 +30,10 @@ public:
   const Protobuf::Message& protobufConfiguration() override { return *route_config_proto_; }
   ConfigConstSharedPtr parsedConfiguration() const override { return config_; }
   SystemTime lastUpdated() const override { return last_updated_; }
-  const ConfigTraits& configTraits() const override { return config_traits_; }
 
 private:
   ConfigTraits& config_traits_;
+  ProtoTraits& proto_traits_;
   TimeSource& time_source_;
   ProtobufTypes::MessagePtr route_config_proto_;
   uint64_t last_config_hash_;

@@ -4,10 +4,11 @@ namespace Envoy {
 namespace Rds {
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(
-    Server::Admin& admin, const std::string& config_tracker_key)
+    Server::Admin& admin, const std::string& config_tracker_key, ProtoTraits& proto_traits)
     : config_tracker_entry_(admin.getConfigTracker().add(
           config_tracker_key,
-          [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })) {
+          [this](const Matchers::StringMatcher& matcher) { return dumpRouteConfigs(matcher); })),
+      proto_traits_(proto_traits) {
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
   RELEASE_ASSERT(config_tracker_entry_, "");
@@ -34,7 +35,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
     ASSERT(provider);
 
     if (provider->configInfo()) {
-      if (!name_matcher.match(provider->configInfo().value().name_)) {
+      if (!name_matcher.match(proto_traits_.resourceName(provider->configInfo().value().config_))) {
         continue;
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
@@ -47,7 +48,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
-    if (!name_matcher.match(provider->configInfo().value().name_)) {
+    if (!name_matcher.match(proto_traits_.resourceName(provider->configInfo().value().config_))) {
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();

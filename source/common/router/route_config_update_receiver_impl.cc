@@ -35,25 +35,8 @@ void rebuildRouteConfigVirtualHosts(
 
 } // namespace
 
-std::string ConfigTraitsImpl::resourceType() const {
-  return Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
-}
-
-Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig() const {
+Rds::ConfigConstSharedPtr ConfigTraitsImpl::createNullConfig() const {
   return std::make_shared<NullConfigImpl>();
-}
-
-ProtobufTypes::MessagePtr ConfigTraitsImpl::createProto() const {
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-}
-
-const Protobuf::Message& ConfigTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
-  return dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
-}
-
-const std::string& ConfigTraitsImpl::resourceName(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
 }
 
 Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message& rc) const {
@@ -61,12 +44,6 @@ Rds::ConfigConstSharedPtr ConfigTraitsImpl::createConfig(const Protobuf::Message
   return std::make_shared<ConfigImpl>(
       static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc), optional_http_filters_,
       factory_context_, validator_, validate_clusters_default_);
-}
-
-ProtobufTypes::MessagePtr ConfigTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
 }
 
 bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,

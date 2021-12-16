@@ -29,7 +29,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier), config_update_info_(std::move(config_update)),
       resource_decoder_(std::move(resource_decoder)) {
-  const auto resource_type = config_update_info_->configTraits().resourceType();
+  const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
@@ -59,11 +59,12 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   const auto& route_config = resources[0].get().resource();
-  config_update_info_->configTraits().validateResourceType(route_config);
-  if (config_update_info_->configTraits().resourceName(route_config) != route_config_name_) {
+  route_config_provider_manager_.protoTraits().validateResourceType(route_config);
+  if (route_config_provider_manager_.protoTraits().resourceName(route_config) !=
+      route_config_name_) {
     throw EnvoyException(
         fmt::format("Unexpected {} configuration (expecting {}): {}", rds_type_, route_config_name_,
-                    config_update_info_->configTraits().resourceName(route_config)));
+                    route_config_provider_manager_.protoTraits().resourceName(route_config)));
   }
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();

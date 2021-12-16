@@ -181,6 +181,15 @@ private:
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;
 
+class ProtoTraitsImpl : public Rds::ProtoTraits {
+public:
+  std::string resourceType() const override;
+  ProtobufTypes::MessagePtr createEmptyProto() const override;
+  void validateResourceType(const Protobuf::Message& rc) const override;
+  const std::string& resourceName(const Protobuf::Message& rc) const override;
+  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override;
+};
+
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
                                        public Singleton::Instance {
 public:
@@ -205,6 +214,7 @@ public:
                                   ProtobufMessage::ValidationVisitor& validator) override;
 
 private:
+  ProtoTraitsImpl proto_traits_;
   Rds::RouteConfigProviderManagerImpl manager_;
 };
 

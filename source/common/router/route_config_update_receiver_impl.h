@@ -26,17 +26,8 @@ public:
       : optional_http_filters_(optional_http_filters), factory_context_(factory_context),
         validator_(validator), validate_clusters_default_(validate_clusters_default) {}
 
-  std::string resourceType() const override;
-
-  Rds::ConfigConstSharedPtr createConfig() const override;
-  ProtobufTypes::MessagePtr createProto() const override;
-
-  const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const override;
-
-  const std::string& resourceName(const Protobuf::Message& rc) const override;
-
+  Rds::ConfigConstSharedPtr createNullConfig() const override;
   Rds::ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override;
-  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override;
 
 private:
   const OptionalHttpFilters optional_http_filters_;
@@ -47,12 +38,13 @@ private:
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
-  RouteConfigUpdateReceiverImpl(Server::Configuration::ServerFactoryContext& factory_context,
+  RouteConfigUpdateReceiverImpl(Rds::ProtoTraits& proto_traits,
+                                Server::Configuration::ServerFactoryContext& factory_context,
                                 const OptionalHttpFilters& optional_http_filters)
       : config_traits_(optional_http_filters, factory_context,
                        factory_context.messageValidationContext().dynamicValidationVisitor(),
                        false),
-        base_(config_traits_, factory_context), last_vhds_config_hash_(0ul),
+        base_(config_traits_, proto_traits, factory_context), last_vhds_config_hash_(0ul),
         vhds_virtual_hosts_(
             std::make_unique<std::map<std::string, envoy::config::route::v3::VirtualHost>>()),
         vhds_configuration_changed_(true) {}
@@ -86,7 +78,6 @@ public:
   const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
     return resource_ids_in_last_update_;
   }
-  const Rds::ConfigTraits& configTraits() const override { return config_traits_; }
   const envoy::config::route::v3::RouteConfiguration& protobufConfigurationCast() override {
     ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(
         &base_.protobufConfiguration()));

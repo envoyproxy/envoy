@@ -22,10 +22,6 @@ public:
     // the caller of configInfo()'s scope.
     const Protobuf::Message& config_;
 
-    // A reference to the name of currently loaded route configuration. Do not hold this reference
-    // beyond the caller of configInfo()'s scope
-    const std::string& name_;
-
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
     const std::string version_;

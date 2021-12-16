@@ -20,10 +20,13 @@ namespace Rds {
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager {
 public:
-  RouteConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_tracker_key);
+  RouteConfigProviderManagerImpl(Server::Admin& admin, const std::string& config_tracker_key,
+                                 ProtoTraits& proto_traits);
 
   void eraseStaticProvider(RouteConfigProvider* provider) override;
   void eraseDynamicProvider(uint64_t manager_identifier) override;
+
+  ProtoTraits& protoTraits() override { return proto_traits_; }
 
   std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
   dumpRouteConfigs(const Matchers::StringMatcher& name_matcher) const;
@@ -45,6 +48,7 @@ private:
       dynamic_route_config_providers_;
   absl::node_hash_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  ProtoTraits& proto_traits_;
 
   RouteConfigProviderSharedPtr reuseDynamicProvider(uint64_t manager_identifier,
                                                     Init::Manager& init_manager,

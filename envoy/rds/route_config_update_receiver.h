@@ -4,7 +4,6 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/rds/config_traits.h"
 #include "envoy/rds/route_config_provider.h"
 
 #include "absl/types/optional.h"
@@ -65,8 +64,6 @@ public:
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;
-
-  virtual const ConfigTraits& configTraits() const PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

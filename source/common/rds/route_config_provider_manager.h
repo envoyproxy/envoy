@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/rds/config_traits.h"
 #include "envoy/rds/route_config_provider.h"
 
 namespace Envoy {
@@ -15,6 +16,8 @@ public:
 
   virtual void eraseStaticProvider(RouteConfigProvider* provider) PURE;
   virtual void eraseDynamicProvider(uint64_t manager_identifier) PURE;
+
+  virtual ProtoTraits& protoTraits() PURE;
 };
 
 } // namespace Rds

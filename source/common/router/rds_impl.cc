@@ -215,8 +215,32 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
   });
 }
 
+std::string ProtoTraitsImpl::resourceType() const {
+  return Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
+}
+
+ProtobufTypes::MessagePtr ProtoTraitsImpl::createEmptyProto() const {
+  return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
+}
+
+void ProtoTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
+  auto dummy = &dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
+  RELEASE_ASSERT(dummy, "");
+}
+
+const std::string& ProtoTraitsImpl::resourceName(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
+}
+
+ProtobufTypes::MessagePtr ProtoTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
+  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
+  return std::make_unique<envoy::config::route::v3::RouteConfiguration>(
+      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
+}
+
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
-    : manager_(admin, "routes") {}
+    : manager_(admin, "routes", proto_traits_) {}
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
@@ -227,8 +251,8 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
       rds, rds.route_config_name(), init_manager,
       [&optional_http_filters, &factory_context, &rds, &stat_prefix,
        this](uint64_t manager_identifier) {
-        auto config_update =
-            new RouteConfigUpdateReceiverImpl(factory_context, optional_http_filters);
+        auto config_update = new RouteConfigUpdateReceiverImpl(proto_traits_, factory_context,
+                                                               optional_http_filters);
         auto resource_decoder = new Envoy::Config::OpaqueResourceDecoderImpl<
             envoy::config::route::v3::RouteConfiguration>(
             factory_context.messageValidationContext().dynamicValidationVisitor(), "name");

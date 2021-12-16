@@ -29,7 +29,6 @@ public:
 
 private:
   ProtobufTypes::MessagePtr route_config_proto_;
-  const std::string& route_config_name_;
   ConfigConstSharedPtr config_;
   SystemTime last_updated_;
   RouteConfigProviderManager& route_config_provider_manager_;

@@ -15,9 +15,9 @@ namespace Rds {
  * The generic rds classes will call the methods of this interface
  * to get information which are not visible for them directly.
  */
-class ConfigTraits {
+class ProtoTraits {
 public:
-  virtual ~ConfigTraits() = default;
+  virtual ~ProtoTraits() = default;
 
   /**
    * Give the full name of the route configuration proto description.
@@ -26,15 +26,9 @@ public:
   virtual std::string resourceType() const PURE;
 
   /**
-   * Create a dummy config object without actual route configuration.
-   * This object will be used before the first valid route configuration is fetched.
-   */
-  virtual ConfigConstSharedPtr createConfig() const PURE;
-
-  /**
    * Create an empty route configuration proto object.
    */
-  virtual ProtobufTypes::MessagePtr createProto() const PURE;
+  virtual ProtobufTypes::MessagePtr createEmptyProto() const PURE;
 
   /**
    * Runtime check if the provided proto message object is really a route configuration instance.
@@ -42,7 +36,7 @@ public:
    * Every other method below this assumes the proto message is already
    * validated and doesn't do any further runtime check.
    */
-  virtual const Protobuf::Message& validateResourceType(const Protobuf::Message& rc) const PURE;
+  virtual void validateResourceType(const Protobuf::Message& rc) const PURE;
 
   /**
    * Gives back the name from the route configuration proto.
@@ -51,15 +45,26 @@ public:
   virtual const std::string& resourceName(const Protobuf::Message& rc) const PURE;
 
   /**
+   * Clones the route configuration proto.
+   */
+  virtual ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const PURE;
+};
+
+class ConfigTraits {
+public:
+  virtual ~ConfigTraits() = default;
+
+  /**
+   * Create a dummy config object without actual route configuration.
+   * This object will be used before the first valid route configuration is fetched.
+   */
+  virtual ConfigConstSharedPtr createNullConfig() const PURE;
+
+  /**
    * Create a config object based on a route configuration.
    * @throw EnvoyException if the new config can't be applied.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Clones the route configuration proto.
-   */
-  virtual ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const PURE;
 };
 
 } // namespace Rds

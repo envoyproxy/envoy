@@ -4,10 +4,12 @@ namespace Envoy {
 namespace Rds {
 
 RouteConfigUpdateReceiverImpl::RouteConfigUpdateReceiverImpl(
-    ConfigTraits& config_traits, Server::Configuration::ServerFactoryContext& factory_context)
-    : config_traits_(config_traits), time_source_(factory_context.timeSource()),
-      route_config_proto_(config_traits_.createProto()), last_config_hash_(0ull),
-      config_(config_traits_.createConfig()) {}
+    ConfigTraits& config_traits, ProtoTraits& proto_traits,
+    Server::Configuration::ServerFactoryContext& factory_context)
+    : config_traits_(config_traits), proto_traits_(proto_traits),
+      time_source_(factory_context.timeSource()),
+      route_config_proto_(proto_traits_.createEmptyProto()), last_config_hash_(0ull),
+      config_(config_traits_.createNullConfig()) {}
 
 void RouteConfigUpdateReceiverImpl::updateConfig(
     std::unique_ptr<Protobuf::Message>&& route_config_proto) {
@@ -20,8 +22,7 @@ void RouteConfigUpdateReceiverImpl::updateConfig(
 void RouteConfigUpdateReceiverImpl::onUpdateCommon(const std::string& version_info) {
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, routeConfigName(),
-                                                       last_config_version_});
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{*route_config_proto_, last_config_version_});
 }
 
 // Rds::RouteConfigUpdateReceiver
@@ -31,14 +32,14 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   if (!checkHash(new_hash)) {
     return false;
   }
-  updateConfig(config_traits_.cloneProto(rc));
+  updateConfig(proto_traits_.cloneProto(rc));
   updateHash(new_hash);
   onUpdateCommon(version_info);
   return true;
 }
 
 const std::string& RouteConfigUpdateReceiverImpl::routeConfigName() const {
-  return config_traits_.resourceName(*route_config_proto_);
+  return proto_traits_.resourceName(*route_config_proto_);
 }
 
 absl::optional<RouteConfigProvider::ConfigInfo> RouteConfigUpdateReceiverImpl::configInfo() const {
