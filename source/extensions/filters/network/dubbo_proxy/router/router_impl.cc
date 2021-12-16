@@ -222,8 +222,8 @@ void Router::onEvent(Network::ConnectionEvent event) {
 }
 
 const Envoy::Router::MetadataMatchCriteria* Router::metadataMatchCriteria() {
-  // have we been called before? If so,there's no need to recompute because
-  // by the time this method is called for the first time,route_entry_ should
+  // Have we been called before? If so, there's no need to recompute because
+  // by the time this method is called for the first time, route_entry_ should
   // not change anymore
   if (metadata_match_ != nullptr) {
     return metadata_match_.get();
