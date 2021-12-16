@@ -137,7 +137,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::extAuthzComplete() {
   if (!timing) {
     return absl::nullopt;
   }
-  return duration(timing.value().get().ext_proc_start_, stream_info_);
+  return duration(timing.value().get().ext_authz_complete_, stream_info_);
 }
 
 absl::optional<std::chrono::nanoseconds> TimingUtility::extProcComplete() {
@@ -145,7 +145,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::extProcComplete() {
   if (!timing) {
     return absl::nullopt;
   }
-  return duration(timing.value().get().ext_authz_complete_, stream_info_);
+  return duration(timing.value().get().ext_proc_complete_, stream_info_);
 }
 
 const std::string&

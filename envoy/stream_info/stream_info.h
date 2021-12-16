@@ -263,7 +263,9 @@ struct UpstreamTiming {
   /*
    * Sets the time when External_Processing completes
    */
-  void onExtProcComplete(TimeSource& time_source) { ext_proc_start_ = time_source.monotonicTime(); }
+  void onExtProcComplete(TimeSource& time_source) {
+    ext_proc_complete_ = time_source.monotonicTime();
+  }
 
   absl::optional<MonotonicTime> ext_authz_start_;
   absl::optional<MonotonicTime> ext_authz_complete_;

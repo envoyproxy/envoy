@@ -71,6 +71,22 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
   dur = checkDuration(dur, timing.lastUpstreamRxByteReceived());
 
+  EXPECT_FALSE(timing.extAuthzStart());
+  upstream_timing.onExtAuthzStart(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.extAuthzStart());
+
+  EXPECT_FALSE(timing.extAuthzComplete());
+  upstream_timing.onExtAuthzComplete(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.extAuthzStart());
+
+  EXPECT_FALSE(timing.extProcStart());
+  upstream_timing.onExtProcStart(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.extProcStart());
+
+  EXPECT_FALSE(timing.extProcComplete());
+  upstream_timing.onExtProcComplete(test_time_.timeSystem());
+  dur = checkDuration(dur, timing.extProcComplete());
+
   EXPECT_FALSE(timing.firstDownstreamTxByteSent());
   info.downstreamTiming().onFirstDownstreamTxByteSent(test_time_.timeSystem());
   dur = checkDuration(dur, timing.firstDownstreamTxByteSent());
