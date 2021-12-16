@@ -83,23 +83,25 @@ public:
       trailers.addCopy(
           Http::LowerCaseString("ext_authz_complete"),
           absl::StrCat(upstream_timing.ext_authz_complete_.value().time_since_epoch().count()));
-      if (upstream_timing.ext_proc_start_.has_value()) {
-        trailers.addCopy(
-            Http::LowerCaseString("ext_proc_start_"),
-            absl::StrCat(upstream_timing.ext_proc_start_.value().time_since_epoch().count()));
-      }
-      if (upstream_timing.ext_proc_complete_.has_value()) {
-        trailers.addCopy(
-            Http::LowerCaseString("ext_proc_complete_"),
-            absl::StrCat(upstream_timing.ext_proc_complete_.value().time_since_epoch().count()));
-      }
-      return Http::FilterTrailersStatus::Continue;
     }
-  };
+    if (upstream_timing.ext_proc_start_.has_value()) {
+      trailers.addCopy(
+          Http::LowerCaseString("ext_proc_start_"),
+          absl::StrCat(upstream_timing.ext_proc_start_.value().time_since_epoch().count()));
+    }
+    if (upstream_timing.ext_proc_complete_.has_value()) {
+      trailers.addCopy(
+          Http::LowerCaseString("ext_proc_complete_"),
+          absl::StrCat(upstream_timing.ext_proc_complete_.value().time_since_epoch().count()));
+    }
 
-  constexpr char StreamInfoToHeadersFilter::name[];
-  static Registry::RegisterFactory<SimpleFilterConfig<StreamInfoToHeadersFilter>,
-                                   Server::Configuration::NamedHttpFilterConfigFactory>
-      register_;
+    return Http::FilterTrailersStatus::Continue;
+  }
+};
+
+constexpr char StreamInfoToHeadersFilter::name[];
+static Registry::RegisterFactory<SimpleFilterConfig<StreamInfoToHeadersFilter>,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
 
 } // namespace Envoy
