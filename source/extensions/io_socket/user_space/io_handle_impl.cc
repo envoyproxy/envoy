@@ -275,7 +275,7 @@ Api::SysCallIntResult IoHandleImpl::bind(Network::Address::InstanceConstSharedPt
 Api::SysCallIntResult IoHandleImpl::listen(int) { return makeInvalidSyscallResult(); }
 
 Network::IoHandlePtr IoHandleImpl::accept(struct sockaddr*, socklen_t*) {
-  ENVOY_BUG(false, "unsupportred call to accept");
+  ENVOY_BUG(false, "unsupported call to accept");
   return nullptr;
 }
 
@@ -342,7 +342,7 @@ void IoHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::Fil
 Network::IoHandlePtr IoHandleImpl::duplicate() {
   // duplicate() is supposed to be used on listener io handle while this implementation doesn't
   // support listen.
-  ENVOY_BUG(false, "unsupportred call to duplicate");
+  ENVOY_BUG(false, "unsupported call to duplicate");
   return nullptr;
 }
 
