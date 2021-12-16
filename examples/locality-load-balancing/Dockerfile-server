@@ -1,0 +1,8 @@
+FROM alpine:latest
+
+RUN apk update && apk add py3-pip
+RUN pip3 install -q Flask==0.11.1
+RUN mkdir /code
+COPY ./service.py /code
+
+CMD ["python3", "/code/service.py"]

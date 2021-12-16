@@ -241,6 +241,17 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+%UPSTREAM_REQUEST_ATTEMPT_COUNT%
+  HTTP
+    Number of times the request is attempted upstream. Note that an attempt count of '0' means that
+    the request was never attempted upstream.
+
+  TCP
+    Number of times the connection request is attempted upstream. Note that an attempt count of '0'
+    means that the connection request was never attempted upstream.
+
+  Renders a numeric value in typed JSON logs.
+
 %UPSTREAM_WIRE_BYTES_SENT%
   HTTP
     Total number of bytes sent to the upstream by the http stream.
@@ -383,6 +394,13 @@ The following command operators are supported:
 
 %ROUTE_NAME%
   Name of the route.
+
+%VIRTUAL_CLUSTER_NAME%
+  HTTP*/gRPC
+    Name of the matched Virtual Cluster (if any).
+
+  TCP/UDP
+    Not implemented ("-")
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).

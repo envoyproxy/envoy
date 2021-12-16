@@ -9,6 +9,26 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 
+class PassthroughFactory : public Network::TransportSocketFactory {
+public:
+  PassthroughFactory(Network::TransportSocketFactoryPtr&& transport_socket_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)) {
+    ASSERT(transport_socket_factory_ != nullptr);
+  }
+
+  bool implementsSecureTransport() const override {
+    return transport_socket_factory_->implementsSecureTransport();
+  }
+  bool supportsAlpn() const override { return transport_socket_factory_->supportsAlpn(); }
+  bool usesProxyProtocolOptions() const override {
+    return transport_socket_factory_->usesProxyProtocolOptions();
+  }
+
+protected:
+  // The wrapped factory.
+  Network::TransportSocketFactoryPtr transport_socket_factory_;
+};
+
 class PassthroughSocket : public Network::TransportSocket {
 public:
   PassthroughSocket(Network::TransportSocketPtr&& transport_socket);

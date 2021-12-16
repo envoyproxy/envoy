@@ -165,7 +165,7 @@ private:
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
     // Http::ResponseDecoder
-    void decode100ContinueHeaders(Http::ResponseHeaderMapPtr&&) override {}
+    void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       if (!parent_.isValidResponse(*headers) || end_stream) {
         parent_.resetEncoder(Network::ConnectionEvent::LocalClose);

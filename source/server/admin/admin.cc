@@ -109,7 +109,6 @@ const char AdminHtmlEnd[] = R"(
   </table>
 </body>
 )";
-
 } // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
@@ -144,7 +143,8 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
   }
 }
 
-AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
+                     bool ignore_global_conn_limit)
     : server_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
@@ -221,7 +221,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+      local_reply_(LocalReply::Factory::createDefault()),
+      ignore_global_conn_limit_(ignore_global_conn_limit) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,

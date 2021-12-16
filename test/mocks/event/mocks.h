@@ -70,9 +70,10 @@ public:
   }
 
   Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
-                                      Network::TcpListenerCallbacks& cb,
-                                      bool bind_to_port) override {
-    return Network::ListenerPtr{createListener_(std::move(socket), cb, bind_to_port)};
+                                      Network::TcpListenerCallbacks& cb, bool bind_to_port,
+                                      bool ignore_global_conn_limit) override {
+    return Network::ListenerPtr{
+        createListener_(std::move(socket), cb, bind_to_port, ignore_global_conn_limit)};
   }
 
   Network::UdpListenerPtr
@@ -138,7 +139,7 @@ public:
   MOCK_METHOD(Filesystem::Watcher*, createFilesystemWatcher_, ());
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
-               bool bind_to_port));
+               bool bind_to_port, bool ignore_global_conn_limit));
   MOCK_METHOD(Network::UdpListener*, createUdpListener_,
               (Network::SocketSharedPtr socket, Network::UdpListenerCallbacks& cb,
                const envoy::config::core::v3::UdpSocketConfig& config));
@@ -224,7 +225,8 @@ public:
 
 class MockSchedulableCallback : public SchedulableCallback {
 public:
-  MockSchedulableCallback(MockDispatcher* dispatcher);
+  MockSchedulableCallback(MockDispatcher* dispatcher,
+                          testing::MockFunction<void()>* destroy_cb = nullptr);
   ~MockSchedulableCallback() override;
 
   void invokeCallback() {
@@ -244,6 +246,7 @@ public:
 
 private:
   std::function<void()> callback_;
+  testing::MockFunction<void()>* destroy_cb_{nullptr};
 };
 
 class MockSignalEvent : public SignalEvent {

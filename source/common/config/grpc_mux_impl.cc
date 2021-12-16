@@ -64,7 +64,7 @@ void GrpcMuxImpl::onDynamicContextUpdate(absl::string_view resource_type_url) {
 
 void GrpcMuxImpl::start() { grpc_stream_.establishNewStream(); }
 
-void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
+void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   if (shutdown_) {
     return;
   }

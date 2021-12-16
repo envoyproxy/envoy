@@ -23,7 +23,7 @@ import github
 import exports
 import utils
 from colorama import Fore, Style
-from packaging import version
+from packaging.version import parse as parse_version
 
 # Tag issues created with these labels.
 LABELS = ['dependencies', 'area/build', 'no stalebot']
@@ -60,16 +60,33 @@ def format_utc_date(date):
     return date.date().isoformat()
 
 
+# Get the chronologically latest release from a github repo
+def get_latest_release(repo, version_min):
+    current_version = parse_version(version_min)
+    latest_version = current_version
+    latest_release = None
+    for release in repo.get_releases():
+        if release.prerelease:
+            continue
+        version = parse_version(release.tag_name)
+        if not version:
+            continue
+        if version >= latest_version:
+            latest_release = release
+            latest_version = version
+    return latest_release
+
+
 # Obtain latest release version and compare against metadata version, warn on
 # mismatch.
 def verify_and_print_latest_release(dep, repo, metadata_version, release_date, create_issue=False):
     try:
-        latest_release = repo.get_latest_release()
+        latest_release = get_latest_release(repo, metadata_version)
     except github.GithubException as err:
         # Repositories can not have releases or if they have releases may not publish a latest releases. Return
         print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
         return
-    if latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
+    if latest_release and latest_release.created_at > release_date and latest_release.tag_name != metadata_version:
         print(
             f'{Fore.YELLOW}*WARNING* {dep} has a newer release than {metadata_version}@<{release_date}>: '
             f'{latest_release.tag_name}@<{latest_release.created_at}>{Style.RESET_ALL}')
@@ -203,29 +220,33 @@ def verify_and_print_release_date(dep, github_release_date, metadata_release_dat
 
 # Extract release date from GitHub API for tagged releases.
 def get_tagged_release_date(repo, metadata_version, github_release):
-
     try:
-        latest = repo.get_latest_release()
+        latest = get_latest_release(repo, github_release.version)
+        if latest:
+            release = repo.get_release(github_release.version)
+            return release.published_at
     except github.GithubException as err:
         # Repositories can not have releases or if they have releases may not publish a latest releases. If this is the case we keep going
         latest = ''
         print(f'GithubException {repo.name}: {err.data} {err.status} while getting latest release.')
 
-    if latest and github_release.version <= latest.tag_name:
-        release = repo.get_release(github_release.version)
-        return release.published_at
-    else:
-        tags = repo.get_tags()
-        current_metadata_tag_commit_date = ''
-        for tag in tags.reversed:
-            if tag.name == github_release.version:
-                current_metadata_tag_commit_date = tag.commit.commit.committer.date
-            if not version.parse(tag.name).is_prerelease and version.parse(
-                    tag.name) > version.parse(github_release.version):
-                print(
-                    f'{Fore.YELLOW}*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
-                    f'{tag.name}@<{tag.commit.commit.committer.date}>{Style.RESET_ALL}')
-        return current_metadata_tag_commit_date
+    tags = repo.get_tags()
+    current_metadata_tag_commit_date = ''
+    current_version = parse_version(github_release.version)
+    latest_version = current_version
+    for tag in tags.reversed:
+        if tag.name == github_release.version:
+            current_metadata_tag_commit_date = tag.commit.commit.committer.date
+            continue
+        tag_version = parse_version(tag.name)
+        if not tag_version.is_prerelease and tag_version > latest_version:
+            latest = tag
+            latest_version = tag_version
+    if latest:
+        print(
+            f'{Fore.YELLOW}*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
+            f'{latest.name}@<{latest.commit.commit.committer.date}>{Style.RESET_ALL}')
+    return current_metadata_tag_commit_date
 
 
 # Extract release date from GitHub API for untagged releases.
@@ -249,10 +270,10 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
         release_date = None
         # Obtain release information from GitHub API.
         github_release = utils.get_github_release_from_urls(metadata['urls'])
-        print('github_release: ', github_release)
         if not github_release:
             print(f'{dep} is not a GitHub repository')
             continue
+        print('github_release: ', github_release)
         repo = github_instance.get_repo(f'{github_release.organization}/{github_release.project}')
         if github_release.tagged:
             release_date = get_tagged_release_date(repo, metadata['version'], github_release)
