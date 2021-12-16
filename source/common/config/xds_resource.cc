@@ -99,6 +99,7 @@ std::string XdsResourceIdentifier::encodeUrl(const xds::core::v3::ResourceLocato
     return absl::StrCat("file://", id_path, fragment);
   }
   }
+  return "";
 }
 
 namespace {
