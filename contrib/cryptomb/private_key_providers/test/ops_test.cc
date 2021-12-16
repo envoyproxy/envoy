@@ -136,9 +136,9 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
-  for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
+  for (auto& cb : cbs) {
     connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
-        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
+        cb, *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of signing operations.
@@ -167,9 +167,9 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
-  for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
+  for (auto& cb : cbs) {
     connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
-        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
+        cb, *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of signing operations.
@@ -198,9 +198,9 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaDecrypt) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
-  for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
+  for (auto& cb : cbs) {
     connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
-        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
+        cb, *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of decryption operations.
@@ -319,9 +319,9 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
-  for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
+  for (auto& cb : cbs) {
     connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
-        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
+        cb, *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Increment all but the last queue size once inside the loop.
