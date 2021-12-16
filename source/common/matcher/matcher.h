@@ -197,7 +197,7 @@ private:
       };
     }
     case MatcherType::MatcherTree::kPrefixMatchMap:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("unsupported");
     case MatcherType::MatcherTree::kCustomMatch: {
       auto& factory = Config::Utility::getAndCheckFactory<CustomMatcherFactory<DataType>>(
           matcher.matcher_tree().custom_match());
@@ -208,7 +208,7 @@ private:
                                                   *this);
     }
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("unsupported");
     }
   }
 

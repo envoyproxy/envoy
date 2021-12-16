@@ -88,7 +88,7 @@ public:
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   IoHandle& ioHandle() override { return *io_handle_; }
