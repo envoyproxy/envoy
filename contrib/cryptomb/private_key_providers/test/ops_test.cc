@@ -84,15 +84,13 @@ protected:
   Event::DispatcherPtr dispatcher_;
   std::shared_ptr<FakeIppCryptoImpl> fakeIpp_;
   CryptoMbStats stats_;
-  TestCallbacks cb_;
 
   // Result of an operation.
   ssl_private_key_result_t res_;
 
   // A size for signing and decryption operation input chosen for tests.
   static constexpr size_t IN_LEN = 32;
-  // Test input bytes for signing and decryption chosen for tests. Other values than 0x7f would also
-  // work.
+  // Test input bytes for signing and decryption chosen for tests.
   static constexpr uint8_t IN[IN_LEN] = {0x7f};
 
   // Maximum size of out_ in all tests cases.
@@ -110,7 +108,8 @@ TEST_F(CryptoMbProviderTest, TestEcdsaSigning) {
                       stats_);
   bssl::UniquePtr<EVP_PKEY> pkey = makeEcdsaKey();
 
-  CryptoMbPrivateKeyConnection op(cb_, *dispatcher_, bssl::UpRef(pkey), queue);
+  TestCallbacks cb;
+  CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey), queue);
   res_ = ecdsaPrivateKeySignForTest(&op, out_, &out_len_, MAX_OUT_LEN,
                                     SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
   EXPECT_EQ(res_, ssl_private_key_success);
@@ -124,9 +123,10 @@ TEST_F(CryptoMbProviderTest, TestRsaPkcs1Signing) {
   fakeIpp_->setRsaKey(rsa);
 
   // Initialize connections.
+  TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cb_, *dispatcher_,
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
                                                                          bssl::UpRef(pkey), queue));
   }
 
@@ -138,9 +138,8 @@ TEST_F(CryptoMbProviderTest, TestRsaPkcs1Signing) {
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
-
     // After the last request, the status is set only from the event loop which is not run. This
-    // should still be "retry". The cryptographic result is present anyway.
+    // should still be "retry", the cryptographic result is present anyway.
     res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
@@ -161,9 +160,10 @@ TEST_F(CryptoMbProviderTest, TestRsaPssSigning) {
   fakeIpp_->setRsaKey(rsa);
 
   // Initialize connections.
+  TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cb_, *dispatcher_,
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
                                                                          bssl::UpRef(pkey), queue));
   }
 
@@ -175,9 +175,8 @@ TEST_F(CryptoMbProviderTest, TestRsaPssSigning) {
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
-
     // After the last request, the status is set only from the event loop which is not run. This
-    // should still be "retry". The cryptographic result is present anyway.
+    // should still be "retry", the cryptographic result is present anyway.
     res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
@@ -198,9 +197,10 @@ TEST_F(CryptoMbProviderTest, TestRsaDecrypt) {
   fakeIpp_->setRsaKey(rsa);
 
   // Initialize connections.
+  TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cb_, *dispatcher_,
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
                                                                          bssl::UpRef(pkey), queue));
   }
 
@@ -212,9 +212,8 @@ TEST_F(CryptoMbProviderTest, TestRsaDecrypt) {
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
-
     // After the last request, the status is set only from the event loop which is not run. This
-    // should still be "retry". The cryptographic result is present anyway.
+    // should still be "retry", the cryptographic result is present anyway.
     res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
@@ -236,8 +235,10 @@ TEST_F(CryptoMbProviderTest, TestErrors) {
   CryptoMbQueue rsa_queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_,
                           *dispatcher_, stats_);
 
-  CryptoMbPrivateKeyConnection op_ec(cb_, *dispatcher_, bssl::UpRef(pkey), ec_queue);
-  CryptoMbPrivateKeyConnection op_rsa(cb_, *dispatcher_, bssl::UpRef(rsa_pkey), rsa_queue);
+  TestCallbacks cb;
+
+  CryptoMbPrivateKeyConnection op_ec(cb, *dispatcher_, bssl::UpRef(pkey), ec_queue);
+  CryptoMbPrivateKeyConnection op_rsa(cb, *dispatcher_, bssl::UpRef(rsa_pkey), rsa_queue);
 
   // no operation defined
   res_ = ecdsaPrivateKeySignForTest(nullptr, nullptr, nullptr, MAX_OUT_LEN,
@@ -281,8 +282,10 @@ TEST_F(CryptoMbProviderTest, TestRSATimer) {
   RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
   fakeIpp_->setRsaKey(rsa);
 
+  TestCallbacks cbs[2];
+
   // Successful operation with timer.
-  CryptoMbPrivateKeyConnection op0(cb_, *dispatcher_, bssl::UpRef(pkey), queue);
+  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher_, bssl::UpRef(pkey), queue);
   res_ = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
                                   IN, IN_LEN);
   EXPECT_EQ(res_, ssl_private_key_retry);
@@ -302,18 +305,20 @@ TEST_F(CryptoMbProviderTest, TestRSATimer) {
   // Add crypto library errors
   fakeIpp_->injectErrors(true);
 
-  res_ = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
+  CryptoMbPrivateKeyConnection op1(cbs[1], *dispatcher_, bssl::UpRef(pkey), queue);
+
+  res_ = rsaPrivateKeySignForTest(&op1, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
                                   IN, IN_LEN);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op0, nullptr, nullptr, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op1, nullptr, nullptr, MAX_OUT_LEN);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op0, out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op1, out_, &out_len_, MAX_OUT_LEN);
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
@@ -325,9 +330,10 @@ TEST_F(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
   fakeIpp_->setRsaKey(rsa);
 
   // Initialize connections.
+  TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cb_, *dispatcher_,
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
                                                                          bssl::UpRef(pkey), queue));
   }
 
