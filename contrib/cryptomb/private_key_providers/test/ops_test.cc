@@ -103,31 +103,42 @@ protected:
   const std::string QUEUE_SIZE_HISTOGRAM_NAME = "cryptomb.rsa_queue_sizes";
 };
 
-TEST_F(CryptoMbProviderTest, TestEcdsaSigning) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Ec, 256, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeEcdsaKey();
+class CryptoMbProviderRsaTest : public CryptoMbProviderTest {
+protected:
+  CryptoMbProviderRsaTest()
+      : queue_(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_, stats_),
+        pkey_(makeRsaKey()) {
+    RSA* rsa = EVP_PKEY_get0_RSA(pkey_.get());
+    fakeIpp_->setRsaKey(rsa);
+  }
+  CryptoMbQueue queue_;
+  bssl::UniquePtr<EVP_PKEY> pkey_;
+};
 
+class CryptoMbProviderEcdsaTest : public CryptoMbProviderTest {
+protected:
+  CryptoMbProviderEcdsaTest()
+      : queue_(std::chrono::milliseconds(200), KeyType::Ec, 256, fakeIpp_, *dispatcher_, stats_),
+        pkey_(makeEcdsaKey()) {}
+  CryptoMbQueue queue_;
+  bssl::UniquePtr<EVP_PKEY> pkey_;
+};
+
+TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
   TestCallbacks cb;
-  CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey), queue);
+  CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey_), queue_);
   res_ = ecdsaPrivateKeySignForTest(&op, out_, &out_len_, MAX_OUT_LEN,
                                     SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
   EXPECT_EQ(res_, ssl_private_key_success);
 }
 
-TEST_F(CryptoMbProviderTest, TestRsaPkcs1Signing) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
-  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  fakeIpp_->setRsaKey(rsa);
-
+TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
-                                                                         bssl::UpRef(pkey), queue));
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
+        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of signing operations.
@@ -152,19 +163,13 @@ TEST_F(CryptoMbProviderTest, TestRsaPkcs1Signing) {
   EXPECT_NE(out_len_, 0);
 }
 
-TEST_F(CryptoMbProviderTest, TestRsaPssSigning) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
-  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  fakeIpp_->setRsaKey(rsa);
-
+TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
-                                                                         bssl::UpRef(pkey), queue));
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
+        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of signing operations.
@@ -189,19 +194,13 @@ TEST_F(CryptoMbProviderTest, TestRsaPssSigning) {
   EXPECT_NE(out_len_, 0);
 }
 
-TEST_F(CryptoMbProviderTest, TestRsaDecrypt) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
-  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  fakeIpp_->setRsaKey(rsa);
-
+TEST_F(CryptoMbProviderRsaTest, TestRsaDecrypt) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
-                                                                         bssl::UpRef(pkey), queue));
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
+        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Create MULTIBUFF_BATCH amount of decryption operations.
@@ -275,17 +274,11 @@ TEST_F(CryptoMbProviderTest, TestErrors) {
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
-TEST_F(CryptoMbProviderTest, TestRSATimer) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
-  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  fakeIpp_->setRsaKey(rsa);
-
+TEST_F(CryptoMbProviderRsaTest, TestRSATimer) {
   TestCallbacks cbs[2];
 
   // Successful operation with timer.
-  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher_, bssl::UpRef(pkey), queue);
+  CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher_, bssl::UpRef(pkey_), queue_);
   res_ = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
                                   IN, IN_LEN);
   EXPECT_EQ(res_, ssl_private_key_retry);
@@ -305,7 +298,7 @@ TEST_F(CryptoMbProviderTest, TestRSATimer) {
   // Add crypto library errors
   fakeIpp_->injectErrors(true);
 
-  CryptoMbPrivateKeyConnection op1(cbs[1], *dispatcher_, bssl::UpRef(pkey), queue);
+  CryptoMbPrivateKeyConnection op1(cbs[1], *dispatcher_, bssl::UpRef(pkey_), queue_);
 
   res_ = rsaPrivateKeySignForTest(&op1, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
                                   IN, IN_LEN);
@@ -322,19 +315,13 @@ TEST_F(CryptoMbProviderTest, TestRSATimer) {
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
-TEST_F(CryptoMbProviderTest, TestRSAQueueSizeStatistics) {
-  CryptoMbQueue queue(std::chrono::milliseconds(200), KeyType::Rsa, 1024, fakeIpp_, *dispatcher_,
-                      stats_);
-  bssl::UniquePtr<EVP_PKEY> pkey = makeRsaKey();
-  RSA* rsa = EVP_PKEY_get0_RSA(pkey.get());
-  fakeIpp_->setRsaKey(rsa);
-
+TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   // Initialize connections.
   TestCallbacks cbs[CryptoMbQueue::MULTIBUFF_BATCH];
   std::vector<std::unique_ptr<CryptoMbPrivateKeyConnection>> connections;
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
-    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(cbs[i], *dispatcher_,
-                                                                         bssl::UpRef(pkey), queue));
+    connections.push_back(std::make_unique<CryptoMbPrivateKeyConnection>(
+        cbs[i], *dispatcher_, bssl::UpRef(pkey_), queue_));
   }
 
   // Increment all but the last queue size once inside the loop.
