@@ -79,6 +79,10 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   LinkedList::moveIntoList(std::move(request), active_requests_);
+
+  auto upstream_info = connection_->streamInfo().upstreamInfo();
+  upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
+
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }

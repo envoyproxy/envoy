@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # External authorization L4 network filter
-# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/network_filters
+# Public docs: TODO(saumoh): Docs needed in docs/root/configuration/listeners/network_filters
 
 envoy_extension_package()
 

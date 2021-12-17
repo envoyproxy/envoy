@@ -8,6 +8,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/utility.h"
 
 #include "test/common/stream_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
@@ -39,7 +40,8 @@ protected:
 TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
   StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr);
-  Envoy::StreamInfo::UpstreamTiming upstream_timing;
+  info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
+  UpstreamTiming& upstream_timing = info.upstreamInfo()->upstreamTiming();
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
   const MonotonicTime& start = info.startTimeMonotonic();
@@ -47,38 +49,35 @@ TEST_F(StreamInfoImplTest, TimingTest) {
   EXPECT_LE(pre_start, start) << "Start time was lower than expected";
   EXPECT_GE(post_start, start) << "Start time was higher than expected";
 
-  EXPECT_FALSE(info.lastDownstreamRxByteReceived());
+  TimingUtility timing(info);
+  EXPECT_FALSE(timing.lastDownstreamRxByteReceived());
   info.downstreamTiming().onLastDownstreamRxByteReceived(test_time_.timeSystem());
   std::chrono::nanoseconds dur =
-      checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
+      checkDuration(std::chrono::nanoseconds{0}, timing.lastDownstreamRxByteReceived());
 
-  EXPECT_FALSE(info.firstUpstreamTxByteSent());
+  EXPECT_FALSE(timing.firstUpstreamTxByteSent());
   upstream_timing.onFirstUpstreamTxByteSent(test_time_.timeSystem());
-  info.setUpstreamTiming(upstream_timing);
-  dur = checkDuration(dur, info.firstUpstreamTxByteSent());
+  dur = checkDuration(dur, timing.firstUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastUpstreamTxByteSent());
+  EXPECT_FALSE(timing.lastUpstreamTxByteSent());
   upstream_timing.onLastUpstreamTxByteSent(test_time_.timeSystem());
-  info.setUpstreamTiming(upstream_timing);
-  dur = checkDuration(dur, info.lastUpstreamTxByteSent());
+  dur = checkDuration(dur, timing.lastUpstreamTxByteSent());
 
-  EXPECT_FALSE(info.firstUpstreamRxByteReceived());
+  EXPECT_FALSE(timing.firstUpstreamRxByteReceived());
   upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
-  info.setUpstreamTiming(upstream_timing);
-  dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
+  dur = checkDuration(dur, timing.firstUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.lastUpstreamRxByteReceived());
+  EXPECT_FALSE(timing.lastUpstreamRxByteReceived());
   upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
-  info.setUpstreamTiming(upstream_timing);
-  dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
+  dur = checkDuration(dur, timing.lastUpstreamRxByteReceived());
 
-  EXPECT_FALSE(info.downstreamTiming().firstDownstreamTxByteSent());
+  EXPECT_FALSE(timing.firstDownstreamTxByteSent());
   info.downstreamTiming().onFirstDownstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.firstDownstreamTxByteSent());
+  dur = checkDuration(dur, timing.firstDownstreamTxByteSent());
 
-  EXPECT_FALSE(info.lastDownstreamTxByteSent());
+  EXPECT_FALSE(timing.lastDownstreamTxByteSent());
   info.downstreamTiming().onLastDownstreamTxByteSent(test_time_.timeSystem());
-  dur = checkDuration(dur, info.lastDownstreamTxByteSent());
+  dur = checkDuration(dur, timing.lastDownstreamTxByteSent());
 
   EXPECT_FALSE(info.requestComplete());
   info.onRequestComplete();
@@ -139,7 +138,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
 
     EXPECT_EQ(nullptr, stream_info.upstreamInfo());
     EXPECT_EQ(Http::Protocol::Http2, stream_info.protocol().value());
-    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
+    stream_info.setUpstreamInfo(std::make_shared<UpstreamInfoImpl>());
 
     stream_info.protocol(Http::Protocol::Http10);
     EXPECT_EQ(Http::Protocol::Http10, stream_info.protocol().value());
@@ -164,10 +163,10 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.connectionTerminationDetails().has_value());
     EXPECT_EQ("access_denied", stream_info.connectionTerminationDetails().value());
 
-    EXPECT_EQ(nullptr, stream_info.upstreamHost());
+    EXPECT_EQ(nullptr, stream_info.upstreamInfo()->upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
-    stream_info.onUpstreamHostSelected(host);
-    EXPECT_EQ(host, stream_info.upstreamHost());
+    stream_info.upstreamInfo()->setUpstreamHost(host);
+    EXPECT_EQ(host, stream_info.upstreamInfo()->upstreamHost());
 
     EXPECT_FALSE(stream_info.healthCheck());
     stream_info.healthCheck(true);
@@ -184,10 +183,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
                                        FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState()->getDataReadOnly<TestIntAccessor>("test").access());
 
-    EXPECT_EQ(nullptr, stream_info.upstreamFilterState());
-    stream_info.setUpstreamFilterState(stream_info.filterState());
-    EXPECT_EQ(1,
-              stream_info.upstreamFilterState()->getDataReadOnly<TestIntAccessor>("test").access());
+    stream_info.upstreamInfo()->setUpstreamFilterState(stream_info.filterState());
+    EXPECT_EQ(1, stream_info.upstreamInfo()
+                     ->upstreamFilterState()
+                     ->getDataReadOnly<TestIntAccessor>("test")
+                     .access());
 
     EXPECT_EQ(absl::nullopt, stream_info.upstreamClusterInfo());
     Upstream::ClusterInfoConstSharedPtr cluster_info(new NiceMock<Upstream::MockClusterInfo>());
@@ -199,13 +199,13 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
         "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
     auto ssl_info = std::make_shared<Ssl::MockConnectionInfo>();
     EXPECT_CALL(*ssl_info, sessionId()).WillRepeatedly(testing::ReturnRef(session_id));
-    stream_info.setUpstreamSslConnection(ssl_info);
-    EXPECT_EQ(session_id, stream_info.upstreamSslConnection()->sessionId());
+    stream_info.upstreamInfo()->setUpstreamSslConnection(ssl_info);
+    EXPECT_EQ(session_id, stream_info.upstreamInfo()->upstreamSslConnection()->sessionId());
 
-    EXPECT_FALSE(stream_info.upstreamConnectionId().has_value());
-    stream_info.setUpstreamConnectionId(12345);
-    ASSERT_TRUE(stream_info.upstreamConnectionId().has_value());
-    EXPECT_EQ(12345, stream_info.upstreamConnectionId().value());
+    EXPECT_FALSE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
+    stream_info.upstreamInfo()->setUpstreamConnectionId(12345);
+    ASSERT_TRUE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
+    EXPECT_EQ(12345, stream_info.upstreamInfo()->upstreamConnectionId().value());
 
     std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
     EXPECT_NE(stream_info.upstreamInfo(), new_info);
@@ -274,7 +274,7 @@ TEST_F(StreamInfoImplTest, DefaultRequestIDExtensionTest) {
 TEST_F(StreamInfoImplTest, Details) {
   StreamInfoImpl stream_info(test_time_.timeSystem(), nullptr);
   EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
-  stream_info.setResponseCodeDetails("two words");
+  stream_info.setResponseCodeDetails("two_words");
   ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
   EXPECT_EQ(stream_info.responseCodeDetails().value(), "two_words");
 }
