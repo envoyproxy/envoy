@@ -192,7 +192,7 @@ public:
     }
   }
 
-  void verifyMetadataMatchCriteriaFromPreComputer() {
+  void verifyMetadataMatchCriteriaFromPreviousCompute() {
     ProtobufWkt::Struct request_struct;
     ProtobufWkt::Value val;
 
@@ -563,11 +563,11 @@ TEST_F(DubboRouterTest, MetadataMatchCriteriaFromRouteNoRouteEntryMatch) {
   verifyMetadataMatchCriteriaFromRoute(false);
 }
 
-TEST_F(DubboRouterTest, MetadataMatchCriteriaFromPreComputer) {
+TEST_F(DubboRouterTest, MetadataMatchCriteriaFromPreviousCompute) {
   initializeRouter();
   startRequest(MessageType::Request);
 
-  verifyMetadataMatchCriteriaFromPreComputer();
+  verifyMetadataMatchCriteriaFromPreviousCompute();
 }
 
 TEST_F(DubboRouterTest, UnexpectedRouterDestroy) {
