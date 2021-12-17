@@ -612,7 +612,7 @@ absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
         interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
         break;
       default:
-        NOT_REACHED_GCOVR_EXCL_LINE;
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
       }
 
       if (socket_address_value == interface_address_value) {
