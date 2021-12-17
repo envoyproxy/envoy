@@ -40,11 +40,12 @@ private:
   friend class DnsResolverImplPeer;
   class PendingResolution : public ActiveDnsQuery {
   public:
-    void cancel(CancelReason) override {
+    void cancel(CancelReason reason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
       // TODO(mattklein123): Potentially use timeout to destroy and recreate the channel.
       cancelled_ = true;
+      cancel_reason_ = reason;
     }
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
@@ -70,6 +71,7 @@ private:
     bool cancelled_ = false;
     const ares_channel channel_;
     const std::string dns_name_;
+    CancelReason cancel_reason_;
 
     // Small wrapping struct to accumulate addresses from firings of the
     // onAresGetAddrInfoCallback callback.
