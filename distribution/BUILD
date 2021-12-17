@@ -21,6 +21,15 @@ envoy_pkg_distros(
     version = VERSION,
 )
 
+genrule(
+    name = "verification",
+    outs = ["verification.sh"],
+    cmd = """
+    echo 'exec $${@}' > $@ \
+    && chmod +x $@
+    """,
+)
+
 sh_binary(
     name = "verify_packages",
     srcs = [":verification.sh"],
