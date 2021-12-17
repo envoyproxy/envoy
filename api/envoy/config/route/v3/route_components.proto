@@ -1573,7 +1573,7 @@ message DirectResponseAction {
       "envoy.api.v2.route.DirectResponseAction";
 
   // Specifies the HTTP response status to be returned.
-  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 100}];
+  uint32 status = 1 [(validate.rules).uint32 = {lt: 600 gte: 200}];
 
   // Specifies the content of the response body. If this setting is omitted,
   // no body is included in the generated response.
