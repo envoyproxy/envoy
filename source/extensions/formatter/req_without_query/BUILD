@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 # Access log formatter that strips query string from request path
-# Public docs: docs/root/TODO(tsaarni)
+# Public docs: TODO(tsaarni)
 
 envoy_cc_library(
     name = "req_without_query_lib",

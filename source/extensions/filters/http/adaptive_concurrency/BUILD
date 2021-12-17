@@ -9,7 +9,7 @@ licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that dynamically adjusts the number of allowed concurrent
 # requests based on sampled latencies.
-# Public docs: docs/root/configuration/http_filters/adaptive_concurrency_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/adaptive_concurrency_filter
 
 envoy_extension_package()
 
