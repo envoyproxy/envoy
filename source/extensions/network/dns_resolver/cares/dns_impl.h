@@ -12,6 +12,7 @@
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
 
 #include "absl/container/node_hash_map.h"
 #include "ares.h"
@@ -27,9 +28,10 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
-                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-                  const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
+  DnsResolverImpl(
+      const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
+      Event::Dispatcher& dispatcher,
+      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -123,7 +125,6 @@ private:
     int family_ = AF_INET;
     const DnsLookupFamily dns_lookup_family_;
     const AvailableInterfaces available_interfaces_;
-    const bool filter_unroutable_families_{true};
   };
 
   struct AresOptions {
@@ -157,6 +158,7 @@ private:
   absl::node_hash_map<int, Event::FileEventPtr> events_;
   const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
+  const bool filter_unroutable_families_;
 };
 
 DECLARE_FACTORY(CaresDnsResolverFactory);

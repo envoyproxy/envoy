@@ -14,7 +14,6 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread.h"
 #include "source/common/network/address_impl.h"
-#include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
 
@@ -25,14 +24,15 @@ namespace Envoy {
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
-    Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
-    const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
+    const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig& config,
+    Event::Dispatcher& dispatcher,
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
-      dns_resolver_options_(dns_resolver_options),
-      use_resolvers_as_fallback_(use_resolvers_as_fallback),
-      resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
+      dns_resolver_options_(config.dns_resolver_options()),
+      use_resolvers_as_fallback_(config.use_resolvers_as_fallback()),
+      resolvers_csv_(maybeBuildResolversCsv(resolvers)),
+      filter_unroutable_families_(config.filter_unroutable_families()) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
 }
@@ -381,7 +381,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
 }
 
 void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
-  if (filter_unroutable_families_) {
+  if (parent_.filter_unroutable_families_) {
     switch (family) {
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
@@ -392,13 +392,13 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
-        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
+        ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
         onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
         return;
       }
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      ENVOY_BUG(false, fmt::format("Unexpected IP family {}", family));
     }
   }
 
@@ -429,6 +429,10 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
   DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
                                                                                        false};
   for (const auto& interface_address : interface_addresses) {
+    if (Network::Utility::isLoopbackAddress(*interface_address.interface_addr_)) {
+      continue;
+    }
+
     switch (interface_address.interface_addr_->ip()->version()) {
     case Network::Address::IpVersion::v4:
       available_interfaces.v4_available_ = true;
@@ -463,14 +467,12 @@ public:
                                          const envoy::config::core::v3::TypedExtensionConfig&
                                              typed_dns_resolver_config) const override {
     envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
-    envoy::config::core::v3::DnsResolverOptions dns_resolver_options;
     std::vector<Network::Address::InstanceConstSharedPtr> resolvers;
 
     ASSERT(dispatcher.isThreadSafe());
     // Only c-ares DNS factory will call into this function.
     // Directly unpack the typed config to a c-ares object.
     Envoy::MessageUtil::unpackTo(typed_dns_resolver_config.typed_config(), cares);
-    dns_resolver_options.MergeFrom(cares.dns_resolver_options());
     if (!cares.resolvers().empty()) {
       const auto& resolver_addrs = cares.resolvers();
       resolvers.reserve(resolver_addrs.size());
@@ -478,8 +480,7 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher, cares.use_resolvers_as_fallback(),
-                                                      resolvers, dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(cares, dispatcher, resolvers);
   }
 };
 

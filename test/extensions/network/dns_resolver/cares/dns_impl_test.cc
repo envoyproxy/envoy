@@ -1144,12 +1144,12 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 // immediately.
 TEST_P(DnsImplTest, PendingTimerEnable) {
   InSequence s;
+  const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig config;
   std::vector<Network::Address::InstanceConstSharedPtr> vec{};
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, false /* use_resolvers_as_fallback */,
-                                                vec, dns_resolver_options_);
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
