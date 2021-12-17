@@ -23,28 +23,10 @@ addenvoyuser() {
     fi
 }
 
-
 case "$1" in
 
     install)
         addenvoyuser
-        cat <<BANNER
-
-You are installing the Envoy proxy server.
-
-Once installed, you can check your Envoy version by running the following in a terminal:
-
-  $ envoy --version
-
-Documentation for your version is available at:
-
-  https://www.envoyproxy.io/docs
-
-The Envoy project can be found at:
-
-  https://github.com/envoyproxy/envoy
-
-BANNER
         ;;
 
     upgrade)

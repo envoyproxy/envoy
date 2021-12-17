@@ -7,4 +7,5 @@ envoy_package()
 exports_files([
     "copyright",
     "preinst",
+    "postinst",
 ])

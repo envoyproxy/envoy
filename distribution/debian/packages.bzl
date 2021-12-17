@@ -9,6 +9,7 @@ def envoy_pkg_deb(
         homepage = "https://www.envoyproxy.io/",
         description = "Envoy built for Debian/Ubuntu",
         preinst = "//distribution/debian:preinst",
+        postinst = "//distribution/debian:postinst",
         supported_distributions = "buster bullseye bionic focal hirstute impish",
         architecture = select({
             "//bazel:x86": "amd64",
@@ -33,6 +34,7 @@ def envoy_pkg_deb(
         package = name,
         version = version,
         preinst = preinst,
+        postinst = postinst,
         **kwargs
     )
 
