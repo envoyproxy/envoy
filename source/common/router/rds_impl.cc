@@ -233,12 +233,6 @@ const std::string& ProtoTraitsImpl::resourceName(const Protobuf::Message& rc) co
   return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
 }
 
-ProtobufTypes::MessagePtr ProtoTraitsImpl::cloneProto(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return std::make_unique<envoy::config::route::v3::RouteConfiguration>(
-      static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
-}
-
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)
     : manager_(admin, "routes", proto_traits_) {}
 

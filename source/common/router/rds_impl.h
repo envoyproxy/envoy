@@ -187,7 +187,6 @@ public:
   ProtobufTypes::MessagePtr createEmptyProto() const override;
   void validateResourceType(const Protobuf::Message& rc) const override;
   const std::string& resourceName(const Protobuf::Message& rc) const override;
-  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override;
 };
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,

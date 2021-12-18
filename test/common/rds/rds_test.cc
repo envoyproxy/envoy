@@ -81,9 +81,6 @@ public:
   ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override {
     return std::make_shared<const TestConfig>(cast(rc));
   }
-  ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const override {
-    return std::make_unique<envoy::config::route::v3::RouteConfiguration>(cast(rc));
-  }
 };
 
 class RdsConfigUpdateReceiverTest : public RdsTestBase {

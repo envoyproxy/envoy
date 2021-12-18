@@ -1,5 +1,7 @@
 #include "source/common/rds/route_config_update_receiver_impl.h"
 
+#include "source/common/rds/util.h"
+
 namespace Envoy {
 namespace Rds {
 
@@ -32,7 +34,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   if (!checkHash(new_hash)) {
     return false;
   }
-  updateConfig(proto_traits_.cloneProto(rc));
+  updateConfig(cloneProto(proto_traits_, rc));
   updateHash(new_hash);
   onUpdateCommon(version_info);
   return true;

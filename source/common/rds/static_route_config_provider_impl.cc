@@ -1,5 +1,7 @@
 #include "source/common/rds/static_route_config_provider_impl.h"
 
+#include "source/common/rds/util.h"
+
 namespace Envoy {
 namespace Rds {
 
@@ -8,7 +10,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Server::Configuration::ServerFactoryContext& factory_context,
     RouteConfigProviderManager& route_config_provider_manager)
     : route_config_proto_(
-          route_config_provider_manager.protoTraits().cloneProto(route_config_proto)),
+          cloneProto(route_config_provider_manager.protoTraits(), route_config_proto)),
       config_(config_traits.createConfig(*route_config_proto_)),
       last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {}

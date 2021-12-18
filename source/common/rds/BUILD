@@ -16,6 +16,7 @@ envoy_cc_library(
         "route_config_provider_manager_impl.cc",
         "route_config_update_receiver_impl.cc",
         "static_route_config_provider_impl.cc",
+        "util.cc",
     ],
     hdrs = [
         "rds_route_config_provider_impl.h",
@@ -24,6 +25,7 @@ envoy_cc_library(
         "route_config_provider_manager_impl.h",
         "route_config_update_receiver_impl.h",
         "static_route_config_provider_impl.h",
+        "util.h",
     ],
     deps = [
         "//envoy/rds:rds_interface",

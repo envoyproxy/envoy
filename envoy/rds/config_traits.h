@@ -43,11 +43,6 @@ public:
    * The object behind the returned reference has to have the same lifetime like the proto.
    */
   virtual const std::string& resourceName(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Clones the route configuration proto.
-   */
-  virtual ProtobufTypes::MessagePtr cloneProto(const Protobuf::Message& rc) const PURE;
 };
 
 class ConfigTraits {
