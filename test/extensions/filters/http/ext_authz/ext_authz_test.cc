@@ -2133,6 +2133,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        // Check timing metadata correctness
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
+        (*response.dynamic_metadata.mutable_fields())["duration"] = returned_dynamic_metadata.fields().at("duration");
+
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));
 
@@ -2181,6 +2185,10 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
       .WillOnce(Invoke([&response](const std::string& ns,
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
+        // Check timing metadata correctness
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
+        (*response.dynamic_metadata.mutable_fields())["duration"] = returned_dynamic_metadata.fields().at("duration");
+
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));
 

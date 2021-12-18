@@ -1,5 +1,8 @@
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
+#include <chrono>
+#include <ratio>
+#include <thread>
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -58,6 +61,9 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
       config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
+  //Store start time of ext_authz filter call
+  start_time_point_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
                                                // going to invoke check call.
@@ -210,6 +216,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   Stats::StatName empty_stat_name;
 
   if (!response->dynamic_metadata.fields().empty()) {
+    // record and emit metadata detailing timing of ext_authz call [milliseconds]
+    ProtobufWkt::Value ext_authz_duration_value;
+    if (start_time_point_.has_value()) {
+      auto ext_authz_duration = std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
+      ext_authz_duration_value.set_number_value(ext_authz_duration.count());
+    } else {
+      ext_authz_duration_value.set_null_value(ProtobufWkt::NULL_VALUE);
+    }
+    (*response->dynamic_metadata.mutable_fields())["duration"] = ext_authz_duration_value;
     decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",
                                                         response->dynamic_metadata);
   }
