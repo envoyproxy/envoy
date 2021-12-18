@@ -125,6 +125,30 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   return stats(params, store, response_headers, response);
 }
 
+Http::Code StatsHandler::handlerStatsPaged(absl::string_view url,
+                                           Http::ResponseHeaderMap& response_headers,
+                                           Buffer::Instance& response, AdminStream&) {
+  Params params;
+  Http::Code code = params.parse(url, response);
+  if (code != Http::Code::OK) {
+    return code;
+  }
+  if (server_.statsConfig().flushOnAdmin()) {
+    server_.flushStats();
+  }
+  Stats::Store& store = server_.stats();
+  if (params.format_ == Format::Prometheus) {
+    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
+        params.text_readouts_ ? store.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+    PrometheusStatsFormatter::statsAsPrometheus(
+        store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
+        params.used_only_, params.filter_, server_.api().customStatNamespaces());
+    return Http::Code::OK;
+  }
+
+  return stats(params, store, response_headers, response);
+}
+
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {

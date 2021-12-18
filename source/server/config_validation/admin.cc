@@ -5,7 +5,7 @@ namespace Server {
 
 // Pretend that handler was added successfully.
 bool ValidationAdmin::addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
-                                 const ParamVec&) {
+                                 const ParamDescriptorVec&) {
   return true;
 }
 

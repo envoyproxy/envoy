@@ -93,6 +93,17 @@ const char AdminHtmlStart[] = R"(
     .home-form {
       margin-bottom: 0;
     }
+
+    .button-as-link {
+      background: none!important;
+      border: none;
+      padding: 0!important;
+      font-family: sans-serif;
+      font-size: medium;
+      color: #069;
+      text-decoration: underline;
+      cursor: pointer;
+   }
   </style>
 </head>
 <body>
@@ -276,7 +287,19 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStats),
            false,
            false,
-           {{Param::Type::Integer, "usedonly", "false"}}},
+           {{ParamDescriptor::Type::Boolean, "usedonly"},
+            {ParamDescriptor::Type::Boolean, "text_readouts"},
+            {ParamDescriptor::Type::Boolean, "pretty"},
+            {ParamDescriptor::Type::String, "format"}}},
+          {"/stats/paged",
+           "print one page of server stats",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsPaged),
+           false,
+           false,
+           {{ParamDescriptor::Type::Boolean, "usedonly"},
+            {ParamDescriptor::Type::Boolean, "pretty"},
+            {ParamDescriptor::Type::String, "after"},
+            {ParamDescriptor::Type::Integer, "num"}}},
           {"/stats/prometheus",
            "print server stats in prometheus format",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats),
@@ -383,6 +406,40 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+      ParamValues values;
+      const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path_and_query);
+      for (const ParamDescriptor& desc : handler.params_) {
+        auto iter = params.find(desc.name_);
+        if (iter != params.end()) {
+          switch (desc.type_) {
+            case ParamDescriptor::Type::Boolean: {
+              if (iter->second == "false") {
+                values.boolean_map_[desc.name_] = false;
+              } else if (iter->second == "true" || iter->second.empty()) {
+                values.boolean_map_[desc.name_] = true;
+              } else {
+                response.add(fmt::format("Invalid value for query-param {}.", desc.name_));
+                return Http::Code::BadRequest;
+              }
+              break;
+            }
+            case ParamDescriptor::Type::Integer: {
+              int64_t val;
+              if (absl::SimpleAtoi(iter->second, &val)) {
+                values.integer_map_[desc.name_] = val;
+              } else {
+                response.add(fmt::format("Invalid value for query-param {}.", desc.name_));
+                return Http::Code::BadRequest;
+              }
+              break;
+            }
+            case ParamDescriptor::Type::String:
+              values.string_map_[desc.name_] = iter->second;
+              break;
+          }
+        }
+      }
+
       found_handler = true;
       if (handler.mutates_server_state_) {
         const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
@@ -464,32 +521,46 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
     // For handlers that mutate state, render the link as a button in a POST form,
     // rather than an anchor tag. This should discourage crawlers that find the /
     // page from accidentally mutating all the server state by GETting all the hrefs.
-    const char* link_format =
-        handler->mutates_server_state_
-            ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
-            : "<a href='{}'>{}</a>";
-    const std::string link = fmt::format(link_format, path, path);
+    const char* style = handler->mutates_server_state_ ? "" : " class='button-as-link'";
+    const char* method = handler->mutates_server_state_ ? "post" : "get";
+    std::string form = absl::StrCat("<form action='", path, "' method='", method,
+                                    "' class='home-form'>\n"
+                                    "  <button", style, ">", path, "</button>");
 
     std::vector<std::string> params;
-    for (const Param& param : handler->params_) {
+    for (const ParamDescriptor& param : handler->params_) {
       switch (param.type_) {
-      case Param::Type::Boolean:
-      case Param::Type::Integer:
+      case ParamDescriptor::Type::Boolean:
+        absl::StrAppend(&form, "  ", param.name_, ": <input type='checkbox' name='", param.name_,
+                        "' id='", param.name_, "'/><br/>\n");
+        break;
+      case ParamDescriptor::Type::Integer:
         // params.emplace_back();
-      case Param::Type::String:
-        // params.emplace_back(fmt::format("<label for='filter'>{}</label><input type='text'"
-        //                                "id='{}'>"));
+        break;
+      case ParamDescriptor::Type::String:
+        absl::StrAppend(&form, "  ", param.name_, ": <input type='text' name='", param.name_,
+                        "' id='", param.name_, "'/><br/>\n");
         break;
       }
     }
+    absl::StrAppend(&form, "</form>\n");
+
+
+    /*
+        <form action="stats" method="GET">
+          <button class="button-as-link" type="submit" id="stats">stats</button><br/>
+          Regex filter: <input type="text" id="filter" name="filter" /><br/>
+          Used Only: <input type="checkbox" name="usedonly" id="usedonly"><br/>
+        </form>
+    */
 
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
-    response.add(fmt::format("<tr class='home-row'><td class='home-data'>{}</td>"
-                             "<td class='home-data'>{}</td>"
-                             "<td class='home-data'>{}</tr>\n",
-                             link, Html::Utility::sanitize(handler->help_text_),
-                             absl::StrJoin(params, "&nbsp;")));
+    response.add(absl::StrCat("<tr class='home-row'><td class='home-data'>", form,
+                              "</td><td class='home-data'>",
+                              Html::Utility::sanitize(handler->help_text_), "</td></tr>"));
+    //"<td class='home-data'>{}</tr>\n",
+                 //absl::StrJoin(params, "&nbsp;")));
   }
   response.add(AdminHtmlEnd);
   return Http::Code::OK;
@@ -501,7 +572,7 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state,
-                           const ParamVec& params) {
+                           const ParamDescriptorVec& params) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 

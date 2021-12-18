@@ -24,7 +24,7 @@ public:
                                                                      nullptr)
                         : nullptr) {}
   bool addHandler(const std::string&, const std::string&, HandlerCb, bool, bool,
-                  const ParamVec&) override;
+                  const ParamDescriptorVec&) override;
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
