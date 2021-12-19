@@ -267,9 +267,9 @@ public:
 
   // ExtAuthz::RequestCallbacks
   void onComplete(Filters::Common::ExtAuthz::ResponsePtr&&) override;
-protected:
-  absl::optional<MonotonicTime> start_time_point_;
+
 private:
+  absl::optional<MonotonicTime> start_time_point_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers,
                     const Router::RouteConstSharedPtr& route);
