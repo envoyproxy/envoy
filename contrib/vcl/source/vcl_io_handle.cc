@@ -372,7 +372,7 @@ Api::IoCallUint64Result VclIoHandle::recvmsg(Buffer::RawSlice* slices, const uin
 }
 
 Api::IoCallUint64Result VclIoHandle::recvmmsg(RawSliceArrays&, uint32_t, RecvMsgOutput&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 bool VclIoHandle::supportsMmsg() const { return false; }

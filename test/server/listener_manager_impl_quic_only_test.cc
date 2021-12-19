@@ -138,6 +138,18 @@ udp_listener_config:
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
   EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
+
+  // Stop listening shouldn't close the socket.
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce(Invoke([](std::function<void()> callback) {
+    callback();
+  }));
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(
+          Invoke([](Network::ListenerConfig&, std::function<void()> completion) { completion(); }));
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 #endif
 

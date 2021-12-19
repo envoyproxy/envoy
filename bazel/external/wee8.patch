@@ -113,7 +113,7 @@
 -          rebase_path("//tools/msan/ignorelist.txt", root_build_dir)
 +    if (!defined(msan_blacklist_path)) {
 +      msan_blacklist_path =
-+          rebase_path("//tools/msan/blacklist.txt", root_build_dir)
++          rebase_path("//tools/msan/ignorelist.txt", root_build_dir)
      }
      cflags = [
        "-fsanitize=memory",

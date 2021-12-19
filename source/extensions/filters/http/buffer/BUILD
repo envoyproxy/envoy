@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Request buffering and timeout L7 HTTP filter
-# Public docs: docs/root/configuration/http_filters/buffer_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/buffer_filter
 
 envoy_extension_package()
 

@@ -23,7 +23,6 @@ import github
 import exports
 import utils
 from colorama import Fore, Style
-from packaging import version
 from packaging.version import parse as parse_version
 
 # Tag issues created with these labels.
@@ -67,6 +66,8 @@ def get_latest_release(repo, version_min):
     latest_version = current_version
     latest_release = None
     for release in repo.get_releases():
+        if release.prerelease:
+            continue
         version = parse_version(release.tag_name)
         if not version:
             continue
@@ -231,14 +232,20 @@ def get_tagged_release_date(repo, metadata_version, github_release):
 
     tags = repo.get_tags()
     current_metadata_tag_commit_date = ''
+    current_version = parse_version(github_release.version)
+    latest_version = current_version
     for tag in tags.reversed:
         if tag.name == github_release.version:
             current_metadata_tag_commit_date = tag.commit.commit.committer.date
-        if not version.parse(tag.name).is_prerelease and version.parse(tag.name) > version.parse(
-                github_release.version):
-            print(
-                f'{Fore.YELLOW}*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
-                f'{tag.name}@<{tag.commit.commit.committer.date}>{Style.RESET_ALL}')
+            continue
+        tag_version = parse_version(tag.name)
+        if not tag_version.is_prerelease and tag_version > latest_version:
+            latest = tag
+            latest_version = tag_version
+    if latest:
+        print(
+            f'{Fore.YELLOW}*WARNING* {repo.name} has a newer release than {github_release.version}@<{current_metadata_tag_commit_date}>: '
+            f'{latest.name}@<{latest.commit.commit.committer.date}>{Style.RESET_ALL}')
     return current_metadata_tag_commit_date
 
 
@@ -263,10 +270,10 @@ def verify_and_print_release_dates(repository_locations, github_instance, create
         release_date = None
         # Obtain release information from GitHub API.
         github_release = utils.get_github_release_from_urls(metadata['urls'])
-        print('github_release: ', github_release)
         if not github_release:
             print(f'{dep} is not a GitHub repository')
             continue
+        print('github_release: ', github_release)
         repo = github_instance.get_repo(f'{github_release.organization}/{github_release.project}')
         if github_release.tagged:
             release_date = get_tagged_release_date(repo, metadata['version'], github_release)
