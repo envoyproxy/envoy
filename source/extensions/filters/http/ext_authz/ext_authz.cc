@@ -3,6 +3,7 @@
 #include <chrono>
 #include <ratio>
 #include <thread>
+
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/common/assert.h"
@@ -61,7 +62,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers,
       config_->includePeerCertificate(), config_->destinationLabels());
 
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
-  //Store start time of ext_authz filter call
+  // Store start time of ext_authz filter call
   start_time_point_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
 
   state_ = State::Calling;
@@ -219,7 +220,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // record and emit metadata detailing timing of ext_authz call [milliseconds]
     ProtobufWkt::Value ext_authz_duration_value;
     if (start_time_point_.has_value()) {
-      auto ext_authz_duration = std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
+      auto ext_authz_duration =
+          std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
       ext_authz_duration_value.set_number_value(ext_authz_duration.count());
     } else {
       ext_authz_duration_value.set_null_value(ProtobufWkt::NULL_VALUE);

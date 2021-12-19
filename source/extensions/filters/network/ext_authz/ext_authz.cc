@@ -24,7 +24,7 @@ void Filter::callCheck() {
   Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
                                                                config_->includePeerCertificate(),
                                                                config_->destinationLabels());
-  //Store start time of ext_authz filter call
+  // Store start time of ext_authz filter call
   start_time_point_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;
   config_->stats().active_.inc();
@@ -87,7 +87,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (!response->dynamic_metadata.fields().empty()) {
     ProtobufWkt::Value ext_authz_duration_value;
     if (start_time_point_.has_value()) {
-      auto ext_authz_duration = std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
+      auto ext_authz_duration =
+          std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
       ext_authz_duration_value.set_number_value(ext_authz_duration.count());
     } else {
       ext_authz_duration_value.set_null_value(ProtobufWkt::NULL_VALUE);
