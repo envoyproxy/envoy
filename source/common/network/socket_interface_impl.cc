@@ -60,8 +60,9 @@ IoHandlePtr SocketInterfaceImpl::socket(Socket::Type socket_type, Address::Type 
     domain = AF_UNIX;
   } else {
     ASSERT(addr_type == Address::Type::EnvoyInternal);
+    PANIC("not implemented");
     // TODO(lambdai): Add InternalIoSocketHandleImpl to support internal address.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   const Api::SysCallSocketResult result =

@@ -27,7 +27,7 @@ class DnsResolverImplPeer;
  */
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::dns> {
 public:
-  DnsResolverImpl(Event::Dispatcher& dispatcher,
+  DnsResolverImpl(Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
                   const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options);
   ~DnsResolverImpl() override;
@@ -40,11 +40,12 @@ private:
   friend class DnsResolverImplPeer;
   class PendingResolution : public ActiveDnsQuery {
   public:
-    void cancel(CancelReason) override {
+    void cancel(CancelReason reason) override {
       // c-ares only supports channel-wide cancellation, so we just allow the
       // network events to continue but don't invoke the callback on completion.
       // TODO(mattklein123): Potentially use timeout to destroy and recreate the channel.
       cancelled_ = true;
+      cancel_reason_ = reason;
     }
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
@@ -70,6 +71,7 @@ private:
     bool cancelled_ = false;
     const ares_channel channel_;
     const std::string dns_name_;
+    CancelReason cancel_reason_;
 
     // Small wrapping struct to accumulate addresses from firings of the
     // onAresGetAddrInfoCallback callback.
@@ -132,6 +134,8 @@ private:
   void onAresSocketStateChange(os_fd_t fd, int read, int write);
   // Initialize the channel.
   void initializeChannel(ares_options* options, int optmask);
+  // Check if the only nameserver available is the c-ares default.
+  bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
   // Return default AresOptions.
@@ -144,6 +148,7 @@ private:
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
   absl::node_hash_map<int, Event::FileEventPtr> events_;
+  const bool use_resolvers_as_fallback_;
   const absl::optional<std::string> resolvers_csv_;
 };
 
