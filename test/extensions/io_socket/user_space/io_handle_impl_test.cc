@@ -57,6 +57,8 @@ public:
   absl::FixedArray<char> buf_;
 };
 
+TEST_F(IoHandleImplTest, InterfaceName) { ASSERT_FALSE(io_handle_->interfaceName().has_value()); }
+
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
   Buffer::OwnedImpl buf_to_write("0123456789");
