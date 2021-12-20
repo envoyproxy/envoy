@@ -37,17 +37,6 @@ struct HttpClientStats {
   ALL_HTTP_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-struct LatencyInfo {
-  long request_start_ms = 0;
-  long request_end_ms = 0;
-  long dns_start_ms = 0;
-  long dns_end_ms = 0;
-  long sent_byte_count = 0;
-  long received_byte_count = 0;
-  // Latest latency info received from StreamInfo.
-  std::shared_ptr<StreamInfo::UpstreamInfo> upstream_info_{};
-};
-
 /**
  * Manages HTTP streams, and provides an interface to interact with them.
  */
@@ -177,7 +166,7 @@ private:
     // than bytes_to_send.
     void resumeData(int32_t bytes_to_send);
 
-    void setFinalStreamIntel(envoy_final_stream_intel& final_intel);
+    void setFinalStreamIntel(StreamInfo::StreamInfo& stream_info);
 
   private:
     bool hasBufferedData() { return response_data_.get() && response_data_->length() != 0; }
@@ -185,6 +174,7 @@ private:
     void sendDataToBridge(Buffer::Instance& data, bool end_stream);
     void sendTrailersToBridge(const ResponseTrailerMap& trailers);
     envoy_stream_intel streamIntel();
+    envoy_final_stream_intel& finalStreamIntel();
     envoy_error streamError();
 
     DirectStream& direct_stream_;
@@ -287,7 +277,7 @@ private:
     bool explicit_flow_control_ = false;
     // Latest intel data retrieved from the StreamInfo.
     envoy_stream_intel stream_intel_{-1, -1, 0};
-    LatencyInfo latency_info_;
+    envoy_final_stream_intel envoy_final_stream_intel_;
     StreamInfo::BytesMeterSharedPtr bytes_meter_;
   };
 

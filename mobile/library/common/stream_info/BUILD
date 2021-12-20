@@ -13,5 +13,6 @@ envoy_cc_library(
         "//library/common/network:configurator_lib",
         "//library/common/types:c_types_lib",
         "@envoy//envoy/stream_info:stream_info_interface",
+        "@envoy//source/common/stream_info:utility_lib",
     ],
 )
