@@ -15,6 +15,7 @@
 #include "library/common/extensions/filters/http/platform_bridge/c_type_definitions.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/http/headers.h"
+#include "library/common/stream_info/extra_stream_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -193,7 +194,7 @@ envoy_final_stream_intel PlatformBridgeFilter::finalStreamIntel() {
   // FIXME: Stream handle cannot currently be set from the filter context.
   envoy_final_stream_intel final_stream_intel;
   memset(&final_stream_intel, 0, sizeof(final_stream_intel));
-  // TODO(alyssawilk) set stream intel from a shared helper function.
+  setFinalStreamIntel(decoder_callbacks_->streamInfo(), final_stream_intel);
   return final_stream_intel;
 }
 

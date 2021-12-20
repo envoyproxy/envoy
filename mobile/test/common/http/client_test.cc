@@ -122,7 +122,7 @@ public:
 
   void createStream() {
     ON_CALL(dispatcher_, isThreadSafe()).WillByDefault(Return(true));
-    ON_CALL(request_decoder_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(*request_decoder_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 
     // Grab the response encoder in order to dispatch responses on the stream.
     // Return the request decoder to make sure calls are dispatched to the decoder via the
@@ -130,7 +130,7 @@ public:
     EXPECT_CALL(api_listener_, newStream(_, _))
         .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder_ = &encoder;
-          return request_decoder_;
+          return *request_decoder_;
         }));
     http_client_.startStream(stream_, bridge_callbacks_, explicit_flow_control_);
   }
@@ -143,7 +143,8 @@ public:
   }
 
   MockApiListener api_listener_;
-  NiceMock<MockRequestDecoder> request_decoder_;
+  std::unique_ptr<NiceMock<MockRequestDecoder>> request_decoder_{
+      std::make_unique<NiceMock<MockRequestDecoder>>()};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   ResponseEncoder* response_encoder_{};
   NiceMock<Event::MockProvisionalDispatcher> dispatcher_;
@@ -181,7 +182,7 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers1), false));
   http_client_.sendHeaders(stream_, c_headers1, false);
 
   // Setting ALPN
@@ -200,7 +201,7 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers_alpn), true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers_alpn), true));
   http_client_.sendHeaders(stream_, c_headers_alpn, true);
 
   // Setting http1.
@@ -219,7 +220,7 @@ TEST_P(ClientTest, SetDestinationClusterUpstreamProtocol) {
   };
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers4), true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(HeaderMapEqual(&expected_headers4), true));
   http_client_.sendHeaders(stream_, c_headers4, true);
 
   // Encode response headers.
@@ -242,7 +243,7 @@ TEST_P(ClientTest, BasicStreamHeaders) {
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode response headers.
@@ -280,7 +281,7 @@ TEST_P(ClientTest, BasicStreamData) {
   // test data functionality.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeData(BufferStringEqual("request body"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), true));
   http_client_.sendData(stream_, c_data, true);
   resumeDataIfExplicitFlowControl(20);
 
@@ -317,7 +318,7 @@ TEST_P(ClientTest, BasicStreamTrailers) {
   // wants to test trailers functionality.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeTrailers_(_));
+  EXPECT_CALL(*request_decoder_, decodeTrailers_(_));
   http_client_.sendTrailers(stream_, c_trailers);
   resumeDataIfExplicitFlowControl(20);
 
@@ -351,13 +352,13 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, false));
   http_client_.sendHeaders(stream_, c_headers, false);
 
   // Send request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeData(BufferStringEqual("request body"), false));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body"), false));
   http_client_.sendData(stream_, c_data, false);
   // The buffer is not full: expect an on_send_window_available call in explicit_flow_control mode.
   EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
@@ -365,7 +366,7 @@ TEST_P(ClientTest, MultipleDataStream) {
   // Send second request data.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeData(BufferStringEqual("request body2"), true));
+  EXPECT_CALL(*request_decoder_, decodeData(BufferStringEqual("request body2"), true));
   http_client_.sendData(stream_, c_data2, true);
   // The stream is done: no further on_send_window_available calls should happen.
   EXPECT_EQ(cc_.on_send_window_available_calls, explicit_flow_control_ ? 1 : 0);
@@ -398,7 +399,7 @@ TEST_P(ClientTest, EmptyDataWithEndStream) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   // Send request headers.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -436,7 +437,7 @@ TEST_P(ClientTest, MultipleStreams) {
   // Send request headers.
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream1, c_headers, true);
 
   // Start stream2.
@@ -523,7 +524,7 @@ TEST_P(ClientTest, EnvoyLocalError) {
   envoy_headers c_headers = defaultRequestHeaders();
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode response headers. A non-200 code triggers an on_error callback chain. In particular, a
@@ -605,7 +606,7 @@ TEST_P(ClientTest, RemoteResetAfterStreamStart) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   envoy_headers c_headers = defaultRequestHeaders();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode response headers.
@@ -637,7 +638,7 @@ TEST_P(ClientTest, StreamResetAfterOnComplete) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   envoy_headers c_headers = defaultRequestHeaders();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode response headers.
@@ -681,7 +682,7 @@ TEST_P(ClientTest, Encode100Continue) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   envoy_headers c_headers = defaultRequestHeaders();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode 100 continue should blow up.
@@ -699,7 +700,7 @@ TEST_P(ClientTest, EncodeMetadata) {
   EXPECT_CALL(dispatcher_, pushTrackedObject(_));
   EXPECT_CALL(dispatcher_, popTrackedObject(_));
   envoy_headers c_headers = defaultRequestHeaders();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, c_headers, true);
 
   // Encode response headers.
@@ -729,7 +730,7 @@ TEST_P(ClientTest, NullAccessors) {
   EXPECT_CALL(api_listener_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder_ = &encoder;
-        return request_decoder_;
+        return *request_decoder_;
       }));
   http_client_.startStream(stream, bridge_callbacks, explicit_flow_control_);
 
@@ -745,7 +746,7 @@ TEST_P(ExplicitFlowControlTest, ShortRead) {
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -755,6 +756,11 @@ TEST_P(ExplicitFlowControlTest, ShortRead) {
   // Test partial reads. Get 5 bytes but only pass 3 up.
   Buffer::OwnedImpl response_data("12345");
   response_encoder_->encodeData(response_data, true);
+
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
+
   resumeDataIfExplicitFlowControl(3);
   EXPECT_EQ("123", cc_.body_data_);
   ASSERT_EQ(cc_.on_complete_calls, 0);
@@ -770,7 +776,7 @@ TEST_P(ExplicitFlowControlTest, DataArrivedWhileBufferNonempty) {
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -786,6 +792,9 @@ TEST_P(ExplicitFlowControlTest, DataArrivedWhileBufferNonempty) {
 
   Buffer::OwnedImpl response_data2("678910");
   response_encoder_->encodeData(response_data2, true);
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
 
   resumeDataIfExplicitFlowControl(20);
   EXPECT_EQ("12345678910", cc_.body_data_);
@@ -797,7 +806,7 @@ TEST_P(ExplicitFlowControlTest, ResumeBeforeDataArrives) {
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -810,6 +819,9 @@ TEST_P(ExplicitFlowControlTest, ResumeBeforeDataArrives) {
   // When data arrives it should be immediately passed up
   Buffer::OwnedImpl response_data("12345");
   response_encoder_->encodeData(response_data, true);
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
   EXPECT_EQ("12345", cc_.body_data_);
   ASSERT_EQ(cc_.on_complete_calls, true);
 }
@@ -820,7 +832,7 @@ TEST_P(ExplicitFlowControlTest, ResumeWithFin) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   // Send request headers.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -839,6 +851,9 @@ TEST_P(ExplicitFlowControlTest, ResumeWithFin) {
   EXPECT_CALL(dispatcher_, deferredDelete_(_));
   Buffer::OwnedImpl response_data2("");
   response_encoder_->encodeData(response_data2, true);
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
   ASSERT_EQ(cc_.on_data_calls, 2);
   EXPECT_EQ("response body", cc_.body_data_);
   // Ensure that the callbacks on the bridge_callbacks_ were called.
@@ -851,7 +866,7 @@ TEST_P(ExplicitFlowControlTest, ResumeWithDataAndTrailers) {
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
   // Send request headers.
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers, data, and trailers.
@@ -862,6 +877,9 @@ TEST_P(ExplicitFlowControlTest, ResumeWithDataAndTrailers) {
   response_encoder_->encodeData(response_data, false);
   TestResponseTrailerMapImpl response_trailers{{"x-test-trailer", "test_trailer"}};
   response_encoder_->encodeTrailers(response_trailers);
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
 
   // On the resume call, the data should be passed up, but not the trailers.
   resumeDataIfExplicitFlowControl(20);
@@ -883,7 +901,7 @@ TEST_P(ExplicitFlowControlTest, CancelWithStreamComplete) {
 
   // Create a stream, and set up request_decoder_ and response_encoder_
   createStream();
-  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*request_decoder_, decodeHeaders_(_, true));
   http_client_.sendHeaders(stream_, defaultRequestHeaders(), true);
 
   // Encode response headers and data.
@@ -893,6 +911,9 @@ TEST_P(ExplicitFlowControlTest, CancelWithStreamComplete) {
   // When data arrives it should be buffered to send up
   Buffer::OwnedImpl response_data("12345");
   response_encoder_->encodeData(response_data, true);
+  // The stream is closed from Envoy's perspective. Make sure sanitizers will catch
+  // any access to the decoder.
+  request_decoder_.reset();
   ASSERT_EQ(cc_.on_complete_calls, false);
 
   MockStreamCallbacks stream_callbacks;
