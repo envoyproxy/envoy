@@ -75,9 +75,11 @@ public:
 class Admin {
 public:
   struct ParamDescriptor {
-    enum class Type { Boolean, Integer, String };
+    enum class Type { Boolean, Integer, String /*, Enum*/ };
     const Type type_;
-    const std::string name_;
+    const std::string id_; // HTML form ID and query-param name (JS var name rules).
+    const std::string help_; // Help text rendered into UI.
+    //std::vector<std::string> enum_choices_;  // Valid values for enums.
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 

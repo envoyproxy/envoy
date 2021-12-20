@@ -40,10 +40,13 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStatsPaged(absl::string_view path_and_query,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                               AdminStream&);
-  Http::Code handlerPrometheusStats(absl::string_view path_and_query,
+  Http::Code handlerStatsJson(absl::string_view path_and_query,
+                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                              AdminStream&);
+  Http::Code handlerStatsHtml(absl::string_view path_and_query,
+                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+                              AdminStream&);
+  Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
   Http::Code handlerStatsScopes(absl::string_view path_and_query,
@@ -55,9 +58,10 @@ public:
 
 private:
   enum class Format {
-    Text,
+    Html,
     Json,
     Prometheus,
+    Text,
   };
 
   struct Params {
@@ -77,8 +81,8 @@ private:
 
   friend class StatsHandlerTest;
 
-  static Http::Code stats(const Params& parmams, Stats::Store& stats,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code stats(const Params& parmams, Http::ResponseHeaderMap& response_headers,
+                   Buffer::Instance& response);
 
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,

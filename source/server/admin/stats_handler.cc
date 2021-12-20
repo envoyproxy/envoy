@@ -122,35 +122,35 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::OK;
   }
 
-  return stats(params, store, response_headers, response);
+  return stats(params, response_headers, response);
 }
 
-Http::Code StatsHandler::handlerStatsPaged(absl::string_view url,
-                                           Http::ResponseHeaderMap& response_headers,
-                                           Buffer::Instance& response, AdminStream&) {
+Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
+                                          Http::ResponseHeaderMap& response_headers,
+                                          Buffer::Instance& response, AdminStream&) {
   Params params;
   Http::Code code = params.parse(url, response);
   if (code != Http::Code::OK) {
     return code;
   }
-  if (server_.statsConfig().flushOnAdmin()) {
-    server_.flushStats();
-  }
-  Stats::Store& store = server_.stats();
-  if (params.format_ == Format::Prometheus) {
-    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.text_readouts_ ? store.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
-    PrometheusStatsFormatter::statsAsPrometheus(
-        store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
-        params.used_only_, params.filter_, server_.api().customStatNamespaces());
-    return Http::Code::OK;
-  }
-
-  return stats(params, store, response_headers, response);
+  params.format_ = Format::Json;
+  return stats(params, response_headers, response);
 }
 
-Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
-                               Http::ResponseHeaderMap& response_headers,
+
+Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
+                                          Http::ResponseHeaderMap& response_headers,
+                                          Buffer::Instance& response, AdminStream&) {
+  Params params;
+  Http::Code code = params.parse(url, response);
+  if (code != Http::Code::OK) {
+    return code;
+  }
+  params.format_ = Format::Html;
+  return stats(params, response_headers, response);
+}
+
+Http::Code StatsHandler::stats(const Params& params, Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
   std::map<std::string, uint64_t> counters_and_gauges;
   std::map<std::string, std::string> text_readouts;
@@ -195,6 +195,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     scope.iterate(hfn);
   };
 
+  Stats::Store& stats = server_.stats();
   if (params.scope_.has_value()) {
     Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
     stats.forEachScope([](size_t) {},
@@ -272,7 +273,7 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
   return Http::Code::OK;
 }
 
-Http::Code StatsHandler::handlerPrometheusStats(absl::string_view path_and_query,
+Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query,
                                                 Http::ResponseHeaderMap&,
                                                 Buffer::Instance& response, AdminStream&) {
   Params params;

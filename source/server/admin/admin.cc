@@ -78,16 +78,12 @@ const char AdminHtmlStart[] = R"(
       font-family: sans-serif;
       font-size: medium;
       border-collapse: collapse;
-    }
-
-    .home-row:nth-child(even) {
-      background-color: #dddddd;
+      border-spacing: 0;
     }
 
     .home-data {
-      border: 1px solid #dddddd;
       text-align: left;
-      padding: 8px;
+      padding: 4px;
     }
 
     .home-form {
@@ -103,7 +99,23 @@ const char AdminHtmlStart[] = R"(
       color: #069;
       text-decoration: underline;
       cursor: pointer;
-   }
+    }
+
+    .gray {
+      background-color: #dddddd;
+    }
+
+    .vert-space {
+      height: 4px;
+    }
+
+    .option {
+      padding-bottom: 4px;
+      padding-top: 4px;
+      padding-right: 4px;
+      padding-left: 20px;
+      text-align: right;
+    }
   </style>
 </head>
 <body>
@@ -111,7 +123,6 @@ const char AdminHtmlStart[] = R"(
     <thead>
       <th class='home-data'>Command</th>
       <th class='home-data'>Description</th>
-      <th class='home-data'>Params</th>
     </thead>
     <tbody>
 )";
@@ -283,29 +294,49 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            false,
            {}},
           {"/stats",
-           "print server stats",
+           "Print server stats in plain text. May be memory/cpu intensive; see stats/html",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStats),
            false,
            false,
-           {{ParamDescriptor::Type::Boolean, "usedonly"},
-            {ParamDescriptor::Type::Boolean, "text_readouts"},
-            {ParamDescriptor::Type::Boolean, "pretty"},
-            {ParamDescriptor::Type::String, "format"}}},
-          {"/stats/paged",
-           "print one page of server stats",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsPaged),
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+              "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"}}},
+          {"/stats/html",
+           "print stats as with HTML paging",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsHtml),
            false,
            false,
-           {{ParamDescriptor::Type::Boolean, "usedonly"},
-            {ParamDescriptor::Type::Boolean, "pretty"},
-            {ParamDescriptor::Type::String, "after"},
-            {ParamDescriptor::Type::Integer, "num"}}},
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+              "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"},
+            {ParamDescriptor::Type::String, "start",
+             "Alphabetically start stats at specified name"},
+            {ParamDescriptor::Type::String, "pagesize",
+             "Number of stats to show per page"}}},
+          {"/stats/json",
+           "print stats as with HTML paging",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsJson),
+           false,
+           false,
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+              "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::Boolean, "pretty",
+             "Add indentation to show JSON structure"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"}}},
           {"/stats/prometheus",
            "print server stats in prometheus format",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats),
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsPrometheus),
            false,
            false,
-           {}},
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+              "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::Boolean, "text_readouts",
+             "Render text_readouts as new gaugues with value 0 (increases Prometheus data size)"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"}}},
           {"/stats/recentlookups",
            "Show recent stat-name lookups",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups),
@@ -406,19 +437,21 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+#if 0
       ParamValues values;
-      const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(path_and_query);
+      const Http::Utility::QueryParams params =
+          Http::Utility::parseAndDecodeQueryString(path_and_query);
       for (const ParamDescriptor& desc : handler.params_) {
-        auto iter = params.find(desc.name_);
+        auto iter = params.find(desc.id_);
         if (iter != params.end()) {
           switch (desc.type_) {
             case ParamDescriptor::Type::Boolean: {
               if (iter->second == "false") {
-                values.boolean_map_[desc.name_] = false;
+                values.boolean_map_[desc.id_] = false;
               } else if (iter->second == "true" || iter->second.empty()) {
-                values.boolean_map_[desc.name_] = true;
+                values.boolean_map_[desc.id_] = true;
               } else {
-                response.add(fmt::format("Invalid value for query-param {}.", desc.name_));
+                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
                 return Http::Code::BadRequest;
               }
               break;
@@ -426,19 +459,20 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
             case ParamDescriptor::Type::Integer: {
               int64_t val;
               if (absl::SimpleAtoi(iter->second, &val)) {
-                values.integer_map_[desc.name_] = val;
+                values.integer_map_[desc.id_] = val;
               } else {
-                response.add(fmt::format("Invalid value for query-param {}.", desc.name_));
+                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
                 return Http::Code::BadRequest;
               }
               break;
             }
             case ParamDescriptor::Type::String:
-              values.string_map_[desc.name_] = iter->second;
+              values.string_map_[desc.id_] = iter->second;
               break;
           }
         }
       }
+#endif
 
       found_handler = true;
       if (handler.mutates_server_state_) {
@@ -497,6 +531,7 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
 
   // Prefix order is used during searching, but for printing do them in alpha order.
+  int index = 0;
   for (const UrlHandler* handler : sortedHandlers()) {
     absl::string_view path = handler->prefix_;
 
@@ -518,33 +553,47 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
     ASSERT(path[0] == '/');
     path = path.substr(1);
 
+    // Alternate gray and white param-blocks. The pure CSS way of doing based on
+    // row index doesn't work correctly for us we are using a row for each
+    // parameter, and we want each endpoint/option-block to be colored the same.
+    const char* row_class = (++index & 1) ? " class='gray'" : "";
+
     // For handlers that mutate state, render the link as a button in a POST form,
     // rather than an anchor tag. This should discourage crawlers that find the /
     // page from accidentally mutating all the server state by GETting all the hrefs.
-    const char* style = handler->mutates_server_state_ ? "" : " class='button-as-link'";
+    const char* button_style = handler->mutates_server_state_ ? "" : " class='button-as-link'";
     const char* method = handler->mutates_server_state_ ? "post" : "get";
-    std::string form = absl::StrCat("<form action='", path, "' method='", method,
-                                    "' class='home-form'>\n"
-                                    "  <button", style, ">", path, "</button>");
+    response.add(absl::StrCat(
+        "\n<tr class='vert-space'></tr>\n",
+        "<tr", row_class, ">\n",
+        "  <td class='home-data'><form action='", path, "' method='", method,
+        "' id='", path, "' class='home-form'>\n"
+        "    <button", button_style, ">", path, "</button>\n",
+        "  </form></td>\n"
+        "  <td class='home-data'>", Html::Utility::sanitize(handler->help_text_), "</td>\n",
+        "</tr>\n"));
 
     std::vector<std::string> params;
     for (const ParamDescriptor& param : handler->params_) {
+      const char* type = "";
       switch (param.type_) {
       case ParamDescriptor::Type::Boolean:
-        absl::StrAppend(&form, "  ", param.name_, ": <input type='checkbox' name='", param.name_,
-                        "' id='", param.name_, "'/><br/>\n");
+        type = "checkbox";
         break;
       case ParamDescriptor::Type::Integer:
-        // params.emplace_back();
+        type = "???";
         break;
       case ParamDescriptor::Type::String:
-        absl::StrAppend(&form, "  ", param.name_, ": <input type='text' name='", param.name_,
-                        "' id='", param.name_, "'/><br/>\n");
+        type = "text";
         break;
       }
+      response.add(absl::StrCat(
+          "<tr", row_class, ">\n",
+          "  <td class='option'><input type='", type, "' name='", param.id_,
+          "' id='", param.id_, "' form='", path, "'/></td>\n",
+          "  <td class='home-data'>", Html::Utility::sanitize(param.help_), "</td>\n",
+          "</tr>\n"));
     }
-    absl::StrAppend(&form, "</form>\n");
-
 
     /*
         <form action="stats" method="GET">
@@ -556,9 +605,9 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
 
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
-    response.add(absl::StrCat("<tr class='home-row'><td class='home-data'>", form,
-                              "</td><td class='home-data'>",
-                              Html::Utility::sanitize(handler->help_text_), "</td></tr>"));
+    //response.add(absl::StrCat("<tr class='home-row'><td class='home-data'>", form,
+    //                          "</td><td class='home-data'>",
+    //                          Html::Utility::sanitize(handler->help_text_), "</td></tr>"));
     //"<td class='home-data'>{}</tr>\n",
                  //absl::StrJoin(params, "&nbsp;")));
   }
