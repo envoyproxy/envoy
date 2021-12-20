@@ -299,7 +299,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            false,
            false,
            {{ParamDescriptor::Type::Boolean, "usedonly",
-              "Only include stats that have been written by system since restart"},
+             "Only include stats that have been written by system since restart"},
             {ParamDescriptor::Type::String, "filter",
              "Regular expression (ecmascript) for filtering stats"}}},
           {"/stats/html",
@@ -308,22 +308,20 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            false,
            false,
            {{ParamDescriptor::Type::Boolean, "usedonly",
-              "Only include stats that have been written by system since restart"},
+             "Only include stats that have been written by system since restart"},
             {ParamDescriptor::Type::String, "filter",
              "Regular expression (ecmascript) for filtering stats"},
             {ParamDescriptor::Type::String, "start",
              "Alphabetically start stats at specified name"},
-            {ParamDescriptor::Type::String, "pagesize",
-             "Number of stats to show per page"}}},
+            {ParamDescriptor::Type::String, "pagesize", "Number of stats to show per page"}}},
           {"/stats/json",
            "print stats as with HTML paging",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsJson),
            false,
            false,
            {{ParamDescriptor::Type::Boolean, "usedonly",
-              "Only include stats that have been written by system since restart"},
-            {ParamDescriptor::Type::Boolean, "pretty",
-             "Add indentation to show JSON structure"},
+             "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::Boolean, "pretty", "Add indentation to show JSON structure"},
             {ParamDescriptor::Type::String, "filter",
              "Regular expression (ecmascript) for filtering stats"}}},
           {"/stats/prometheus",
@@ -332,7 +330,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            false,
            false,
            {{ParamDescriptor::Type::Boolean, "usedonly",
-              "Only include stats that have been written by system since restart"},
+             "Only include stats that have been written by system since restart"},
             {ParamDescriptor::Type::Boolean, "text_readouts",
              "Render text_readouts as new gaugues with value 0 (increases Prometheus data size)"},
             {ParamDescriptor::Type::String, "filter",
@@ -563,15 +561,15 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
     // page from accidentally mutating all the server state by GETting all the hrefs.
     const char* button_style = handler->mutates_server_state_ ? "" : " class='button-as-link'";
     const char* method = handler->mutates_server_state_ ? "post" : "get";
-    response.add(absl::StrCat(
-        "\n<tr class='vert-space'></tr>\n",
-        "<tr", row_class, ">\n",
-        "  <td class='home-data'><form action='", path, "' method='", method,
-        "' id='", path, "' class='home-form'>\n"
-        "    <button", button_style, ">", path, "</button>\n",
-        "  </form></td>\n"
-        "  <td class='home-data'>", Html::Utility::sanitize(handler->help_text_), "</td>\n",
-        "</tr>\n"));
+    response.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
+                              "  <td class='home-data'><form action='", path, "' method='", method,
+                              "' id='", path,
+                              "' class='home-form'>\n"
+                              "    <button",
+                              button_style, ">", path, "</button>\n",
+                              "  </form></td>\n"
+                              "  <td class='home-data'>",
+                              Html::Utility::sanitize(handler->help_text_), "</td>\n", "</tr>\n"));
 
     std::vector<std::string> params;
     for (const ParamDescriptor& param : handler->params_) {
@@ -587,29 +585,11 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
         type = "text";
         break;
       }
-      response.add(absl::StrCat(
-          "<tr", row_class, ">\n",
-          "  <td class='option'><input type='", type, "' name='", param.id_,
-          "' id='", param.id_, "' form='", path, "'/></td>\n",
-          "  <td class='home-data'>", Html::Utility::sanitize(param.help_), "</td>\n",
-          "</tr>\n"));
+      response.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'><input type='", type,
+                                "' name='", param.id_, "' id='", param.id_, "' form='", path,
+                                "'/></td>\n", "  <td class='home-data'>",
+                                Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
     }
-
-    /*
-        <form action="stats" method="GET">
-          <button class="button-as-link" type="submit" id="stats">stats</button><br/>
-          Regex filter: <input type="text" id="filter" name="filter" /><br/>
-          Used Only: <input type="checkbox" name="usedonly" id="usedonly"><br/>
-        </form>
-    */
-
-    // Handlers are all specified by statically above, and are thus trusted and do
-    // not require escaping.
-    //response.add(absl::StrCat("<tr class='home-row'><td class='home-data'>", form,
-    //                          "</td><td class='home-data'>",
-    //                          Html::Utility::sanitize(handler->help_text_), "</td></tr>"));
-    //"<td class='home-data'>{}</tr>\n",
-                 //absl::StrJoin(params, "&nbsp;")));
   }
   response.add(AdminHtmlEnd);
   return Http::Code::OK;

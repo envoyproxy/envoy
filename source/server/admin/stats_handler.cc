@@ -137,7 +137,6 @@ Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
   return stats(params, response_headers, response);
 }
 
-
 Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
                                           Http::ResponseHeaderMap& response_headers,
                                           Buffer::Instance& response, AdminStream&) {
