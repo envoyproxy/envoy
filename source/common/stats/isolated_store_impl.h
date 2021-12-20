@@ -101,12 +101,14 @@ public:
     return true;
   }
 
-  void forEachStat(SizeFn f_size, std::function<void(Base&)> f_stat) const {
+  void forEachStat(SizeFn f_size, StatFn<Base> f_stat) const {
     if (f_size != nullptr) {
       f_size(stats_.size());
     }
     for (auto const& stat : stats_) {
-      f_stat(*stat.second);
+      if (!f_stat(*stat.second)) {
+        return;
+      }
     }
   }
 

@@ -141,7 +141,10 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   std::vector<CounterSharedPtr> ret;
   forEachCounter(
       [&ret](std::size_t size) mutable { ret.reserve(size); },
-      [&ret](Counter& counter) mutable { ret.emplace_back(CounterSharedPtr(&counter)); });
+      [&ret](Counter& counter) mutable -> bool {
+        ret.emplace_back(CounterSharedPtr(&counter));
+        return true;
+      });
   return ret;
 }
 
@@ -161,10 +164,11 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
-               [&ret](Gauge& gauge) mutable {
+               [&ret](Gauge& gauge) mutable -> bool{
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }
+                 return true;
                });
   return ret;
 }
@@ -173,8 +177,9 @@ std::vector<TextReadoutSharedPtr> ThreadLocalStoreImpl::textReadouts() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<TextReadoutSharedPtr> ret;
   forEachTextReadout([&ret](std::size_t size) mutable { ret.reserve(size); },
-                     [&ret](TextReadout& text_readout) mutable {
+                     [&ret](TextReadout& text_readout) mutable -> bool {
                        ret.emplace_back(TextReadoutSharedPtr(&text_readout));
+                       return true;
                      });
   return ret;
 }
@@ -967,12 +972,16 @@ void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout>
 }
 
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
-                                        std::function<void(const Scope&)> f_scope) const {
+                                        std::function<bool(const Scope&)> f_scope) const {
   Thread::LockGuard lock(lock_);
   f_size(scopes_.size() + 1 /* for default_scope_ */);
-  f_scope(*default_scope_);
+  if (!f_scope(*default_scope_)) {
+    return;
+  }
   for (ScopeImpl* scope : scopes_) {
-    f_scope(*scope);
+    if (!f_scope(*scope)) {
+      return;
+    }
   }
 }
 

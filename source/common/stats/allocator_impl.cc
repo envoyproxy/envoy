@@ -362,7 +362,9 @@ void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const 
     f_size(counters_.size());
   }
   for (auto& counter : counters_) {
-    f_stat(*counter);
+    if (!f_stat(*counter)) {
+      return;
+    }
   }
 }
 
@@ -372,7 +374,9 @@ void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
     f_size(gauges_.size());
   }
   for (auto& gauge : gauges_) {
-    f_stat(*gauge);
+    if (!f_stat(*gauge)) {
+      return;
+    }
   }
 }
 
@@ -382,7 +386,9 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
     f_size(text_readouts_.size());
   }
   for (auto& text_readout : text_readouts_) {
-    f_stat(*text_readout);
+    if (!f_stat(*text_readout)) {
+      return;
+    }
   }
 }
 
@@ -391,7 +397,9 @@ void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_counters_.size());
     for (auto counter : sinked_counters_) {
-      f_stat(*counter);
+      if (!f_stat(*counter)) {
+        return;
+      }
     }
   } else {
     forEachCounter(f_size, f_stat);
@@ -403,7 +411,9 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
     for (auto gauge : sinked_gauges_) {
-      f_stat(*gauge);
+      if (!f_stat(*gauge)) {
+        return;
+      }
     }
   } else {
     forEachGauge(f_size, f_stat);
@@ -415,7 +425,9 @@ void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_text_readouts_.size());
     for (auto text_readout : sinked_text_readouts_) {
-      f_stat(*text_readout);
+      if (!f_stat(*text_readout)) {
+        return;
+      }
     }
   } else {
     forEachTextReadout(f_size, f_stat);

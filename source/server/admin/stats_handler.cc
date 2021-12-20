@@ -198,10 +198,11 @@ Http::Code StatsHandler::stats(const Params& params, Http::ResponseHeaderMap& re
   if (params.scope_.has_value()) {
     Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
     stats.forEachScope([](size_t) {},
-                       [&scope_name, &append_stats_from_scope](const Stats::Scope& scope) {
+                       [&scope_name, &append_stats_from_scope](const Stats::Scope& scope) -> bool {
                          if (scope.prefix() == scope_name.statName()) {
                            append_stats_from_scope(scope);
                          }
+                         return true;
                        });
   } else {
     append_stats_from_scope(stats);
@@ -253,7 +254,10 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
 
   Stats::StatNameHashSet prefixes;
   server_.stats().forEachScope(
-      [](size_t) {}, [&prefixes](const Stats::Scope& scope) { prefixes.insert(scope.prefix()); });
+      [](size_t) {}, [&prefixes](const Stats::Scope& scope) -> bool {
+        prefixes.insert(scope.prefix());
+        return true;
+      });
   std::vector<std::string> lines, names;
   names.reserve(prefixes.size());
   lines.reserve(prefixes.size() + 2);

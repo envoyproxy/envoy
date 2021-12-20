@@ -197,8 +197,10 @@ using SizeFn = std::function<void(std::size_t)>;
 
 /**
  * Callback invoked for each stat during iteration.
+ *
+ * @return false if the iteration should stop.
  */
-template <typename Stat> using StatFn = std::function<void(Stat&)>;
+template <typename Stat> using StatFn = std::function<bool(Stat&)>;
 
 } // namespace Stats
 } // namespace Envoy

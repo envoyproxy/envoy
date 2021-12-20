@@ -128,15 +128,16 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 // magnitude of memory usage that they are meant to avoid, since this map holds full-string
 // names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
-  server_->stats().forEachSinkedGauge(nullptr, [this, stats](Stats::Gauge& gauge) mutable {
+  server_->stats().forEachSinkedGauge(nullptr, [this, stats](Stats::Gauge& gauge) mutable -> bool {
     if (gauge.used()) {
       const std::string name = gauge.name();
       (*stats->mutable_gauges())[name] = gauge.value();
       recordDynamics(stats, name, gauge.statName());
     }
+    return true;
   });
 
-  server_->stats().forEachSinkedCounter(nullptr, [this, stats](Stats::Counter& counter) mutable {
+  server_->stats().forEachSinkedCounter(nullptr, [this, stats](Stats::Counter& counter) mutable -> bool {
     if (counter.used()) {
       // The hot restart parent is expected to have stopped its normal stat exporting (and so
       // latching) by the time it begins exporting to the hot restart child.
@@ -147,6 +148,7 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
         recordDynamics(stats, name, counter.statName());
       }
     }
+    return true;
   });
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
