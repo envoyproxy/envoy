@@ -483,6 +483,25 @@ public:
 using InternalListenerManagerOptRef =
     absl::optional<std::reference_wrapper<InternalListenerManager>>;
 
+class LocalInternalListenerRegistry {
+public:
+  virtual ~LocalInternalListenerRegistry() = default;
+
+  virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
+
+  virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;
+};
+
+// The singleton interface of LocalInternalListenerRegistry accessor. The prod implementation is
+// thread local.
+class InternalListenerRegistry {
+public:
+  virtual ~InternalListenerRegistry() = default;
+
+  // This
+  virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
+};
+
 /**
  * Handles delivering datagrams to the correct worker.
  */

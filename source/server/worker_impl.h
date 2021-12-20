@@ -9,6 +9,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/worker.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/server/listener_hooks.h"
@@ -28,8 +29,10 @@ struct WorkerStatNames {
 
 class ProdWorkerFactory : public WorkerFactory, Logger::Loggable<Logger::Id::main> {
 public:
-  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, ListenerHooks& hooks)
-      : tls_(tls), api_(api), stat_names_(api.rootScope().symbolTable()), hooks_(hooks) {}
+  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, ListenerHooks& hooks,
+                    Singleton::Manager& singleton_manager)
+      : tls_(tls), api_(api), stat_names_(api.rootScope().symbolTable()), hooks_(hooks),
+        singleton_manager_(singleton_manager) {}
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
@@ -40,6 +43,7 @@ private:
   Api::Api& api_;
   WorkerStatNames stat_names_;
   ListenerHooks& hooks_;
+  Singleton::Manager& singleton_manager_;
 };
 
 /**

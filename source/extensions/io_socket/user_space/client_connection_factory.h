@@ -8,6 +8,7 @@
 #include "envoy/network/connection.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/io_socket/user_space/thread_local_registry.h"
 
 namespace Envoy {
 
@@ -26,6 +27,15 @@ public:
                          Network::Address::InstanceConstSharedPtr source_address,
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  // The slot is owned by the internal listener registry extension. Once that extension is
+  // intialized, this slot is available. The ClientConnectionFactory has two potential user cases.
+  // 1. The per worker thread connection handler populates the per worker listener registry.
+  // 2. A envoy thread local cluster lookup the per thread internal listener by listener name.
+  // Since the population and the lookup is supposed to be executed in the same worker thread,
+  // neither need to hold a lock.
+  // TODO(lambdai): make it friend to only bootstrap extension.
+  static ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>*
+      registry_tls_slot_;
 };
 
 } // namespace UserSpace

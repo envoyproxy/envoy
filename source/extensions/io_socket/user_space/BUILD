@@ -14,6 +14,7 @@ envoy_cc_extension(
     srcs = ["config.h"],
     deps = [
         ":client_connection_factory",
+        ":internal_listener_registry",
         ":io_handle_impl_lib",
     ],
 )
@@ -69,6 +70,7 @@ envoy_cc_library(
     ],
     deps = [
         ":io_handle_impl_lib",
+        ":thread_local_registry",
         "//envoy/network:client_connection_factory",
         "//envoy/network:connection_interface",
         "//envoy/registry",
@@ -86,6 +88,24 @@ envoy_cc_library(
         "internal_listener_registry.h",
     ],
     deps = [
-        "//source/server:bootstrap_extension_config_interface",
-    ]
+        ":thread_local_registry",
+        "//envoy/server:bootstrap_extension_config_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "thread_local_registry",
+    srcs = [
+        "thread_local_registry.cc",
+    ],
+    hdrs = [
+        "client_connection_factory.h",
+        "thread_local_registry.h",
+    ],
+    deps = [
+        "//envoy/network:client_connection_factory",
+        "//envoy/network:listener_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+    ],
 )

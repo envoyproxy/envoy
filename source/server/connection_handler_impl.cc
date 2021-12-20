@@ -4,6 +4,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/client_connection_factory.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
@@ -11,14 +12,18 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/active_internal_listener.h"
 #include "source/server/active_tcp_listener.h"
+#include "envoy/singleton/manager.h"
+#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Server {
 
 ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
-                                             absl::optional<uint32_t> worker_index)
+                                             absl::optional<uint32_t> worker_index,
+                                             Singleton::Manager& singleton_manager)
     : worker_index_(worker_index), dispatcher_(dispatcher),
-      per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
+      per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false),
+      singleton_manager_(singleton_manager) {}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
 
@@ -41,6 +46,19 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   ActiveListenerDetails details;
   if (config.internalListenerConfig().has_value()) {
+    // Link this ConnectionHandlerImpl to the thread local. Ideally this should be done during the
+    // initialization of ConnectionHandlerImpl. We move it here because the thread local object is
+    // not yet ready.
+    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
+        singleton_manager_.getTyped<Network::InternalListenerRegistry>(
+            // TODO: avoid hacking into the singleton var implmentation.
+            "internal_listener_registry_singleton");
+    RELEASE_ASSERT(internal_listener_registry != nullptr,
+                   "Failed to get internal listener registry");
+    Network::LocalInternalListenerRegistry* local_registry =
+        internal_listener_registry->getLocalRegistry();
+    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry");
+    local_registry->setInternalListenerManager(*this);
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {
         if (listener.second.listener_->listenerTag() == overridden_listener) {
