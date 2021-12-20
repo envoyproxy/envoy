@@ -350,9 +350,19 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-frozendict==2.1.1 \
-    --hash=sha256:655b879217dd445a2023e16154cc231febef802b5c812d5c2e822280ad69e1dc \
-    --hash=sha256:bbad8ef1a428f5e6f7e195742fd739f56a5a602f9cf9bbe86f55a4848b1fabd6
+frozendict==2.1.2 \
+    --hash=sha256:2cfe6d89d2af7b97726a5f789d73b5298eb067a9348a8cc8f0834fdc5349b125 \
+    --hash=sha256:2eb92fbe8dde37075ed0e5dd3dac88a850a04ccfc646d20f3412b72220ddbaf2 \
+    --hash=sha256:3b4ac7aafd613959a055818c3e9844822196c874b9c8bf118b6c1419ff1fbbdc \
+    --hash=sha256:3cbb8bd5ddbdd1db1caa670586b50f9e665e60b1c095add5aa04d9e2bedf5f00 \
+    --hash=sha256:3cdc8602e398d28887484226a493ae6e96ff3532b4368d4d49ab96c5ee7eb61d \
+    --hash=sha256:513a3f3a8ff2767492570c78c158845a1cc7b4c954fc9f78ed313b2463727cae \
+    --hash=sha256:79666516d594ced95a294869988dba2daff89d9d274061f7138e1c49e49428ce \
+    --hash=sha256:a0650a673ce6e320e8b25a38f4620f42382c081b2088051c81073a67f14bac32 \
+    --hash=sha256:afaaa4fc0343af15f1153d9e09660f6c388ab1d6d01147bbd7f7979e723258df \
+    --hash=sha256:bb1ebca998c68c3bf28ce70f14a392431bbe01bfa610e3e9e635176d9ecbba71 \
+    --hash=sha256:c0e09b7159fee7c6dafd727dec2ea7a135f47458dd3996705f9a64e3fca3bf73 \
+    --hash=sha256:f45f7a724e93653f0d446e0cc99e09bda4835f16de08eb1de3b007537e18daa1
     # via
     #   -r requirements.in
     #   envoy.base.runner
@@ -752,7 +762,6 @@ typing-extensions==3.10.0.2 \
     # via
     #   aiodocker
     #   aiohttp
-    #   gitpython
 uritemplate==3.0.1 \
     --hash=sha256:07620c3f3f8eed1f12600845892b0e036a2420acf513c53f7de0abd911a5894f \
     --hash=sha256:5af8ad10cec94f215e3f48112de2022e1d5a37ed427fbd88652fa908f2ab7cae
