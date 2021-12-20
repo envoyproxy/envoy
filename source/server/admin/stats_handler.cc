@@ -122,7 +122,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
     return Http::Code::OK;
   }
 
-  return stats(params, response_headers, response);
+  return stats(params, server_.stats(), response_headers, response);
 }
 
 Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
@@ -134,7 +134,7 @@ Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
     return code;
   }
   params.format_ = Format::Json;
-  return stats(params, response_headers, response);
+  return stats(params, server_.stats(), response_headers, response);
 }
 
 Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
@@ -146,11 +146,11 @@ Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
     return code;
   }
   params.format_ = Format::Html;
-  return stats(params, response_headers, response);
+  return stats(params, server_.stats(), response_headers, response);
 }
 
-Http::Code StatsHandler::stats(const Params& params, Http::ResponseHeaderMap& response_headers,
-                               Buffer::Instance& response) {
+Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
+                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
   std::map<std::string, uint64_t> counters_and_gauges;
   std::map<std::string, std::string> text_readouts;
   std::vector<Stats::HistogramSharedPtr> histograms;
@@ -194,7 +194,6 @@ Http::Code StatsHandler::stats(const Params& params, Http::ResponseHeaderMap& re
     scope.iterate(hfn);
   };
 
-  Stats::Store& stats = server_.stats();
   if (params.scope_.has_value()) {
     Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
     stats.forEachScope([](size_t) {},

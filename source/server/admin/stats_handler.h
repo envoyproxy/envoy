@@ -81,8 +81,8 @@ private:
 
   friend class StatsHandlerTest;
 
-  Http::Code stats(const Params& parmams, Http::ResponseHeaderMap& response_headers,
-                   Buffer::Instance& response);
+  static Http::Code stats(const Params& parmams, Stats::Store& store,
+                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
