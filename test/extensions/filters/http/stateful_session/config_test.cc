@@ -17,9 +17,6 @@ namespace StatefulSession {
 namespace {
 
 constexpr absl::string_view ConfigYaml = R"EOF(
-host_statuses:
-- HEALTHY
-- DEGRADED
 session_state:
   name: "envoy.http.stateful_session.mock"
   typed_config: {}
@@ -31,8 +28,6 @@ disabled: true
 
 constexpr absl::string_view RouteConfigYaml = R"EOF(
 stateful_session:
-  host_statuses:
-  - HEALTHY
   session_state:
     name: "envoy.http.stateful_session.mock"
     typed_config: {}
@@ -40,8 +35,6 @@ stateful_session:
 
 constexpr absl::string_view NotExistYaml = R"EOF(
 stateful_session:
-  host_statuses:
-  - HEALTHY
   session_state:
     name: "envoy.http.stateful_session.not_exist"
     typed_config: {}

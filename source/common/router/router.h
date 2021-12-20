@@ -432,7 +432,13 @@ public:
       return {};
     }
 
-    return callbacks_->upstreamOverrideHost();
+    auto override_host = callbacks_->upstreamOverrideHost();
+    if (override_host.has_value()) {
+      // TODO(wbpcode): Currently we need to provide additional expected host status to the load
+      // balancer. This should be resolved after the `overrideHostToSelect()` refactoring.
+      return std::make_pair(std::string(override_host.value()), ~static_cast<uint32_t>(0));
+    }
+    return {};
   }
 
   /**

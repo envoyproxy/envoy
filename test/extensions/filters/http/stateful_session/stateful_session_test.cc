@@ -71,15 +71,6 @@ public:
 };
 
 constexpr absl::string_view ConfigYaml = R"EOF(
-host_statuses:
-- HEALTHY
-- DEGRADED
-session_state:
-  name: "envoy.http.stateful_session.mock"
-  typed_config: {}
-)EOF";
-
-constexpr absl::string_view ConfigYamlNoStatus = R"EOF(
 session_state:
   name: "envoy.http.stateful_session.mock"
   typed_config: {}
@@ -91,8 +82,6 @@ disabled: true
 
 constexpr absl::string_view RouteConfigYaml = R"EOF(
 stateful_session:
-  host_statuses:
-  - HEALTHY
   session_state:
     name: "envoy.http.stateful_session.mock"
     typed_config: {}
@@ -112,35 +101,7 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
   EXPECT_CALL(*raw_session_state, upstreamAddress())
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
-      .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
-        EXPECT_EQ(0b110, host.second);
-      }));
-
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
-
-  EXPECT_CALL(*raw_session_state, onUpdate(_, _));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
-}
-
-// Test the case that the stateful session is enabled no host status restriction.
-TEST_F(StatefulSessionTest, SessionStateTestWithoutStatus) {
-  initialize(ConfigYamlNoStatus);
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-
-  auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
-  auto raw_session_state = session_state.get();
-
-  EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
-  EXPECT_CALL(*raw_session_state, upstreamAddress())
-      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
-  EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
-      .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
-        EXPECT_EQ(~static_cast<uint32_t>(0), host.second);
-      }));
+      .WillOnce(testing::Invoke([&](absl::string_view host) { EXPECT_EQ("1.2.3.4", host); }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -178,10 +139,7 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
   EXPECT_CALL(*raw_session_state, upstreamAddress())
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
-      .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
-        EXPECT_EQ(0b100, host.second);
-      }));
+      .WillOnce(testing::Invoke([&](absl::string_view host) { EXPECT_EQ("1.2.3.4", host); }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -223,10 +181,7 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
   EXPECT_CALL(*raw_session_state, upstreamAddress())
       .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
   EXPECT_CALL(decoder_callbacks_, setUpstreamOverrideHost(_))
-      .WillOnce(testing::Invoke([&](Upstream::LoadBalancerContext::OverrideHost host) {
-        EXPECT_EQ("1.2.3.4", host.first);
-        EXPECT_EQ(0b110, host.second);
-      }));
+      .WillOnce(testing::Invoke([&](absl::string_view host) { EXPECT_EQ("1.2.3.4", host); }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 

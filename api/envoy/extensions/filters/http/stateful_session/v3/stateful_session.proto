@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.extensions.filters.http.stateful_session.v3;
 
 import "envoy/config/core/v3/extension.proto";
-import "envoy/config/core/v3/health_check.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -18,26 +17,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stateful session :ref:`configuration overview <config_http_filters_stateful_session>`.
 // [#extension: envoy.filters.http.stateful_session]
 
-// [#comment:TODO(wbpcode): To support global feature enabled or disabled flag.]
 message StatefulSession {
-  // The expected health status of the host. Suppose a session is assigned to the host X.
-  // However, if the health status of host X does not meet expectations, Envoy will select
-  // new host for the session according to the load balancing algorithm. In other words,
-  // the status of the target host must be in this list for session sticky to take effect.
-  // If no expected health status is configured then any host status will be accepted by
-  // default.
-  //
-  // .. note::
-  //
-  //    The *DRAINING* and *TIMEOUT* will be interpreted as *UNHEALTHY* and *UNKNOWN* will
-  //    be interpreted as *HEALTHY*.
-  repeated config.core.v3.HealthStatus host_statuses = 1;
-
   // Specific implementation of session state. This session state will be used to store and
   // get address of the upstream host to which the session is assigned.
   //
   // [#extension-category: envoy.http.stateful_session]
-  config.core.v3.TypedExtensionConfig session_state = 2
+  config.core.v3.TypedExtensionConfig session_state = 1
       [(validate.rules).message = {required: true}];
 }
 

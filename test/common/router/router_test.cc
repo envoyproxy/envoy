@@ -6613,12 +6613,11 @@ TEST_F(RouterTest, RequestWithUpstreamOverrideHost) {
   // `LoadBalancerContext` is called, `upstreamOverrideHost` of StreamDecoderFilterCallbacks will be
   // called to get address of upstream host that should be selected first.
   EXPECT_CALL(callbacks_, upstreamOverrideHost())
-      .WillOnce(Return(
-          absl::make_optional<Upstream::LoadBalancerContext::OverrideHost>({"1.2.3.4", 0b111})));
+      .WillOnce(Return(absl::make_optional<absl::string_view>("1.2.3.4")));
 
   auto override_host = router_.overrideHostToSelect();
   EXPECT_EQ("1.2.3.4", override_host->first);
-  EXPECT_EQ(0b111, override_host->second);
+  EXPECT_EQ(~static_cast<uint32_t>(0), override_host->second);
 
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);

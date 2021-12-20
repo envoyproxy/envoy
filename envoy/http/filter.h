@@ -614,18 +614,16 @@ public:
 
   /**
    * Set override host to be used by the upstream load balancing. If the target host exists in the
-   * host list of the routed cluster, and the status of the target host also meets expectations, the
-   * host should be selected first.
-   * @param host The override host address and expected health status.
+   * host list of the routed cluster, the host should be selected first.
+   * @param host The override host address.
    */
-  virtual void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost host) PURE;
+  virtual void setUpstreamOverrideHost(absl::string_view host) PURE;
 
   /**
-   * @return absl::optional<Upstream::LoadBalancerContext::OverrideHost> optional overrride host
-   * for the upstream load balancing.
+   * @return absl::optional<absl::string_view> optional overrride host for the upstream
+   * load balancing.
    */
-  virtual absl::optional<Upstream::LoadBalancerContext::OverrideHost>
-  upstreamOverrideHost() const PURE;
+  virtual absl::optional<absl::string_view> upstreamOverrideHost() const PURE;
 };
 
 /**

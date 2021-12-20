@@ -94,8 +94,6 @@ static const std::string STATEFUL_SESSION_FILTER =
 name: envoy.filters.http.stateful_session
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
-  host_statuses:
-  - HEALTHY
   session_state:
     name: envoy.http.stateful_session.cookie
     typed_config:
@@ -115,8 +113,6 @@ static const std::string OVERRIDE_STATEFUL_SESSION =
     R"EOF(
 "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
 stateful_session:
-  host_statuses:
-  - HEALTHY
   session_state:
     name: envoy.http.stateful_session.cookie
     typed_config:

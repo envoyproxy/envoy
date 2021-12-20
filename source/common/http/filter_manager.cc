@@ -1665,13 +1665,11 @@ Buffer::BufferMemoryAccountSharedPtr ActiveStreamDecoderFilter::account() const 
   return parent_.account();
 }
 
-void ActiveStreamDecoderFilter::setUpstreamOverrideHost(
-    Upstream::LoadBalancerContext::OverrideHost host) {
+void ActiveStreamDecoderFilter::setUpstreamOverrideHost(absl::string_view host) {
   parent_.upstream_override_host_.emplace(std::move(host));
 }
 
-absl::optional<Upstream::LoadBalancerContext::OverrideHost>
-ActiveStreamDecoderFilter::upstreamOverrideHost() const {
+absl::optional<absl::string_view> ActiveStreamDecoderFilter::upstreamOverrideHost() const {
   return parent_.upstream_override_host_;
 }
 
