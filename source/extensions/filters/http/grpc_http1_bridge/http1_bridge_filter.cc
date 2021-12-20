@@ -8,6 +8,7 @@
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/codec.h"
 #include "source/common/grpc/common.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/headers.h"
@@ -18,12 +19,29 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
+static void updateContentLength(Http::RequestHeaderMap& headers, uint64_t delta) {
+  const auto length_header = headers.getContentLengthValue();
+  uint64_t length;
+  if (absl::SimpleAtoi(length_header, &length)) {
+    headers.setContentLength(length + delta);
+  }
+}
+
 void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
   context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
                       headers.GrpcStatus());
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  const bool protobuf_request = Grpc::Common::isProtobufRequestHeaders(headers);
+  if (upgrade_protobuf_ && protobuf_request) {
+    do_framing_ = true;
+    headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
+    updateContentLength(headers, Grpc::GRPC_FRAME_HEADER_SIZE);
+    decoder_callbacks_->clearRouteCache();
+  }
+
   const bool grpc_request = Grpc::Common::isGrpcRequestHeaders(headers);
   if (grpc_request) {
     setupStatTracking(headers);
@@ -36,6 +54,21 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus Http1BridgeFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (!do_bridging_ || !do_framing_) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  decoder_callbacks_->addDecodedData(data, true);
+  if (end_stream && do_framing_) {
+    decoder_callbacks_->modifyDecodingBuffer(
+        [](Buffer::Instance& buf) { Grpc::Common::prependGrpcFrameHeader(buf); });
+    return Http::FilterDataStatus::Continue;
+  }
+
+  return Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
@@ -52,11 +85,14 @@ Http::FilterHeadersStatus Http1BridgeFilter::encodeHeaders(Http::ResponseHeaderM
   }
 }
 
-Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance&, bool end_stream) {
+Http::FilterDataStatus Http1BridgeFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!do_bridging_ || end_stream) {
     return Http::FilterDataStatus::Continue;
   } else {
     // Buffer until the complete request has been processed.
+    if (do_framing_) {
+      data.drain(Grpc::GRPC_FRAME_HEADER_SIZE);
+    }
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 }

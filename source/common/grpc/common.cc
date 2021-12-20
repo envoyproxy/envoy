@@ -36,11 +36,23 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
           content_type[Http::Headers::get().ContentTypeValues.Grpc.size()] == '+');
 }
 
+bool Common::hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers) {
+  const absl::string_view content_type = headers.getContentTypeValue();
+  return absl::EqualsIgnoreCase(content_type, Http::Headers::get().ContentTypeValues.Protobuf);
+}
+
 bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Path()) {
     return false;
   }
   return hasGrpcContentType(headers);
+}
+
+bool Common::isProtobufRequestHeaders(const Http::RequestHeaderMap& headers) {
+  if (!headers.Path()) {
+    return false;
+  }
+  return hasProtobufContentType(headers);
 }
 
 bool Common::isGrpcResponseHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {

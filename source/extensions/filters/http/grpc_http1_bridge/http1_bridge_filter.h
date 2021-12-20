@@ -16,7 +16,8 @@ namespace GrpcHttp1Bridge {
  */
 class Http1BridgeFilter : public Http::StreamFilter {
 public:
-  explicit Http1BridgeFilter(Grpc::Context& context) : context_(context) {}
+  explicit Http1BridgeFilter(Grpc::Context& context, bool upgrade_protobuf_to_grpc)
+      : context_(context), upgrade_protobuf_(upgrade_protobuf_to_grpc) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -24,9 +25,8 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
-    return Http::FilterDataStatus::Continue;
-  }
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -64,9 +64,11 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::ResponseHeaderMap* response_headers_{};
   bool do_bridging_{};
+  bool do_framing_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   absl::optional<Grpc::Context::RequestStatNames> request_stat_names_;
   Grpc::Context& context_;
+  bool upgrade_protobuf_{};
 };
 
 } // namespace GrpcHttp1Bridge

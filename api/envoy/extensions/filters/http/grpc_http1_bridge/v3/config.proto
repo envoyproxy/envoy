@@ -19,4 +19,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.grpc_http1_bridge.v2.Config";
+  bool upgrade_protobuf_to_grpc = 1;
 }
