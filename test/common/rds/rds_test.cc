@@ -63,24 +63,25 @@ private:
 
 class TestTraits : public ConfigTraits, public ProtoTraits {
 public:
-  const envoy::config::route::v3::RouteConfiguration& cast(const Protobuf::Message& rc) const {
-    return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
+  TestTraits() {
+    resource_type_ = Envoy::Config::getResourceName<envoy::config::route::v3::RouteConfiguration>();
   }
 
-  std::string resourceType() const override { return "test"; }
+  std::string resourceType() const override { return resource_type_; }
+  int resourceNameFieldNumber() const override { return resource_name_field_index_; }
   ConfigConstSharedPtr createNullConfig() const override {
     return std::make_shared<const TestConfig>();
   }
   ProtobufTypes::MessagePtr createEmptyProto() const override {
     return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   }
-  void validateResourceType(const Protobuf::Message&) const override {}
-  const std::string& resourceName(const Protobuf::Message& rc) const override {
-    return cast(rc).name();
-  }
   ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const override {
-    return std::make_shared<const TestConfig>(cast(rc));
+    return std::make_shared<const TestConfig>(
+        dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc));
   }
+
+  std::string resource_type_;
+  int resource_name_field_index_ = 1;
 };
 
 class RdsConfigUpdateReceiverTest : public RdsTestBase {
@@ -179,8 +180,9 @@ public:
               server_factory_context_.messageValidationContext().dynamicValidationVisitor(),
               "name");
           auto subscription = std::make_shared<RdsRouteConfigSubscription>(
-              std::move(config_update), std::move(resource_decoder), config_source, "test_route",
-              manager_identifier, server_factory_context_, "test_stat", "TestRDS", manager_);
+              std::move(config_update), std::move(resource_decoder), config_source,
+              route_config_name_, manager_identifier, server_factory_context_, "test_stat",
+              rds_type_, manager_);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
                                                                        server_factory_context_);
           return std::make_pair(provider, &provider->subscription().initTarget());
@@ -219,6 +221,8 @@ public:
   NiceMock<Init::MockManager> outer_init_manager_;
   TestTraits traits_;
   RouteConfigProviderManagerImpl manager_;
+  const std::string rds_type_ = "TestRDS";
+  const std::string route_config_name_ = "test_route";
 };
 
 TEST_F(RdsConfigProviderManagerTest, ProviderErase) {
@@ -245,6 +249,21 @@ TEST_F(RdsConfigProviderManagerTest, ProviderErase) {
   dump = manager_.dumpRouteConfigs(universal_name_matcher);
   EXPECT_EQ(0, dump->dynamic_route_configs().size());
   EXPECT_EQ(0, dump->static_route_configs().size());
+}
+
+TEST_F(RdsConfigProviderManagerTest, FailureInvalidResourceType) {
+  RouteConfigProviderSharedPtr dynamic_provider = createDynamic();
+
+  traits_.resource_name_field_index_ = 0;
+  EXPECT_THROW_WITH_MESSAGE(setConfigToDynamicProvider(), EnvoyException,
+                            "Unexpected " + rds_type_ + " configuration (expecting " +
+                                route_config_name_ + "): ");
+
+  traits_.resource_type_ = "EXPECTED_resource_type";
+  EXPECT_THROW_WITH_MESSAGE(setConfigToDynamicProvider(), EnvoyException,
+                            "Unexpected " + rds_type_ + " configuration type (expecting " +
+                                traits_.resource_type_ +
+                                "): envoy.config.route.v3.RouteConfiguration");
 }
 
 } // namespace

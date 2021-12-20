@@ -61,7 +61,6 @@ public:
                     const std::set<std::string>& added_resource_ids,
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
-  const std::string& routeConfigName() const override { return base_.routeConfigName(); }
   const std::string& configVersion() const override { return base_.configVersion(); }
   uint64_t configHash() const override { return base_.configHash(); }
   absl::optional<Rds::RouteConfigProvider::ConfigInfo> configInfo() const override {

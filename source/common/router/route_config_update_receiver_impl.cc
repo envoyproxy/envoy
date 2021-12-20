@@ -52,7 +52,7 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   if (!base_.checkHash(new_hash)) {
     return false;
   }
-  auto route_config = static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
+  auto route_config = dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
   const uint64_t new_vhds_config_hash =
       route_config.has_vhds() ? MessageUtil::hash(route_config.vhds()) : 0ul;
   std::map<std::string, envoy::config::route::v3::VirtualHost> rds_virtual_hosts;

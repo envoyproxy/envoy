@@ -197,8 +197,8 @@ ConfigConstSharedPtr RdsRouteConfigProviderImpl::configCast() {
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
-  auto alias =
-      VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
+  auto alias = VhdsSubscription::domainNameToAlias(
+      config_update_info_->protobufConfigurationCast().name(), for_domain);
   // The RdsRouteConfigProviderImpl instance can go away before the dispatcher has a chance to
   // execute the callback. still_alive shared_ptr will be deallocated when the current instance of
   // the RdsRouteConfigProviderImpl is deallocated; we rely on a weak_ptr to still_alive flag to
@@ -221,16 +221,6 @@ std::string ProtoTraitsImpl::resourceType() const {
 
 ProtobufTypes::MessagePtr ProtoTraitsImpl::createEmptyProto() const {
   return std::make_unique<envoy::config::route::v3::RouteConfiguration>();
-}
-
-void ProtoTraitsImpl::validateResourceType(const Protobuf::Message& rc) const {
-  auto dummy = &dynamic_cast<const envoy::config::route::v3::RouteConfiguration&>(rc);
-  RELEASE_ASSERT(dummy, "");
-}
-
-const std::string& ProtoTraitsImpl::resourceName(const Protobuf::Message& rc) const {
-  ASSERT(dynamic_cast<const envoy::config::route::v3::RouteConfiguration*>(&rc));
-  return static_cast<const envoy::config::route::v3::RouteConfiguration&>(rc).name();
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin)

@@ -23,7 +23,6 @@ public:
   // RouteConfigUpdateReceiver
   bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) override;
 
-  const std::string& routeConfigName() const override;
   const std::string& configVersion() const override { return last_config_version_; }
   uint64_t configHash() const override { return last_config_hash_; }
   absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override;

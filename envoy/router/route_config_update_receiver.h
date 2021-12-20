@@ -59,6 +59,5 @@ public:
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;
-
 } // namespace Router
 } // namespace Envoy

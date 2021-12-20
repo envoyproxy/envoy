@@ -40,10 +40,6 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message& rc,
   return true;
 }
 
-const std::string& RouteConfigUpdateReceiverImpl::routeConfigName() const {
-  return proto_traits_.resourceName(*route_config_proto_);
-}
-
 absl::optional<RouteConfigProvider::ConfigInfo> RouteConfigUpdateReceiverImpl::configInfo() const {
   return config_info_;
 }

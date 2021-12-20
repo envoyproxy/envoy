@@ -184,9 +184,8 @@ using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProvid
 class ProtoTraitsImpl : public Rds::ProtoTraits {
 public:
   std::string resourceType() const override;
+  int resourceNameFieldNumber() const override { return 1; }
   ProtobufTypes::MessagePtr createEmptyProto() const override;
-  void validateResourceType(const Protobuf::Message& rc) const override;
-  const std::string& resourceName(const Protobuf::Message& rc) const override;
 };
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,

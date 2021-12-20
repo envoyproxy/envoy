@@ -1,5 +1,7 @@
 #include "source/common/rds/route_config_provider_manager_impl.h"
 
+#include "source/common/rds/util.h"
+
 namespace Envoy {
 namespace Rds {
 
@@ -35,7 +37,8 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
     ASSERT(provider);
 
     if (provider->configInfo()) {
-      if (!name_matcher.match(proto_traits_.resourceName(provider->configInfo().value().config_))) {
+      if (!name_matcher.match(
+              resourceName(proto_traits_, provider->configInfo().value().config_))) {
         continue;
       }
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
@@ -48,7 +51,7 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs(
 
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
-    if (!name_matcher.match(proto_traits_.resourceName(provider->configInfo().value().config_))) {
+    if (!name_matcher.match(resourceName(proto_traits_, provider->configInfo().value().config_))) {
       continue;
     }
     auto* static_config = config_dump->mutable_static_route_configs()->Add();

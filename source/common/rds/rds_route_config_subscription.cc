@@ -1,6 +1,7 @@
 #include "source/common/rds/rds_route_config_subscription.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/rds/util.h"
 
 namespace Envoy {
 namespace Rds {
@@ -59,12 +60,18 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   const auto& route_config = resources[0].get().resource();
-  route_config_provider_manager_.protoTraits().validateResourceType(route_config);
-  if (route_config_provider_manager_.protoTraits().resourceName(route_config) !=
+  if (route_config.GetDescriptor()->full_name() !=
+      route_config_provider_manager_.protoTraits().resourceType()) {
+    throw EnvoyException(fmt::format("Unexpected {} configuration type (expecting {}): {}",
+                                     rds_type_,
+                                     route_config_provider_manager_.protoTraits().resourceType(),
+                                     route_config.GetDescriptor()->full_name()));
+  }
+  if (resourceName(route_config_provider_manager_.protoTraits(), route_config) !=
       route_config_name_) {
     throw EnvoyException(
         fmt::format("Unexpected {} configuration (expecting {}): {}", rds_type_, route_config_name_,
-                    route_config_provider_manager_.protoTraits().resourceName(route_config)));
+                    resourceName(route_config_provider_manager_.protoTraits(), route_config)));
   }
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();

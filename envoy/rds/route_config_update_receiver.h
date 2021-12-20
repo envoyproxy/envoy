@@ -28,11 +28,6 @@ public:
   virtual bool onRdsUpdate(const Protobuf::Message& rc, const std::string& version_info) PURE;
 
   /**
-   * @return std::string& the name of RouteConfiguration.
-   */
-  virtual const std::string& routeConfigName() const PURE;
-
-  /**
    * @return std::string& the version of RouteConfiguration.
    */
   virtual const std::string& configVersion() const PURE;

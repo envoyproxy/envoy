@@ -26,23 +26,14 @@ public:
   virtual std::string resourceType() const PURE;
 
   /**
+   * Gives back the name field tag number of the route configuration proto.
+   */
+  virtual int resourceNameFieldNumber() const PURE;
+
+  /**
    * Create an empty route configuration proto object.
    */
   virtual ProtobufTypes::MessagePtr createEmptyProto() const PURE;
-
-  /**
-   * Runtime check if the provided proto message object is really a route configuration instance.
-   * Throw an std::bad_cast exception if not.
-   * Every other method below this assumes the proto message is already
-   * validated and doesn't do any further runtime check.
-   */
-  virtual void validateResourceType(const Protobuf::Message& rc) const PURE;
-
-  /**
-   * Gives back the name from the route configuration proto.
-   * The object behind the returned reference has to have the same lifetime like the proto.
-   */
-  virtual const std::string& resourceName(const Protobuf::Message& rc) const PURE;
 };
 
 class ConfigTraits {
@@ -57,7 +48,11 @@ public:
 
   /**
    * Create a config object based on a route configuration.
-   * @throw EnvoyException if the new config can't be applied.
+   * The full name of the type of the parameter message is
+   * guaranteed to match with the return value of ProtoTraits::resourceType.
+   * Both dynamic or static cast can be applied to downcast the message
+   * to the corresponding route configuration class.
+   * @throw EnvoyException if the new config can't be applied of.
    */
   virtual ConfigConstSharedPtr createConfig(const Protobuf::Message& rc) const PURE;
 };
