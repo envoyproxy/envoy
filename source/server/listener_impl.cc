@@ -80,7 +80,7 @@ ListenSocketFactoryImpl::ListenSocketFactoryImpl(
 
   if (local_address_->type() == Network::Address::Type::Ip) {
     if (socket_type == Network::Socket::Type::Datagram) {
-      ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort);
+      ASSERT(bind_type_ == ListenerComponentFactory::BindType::ReusePort || num_sockets == 1u);
     }
   } else {
     if (local_address_->type() == Network::Address::Type::Pipe) {
@@ -290,7 +290,7 @@ Network::DrainDecision& ListenerFactoryContextBaseImpl::drainDecision() { return
 Server::DrainManager& ListenerFactoryContextBaseImpl::drainManager() { return *drain_manager_; }
 
 // Must be overridden
-Init::Manager& ListenerFactoryContextBaseImpl::initManager() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+Init::Manager& ListenerFactoryContextBaseImpl::initManager() { PANIC("not implemented"); }
 
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
@@ -709,9 +709,7 @@ Event::Dispatcher& PerListenerFactoryContextImpl::mainThreadDispatcher() {
 const Server::Options& PerListenerFactoryContextImpl::options() {
   return listener_factory_context_base_->options();
 }
-Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+Network::DrainDecision& PerListenerFactoryContextImpl::drainDecision() { PANIC("not implemented"); }
 Grpc::Context& PerListenerFactoryContextImpl::grpcContext() {
   return listener_factory_context_base_->grpcContext();
 }

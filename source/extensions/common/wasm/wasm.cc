@@ -308,7 +308,7 @@ WasmEvent toWasmEvent(const std::shared_ptr<WasmHandleBase>& wasm) {
   case FailState::RuntimeError:
     return WasmEvent::RuntimeError;
   }
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("corrupt enum");
 }
 
 bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scope,

@@ -2,8 +2,8 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_package",
 )
-load("@rules_pkg//:mappings.bzl", "pkg_filegroup", "pkg_files")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
 
 licenses(["notice"])  # Apache 2
 

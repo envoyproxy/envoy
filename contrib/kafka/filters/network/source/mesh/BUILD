@@ -11,7 +11,7 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 # Kafka-mesh network filter.
-# Mesh filter public docs: docs/root/configuration/listeners/network_filters/kafka_mesh_filter.rst
+# Mesh filter public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/kafka_mesh_filter
 
 envoy_cc_contrib_extension(
     name = "config_lib",

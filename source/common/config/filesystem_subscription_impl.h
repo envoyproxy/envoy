@@ -30,7 +30,7 @@ public:
   void start(const absl::flat_hash_set<std::string>&) override;
   void updateResourceInterest(const absl::flat_hash_set<std::string>&) override;
   void requestOnDemandUpdate(const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
 protected:

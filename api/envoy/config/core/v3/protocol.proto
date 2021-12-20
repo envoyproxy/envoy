@@ -290,7 +290,7 @@ message Http1ProtocolOptions {
   // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
-  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
   //
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic
