@@ -18,6 +18,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Protocol options]
@@ -289,7 +290,7 @@ message Http1ProtocolOptions {
   // Allows Envoy to process requests/responses with both `Content-Length` and `Transfer-Encoding`
   // headers set. By default such messages are rejected, but if option is enabled - Envoy will
   // remove Content-Length header and process message.
-  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>` for details.
+  // See `RFC7230, sec. 3.3.3 <https://tools.ietf.org/html/rfc7230#section-3.3.3>`_ for details.
   //
   // .. attention::
   //   Enabling this option might lead to request smuggling vulnerability, especially if traffic

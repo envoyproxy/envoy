@@ -86,9 +86,9 @@ public:
 
   // Upstream:HostDescription
   bool canary() const override { return logical_host_->canary(); }
-  void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void canary(bool) override {}
   MetadataConstSharedPtr metadata() const override { return logical_host_->metadata(); }
-  void metadata(MetadataConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void metadata(MetadataConstSharedPtr) override {}
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
@@ -114,13 +114,12 @@ public:
     return logical_host_->localityZoneStatName();
   }
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-    // Should never be called since real hosts are used only for forwarding and not health
-    // checking.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // Should never be called since real hosts are used only for forwarding.
+    return nullptr;
   }
   MonotonicTime creationTime() const override { return logical_host_->creationTime(); }
   uint32_t priority() const override { return logical_host_->priority(); }
-  void priority(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void priority(uint32_t) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

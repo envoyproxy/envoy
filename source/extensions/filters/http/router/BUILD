@@ -7,7 +7,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter responsible for routing to upstream connection pools
-# Public docs: docs/root/configuration/http_filters/router_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/router_filter
 
 envoy_extension_package()
 

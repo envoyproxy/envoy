@@ -57,9 +57,6 @@ using IpList = std::list<std::string>;
 using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
-// Represents a single TestDnsServer query state and lifecycle. This implements
-// just enough of RFC 1035 to handle queries we generate in the tests below.
-enum class RecordType { A, AAAA };
 
 class TestDnsServerQuery {
 public:
@@ -282,7 +279,7 @@ public:
     queries_.emplace_back(query);
   }
 
-  void onReject(RejectCause) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onReject(RejectCause) override { PANIC("not implemented"); }
 
   void addHosts(const std::string& hostname, const IpList& ip, const RecordType& type) {
     if (type == RecordType::A) {
@@ -393,6 +390,41 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   EXPECT_EQ(resolvers->next->udp_port, 54);
   EXPECT_STREQ(inet_ntop(AF_INET6, &resolvers->next->addr.addr6, addr6str, INET6_ADDRSTRLEN),
                "::1");
+  ares_free_data(resolvers);
+}
+
+TEST_F(DnsImplConstructor, SupportsCustomResolversAsFallback) {
+  char addr4str[INET_ADDRSTRLEN];
+  auto addr4 = Network::Utility::parseInternetAddress("1.2.3.4");
+
+  // convert the address and options into typed_dns_resolver_config
+  envoy::config::core::v3::Address dns_resolvers;
+  Network::Utility::addressToProtobufAddress(
+      Network::Address::Ipv4Instance(addr4->ip()->addressAsString(), addr4->ip()->port()),
+      dns_resolvers);
+  envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
+  cares.set_use_resolvers_as_fallback(true);
+  cares.add_resolvers()->MergeFrom(dns_resolvers);
+
+  // copy over dns_resolver_options_
+  cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options_);
+
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+  typed_dns_resolver_config.mutable_typed_config()->PackFrom(cares);
+  typed_dns_resolver_config.set_name(std::string(Network::CaresDnsResolver));
+  Network::DnsResolverFactory& dns_resolver_factory =
+      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+  auto resolver =
+      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
+
+  // Given that the local machine will have a working conf in resolve.conf the resolver will not
+  // use the fallback given.
+  auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
+  ares_addr_port_node* resolvers;
+  int result = ares_get_servers_ports(peer->channel(), &resolvers);
+  EXPECT_EQ(result, ARES_SUCCESS);
+  EXPECT_EQ(resolvers->family, AF_INET);
+  EXPECT_STRNE(inet_ntop(AF_INET, &resolvers->addr.addr4, addr4str, INET_ADDRSTRLEN), "1.2.3.4");
   ares_free_data(resolvers);
 }
 
@@ -625,7 +657,7 @@ public:
     std::list<Address::InstanceConstSharedPtr> address;
 
     for_each(response.begin(), response.end(),
-             [&](DnsResponse resp) { address.emplace_back(resp.address_); });
+             [&](DnsResponse resp) { address.emplace_back(resp.addrInfo().address_); });
     return address;
   }
 
@@ -633,7 +665,7 @@ public:
     std::list<std::string> address;
 
     for_each(response.begin(), response.end(), [&](DnsResponse resp) {
-      address.emplace_back(resp.address_->ip()->addressAsString());
+      address.emplace_back(resp.addrInfo().address_->ip()->addressAsString());
     });
     return address;
   }
@@ -667,7 +699,7 @@ public:
           if (expected_ttl) {
             std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
             for (const auto& address : results) {
-              EXPECT_EQ(address.ttl_, expected_ttl.value());
+              EXPECT_EQ(address.addrInfo().ttl_, expected_ttl.value());
             }
           }
 
@@ -1116,7 +1148,8 @@ TEST_P(DnsImplTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, vec, dns_resolver_options_);
+  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, false /* use_resolvers_as_fallback */,
+                                                vec, dns_resolver_options_);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));

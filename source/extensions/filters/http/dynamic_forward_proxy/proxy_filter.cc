@@ -26,9 +26,15 @@ struct ResponseStringValues {
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
 };
 
+struct RcDetailsValues {
+  const std::string DnsCacheOverflow = "dns_cache_overflow";
+  const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
+};
+
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
 
 using ResponseStrings = ConstSingleton<ResponseStringValues>;
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
@@ -85,7 +91,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "pending request overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, ResponseStrings::get().PendingRequestOverflow, nullptr,
-        absl::nullopt, ResponseStrings::get().PendingRequestOverflow);
+        absl::nullopt, RcDetails::get().PendingRequestOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -153,7 +159,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
     ENVOY_STREAM_LOG(debug, "DNS cache overflow", *decoder_callbacks_);
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
                                        ResponseStrings::get().DnsCacheOverflow, nullptr,
-                                       absl::nullopt, ResponseStrings::get().DnsCacheOverflow);
+                                       absl::nullopt, RcDetails::get().DnsCacheOverflow);
     return Http::FilterHeadersStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;

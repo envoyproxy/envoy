@@ -270,7 +270,7 @@ void UpstreamRequest::onResetStream(ConnectionPool::PoolFailureReason reason) {
     stats_.incResponseLocalException(parent_.cluster());
     parent_.sendLocalReply(AppException(AppExceptionType::InternalError,
                                         "thrift upstream request: too many connections"),
-                           true);
+                           false /* Don't close the downstream connection. */);
     break;
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_host_->outlierDetector().putResult(

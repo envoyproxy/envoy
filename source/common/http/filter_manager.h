@@ -631,9 +631,6 @@ public:
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
     return StreamInfoImpl::downstreamAddressProvider().sslConnection();
   }
-  Ssl::ConnectionInfoConstSharedPtr upstreamSslConnection() const override {
-    return StreamInfoImpl::upstreamSslConnection();
-  }
   void dumpState(std::ostream& os, int indent_level) const override {
     StreamInfoImpl::dumpState(os, indent_level);
 
@@ -945,6 +942,8 @@ public:
 
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 
+  void onDownstreamReset() { state_.saw_downstream_reset_ = true; }
+
 private:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
@@ -1065,7 +1064,8 @@ private:
         : remote_complete_(false), local_complete_(false), has_1xx_headers_(false),
           created_filter_chain_(false), is_head_request_(false), is_grpc_request_(false),
           non_100_response_headers_encoded_(false), under_on_local_reply_(false),
-          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false) {}
+          decoder_filter_chain_aborted_(false), encoder_filter_chain_aborted_(false),
+          saw_downstream_reset_(false) {}
 
     uint32_t filter_call_state_{0};
 
@@ -1088,6 +1088,7 @@ private:
     // True when the filter chain iteration was aborted with local reply.
     bool decoder_filter_chain_aborted_ : 1;
     bool encoder_filter_chain_aborted_ : 1;
+    bool saw_downstream_reset_ : 1;
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
