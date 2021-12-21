@@ -164,7 +164,7 @@ private:
     ~ActiveSession() override;
     const Network::UdpRecvData::LocalPeerAddresses& addresses() const { return addresses_; }
     const Upstream::Host& host() const { return *host_; }
-    void write(const Buffer::Instance& buffer);
+    void write(const Buffer::Instance& buffer, const unsigned int tos = 0);
 
   private:
     void onIdleTimer();
@@ -173,7 +173,8 @@ private:
     // Network::UdpPacketProcessor
     void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                        Network::Address::InstanceConstSharedPtr peer_address,
-                       Buffer::InstancePtr buffer, MonotonicTime receive_time) override;
+                       Buffer::InstancePtr buffer, MonotonicTime receive_time,
+                       const unsigned int tos = 0) override;
     uint64_t maxDatagramSize() const override {
       return cluster_.filter_.config_->upstreamSocketConfig().max_rx_datagram_size_;
     }

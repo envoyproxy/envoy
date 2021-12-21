@@ -43,7 +43,7 @@ public:
   // Network::UdpPacketProcessor
   void processPacket(Address::InstanceConstSharedPtr local_address,
                      Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-                     MonotonicTime receive_time) override;
+                     MonotonicTime receive_time, const unsigned int tos = 0) override;
   uint64_t maxDatagramSize() const override { return config_.max_rx_datagram_size_; }
   void onDatagramsDropped(uint32_t dropped) override { cb_.onDatagramsDropped(dropped); }
   size_t numPacketsExpectedPerEventLoop() const override {

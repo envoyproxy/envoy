@@ -49,7 +49,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time) {
+    MonotonicTime receive_time, unsigned int) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(

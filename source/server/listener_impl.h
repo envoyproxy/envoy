@@ -415,6 +415,7 @@ private:
   Network::ListenSocketFactoryPtr socket_factory_;
   const bool bind_to_port_;
   const bool mptcp_enabled_;
+  const bool enable_tos_forward_;
   const bool hand_off_restored_destination_connections_;
   const uint32_t per_connection_buffer_limit_bytes_;
   const uint64_t listener_tag_;

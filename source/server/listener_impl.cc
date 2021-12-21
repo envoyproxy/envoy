@@ -298,6 +298,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       bind_to_port_(shouldBindToPort(config)), mptcp_enabled_(config.enable_mptcp()),
+      enable_tos_forward_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_tos_forward, false)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -389,6 +390,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                            uint64_t hash)
     : parent_(parent), address_(origin.address_), bind_to_port_(shouldBindToPort(config)),
       mptcp_enabled_(config.enable_mptcp()),
+      enable_tos_forward_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_tos_forward, false)),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -557,6 +559,9 @@ void ListenerImpl::buildListenSocketOptions(Network::Socket::Type socket_type) {
   }
   if (reuse_port_) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
+  }
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_, enable_tos_forward, false)) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildTosForwardOptions());
   }
   if (!config_.socket_options().empty()) {
     addListenSocketOptions(

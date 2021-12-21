@@ -55,7 +55,8 @@ public:
   }
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Envoy::Network::Address::Ip* self_ip,
-                                  const Network::Address::Instance& peer_address) override {
+                                  const Network::Address::Instance& peer_address,
+                                  unsigned int) override {
     if (closed_) {
       return Api::IoCallUint64Result(0, Api::IoErrorPtr(new Network::IoSocketError(EBADF),
                                                         Network::IoSocketError::deleteIoError));

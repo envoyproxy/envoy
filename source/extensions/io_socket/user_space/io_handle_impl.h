@@ -57,7 +57,8 @@ public:
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
                                   const Network::Address::Ip* self_ip,
-                                  const Network::Address::Instance& peer_address) override;
+                                  const Network::Address::Instance& peer_address,
+                                  const unsigned int tos = 0) override;
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;
   Api::IoCallUint64Result recvmmsg(RawSliceArrays& slices, uint32_t self_port,

@@ -181,7 +181,7 @@ Network::FilterStatus UdpProxyFilter::StickySessionClusterInfo::onData(Network::
     }
   }
 
-  active_session->write(*data.buffer_);
+  active_session->write(*data.buffer_, data.tos_);
 
   return Network::FilterStatus::StopIteration;
 }
@@ -257,6 +257,14 @@ UdpProxyFilter::ActiveSession::ActiveSession(ClusterInfo& cluster,
     ENVOY_LOG(debug, "The original src is enabled for address {}.",
               addresses_.peer_->asStringView());
   }
+  if (cluster_.filter_.config_->upstreamSocketConfig().tos_) {
+    const bool ok = Network::Socket::applyOptions(
+        Network::SocketOptionFactory::buildTosForwardOptions(), *socket_,
+        envoy::config::core::v3::SocketOption::STATE_PREBIND);
+    RELEASE_ASSERT(ok, "Should never occur!");
+    ENVOY_LOG(debug, "The original tos forward is enabled for address {}.",
+              addresses_.peer_->asStringView());
+  }
 
   // TODO(mattklein123): Enable dropped packets socket option. In general the Socket abstraction
   // does not work well right now for client sockets. It's too heavy weight and is aimed at listener
@@ -303,7 +311,7 @@ void UdpProxyFilter::ActiveSession::onReadReady() {
   cluster_.filter_.read_callbacks_->udpListener().flush();
 }
 
-void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
+void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer, const unsigned int tos) {
   ENVOY_LOG(trace, "writing {} byte datagram upstream: downstream={} local={} upstream={}",
             buffer.length(), addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
@@ -319,8 +327,8 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
   //       set. We allow the OS to select the right IP based on outbound routing rules if
   //       use_original_src_ip_ is not set, else use downstream peer IP as local IP.
   const Network::Address::Ip* local_ip = use_original_src_ip_ ? addresses_.peer_->ip() : nullptr;
-  Api::IoCallUint64Result rc =
-      Network::Utility::writeToSocket(socket_->ioHandle(), buffer, local_ip, *host_->address());
+  Api::IoCallUint64Result rc = Network::Utility::writeToSocket(socket_->ioHandle(), buffer,
+                                                               local_ip, *host_->address(), tos);
   if (!rc.ok()) {
     cluster_.cluster_stats_.sess_tx_errors_.inc();
   } else {
@@ -331,7 +339,8 @@ void UdpProxyFilter::ActiveSession::write(const Buffer::Instance& buffer) {
 
 void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceConstSharedPtr,
                                                   Network::Address::InstanceConstSharedPtr,
-                                                  Buffer::InstancePtr buffer, MonotonicTime) {
+                                                  Buffer::InstancePtr buffer, MonotonicTime,
+                                                  const unsigned int tos) {
   ENVOY_LOG(trace, "writing {} byte datagram downstream: downstream={} local={} upstream={}",
             buffer->length(), addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_->address()->asStringView());
@@ -340,7 +349,7 @@ void UdpProxyFilter::ActiveSession::processPacket(Network::Address::InstanceCons
   cluster_.cluster_stats_.sess_rx_datagrams_.inc();
   cluster_.cluster_.info()->stats().upstream_cx_rx_bytes_total_.add(buffer_length);
 
-  Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer};
+  Network::UdpSendData data{addresses_.local_->ip(), *addresses_.peer_, *buffer, tos};
   const Api::IoCallUint64Result rc = cluster_.filter_.read_callbacks_->udpListener().send(data);
   if (!rc.ok()) {
     cluster_.filter_.config_->stats().downstream_sess_tx_errors_.inc();

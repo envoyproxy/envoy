@@ -147,7 +147,8 @@ Api::IoCallUint64Result IoSocketHandleImpl::write(Buffer::Instance& buffer) {
 Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                     uint64_t num_slice, int flags,
                                                     const Address::Ip* self_ip,
-                                                    const Address::Instance& peer_address) {
+                                                    const Address::Instance& peer_address,
+                                                    const unsigned int tos) {
   const auto* address_base = dynamic_cast<const Address::InstanceBase*>(&peer_address);
   sockaddr* sock_addr = const_cast<sockaddr*>(address_base->sockAddr());
   if (sock_addr == nullptr) {
@@ -165,6 +166,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
   }
   if (num_slices_to_write == 0) {
     return Api::ioCallUint64ResultNoError();
+  }
+  if (tos > 0 && previous_tos_ != tos) {
+    previous_tos_ = tos;
+    setOption(IPPROTO_IP, IP_TOS, &tos, sizeof(tos));
   }
 
   msghdr message;
@@ -329,6 +334,11 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
           continue;
         }
       }
+      if ((cmsg->cmsg_level == IPPROTO_IP) && (cmsg->cmsg_type == IP_TOS)) {
+        uint16_t tos = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+        output.msg_[0].tos_ = tos;
+        continue;
+      }
 #ifdef UDP_GRO
       if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
         output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
@@ -413,7 +423,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
         if (addr != nullptr) {
           // This is a IP packet info message.
           output.msg_[i].local_address_ = std::move(addr);
-          break;
+          continue;
+        }
+        if ((cmsg->cmsg_level == IPPROTO_IP) && (cmsg->cmsg_type == IP_TOS)) {
+          uint16_t tos = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+          output.msg_[i].tos_ = tos;
+          continue;
         }
       }
     }

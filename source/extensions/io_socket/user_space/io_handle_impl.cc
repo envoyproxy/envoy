@@ -228,7 +228,7 @@ Api::IoCallUint64Result IoHandleImpl::write(Buffer::Instance& buffer) {
 
 Api::IoCallUint64Result IoHandleImpl::sendmsg(const Buffer::RawSlice*, uint64_t, int,
                                               const Network::Address::Ip*,
-                                              const Network::Address::Instance&) {
+                                              const Network::Address::Instance&, unsigned int) {
   return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 

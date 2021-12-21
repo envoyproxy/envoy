@@ -285,6 +285,7 @@ struct UdpRecvData {
   LocalPeerAddresses addresses_;
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
+  unsigned int tos_;
 };
 
 /**
@@ -297,6 +298,7 @@ struct UdpSendData {
   // The buffer is a reference so that it can be reused by the sender to send different
   // messages
   Buffer::Instance& buffer_;
+  unsigned int tos_{};
 };
 
 /**

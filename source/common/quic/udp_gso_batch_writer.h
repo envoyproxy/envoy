@@ -61,7 +61,8 @@ public:
   // writePacket perform batched sends based on QuicGsoBatchWriter::WritePacket
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                       const Network::Address::Ip* local_ip,
-                                      const Network::Address::Instance& peer_address) override;
+                                      const Network::Address::Instance& peer_address,
+                                      const unsigned int tos = 0) override;
 
   // UdpPacketWriter Implementations
   bool isWriteBlocked() const override { return IsWriteBlocked(); }

@@ -46,7 +46,8 @@ Api::IoCallUint64Result Win32SocketHandleImpl::write(Buffer::Instance& buffer) {
 Api::IoCallUint64Result Win32SocketHandleImpl::sendmsg(const Buffer::RawSlice* slices,
                                                        uint64_t num_slice, int flags,
                                                        const Address::Ip* self_ip,
-                                                       const Address::Instance& peer_address) {
+                                                       const Address::Instance& peer_address,
+                                                       unsigned int) {
 
   Api::IoCallUint64Result result =
       IoSocketHandleImpl::sendmsg(slices, num_slice, flags, self_ip, peer_address);

@@ -13,10 +13,11 @@ UdpDefaultWriter::~UdpDefaultWriter() = default;
 
 Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& buffer,
                                                       const Address::Ip* local_ip,
-                                                      const Address::Instance& peer_address) {
+                                                      const Address::Instance& peer_address,
+                                                      const unsigned int tos) {
   ASSERT(!write_blocked_, "Cannot write while IO handle is blocked.");
   Api::IoCallUint64Result result =
-      Utility::writeToSocket(io_handle_, buffer, local_ip, peer_address);
+      Utility::writeToSocket(io_handle_, buffer, local_ip, peer_address, tos);
   if (result.err_ && result.err_->getErrorCode() == Api::IoError::IoErrorCode::Again) {
     // Writer is blocked when error code received is EWOULDBLOCK/EAGAIN
     write_blocked_ = true;

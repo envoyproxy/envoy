@@ -85,12 +85,13 @@ void UdpListenerImpl::handleReadCallback() {
 
 void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_address,
                                     Address::InstanceConstSharedPtr peer_address,
-                                    Buffer::InstancePtr buffer, MonotonicTime receive_time) {
+                                    Buffer::InstancePtr buffer, MonotonicTime receive_time,
+                                    const unsigned int tos) {
   // UDP listeners are always configured with the socket option that allows pulling the local
   // address. This should never be null.
   ASSERT(local_address != nullptr);
   UdpRecvData recvData{
-      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time, tos};
   cb_.onData(std::move(recvData));
 }
 
@@ -109,8 +110,8 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   ENVOY_UDP_LOG(trace, "send");
   Buffer::Instance& buffer = send_data.buffer_;
 
-  Api::IoCallUint64Result send_result =
-      cb_.udpPacketWriter().writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
+  Api::IoCallUint64Result send_result = cb_.udpPacketWriter().writePacket(
+      buffer, send_data.local_ip_, send_data.peer_address_, send_data.tos_);
 
   // The send_result normalizes the return_value_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.

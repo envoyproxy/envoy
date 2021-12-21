@@ -41,8 +41,8 @@ public:
   Api::IoCallUint64Result write(Buffer::Instance& buffer) override;
 
   Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice, int flags,
-                                  const Address::Ip* self_ip,
-                                  const Address::Instance& peer_address) override;
+                                  const Address::Ip* self_ip, const Address::Instance& peer_address,
+                                  const unsigned int tos = 0) override;
 
   Api::IoCallUint64Result recvmsg(Buffer::RawSlice* slices, const uint64_t num_slice,
                                   uint32_t self_port, RecvMsgOutput& output) override;
@@ -104,12 +104,14 @@ protected:
   int socket_v6only_{false};
   const absl::optional<int> domain_;
   Event::FileEventPtr file_event_{nullptr};
+  bool previous_tos_{};
 
   // The minimum cmsg buffer size to filled in destination address, packets dropped and gso
   // size when receiving a packet. It is possible for a received packet to contain both IPv4
   // and IPV6 addresses.
   const size_t cmsg_space_{CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct in_pktinfo)) +
-                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t))};
+                           CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(uint16_t)) +
+                           CMSG_SPACE(sizeof(uint16_t))};
 };
 } // namespace Network
 } // namespace Envoy

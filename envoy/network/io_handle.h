@@ -118,7 +118,8 @@ public:
    */
   virtual Api::IoCallUint64Result sendmsg(const Buffer::RawSlice* slices, uint64_t num_slice,
                                           int flags, const Address::Ip* self_ip,
-                                          const Address::Instance& peer_address) PURE;
+                                          const Address::Instance& peer_address,
+                                          const unsigned int tos = 0) PURE;
 
   struct RecvMsgPerPacketInfo {
     // The destination address from transport header.
@@ -132,6 +133,7 @@ public:
     // If true indicates a successful syscall, but the packet was dropped due to truncation. We do
     // not support receiving truncated packets.
     bool truncated_and_dropped_{false};
+    unsigned int tos_{};
   };
 
   /**

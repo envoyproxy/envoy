@@ -48,7 +48,8 @@ public:
    */
   virtual Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                               const Address::Ip* local_ip,
-                                              const Address::Instance& peer_address) PURE;
+                                              const Address::Instance& peer_address,
+                                              const unsigned int tos = 0) PURE;
 
   /**
    * @returns true if the network socket is not writable.

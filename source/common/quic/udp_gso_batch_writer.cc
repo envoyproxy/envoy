@@ -50,7 +50,7 @@ UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope&
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
-                               const Network::Address::Instance& peer_address) {
+                               const Network::Address::Instance& peer_address, unsigned int) {
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
