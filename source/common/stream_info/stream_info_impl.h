@@ -28,6 +28,10 @@ struct UpstreamInfoImpl : public UpstreamInfo {
 
   absl::optional<uint64_t> upstreamConnectionId() const override { return upstream_connection_id_; }
 
+  void setUpstreamInterfaceName(const absl::string_view interface_name) override { upstream_connection_interface_name_ = std::string(interface_name); }
+
+  absl::optional<std::string> upstreamInterfaceName() const override { return upstream_connection_interface_name_; }
+
   void
   setUpstreamSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
     upstream_ssl_info_ = ssl_connection_info;
@@ -76,6 +80,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   UpstreamTiming upstream_timing_;
   Ssl::ConnectionInfoConstSharedPtr upstream_ssl_info_;
   absl::optional<uint64_t> upstream_connection_id_;
+  absl::optional<std::string> upstream_connection_interface_name_;
   std::string upstream_transport_failure_reason_;
   FilterStateSharedPtr upstream_filter_state_;
   size_t num_streams_{};
