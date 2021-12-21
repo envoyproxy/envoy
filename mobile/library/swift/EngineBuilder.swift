@@ -21,6 +21,7 @@ open class EngineBuilder: NSObject {
   private var dnsFailureRefreshSecondsMax: UInt32 = 10
   private var dnsQueryTimeoutSeconds: UInt32 = 25
   private var dnsPreresolveHostnames: String = "[]"
+  private var enableHappyEyeballs: Bool = false
   private var enableInterfaceBinding: Bool = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds: UInt32 = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds: UInt32 = 10
@@ -132,6 +133,17 @@ open class EngineBuilder: NSObject {
   @discardableResult
   public func addDNSPreresolveHostnames(dnsPreresolveHostnames: String) -> Self {
     self.dnsPreresolveHostnames = dnsPreresolveHostnames
+    return self
+  }
+
+  /// Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+  ///
+  /// - parameter enableHappyEyeballs: whether to enable RFC 6555 handling for IPv4/IPv6.
+  ///
+  /// - returns: This builder.
+  @discardableResult
+  public func enableHappyEyeballs(_ enableHappyEyeballs: Bool) -> Self {
+    self.enableHappyEyeballs = enableHappyEyeballs
     return self
   }
 
@@ -364,6 +376,7 @@ open class EngineBuilder: NSObject {
       dnsFailureRefreshSecondsMax: self.dnsFailureRefreshSecondsMax,
       dnsQueryTimeoutSeconds: self.dnsQueryTimeoutSeconds,
       dnsPreresolveHostnames: self.dnsPreresolveHostnames,
+      enableHappyEyeballs: self.enableHappyEyeballs,
       enableInterfaceBinding: self.enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds:
         self.h2ConnectionKeepaliveIdleIntervalMilliseconds,
