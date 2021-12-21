@@ -137,19 +137,20 @@ void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply:
     return true;
   });
 
-  server_->stats().forEachSinkedCounter(nullptr, [this, stats](Stats::Counter& counter) mutable -> bool {
-    if (counter.used()) {
-      // The hot restart parent is expected to have stopped its normal stat exporting (and so
-      // latching) by the time it begins exporting to the hot restart child.
-      uint64_t latched_value = counter.latch();
-      if (latched_value > 0) {
-        const std::string name = counter.name();
-        (*stats->mutable_counter_deltas())[name] = latched_value;
-        recordDynamics(stats, name, counter.statName());
-      }
-    }
-    return true;
-  });
+  server_->stats().forEachSinkedCounter(
+      nullptr, [this, stats](Stats::Counter& counter) mutable -> bool {
+        if (counter.used()) {
+          // The hot restart parent is expected to have stopped its normal stat exporting (and so
+          // latching) by the time it begins exporting to the hot restart child.
+          uint64_t latched_value = counter.latch();
+          if (latched_value > 0) {
+            const std::string name = counter.name();
+            (*stats->mutable_counter_deltas())[name] = latched_value;
+            recordDynamics(stats, name, counter.statName());
+          }
+        }
+        return true;
+      });
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());
   stats->set_num_connections(server_->listenerManager().numConnections());
 }

@@ -75,8 +75,10 @@ private:
     bool text_readouts_{false};
     bool pretty_{false};
     Format format_{Format::Text};
+    std::string start_;
     absl::optional<std::regex> filter_;
     absl::optional<std::string> scope_;
+    absl::optional<uint32_t> page_size_;
   };
 
   friend class StatsHandlerTest;

@@ -139,12 +139,11 @@ bool ThreadLocalStoreImpl::slowRejects(StatsMatcher::FastResult fast_reject_resu
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  forEachCounter(
-      [&ret](std::size_t size) mutable { ret.reserve(size); },
-      [&ret](Counter& counter) mutable -> bool {
-        ret.emplace_back(CounterSharedPtr(&counter));
-        return true;
-      });
+  forEachCounter([&ret](std::size_t size) mutable { ret.reserve(size); },
+                 [&ret](Counter& counter) mutable -> bool {
+                   ret.emplace_back(CounterSharedPtr(&counter));
+                   return true;
+                 });
   return ret;
 }
 
@@ -164,7 +163,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
   forEachGauge([&ret](std::size_t size) mutable { ret.reserve(size); },
-               [&ret](Gauge& gauge) mutable -> bool{
+               [&ret](Gauge& gauge) mutable -> bool {
                  if (gauge.importMode() != Gauge::ImportMode::Uninitialized) {
                    ret.emplace_back(GaugeSharedPtr(&gauge));
                  }

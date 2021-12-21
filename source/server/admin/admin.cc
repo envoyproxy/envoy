@@ -313,7 +313,10 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
              "Regular expression (ecmascript) for filtering stats"},
             {ParamDescriptor::Type::String, "start",
              "Alphabetically start stats at specified name"},
-            {ParamDescriptor::Type::String, "pagesize", "Number of stats to show per page"}}},
+            {ParamDescriptor::Type::Enum,
+             "pagesize",
+             "Number of stats to show per page",
+             {"25", "100", "1000"}}}},
           {"/stats/json",
            "print stats as with HTML paging",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsJson),
@@ -573,21 +576,28 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMa
 
     std::vector<std::string> params;
     for (const ParamDescriptor& param : handler->params_) {
-      const char* type = "";
+      response.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'>"));
       switch (param.type_) {
       case ParamDescriptor::Type::Boolean:
-        type = "checkbox";
-        break;
-      case ParamDescriptor::Type::Integer:
-        type = "???";
+        response.add(absl::StrCat("<input type='checkbox' name='", param.id_, "' id='", param.id_,
+                                  "' form='", path, "'/>"));
         break;
       case ParamDescriptor::Type::String:
-        type = "text";
+        response.add(absl::StrCat("<input type='text' name='", param.id_, "' id='", param.id_,
+                                  "' form='", path, "'/>"));
+        break;
+      case ParamDescriptor::Type::Enum:
+        response.add(absl::StrCat("\n    <select name='", param.id_, "' id='", param.id_,
+                                  "' form='", path, "'>\n"));
+        for (const std::string& choice : param.enum_choices_) {
+          std::string sanitized = Html::Utility::sanitize(choice);
+          response.add(
+              absl::StrCat("      <option value='", sanitized, "'>", sanitized, "</option>\n"));
+        }
+        response.add("    </select>\n  ");
         break;
       }
-      response.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'><input type='", type,
-                                "' name='", param.id_, "' id='", param.id_, "' form='", path,
-                                "'/></td>\n", "  <td class='home-data'>",
+      response.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
                                 Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
     }
   }

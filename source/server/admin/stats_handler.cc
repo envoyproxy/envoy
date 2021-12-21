@@ -98,6 +98,21 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     scope_ = scope_iter->second;
   }
 
+  Http::Utility::QueryParams::const_iterator pagesize_iter = params.find("pagesize");
+  if (pagesize_iter != params.end()) {
+    // We don't accept arbitrary page sizes as they might be dangerous.
+    if (pagesize_iter->second == "25") {
+      page_size_ = 25;
+    } else if (pagesize_iter->second == "100") {
+      page_size_ = 100;
+    } else if (pagesize_iter->second == "1000") {
+      page_size_ = 1000;
+    } else {
+      response.add("pagesize must be 25, 100, or 1000");
+      return Http::Code::NotFound;
+    }
+  }
+
   return Http::Code::OK;
 }
 
@@ -150,7 +165,8 @@ Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
 }
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
-                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response) {
+                               Http::ResponseHeaderMap& response_headers,
+                               Buffer::Instance& response) {
   std::map<std::string, uint64_t> counters_and_gauges;
   std::map<std::string, std::string> text_readouts;
   std::vector<Stats::HistogramSharedPtr> histograms;
@@ -252,11 +268,11 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
 )";
 
   Stats::StatNameHashSet prefixes;
-  server_.stats().forEachScope(
-      [](size_t) {}, [&prefixes](const Stats::Scope& scope) -> bool {
-        prefixes.insert(scope.prefix());
-        return true;
-      });
+  server_.stats().forEachScope([](size_t) {},
+                               [&prefixes](const Stats::Scope& scope) -> bool {
+                                 prefixes.insert(scope.prefix());
+                                 return true;
+                               });
   std::vector<std::string> lines, names;
   names.reserve(prefixes.size());
   lines.reserve(prefixes.size() + 2);

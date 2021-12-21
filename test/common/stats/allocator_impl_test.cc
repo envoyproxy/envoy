@@ -286,12 +286,13 @@ TEST_F(AllocatorImplTest, ForEachTextReadout) {
 
   size_t num_text_readouts = 0;
   size_t num_iterations = 0;
-  alloc_.forEachTextReadout([&num_text_readouts](std::size_t size) { num_text_readouts = size; },
-                            [&num_iterations, &stat_names](Stats::TextReadout& text_readout) -> bool {
-                              EXPECT_EQ(stat_names.count(text_readout.statName()), 1);
-                              ++num_iterations;
-                              return true;
-                            });
+  alloc_.forEachTextReadout(
+      [&num_text_readouts](std::size_t size) { num_text_readouts = size; },
+      [&num_iterations, &stat_names](Stats::TextReadout& text_readout) -> bool {
+        EXPECT_EQ(stat_names.count(text_readout.statName()), 1);
+        ++num_iterations;
+        return true;
+      });
   EXPECT_EQ(num_text_readouts, 11);
   EXPECT_EQ(num_iterations, 11);
 
