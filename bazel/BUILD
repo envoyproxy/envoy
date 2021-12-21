@@ -371,6 +371,11 @@ config_setting(
 )
 
 config_setting(
+    name = "enable_perf_tracing",
+    values = {"define": "perf_tracing=enabled"},
+)
+
+config_setting(
     name = "force_libcpp",
     values = {"define": "force_libcpp=enabled"},
 )

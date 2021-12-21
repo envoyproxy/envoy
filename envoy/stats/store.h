@@ -24,6 +24,7 @@ class Instance;
 namespace Stats {
 
 class Sink;
+class SinkPredicates;
 
 /**
  * A store for all known counters, gauges, and timers.
@@ -51,20 +52,27 @@ public:
   virtual std::vector<ParentHistogramSharedPtr> histograms() const PURE;
 
   /**
-   * Iterate over all stats that need to be added to a sink. Note, that implementations can
-   * potentially  hold on to a mutex that will deadlock if the passed in functors try to create
-   * or delete a stat.
-   * @param f_size functor that is provided the number of all stats in the sink.
-   * @param f_stat functor that is provided one stat in the sink at a time.
+   * Iterate over all stats. Note, that implementations can potentially hold on to a mutex that
+   * will deadlock if the passed in functors try to create or delete a stat.
+   * @param f_size functor that is provided the current number of all stats. Note that this is
+   * called only once, prior to any calls to f_stat.
+   * @param f_stat functor that is provided one stat at a time from the stats container.
    */
-  virtual void forEachCounter(std::function<void(std::size_t)> f_size,
-                              std::function<void(Stats::Counter&)> f_stat) const PURE;
+  virtual void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
+  virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
+  virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
-  virtual void forEachGauge(std::function<void(std::size_t)> f_size,
-                            std::function<void(Stats::Gauge&)> f_stat) const PURE;
-
-  virtual void forEachTextReadout(std::function<void(std::size_t)> f_size,
-                                  std::function<void(Stats::TextReadout&)> f_stat) const PURE;
+  /**
+   * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
+   * potentially hold on to a mutex that will deadlock if the passed in functors try to create
+   * or delete a stat.
+   * @param f_size functor that is provided the number of all stats that will be flushed to sinks.
+   * Note that this is called only once, prior to any calls to f_stat.
+   * @param f_stat functor that is provided one stat that will be flushed to sinks, at a time.
+   */
+  virtual void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const PURE;
+  virtual void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
+  virtual void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 };
 
 using StorePtr = std::unique_ptr<Store>;
@@ -123,6 +131,14 @@ public:
    * method would be asserted.
    */
   virtual void mergeHistograms(PostMergeCb merge_complete_cb) PURE;
+
+  /**
+   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   * Note that if the sink predicates object is set, we do not send non-sink stats over to the
+   * child process during hot restart. This will result in the admin stats console being wrong
+   * during hot restart.
+   */
+  virtual void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) PURE;
 };
 
 using StoreRootPtr = std::unique_ptr<StoreRoot>;

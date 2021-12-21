@@ -4,7 +4,7 @@ namespace Envoy {
 
 FakeResourceMonitor::~FakeResourceMonitor() { factory_.onMonitorDestroyed(this); }
 
-void FakeResourceMonitor::updateResourceUsage(Callbacks& callbacks) {
+void FakeResourceMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) {
   Server::ResourceUsage usage;
   usage.resource_pressure_ = pressure_;
   callbacks.onSuccess(usage);

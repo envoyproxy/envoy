@@ -153,6 +153,31 @@ public:
   Socket::Type socketType() const override { return Socket::Type::Stream; }
 };
 
+// This socket type adapts the ListenerComponentFactory.
+class InternalListenSocket : public ListenSocketImpl {
+public:
+  InternalListenSocket(const Address::InstanceConstSharedPtr& address)
+      : ListenSocketImpl(/* io_handle= */ nullptr, address) {}
+  Socket::Type socketType() const override { return Socket::Type::Stream; }
+
+  // InternalListenSocket cannot be duplicated.
+  SocketPtr duplicate() override {
+    return std::make_unique<InternalListenSocket>(connectionInfoProvider().localAddress());
+  }
+
+  Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override {
+    // internal listener socket does not support bind semantic.
+    // TODO(lambdai) return an error.
+    PANIC("not implemented");
+  }
+
+  void close() override { ASSERT(io_handle_ == nullptr); }
+  bool isOpen() const override {
+    ASSERT(io_handle_ == nullptr);
+    return false;
+  }
+};
+
 class ConnectionSocketImpl : public SocketImpl, public ConnectionSocket {
 public:
   ConnectionSocketImpl(IoHandlePtr&& io_handle,
@@ -193,6 +218,11 @@ public:
   absl::string_view requestedServerName() const override {
     return connectionInfoProvider().requestedServerName();
   }
+
+  void setJA3Hash(absl::string_view ja3_hash) override {
+    connectionInfoProvider().setJA3Hash(ja3_hash);
+  }
+  absl::string_view ja3Hash() const override { return connectionInfoProvider().ja3Hash(); }
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override {
     return ioHandle().lastRoundTripTime();

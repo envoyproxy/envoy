@@ -99,7 +99,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 
     stats_.rq_rejected_.inc();
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "denied by admission control");
+                                       "denied_by_admission_control");
     return Http::FilterHeadersStatus::StopIteration;
   }
 

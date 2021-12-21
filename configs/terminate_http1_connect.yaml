@@ -1,5 +1,6 @@
 # This configuration terminates a CONNECT request and sends the CONNECT payload upstream.
-# It can be used to test TCP tunneling as described in docs/root/intro/arch_overview/http/upgrades.rst
+# It can be used to test TCP tunneling as described in
+# https://envoyproxy.io/docs/envoy/latest/intro/arch_overview/http/upgrades
 # or used to test CONNECT directly, by running `curl -k -v -x 127.0.0.1:10001 https://www.google.com`
 admin:
   address:

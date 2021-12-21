@@ -74,7 +74,7 @@ private:
 
   Http::ResponseDecoder* response_decoder_{nullptr};
 
-  bool decoded_100_continue_{false};
+  bool decoded_1xx_{false};
 };
 
 } // namespace Quic

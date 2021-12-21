@@ -24,12 +24,13 @@ namespace Envoy {
 namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
-    Event::Dispatcher& dispatcher,
+    Event::Dispatcher& dispatcher, const bool use_resolvers_as_fallback,
     const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
     const envoy::config::core::v3::DnsResolverOptions& dns_resolver_options)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })),
       dns_resolver_options_(dns_resolver_options),
+      use_resolvers_as_fallback_(use_resolvers_as_fallback),
       resolvers_csv_(maybeBuildResolversCsv(resolvers)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
@@ -82,6 +83,21 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
   return options;
 }
 
+bool DnsResolverImpl::isCaresDefaultTheOnlyNameserver() {
+  struct ares_addr_port_node* servers{};
+  int result = ares_get_servers_ports(channel_, &servers);
+  RELEASE_ASSERT(result == ARES_SUCCESS, "failure in ares_get_servers_ports");
+  // as determined in init_by_defaults in ares_init.c.
+  const bool has_only_default_nameserver =
+      servers == nullptr || (servers->next == nullptr && servers->family == AF_INET &&
+                             servers->addr.addr4.s_addr == htonl(INADDR_LOOPBACK) &&
+                             servers->udp_port == 0 && servers->tcp_port == 0);
+  if (servers != nullptr) {
+    ares_free_data(servers);
+  }
+  return has_only_default_nameserver;
+}
+
 void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   dirty_channel_ = false;
 
@@ -91,15 +107,28 @@ void DnsResolverImpl::initializeChannel(ares_options* options, int optmask) {
   options->sock_state_cb_data = this;
   ares_init_options(&channel_, options, optmask | ARES_OPT_SOCK_STATE_CB);
 
-  // Ensure that the channel points to custom resolvers, if they exist.
   if (resolvers_csv_.has_value()) {
-    int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    bool use_resolvers = true;
+    // If the only name server available is c-ares' default then fallback to the user defined
+    // resolvers. Otherwise, use the resolvers provided by c-ares.
+    if (use_resolvers_as_fallback_ && !isCaresDefaultTheOnlyNameserver()) {
+      use_resolvers = false;
+    }
+
+    if (use_resolvers) {
+      int result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
+      RELEASE_ASSERT(result == ARES_SUCCESS, "");
+    }
   }
 }
 
-void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, int timeouts,
-                                                                   ares_addrinfo* addrinfo) {
+void DnsResolverImpl::AddrInfoPendingResolution::onAresGetAddrInfoCallback(
+    int status, int timeouts, ares_addrinfo* addrinfo) {
+  if (status != ARES_SUCCESS) {
+    ENVOY_LOG_EVENT(debug, "cares_resolution_failure",
+                    "dns resolution for {} failed with c-ares status {}", dns_name_, status);
+  }
+
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
@@ -189,9 +218,9 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
     // that the first lookup failed to return any addresses. Note that DnsLookupFamily::All issues
     // both lookups concurrently so there is no need to fire a second lookup here.
     if (dns_lookup_family_ == DnsLookupFamily::Auto) {
-      getAddrInfo(AF_INET);
+      startResolutionImpl(AF_INET);
     } else if (dns_lookup_family_ == DnsLookupFamily::V4Preferred) {
-      getAddrInfo(AF_INET6);
+      startResolutionImpl(AF_INET6);
     }
 
     // Note: Nothing can follow this call to getAddrInfo due to deletion of this
@@ -201,6 +230,10 @@ void DnsResolverImpl::PendingResolution::onAresGetAddrInfoCallback(int status, i
 }
 
 void DnsResolverImpl::PendingResolution::finishResolve() {
+  ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
+                  "dns resolution for {} completed with status {}", dns_name_,
+                  pending_response_.status_);
+
   if (!cancelled_) {
     // Use a raw try here because it is used in both main thread and filter.
     // Can not convert to use status code as there may be unexpected exceptions in server fuzz
@@ -208,10 +241,6 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
     // portFromTcpUrl().
     // TODO(chaoqin-li1123): remove try catch pattern here once we figure how to handle unexpected
     // exception in fuzz tests.
-    ENVOY_LOG_EVENT(debug, "cares_dns_resolution_complete",
-                    "dns resolution for {} completed with status {}", dns_name_,
-                    pending_response_.status_);
-
     TRY_NEEDS_AUDIT {
       callback_(pending_response_.status_, std::move(pending_response_.address_list_));
     }
@@ -227,6 +256,10 @@ void DnsResolverImpl::PendingResolution::finishResolve() {
       ENVOY_LOG(critical, "Unknown exception in c-ares callback");
       dispatcher_.post([] { throw EnvoyException("unknown"); });
     }
+  } else {
+    ENVOY_LOG_EVENT(debug, "cares_dns_callback_cancelled",
+                    "dns resolution callback for {} not issued. Cancelled with reason={}",
+                    dns_name_, cancel_reason_);
   }
   if (owned_) {
     delete this;
@@ -291,32 +324,9 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     initializeChannel(&options.options_, options.optmask_);
   }
 
-  auto pending_resolution = std::make_unique<PendingResolution>(
+  auto pending_resolution = std::make_unique<AddrInfoPendingResolution>(
       *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
-  if (dns_lookup_family == DnsLookupFamily::Auto ||
-      dns_lookup_family == DnsLookupFamily::V4Preferred ||
-      dns_lookup_family == DnsLookupFamily::All) {
-    pending_resolution->dual_resolution_ = true;
-  }
-
-  switch (dns_lookup_family) {
-  case DnsLookupFamily::V4Only:
-  case DnsLookupFamily::V4Preferred:
-    pending_resolution->getAddrInfo(AF_INET);
-    break;
-  case DnsLookupFamily::V6Only:
-  case DnsLookupFamily::Auto:
-    pending_resolution->getAddrInfo(AF_INET6);
-    break;
-  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
-  // are being requested.
-  case DnsLookupFamily::All:
-    pending_resolution->getAddrInfo(AF_INET);
-    pending_resolution->getAddrInfo(AF_INET6);
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  pending_resolution->startResolution();
 
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
@@ -334,7 +344,46 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
-void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
+DnsResolverImpl::AddrInfoPendingResolution::AddrInfoPendingResolution(
+    DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+    ares_channel channel, const std::string& dns_name, DnsLookupFamily dns_lookup_family)
+    : PendingResolution(parent, callback, dispatcher, channel, dns_name),
+      dns_lookup_family_(dns_lookup_family) {
+  if (dns_lookup_family == DnsLookupFamily::Auto ||
+      dns_lookup_family == DnsLookupFamily::V4Preferred ||
+      dns_lookup_family == DnsLookupFamily::All) {
+    dual_resolution_ = true;
+  }
+
+  switch (dns_lookup_family_) {
+  case DnsLookupFamily::V4Only:
+  case DnsLookupFamily::V4Preferred:
+    family_ = AF_INET;
+    break;
+  case DnsLookupFamily::V6Only:
+  case DnsLookupFamily::Auto:
+    family_ = AF_INET6;
+    break;
+  // NOTE: DnsLookupFamily::All performs both lookups concurrently as addresses from both families
+  // are being requested.
+  case DnsLookupFamily::All:
+    lookup_all_ = true;
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+void DnsResolverImpl::AddrInfoPendingResolution::startResolution() {
+  if (lookup_all_) {
+    startResolutionImpl(AF_INET);
+    startResolutionImpl(AF_INET6);
+  } else {
+    startResolutionImpl(family_);
+  }
+}
+
+void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family) {
   struct ares_addrinfo_hints hints = {};
   hints.ai_family = family;
 
@@ -347,7 +396,8 @@ void DnsResolverImpl::PendingResolution::getAddrInfo(int family) {
   ares_getaddrinfo(
       channel_, dns_name_.c_str(), /* service */ nullptr, &hints,
       [](void* arg, int status, int timeouts, ares_addrinfo* addrinfo) {
-        static_cast<PendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts, addrinfo);
+        static_cast<AddrInfoPendingResolution*>(arg)->onAresGetAddrInfoCallback(status, timeouts,
+                                                                                addrinfo);
       },
       this);
 }
@@ -381,7 +431,8 @@ public:
         resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
       }
     }
-    return std::make_shared<Network::DnsResolverImpl>(dispatcher, resolvers, dns_resolver_options);
+    return std::make_shared<Network::DnsResolverImpl>(dispatcher, cares.use_resolvers_as_fallback(),
+                                                      resolvers, dns_resolver_options);
   }
 };
 

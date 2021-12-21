@@ -61,7 +61,6 @@ public:
                            const SubscriptionOptions& options) override;
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   void handleDiscoveryResponse(
@@ -84,7 +83,7 @@ public:
 private:
   void drainRequests();
   void setRetryTimer();
-  void sendDiscoveryRequest(const std::string& type_url);
+  void sendDiscoveryRequest(absl::string_view type_url);
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const absl::flat_hash_set<std::string>& resources,
@@ -214,7 +213,7 @@ public:
   }
 
   void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
   void onWriteable() override {}

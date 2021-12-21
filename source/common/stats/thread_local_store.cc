@@ -954,23 +954,37 @@ bool ParentHistogramImpl::usedLockHeld() const {
   return false;
 }
 
-void ThreadLocalStoreImpl::forEachCounter(std::function<void(std::size_t)> f_size,
-                                          std::function<void(Stats::Counter&)> f_stat) const {
-  Thread::LockGuard lock(lock_);
+void ThreadLocalStoreImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   alloc_.forEachCounter(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachGauge(std::function<void(std::size_t)> f_size,
-                                        std::function<void(Stats::Gauge&)> f_stat) const {
-  Thread::LockGuard lock(lock_);
+void ThreadLocalStoreImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
   alloc_.forEachGauge(f_size, f_stat);
 }
 
-void ThreadLocalStoreImpl::forEachTextReadout(
-    std::function<void(std::size_t)> f_size,
-    std::function<void(Stats::TextReadout&)> f_stat) const {
-  Thread::LockGuard lock(lock_);
+void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const {
   alloc_.forEachTextReadout(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
+  alloc_.forEachSinkedCounter(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
+  alloc_.forEachSinkedGauge(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
+                                                    StatFn<TextReadout> f_stat) const {
+  alloc_.forEachSinkedTextReadout(f_size, f_stat);
+}
+
+void ThreadLocalStoreImpl::setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) {
+  ASSERT(sink_predicates != nullptr);
+  if (sink_predicates != nullptr) {
+    sink_predicates_.emplace(*sink_predicates);
+    alloc_.setSinkPredicates(std::move(sink_predicates));
+  }
 }
 
 } // namespace Stats

@@ -96,8 +96,8 @@ parseMetadataField(absl::string_view params_str, bool upstream = true) {
 
   return [upstream, params](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
     const envoy::config::core::v3::Metadata* metadata = nullptr;
-    if (upstream) {
-      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamHost();
+    if (upstream && stream_info.upstreamInfo()) {
+      Upstream::HostDescriptionConstSharedPtr host = stream_info.upstreamInfo()->upstreamHost();
       if (!host) {
         return std::string();
       }
@@ -241,6 +241,14 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return Envoy::Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(
           stream_info.protocol());
     };
+  } else if (field_name == "REQUESTED_SERVER_NAME") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) -> std::string {
+      return std::string(stream_info.downstreamAddressProvider().requestedServerName());
+    };
+  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      return stream_info.virtualClusterName().value_or("");
+    };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       return stream_info.downstreamAddressProvider().remoteAddress()->asString();
@@ -326,8 +334,8 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
     field_extractor_ = parseSubstitutionFormatField(field_name, formatter_map_);
   } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
-      if (stream_info.upstreamHost()) {
-        return stream_info.upstreamHost()->address()->asString();
+      if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+        return stream_info.upstreamInfo()->upstreamHost()->address()->asString();
       }
       return "";
     };

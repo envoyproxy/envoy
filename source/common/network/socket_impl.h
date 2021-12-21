@@ -54,8 +54,11 @@ public:
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
+  absl::string_view ja3Hash() const override { return ja3_hash_; }
+  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -65,6 +68,7 @@ private:
   std::string server_name_;
   absl::optional<uint64_t> connection_id_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  std::string ja3_hash_;
 };
 
 class SocketImpl : public virtual Socket {
@@ -84,7 +88,7 @@ public:
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   IoHandle& ioHandle() override { return *io_handle_; }
