@@ -894,7 +894,7 @@ void ClientConnectionImpl::connect() {
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (ioHandle().interfaceName().has_value()) {
-      socket_->connectionInfoProvider().setInterfaceName(ioHandle().interfaceName().value());
+    socket_->connectionInfoProvider().setInterfaceName(ioHandle().interfaceName().value());
   }
   if (result.return_value_ == 0) {
     // write will become ready.
