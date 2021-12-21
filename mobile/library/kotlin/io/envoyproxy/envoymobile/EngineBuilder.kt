@@ -35,6 +35,7 @@ open class EngineBuilder(
   private var dnsFailureRefreshSecondsMax = 10
   private var dnsQueryTimeoutSeconds = 25
   private var dnsPreresolveHostnames = "[]"
+  private var dnsFallbackNameservers = listOf<String>()
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
@@ -149,6 +150,18 @@ open class EngineBuilder(
    */
   fun addDNSPreresolveHostnames(dnsPreresolveHostnames: String): EngineBuilder {
     this.dnsPreresolveHostnames = dnsPreresolveHostnames
+    return this
+  }
+
+  /**
+   * Add a list of IP addresses to use as fallback DNS name servers.
+   *
+   * @param dnsFallbackNameservers addresses to use.
+   *
+   * @return this builder.
+   */
+  fun addDNSFallbackNameservers(dnsFallbackNameservers: List<String>): EngineBuilder {
+    this.dnsFallbackNameservers = dnsFallbackNameservers
     return this
   }
 
@@ -375,10 +388,11 @@ open class EngineBuilder(
           EnvoyConfiguration(
             adminInterfaceEnabled, grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            statsFlushSeconds, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
-            appId, virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
+            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, dnsFallbackNameservers,
+            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds, statsFlushSeconds, streamIdleTimeoutSeconds,
+            perTryIdleTimeoutSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
+            platformFilterChain, stringAccessors
           ),
           configuration.yaml,
           logLevel
@@ -390,10 +404,11 @@ open class EngineBuilder(
           EnvoyConfiguration(
             adminInterfaceEnabled, grpcStatsDomain, statsDPort, connectTimeoutSeconds,
             dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, enableInterfaceBinding,
-            h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-            statsFlushSeconds, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
-            appId, virtualClusters, nativeFilterChain, platformFilterChain, stringAccessors
+            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, dnsFallbackNameservers,
+            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds, statsFlushSeconds, streamIdleTimeoutSeconds,
+            perTryIdleTimeoutSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
+            platformFilterChain, stringAccessors
           ),
           logLevel
         )

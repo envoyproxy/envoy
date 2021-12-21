@@ -81,6 +81,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying dns fallback nameservers overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.addDNSFallbackNameservers(listOf<String>("8.8.8.8"))
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.dnsFallbackNameservers.size).isEqualTo(1)
+  }
+
+  @Test
   fun `specifying H2 Ping idle interval overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }

@@ -116,6 +116,19 @@ The configuration is expected as a JSON list.
   // Swift
   builder.addDNSPreresolveHostnames("[{\"address\": \"foo.com", \"port_value\": 443}]")
 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``addDNSFallbackNameservers``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. attention::
+
+  This API is only available for Kotlin.
+
+Add a list of IP addresses to use as fallback DNS name servers.
+
+  // Kotlin
+  builder.addDNSFallbackNameservers(listOf<String>("8.8.8.8"))
+
 ~~~~~~~~~~~~~~~
 ``addLogLevel``
 ~~~~~~~~~~~~~~~
