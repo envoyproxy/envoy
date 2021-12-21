@@ -28,20 +28,18 @@ public:
   void unregisterEventfd() override;
   bool isEventfdRegistered() const override;
   void forEveryCompletion(CompletionCb completion_cb) override;
-  void prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
-                     void* user_data) override;
-  void prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
-                      void* user_data) override;
-  void prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
-                    void* user_data) override;
-  void prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
-                     void* user_data) override;
-  void prepareClose(os_fd_t fd, void* user_data) override;
-  void submit() override;
+  IoUringResult prepareAccept(os_fd_t fd, struct sockaddr* remote_addr, socklen_t* remote_addr_len,
+                              void* user_data) override;
+  IoUringResult prepareConnect(os_fd_t fd, const Network::Address::InstanceConstSharedPtr& address,
+                               void* user_data) override;
+  IoUringResult prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs, off_t offset,
+                             void* user_data) override;
+  IoUringResult prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                              off_t offset, void* user_data) override;
+  IoUringResult prepareClose(os_fd_t fd, void* user_data) override;
+  IoUringResult submit() override;
 
 private:
-  struct io_uring_sqe* getSqe();
-
   const uint32_t io_uring_size_;
   struct io_uring ring_;
   std::vector<struct io_uring_cqe*> cqes_;

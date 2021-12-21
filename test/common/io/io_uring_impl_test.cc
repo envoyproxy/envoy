@@ -26,19 +26,28 @@ thread_local const IoUringFactoryImpl IoUringBaseTest::factory_(2, false);
 
 class IoUringImplParamTest
     : public IoUringBaseTest,
-      public testing::WithParamInterface<std::function<void(IoUring&, os_fd_t)>> {};
+      public testing::WithParamInterface<std::function<IoUringResult(IoUring&, os_fd_t)>> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    InvalidPrepareMethodParamsTest, IoUringImplParamTest,
-    testing::Values(
-        [](IoUring& uring, os_fd_t fd) { uring.prepareAccept(fd, nullptr, nullptr, nullptr); },
-        [](IoUring& uring, os_fd_t fd) {
-          auto address = std::make_shared<Network::Address::EnvoyInternalInstance>("test");
-          uring.prepareConnect(fd, address, nullptr);
-        },
-        [](IoUring& uring, os_fd_t fd) { uring.prepareReadv(fd, nullptr, 0, 0, nullptr); },
-        [](IoUring& uring, os_fd_t fd) { uring.prepareWritev(fd, nullptr, 0, 0, nullptr); },
-        [](IoUring& uring, os_fd_t fd) { uring.prepareClose(fd, nullptr); }));
+INSTANTIATE_TEST_SUITE_P(InvalidPrepareMethodParamsTest, IoUringImplParamTest,
+                         testing::Values(
+                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+                               return uring.prepareAccept(fd, nullptr, nullptr, nullptr);
+                             },
+                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+                               auto address =
+                                   std::make_shared<Network::Address::EnvoyInternalInstance>(
+                                       "test");
+                               return uring.prepareConnect(fd, address, nullptr);
+                             },
+                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+                               return uring.prepareReadv(fd, nullptr, 0, 0, nullptr);
+                             },
+                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+                               return uring.prepareWritev(fd, nullptr, 0, 0, nullptr);
+                             },
+                             [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+                               return uring.prepareClose(fd, nullptr);
+                             }));
 
 TEST_P(IoUringImplParamTest, InvalidParams) {
   os_fd_t fd;
@@ -55,8 +64,16 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   ASSERT_FALSE(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1);
 
   auto prepare_method = GetParam();
-  prepare_method(uring, fd);
-  uring.submit();
+  IoUringResult res = prepare_method(uring, fd);
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = prepare_method(uring, fd);
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = prepare_method(uring, fd);
+  EXPECT_EQ(res, IoUringResult::Failed);
+  res = uring.submit();
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = uring.submit();
+  EXPECT_EQ(res, IoUringResult::Ok);
 
   int ret = epoll_wait(epoll_fd, events, 10, -1);
   EXPECT_EQ(ret, 1);
@@ -66,7 +83,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
     EXPECT_TRUE(res < 0);
     completions_nr++;
   });
-  EXPECT_EQ(completions_nr, 1);
+  EXPECT_EQ(completions_nr, 2);
 }
 
 class IoUringImplTest : public IoUringBaseTest {
@@ -166,21 +183,25 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   ev.data.fd = event_fd;
   ASSERT_FALSE(epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event_fd, &ev) == -1);
 
-  uring.prepareReadv(fd, &iov1, 1, 0, reinterpret_cast<void*>(1));
-  uring.prepareReadv(fd, &iov2, 1, 2, reinterpret_cast<void*>(2));
-  uring.prepareReadv(fd, &iov3, 1, 4, reinterpret_cast<void*>(3));
-  uring.submit();
-  int ret = epoll_wait(epoll_fd, events, 10, -1);
-  EXPECT_EQ(ret, 1);
+  IoUringResult res = uring.prepareReadv(fd, &iov1, 1, 0, reinterpret_cast<void*>(1));
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = uring.prepareReadv(fd, &iov2, 1, 2, reinterpret_cast<void*>(2));
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = uring.prepareReadv(fd, &iov3, 1, 4, reinterpret_cast<void*>(3));
+  // Expect the submission queue overflow.
+  EXPECT_EQ(res, IoUringResult::Failed);
+  res = uring.submit();
+  EXPECT_EQ(res, IoUringResult::Ok);
 
+  // Even though we haven't been notified about ops completion the buffers
+  // are filled aready.
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[0], 'a');
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[1], 'b');
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[0], 'c');
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[1], 'd');
-  // Even though the completion event for this buffer is not in the completion
-  // queue yet, the third READ op has actually happened already.
-  EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
-  EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
+
+  int ret = epoll_wait(epoll_fd, events, 10, -1);
+  EXPECT_EQ(ret, 1);
 
   uint32_t completions_nr = 0;
   uring.forEveryCompletion([&completions_nr](void* user_data, int32_t res) {
@@ -193,9 +214,13 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   // no more than 2 entries.
   EXPECT_EQ(completions_nr, 2);
 
-  // Touch event_fd manually to get the rest.
-  uint64_t inc{1};
-  write(event_fd, &inc, sizeof(inc));
+  res = uring.prepareReadv(fd, &iov3, 1, 4, reinterpret_cast<void*>(3));
+  EXPECT_EQ(res, IoUringResult::Ok);
+  res = uring.submit();
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
+  EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
 
   ret = epoll_wait(epoll_fd, events, 10, -1);
   EXPECT_EQ(ret, 1);

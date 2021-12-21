@@ -68,55 +68,70 @@ void IoUringImpl::forEveryCompletion(CompletionCb completion_cb) {
   io_uring_cq_advance(&ring_, count);
 }
 
-void IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
-                                socklen_t* remote_addr_len, void* user_data) {
-  struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_accept(sqe, fd, remote_addr, remote_addr_len, 0);
-  io_uring_sqe_set_data(sqe, user_data);
-}
-
-void IoUringImpl::prepareConnect(os_fd_t fd,
-                                 const Network::Address::InstanceConstSharedPtr& address,
-                                 void* user_data) {
-  struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
-  io_uring_sqe_set_data(sqe, user_data);
-}
-
-void IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                               off_t offset, void* user_data) {
-  struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset);
-  io_uring_sqe_set_data(sqe, user_data);
-}
-
-void IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
-                                off_t offset, void* user_data) {
-  struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
-  io_uring_sqe_set_data(sqe, user_data);
-}
-
-void IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
-  struct io_uring_sqe* sqe = getSqe();
-  io_uring_prep_close(sqe, fd);
-  io_uring_sqe_set_data(sqe, user_data);
-}
-
-void IoUringImpl::submit() {
-  // TODO(rojkov): Handle `EBUSY` in case the completion queue is never reaped.
-  RELEASE_ASSERT(io_uring_submit(&ring_) >= 0, "unable to submit io_uring queue entries");
-}
-
-struct io_uring_sqe* IoUringImpl::getSqe() {
+IoUringResult IoUringImpl::prepareAccept(os_fd_t fd, struct sockaddr* remote_addr,
+                                         socklen_t* remote_addr_len, void* user_data) {
   struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
   if (sqe == nullptr) {
-    FANCY_LOG(warn, "io_uring submission queue is saturated; you may want to increase it");
-    submit();
-    sqe = io_uring_get_sqe(&ring_);
+    return IoUringResult::Failed;
   }
-  RELEASE_ASSERT(sqe != nullptr, "unable to get SQE");
-  return sqe;
+
+  io_uring_prep_accept(sqe, fd, remote_addr, remote_addr_len, 0);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareConnect(os_fd_t fd,
+                                          const Network::Address::InstanceConstSharedPtr& address,
+                                          void* user_data) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_connect(sqe, fd, address->sockAddr(), address->sockAddrLen());
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareReadv(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                                        off_t offset, void* user_data) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_readv(sqe, fd, iovecs, nr_vecs, offset);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareWritev(os_fd_t fd, const struct iovec* iovecs, unsigned nr_vecs,
+                                         off_t offset, void* user_data) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_writev(sqe, fd, iovecs, nr_vecs, offset);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareClose(os_fd_t fd, void* user_data) {
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_close(sqe, fd);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::submit() {
+  int res = io_uring_submit(&ring_);
+  RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");
+  return res == -EBUSY ? IoUringResult::Busy : IoUringResult::Ok;
 }
 
 } // namespace Io

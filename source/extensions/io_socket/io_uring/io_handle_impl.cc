@@ -39,7 +39,11 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
 Api::IoCallUint64Result IoUringSocketHandleImpl::close() {
   ASSERT(SOCKET_VALID(fd_));
   auto req = new Request{absl::nullopt, RequestType::Close};
-  io_uring_factory_.getOrCreateUring().prepareClose(fd_, req);
+  Io::IoUringResult res = io_uring_factory_.getOrCreateUring().prepareClose(fd_, req);
+  if (res == Io::IoUringResult::Failed) {
+    // Fall back to posix system call.
+    ::close(fd_);
+  }
   if (isLeader()) {
     io_uring_factory_.getOrCreateUring().unregisterEventfd();
     file_event_adapter_.reset();
@@ -113,7 +117,14 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer)
   }
 
   auto req = new Request{*this, RequestType::Write, iovecs, std::move(slices)};
-  io_uring_factory_.getOrCreateUring().prepareWritev(fd_, iovecs, nr_vecs, 0, req);
+  auto& uring = io_uring_factory_.getOrCreateUring();
+  auto res = uring.prepareWritev(fd_, iovecs, nr_vecs, 0, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    uring.submit();
+    res = uring.prepareWritev(fd_, iovecs, nr_vecs, 0, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare writev");
+  }
   return Api::IoCallUint64Result(length,
                                  Api::IoErrorPtr(nullptr, Network::IoSocketError::deleteIoError));
 }
@@ -164,10 +175,20 @@ Network::IoHandlePtr IoUringSocketHandleImpl::accept(struct sockaddr* addr, sock
 
 Api::SysCallIntResult
 IoUringSocketHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
+  auto& uring = io_uring_factory_.getOrCreateUring();
   auto req = new Request{*this, RequestType::Connect};
-  io_uring_factory_.getOrCreateUring().prepareConnect(fd_, address, req);
+  auto res = uring.prepareConnect(fd_, address, req);
+  if (res == Io::IoUringResult::Failed) {
+    res = uring.submit();
+    if (res == Io::IoUringResult::Busy) {
+      return Api::SysCallIntResult{0, SOCKET_ERROR_AGAIN};
+    }
+    res = uring.prepareConnect(fd_, address, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare connect");
+  }
   if (isLeader()) {
-    io_uring_factory_.getOrCreateUring().submit();
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    uring.submit();
   }
   return Api::SysCallIntResult{0, SOCKET_ERROR_IN_PROGRESS};
 }
@@ -290,8 +311,15 @@ void IoUringSocketHandleImpl::addReadRequest() {
   read_buf_ = std::unique_ptr<uint8_t[]>(new uint8_t[read_buffer_size_]);
   iov_.iov_base = read_buf_.get();
   iov_.iov_len = read_buffer_size_;
+  auto& uring = io_uring_factory_.getOrCreateUring();
   auto req = new Request{*this, RequestType::Read};
-  io_uring_factory_.getOrCreateUring().prepareReadv(fd_, &iov_, 1, 0, req);
+  auto res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    uring.submit();
+    res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
+  }
 }
 
 Network::IoHandlePtr IoUringSocketHandleImpl::FileEventAdapter::accept(struct sockaddr* addr,
@@ -383,8 +411,15 @@ void IoUringSocketHandleImpl::FileEventAdapter::initialize(Event::Dispatcher& di
 
 void IoUringSocketHandleImpl::FileEventAdapter::addAcceptRequest() {
   is_accept_added_ = true;
+  auto& uring = io_uring_factory_.getOrCreateUring();
   auto req = new Request{absl::nullopt, RequestType::Accept};
-  io_uring_factory_.getOrCreateUring().prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
+  auto res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
+  if (res == Io::IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    uring.submit();
+    res = uring.prepareAccept(fd_, &remote_addr_, &remote_addr_len_, req);
+    RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare accept");
+  }
 }
 
 } // namespace IoUring
