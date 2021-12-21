@@ -387,6 +387,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
         ares_addrinfo* info = new ares_addrinfo;
         info->nodes = nullptr;
+        info->cnames = nullptr;
         onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
         return;
       }
@@ -396,6 +397,7 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
         ares_addrinfo* info = new ares_addrinfo;
         info->nodes = nullptr;
+        info->cnames = nullptr;
         onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
         return;
       }
