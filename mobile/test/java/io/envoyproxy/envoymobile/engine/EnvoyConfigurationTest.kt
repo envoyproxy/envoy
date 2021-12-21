@@ -28,7 +28,7 @@ class EnvoyConfigurationTest {
   @Test
   fun `resolving with default configuration resolves with values`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8"), true, 222, 333, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", listOf("8.8.8.8"), true, true, 222, 333, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")),
       emptyList(), emptyMap()
     )
@@ -45,6 +45,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("&dns_fail_base_interval 345s")
     assertThat(resolvedTemplate).contains("&dns_fail_max_interval 456s")
     assertThat(resolvedTemplate).contains("&dns_query_timeout 321s")
+    assertThat(resolvedTemplate).contains("&dns_lookup_family ALL")
     assertThat(resolvedTemplate).contains("&dns_preresolve_hostnames [hostname]")
     assertThat(resolvedTemplate).contains("&dns_resolver_name envoy.network.dns_resolver.cares")
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[{\"socket_address\":{\"address\":\"8.8.8.8\"}}],\"use_resolvers_as_fallback\": true}")
@@ -77,9 +78,9 @@ class EnvoyConfigurationTest {
   }
 
   @Test
-  fun `resolving with no DNS resolvers has the right config`() {
+  fun `resolving with alternate values also sets appropriate config`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), true, 222, 333, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false, false, 222, 333, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
       listOf(EnvoyNativeFilterConfig("filter_name", "test_config")),
       emptyList(), emptyMap()
     )
@@ -88,13 +89,18 @@ class EnvoyConfigurationTest {
       TEST_CONFIG, PLATFORM_FILTER_CONFIG, NATIVE_FILTER_CONFIG
     )
 
+    // DNS
     assertThat(resolvedTemplate).contains("&dns_resolver_config {\"@type\":\"type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig\",\"resolvers\":[],\"use_resolvers_as_fallback\": false}")
+    assertThat(resolvedTemplate).contains("&dns_lookup_family V4_PREFERRED")
+
+    // Interface Binding
+    assertThat(resolvedTemplate).contains("&enable_interface_binding false")
   }
 
   @Test
   fun `resolve templates with invalid templates will throw on build`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false, 123, 123, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
+      false, "stats.foo.com", null, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false, false, 123, 123, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
       emptyList(), emptyList(), emptyMap()
     )
 
@@ -109,7 +115,7 @@ class EnvoyConfigurationTest {
   @Test
   fun `cannot configure both statsD and gRPC stat sink`() {
     val envoyConfiguration = EnvoyConfiguration(
-      false, "stats.foo.com", 5050, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false, 123, 123, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
+      false, "stats.foo.com", 5050, 123, 234, 345, 456, 321, "[hostname]", emptyList(), false, false, 123, 123, 567, 678, 910, "v1.2.3", "com.mydomain.myapp", "[test]",
       emptyList(), emptyList(), emptyMap()
     )
 

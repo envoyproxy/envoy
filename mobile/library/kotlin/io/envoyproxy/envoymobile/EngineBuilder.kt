@@ -36,6 +36,7 @@ open class EngineBuilder(
   private var dnsQueryTimeoutSeconds = 25
   private var dnsPreresolveHostnames = "[]"
   private var dnsFallbackNameservers = listOf<String>()
+  private var enableHappyEyeballs = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
   private var h2ConnectionKeepaliveTimeoutSeconds = 10
@@ -162,6 +163,18 @@ open class EngineBuilder(
    */
   fun addDNSFallbackNameservers(dnsFallbackNameservers: List<String>): EngineBuilder {
     this.dnsFallbackNameservers = dnsFallbackNameservers
+    return this
+  }
+
+  /**
+   * Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+   *
+   * @param enableHappyEyeballs whether to enable RFC 6555 handling for IPv4/IPv6.
+   *
+   * @return This builder.
+   */
+  fun enableHappyEyeballs(enableHappyEyeballs: Boolean): EngineBuilder {
+    this.enableHappyEyeballs = enableHappyEyeballs
     return this
   }
 
@@ -380,19 +393,36 @@ open class EngineBuilder(
    *
    * @return A new instance of Envoy.
    */
+  @Suppress("LongMethod")
   fun build(): Engine {
     return when (configuration) {
       is Custom -> {
         EngineImpl(
           engineType(),
           EnvoyConfiguration(
-            adminInterfaceEnabled, grpcStatsDomain, statsDPort, connectTimeoutSeconds,
-            dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, dnsFallbackNameservers,
-            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds, statsFlushSeconds, streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
-            platformFilterChain, stringAccessors
+            adminInterfaceEnabled,
+            grpcStatsDomain,
+            statsDPort,
+            connectTimeoutSeconds,
+            dnsRefreshSeconds,
+            dnsFailureRefreshSecondsBase,
+            dnsFailureRefreshSecondsMax,
+            dnsQueryTimeoutSeconds,
+            dnsPreresolveHostnames,
+            dnsFallbackNameservers,
+            enableHappyEyeballs,
+            enableInterfaceBinding,
+            h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds,
+            statsFlushSeconds,
+            streamIdleTimeoutSeconds,
+            perTryIdleTimeoutSeconds,
+            appVersion,
+            appId,
+            virtualClusters,
+            nativeFilterChain,
+            platformFilterChain,
+            stringAccessors
           ),
           configuration.yaml,
           logLevel
@@ -402,13 +432,29 @@ open class EngineBuilder(
         EngineImpl(
           engineType(),
           EnvoyConfiguration(
-            adminInterfaceEnabled, grpcStatsDomain, statsDPort, connectTimeoutSeconds,
-            dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
-            dnsQueryTimeoutSeconds, dnsPreresolveHostnames, dnsFallbackNameservers,
-            enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
-            h2ConnectionKeepaliveTimeoutSeconds, statsFlushSeconds, streamIdleTimeoutSeconds,
-            perTryIdleTimeoutSeconds, appVersion, appId, virtualClusters, nativeFilterChain,
-            platformFilterChain, stringAccessors
+            adminInterfaceEnabled,
+            grpcStatsDomain,
+            statsDPort,
+            connectTimeoutSeconds,
+            dnsRefreshSeconds,
+            dnsFailureRefreshSecondsBase,
+            dnsFailureRefreshSecondsMax,
+            dnsQueryTimeoutSeconds,
+            dnsPreresolveHostnames,
+            dnsFallbackNameservers,
+            enableHappyEyeballs,
+            enableInterfaceBinding,
+            h2ConnectionKeepaliveIdleIntervalMilliseconds,
+            h2ConnectionKeepaliveTimeoutSeconds,
+            statsFlushSeconds,
+            streamIdleTimeoutSeconds,
+            perTryIdleTimeoutSeconds,
+            appVersion,
+            appId,
+            virtualClusters,
+            nativeFilterChain,
+            platformFilterChain,
+            stringAccessors
           ),
           logLevel
         )

@@ -12,6 +12,7 @@
                       dnsFailureRefreshSecondsMax:(UInt32)dnsFailureRefreshSecondsMax
                            dnsQueryTimeoutSeconds:(UInt32)dnsQueryTimeoutSeconds
                            dnsPreresolveHostnames:(NSString *)dnsPreresolveHostnames
+                              enableHappyEyeballs:(BOOL)enableHappyEyeballs
                            enableInterfaceBinding:(BOOL)enableInterfaceBinding
     h2ConnectionKeepaliveIdleIntervalMilliseconds:
         (UInt32)h2ConnectionKeepaliveIdleIntervalMilliseconds
@@ -44,6 +45,7 @@
   self.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
   self.dnsQueryTimeoutSeconds = dnsQueryTimeoutSeconds;
   self.dnsPreresolveHostnames = dnsPreresolveHostnames;
+  self.enableHappyEyeballs = enableHappyEyeballs;
   self.enableInterfaceBinding = enableInterfaceBinding;
   self.h2ConnectionKeepaliveIdleIntervalMilliseconds =
       h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -120,6 +122,8 @@
   [definitions
       appendFormat:@"- &dns_query_timeout %lus\n", (unsigned long)self.dnsQueryTimeoutSeconds];
   [definitions appendFormat:@"- &dns_preresolve_hostnames %@\n", self.dnsPreresolveHostnames];
+  [definitions appendFormat:@"- &dns_lookup_family %@\n",
+                            self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
   // No additional values are currently needed for Apple-based DNS resolver.
   [definitions appendFormat:@"- &dns_resolver_config {}\n"];

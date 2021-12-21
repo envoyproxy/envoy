@@ -38,6 +38,7 @@ const std::string config_header = R"(
 - &dns_fail_base_interval 2s
 - &dns_fail_max_interval 10s
 - &dns_query_timeout 25s
+- &dns_lookup_family V4_PREFERRED
 - &dns_preresolve_hostnames []
 - &dns_resolver_name envoy.network.dns_resolver.cares
 - &dns_resolver_config {}
@@ -258,9 +259,7 @@ static_resources:
                 // https://github.com/envoyproxy/envoy-mobile/issues/1534
 R"(
                 preresolve_hostnames: *dns_preresolve_hostnames
-)"              // TODO: Support IPV6 https://github.com/envoyproxy/envoy-mobile/issues/1022
-R"(
-                dns_lookup_family: V4_PREFERRED
+                dns_lookup_family: *dns_lookup_family
 )"              // On mobile, backgrounding might cause the host to be past its TTL without good
                 // reason. Given the host would be deleted, and new streams for a given domain
                 // would have to wait for resolution, it is better to not delete existing hosts;
