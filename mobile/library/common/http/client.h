@@ -146,11 +146,11 @@ private:
     Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override { return absl::nullopt; }
     void encode1xxHeaders(const ResponseHeaderMap&) override {
       // TODO(goaway): implement?
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
     bool streamErrorOnInvalidHttpMessage() const override { return false; }
 
-    void encodeMetadata(const MetadataMapVector&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    void encodeMetadata(const MetadataMapVector&) override { PANIC("not implemented"); }
 
     void onHasBufferedData();
     void onBufferedDataDrained();

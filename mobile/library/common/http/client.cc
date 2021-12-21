@@ -464,7 +464,7 @@ void Client::sendData(envoy_stream_t stream, envoy_data data, bool end_stream) {
   }
 }
 
-void Client::sendMetadata(envoy_stream_t, envoy_headers) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+void Client::sendMetadata(envoy_stream_t, envoy_headers) { PANIC("not implemented"); }
 
 void Client::sendTrailers(envoy_stream_t stream, envoy_headers trailers) {
   ASSERT(dispatcher_.isThreadSafe());
