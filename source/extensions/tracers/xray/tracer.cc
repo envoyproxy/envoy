@@ -71,7 +71,9 @@ void Span::finishSpan() {
   s.set_error(clientError());
   s.set_fault(serverError());
   s.set_throttle(isThrottled());
-
+  if (type() == Subsegment) {
+    s.set_type(std::string(Subsegment));
+  }
   auto* aws = s.mutable_aws()->mutable_fields();
   for (const auto& field : aws_metadata_) {
     aws->insert({field.first, field.second});
@@ -115,6 +117,7 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
   child_span->setParentId(id());
   child_span->setTraceId(traceId());
   child_span->setSampled(sampled());
+  child_span->setType(Subsegment);
   return child_span;
 }
 

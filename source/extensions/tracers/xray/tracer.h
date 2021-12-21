@@ -26,6 +26,7 @@ namespace Tracers {
 namespace XRay {
 
 constexpr auto XRayTraceHeader = "x-amzn-trace-id";
+constexpr absl::string_view Subsegment = "subsegment";
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {
 public:
@@ -102,6 +103,12 @@ public:
   }
 
   /**
+   * Sets the type of the Span. In Xray, an independent subsegment has a type of ``subsegment``.
+   * https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-subsegments
+   */
+  void setType(absl::string_view type) { type_ = std::string(type); }
+
+  /**
    * Sets the aws metadata field of the Span.
    */
   void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
@@ -155,6 +162,11 @@ public:
    * Gets this Span's direction.
    */
   const std::string& direction() const { return direction_; }
+
+  /**
+   * Gets this Span's type.
+   */
+  const std::string& type() const { return type_; }
 
   /**
    * Gets this Span's name.
@@ -216,6 +228,7 @@ private:
   std::string parent_segment_id_;
   std::string name_;
   std::string origin_;
+  std::string type_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
   absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
