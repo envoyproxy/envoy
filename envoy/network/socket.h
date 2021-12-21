@@ -86,6 +86,11 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
+   * @return the name of the network interface used by the downstream connection, or unset if not available.
+   **/
+  virtual absl::optional<std::string> interfaceName() const PURE;
+
+  /**
    * Dumps the state of the ConnectionInfoProvider to the given ostream.
    *
    * @param os the std::ostream to dump to.
@@ -142,6 +147,11 @@ public:
    * @param id Connection ID of the downstream connection.
    **/
   virtual void setConnectionID(uint64_t id) PURE;
+
+  /**
+   * @param interface_name the name of the network interface used by the downstream connection.
+   **/
+  virtual void setInterfaceName(const absl::string_view interface_name) PURE;
 
   /**
    * @param connection_info sets the downstream ssl connection.
