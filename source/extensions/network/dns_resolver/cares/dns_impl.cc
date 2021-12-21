@@ -324,7 +324,6 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   auto pending_resolution = std::make_unique<AddrInfoPendingResolution>(
       *this, callback, dispatcher_, channel_, dns_name, dns_lookup_family);
   pending_resolution->startResolution();
-
   if (pending_resolution->completed_) {
     // Resolution does not need asynchronous behavior or network events. For
     // example, localhost lookup.
@@ -386,14 +385,18 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
-        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+        ares_addrinfo* info = new ares_addrinfo;
+        info->nodes = nullptr;
+        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
         return;
       }
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
-        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, nullptr);
+        ares_addrinfo* info = new ares_addrinfo;
+        info->nodes = nullptr;
+        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
         return;
       }
       break;
@@ -422,6 +425,11 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
 
 DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces
 DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
+  if (!Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    // Maintain no-op behavior if the system cannot provide interface information.
+    return {true, true};
+  }
+
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
