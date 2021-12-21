@@ -43,9 +43,6 @@ public:
   Http::Code handlerStatsJson(absl::string_view path_and_query,
                               Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                               AdminStream&);
-  Http::Code handlerStatsHtml(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                              AdminStream&);
   Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -57,6 +54,11 @@ public:
                                Buffer::Instance& response, AdminStream&);
 
 private:
+  class Context;
+  class JsonRender;
+  class Render;
+  class TextRender;
+
   enum class Format {
     Html,
     Json,

@@ -152,68 +152,142 @@ Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
   return stats(params, server_.stats(), response_headers, response);
 }
 
-Http::Code StatsHandler::handlerStatsHtml(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  Params params;
-  Http::Code code = params.parse(url, response);
-  if (code != Http::Code::OK) {
-    return code;
+class StatsHandler::Render {
+ public:
+  virtual ~Render() = default;
+  virtual void counter(Stats::Counter&) PURE;
+  virtual void gauge(Stats::Gauge&) PURE;
+  virtual void textReadout(Stats::TextReadout&) PURE;
+  virtual void histogram(Stats::Histogram&) PURE;
+};
+
+class StatsHandler::TextRender : public StatsHandler::Render {
+ public:
+  explicit TextRender(Buffer::Instance& response) : response_(response) {}
+  void counter(Stats::Counter& counter) override {
+    response_.add(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
   }
-  params.format_ = Format::Html;
-  return stats(params, server_.stats(), response_headers, response);
-}
+  void gauge(Stats::Gauge& gauge) override {
+    response_.add(absl::StrCat(gauge.name(), ": ", gauge.value(), "\n"));
+  }
+  void textReadout(Stats::TextReadout& text_readout) override {
+    response_.add(absl::StrCat(text_readout.name(), ": \"",
+                               Html::Utility::sanitize(text_readout.value()), "\"\n"));
+  }
+  void histogram(Stats::Histogram& histogram) override {
+    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
+    if (phist != nullptr) {
+      response_.add(absl::StrCat(phist->name(), ": ", phist->quantileSummary(), "\n"));
+    }
+  }
+
+ private:
+  Buffer::Instance& response_;
+};
+
+class StatsHandler::Context {
+ public:
+  Context(const Params& params, Render& render) : params_(params), render_(render) {}
+  absl::string_view start() { return params_.start_; }
+
+  template <class StatType> bool checkEndOfPage(const StatType& /*metric*/) {
+    ++num_;
+    if (params_.page_size_.has_value()) {
+      if (num_ == params_.page_size_.value()) {
+        next_start_ = "";//metric->name();
+        return true;
+      } else if (num_ > params_.page_size_.value()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  template <class StatType> bool shouldShowMetric(const StatType& metric) const {
+    return params_.shouldShowMetric(metric);
+  }
+
+  Render& render() { return render_; }
+
+  int64_t num_{-1};
+  const Params& params_;
+  Render& render_;
+  std::string next_start_;
+};
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
-  std::map<std::string, uint64_t> counters_and_gauges;
-  std::map<std::string, std::string> text_readouts;
-  std::vector<Stats::HistogramSharedPtr> histograms;
-  auto append_stats_from_scope = [&counters_and_gauges, &text_readouts, &histograms,
-                                  &params](const Stats::Scope& scope) {
-    Stats::IterateFn<Stats::Counter> cfn =
-        [&counters_and_gauges, &params](const Stats::CounterSharedPtr& counter) -> bool {
-      if (params.shouldShowMetric(*counter)) {
-        counters_and_gauges.emplace(counter->name(), counter->value());
-      }
-      return true;
-    };
-    scope.iterate(cfn);
+  // We render as HTML if a pagesize is specificed.
+  bool use_html = params.page_size_.has_value();
 
-    Stats::IterateFn<Stats::Gauge> gfn = [&counters_and_gauges,
-                                          &params](const Stats::GaugeSharedPtr& gauge) -> bool {
-      if (params.shouldShowMetric(*gauge)) {
-        ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-        counters_and_gauges.emplace(gauge->name(), gauge->value());
+  std::unique_ptr<Render> render;
+  if (params.format_ == Format::Json) {
+    render = std::make_unique<TextRender>(response); // JSON
+  } else {
+    render = std::make_unique<TextRender>(response);
+  }
+
+  Context context(params, *render);
+
+  std::vector<Stats::HistogramSharedPtr> histograms;
+  auto append_stats_from_scope = [&context, &histograms](const Stats::Scope& scope) {
+    Stats::IterateFn<Stats::Counter> cfn =
+        [&context](const Stats::CounterSharedPtr& counter) -> bool {
+      if (context.checkEndOfPage(counter)) {
+        return false;
+      }
+      if (context.shouldShowMetric(*counter)) {
+        context.render().counter(*counter);
       }
       return true;
     };
-    scope.iterate(gfn);
+    scope.iterate(cfn, context.start());
+
+    Stats::IterateFn<Stats::Gauge> gfn = [&context](const Stats::GaugeSharedPtr& gauge) -> bool {
+      if (context.checkEndOfPage(gauge)) {
+        return false;
+      }
+      if (context.shouldShowMetric(*gauge)) {
+        ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
+        context.render().gauge(*gauge);
+      }
+      return true;
+    };
+    scope.iterate(gfn, context.start());
 
     Stats::IterateFn<Stats::TextReadout> tfn =
-        [&text_readouts, &params](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
-      if (params.shouldShowMetric(*text_readout)) {
-        text_readouts.emplace(text_readout->name(), text_readout->value());
+        [&context](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
+      if (context.checkEndOfPage(text_readout)) {
+        return false;
+      }
+      if (context.shouldShowMetric(*text_readout)) {
+        context.render().textReadout(*text_readout);
       }
       return true;
     };
-    scope.iterate(tfn);
+    scope.iterate(tfn, context.start());
 
+    // Note that histograms are not in alphabetic order, so we need to collect
+    // all of them in a vector and sort before we can select out a page of them.
     Stats::IterateFn<Stats::Histogram> hfn =
-        [&histograms, &params](const Stats::HistogramSharedPtr& histogram) -> bool {
-      if (params.shouldShowMetric(*histogram)) {
+        [&histograms, &context](const Stats::HistogramSharedPtr& histogram) -> bool {
+      if (context.shouldShowMetric(*histogram)) {
         histograms.push_back(histogram);
       }
       return true;
     };
-    scope.iterate(hfn);
+    scope.iterate(hfn, context.start());
   };
 
   if (params.scope_.has_value()) {
     Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
     stats.forEachScope([](size_t) {},
-                       [&scope_name, &append_stats_from_scope](const Stats::Scope& scope) -> bool {
+                       [&scope_name, &append_stats_from_scope, &context](
+                           const Stats::Scope& scope) -> bool {
+                         if (context.checkEndOfPage(scope)) {
+                           return false;
+                         }
                          if (scope.prefix() == scope_name.statName()) {
                            append_stats_from_scope(scope);
                          }
@@ -230,12 +304,12 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   if (params.format_ == Format::Json) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    response.add(statsAsJson(counters_and_gauges, text_readouts, histograms, params.pretty_));
+    //response.add(statsAsJson(counters_and_gauges, text_readouts, histograms, params.pretty_));
     return Http::Code::OK;
   }
 
   // Display plain stats if format query param is not there.
-  statsAsText(counters_and_gauges, text_readouts, histograms, response);
+  //statsAsText(counters_and_gauges, text_readouts, histograms, response);
   return Http::Code::OK;
 }
 
