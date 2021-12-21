@@ -198,6 +198,10 @@ const char* config_template = R"(
             address:
               socket_address: { address: 127.0.0.1, port_value: 10101 }
 
+typed_dns_resolver_config:
+  name: *dns_resolver_name
+  typed_config: *dns_resolver_config
+
 static_resources:
   listeners:
 #{custom_listeners}
