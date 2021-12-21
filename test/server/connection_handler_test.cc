@@ -12,6 +12,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/api/api_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
@@ -48,7 +50,7 @@ namespace {
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
-      : handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
+      : handler_(new ConnectionHandlerImpl(dispatcher_, 0, singleton_manager_)),
         filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -333,6 +335,8 @@ public:
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   std::list<TestListenerPtr> listeners_;
+  Api::ApiPtr api_{Api::createApiForTest()};
+  Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};
   std::unique_ptr<ConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;

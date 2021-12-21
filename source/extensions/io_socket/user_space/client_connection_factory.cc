@@ -31,8 +31,14 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
                                                       address),
       source_address, std::move(transport_socket), options);
 
+  if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
+    ENVOY_LOG_MISC(debug, "server has not initialized internal listener registry, close the connection");
+    io_handle_server->close();
+    return client_conn;
+  }
+
   // It's either in the main thread or the worker is not yet started.
-  auto internal_listener_manager = dispatcher.getInternalListenerManager();
+  auto internal_listener_manager = registry_tls_slot_->get()->getInternalListenerManager();
   if (!internal_listener_manager.has_value()) {
     io_handle_server->close();
     return client_conn;

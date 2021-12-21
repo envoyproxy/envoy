@@ -21,6 +21,7 @@
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/linked_object.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
@@ -844,6 +845,7 @@ private:
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
+  Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
 

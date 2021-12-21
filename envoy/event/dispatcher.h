@@ -219,19 +219,6 @@ public:
                          const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
-   * Register an internal listener manager for this dispatcher.
-   */
-  virtual void
-  registerInternalListenerManager(Network::InternalListenerManager& internal_listener_manager) PURE;
-
-  /**
-   * @brief Get the Internal Listener Manager object.
-   *
-   * @return the registered internal istener manager or nullopt.
-   */
-  virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;
-
-  /**
    * @return Filesystem::WatcherPtr a filesystem watcher owned by the caller.
    */
   virtual Filesystem::WatcherPtr createFilesystemWatcher() PURE;

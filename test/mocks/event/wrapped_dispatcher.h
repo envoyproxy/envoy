@@ -50,15 +50,6 @@ public:
                                         std::move(transport_socket), options);
   }
 
-  void registerInternalListenerManager(
-      Network::InternalListenerManager& internal_listener_manager) override {
-    impl_.registerInternalListenerManager(internal_listener_manager);
-  }
-
-  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
-    return impl_.getInternalListenerManager();
-  }
-
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override {
     return impl_.createFileEvent(fd, cb, trigger, events);

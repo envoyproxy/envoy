@@ -8,6 +8,7 @@
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 #include "source/server/connection_handler_impl.h"
+#include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -43,7 +44,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt, singleton_manager_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
@@ -168,6 +169,7 @@ public:
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
+  Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;

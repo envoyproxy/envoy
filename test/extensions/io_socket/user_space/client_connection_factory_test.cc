@@ -71,7 +71,8 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotEx
 
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
   MockInternalListenerManger internal_listener_manager;
-  dispatcher_->registerInternalListenerManager(internal_listener_manager);
+  // TODO(lambdai): fix attach the dispatcher to the thread local registry.
+  // dispatcher_->registerInternalListenerManager(internal_listener_manager);
 
   EXPECT_CALL(internal_listener_manager, findByAddress(_))
       .WillOnce(testing::Return(Network::InternalListenerOptRef()));
@@ -92,7 +93,8 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
 // does not instantiate a server connection. The server connection is tested in internal listener.
 TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
   MockInternalListenerManger internal_listener_manager;
-  dispatcher_->registerInternalListenerManager(internal_listener_manager);
+  // TODO(lambdai): fix attach the dispatcher to the thread local registry.
+  // dispatcher_->registerInternalListenerManager(internal_listener_manager);
   MockInternalListener internal_listener;
   Network::InternalListenerOptRef internal_listener_opt{internal_listener};
 

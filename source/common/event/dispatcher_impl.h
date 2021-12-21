@@ -67,16 +67,6 @@ public:
                          Network::TransportSocketPtr&& transport_socket,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
 
-  void registerInternalListenerManager(
-      Network::InternalListenerManager& internal_listener_manager) override {
-    ASSERT(!internal_listener_manager_.has_value());
-    internal_listener_manager_ = internal_listener_manager;
-  }
-
-  Network::InternalListenerManagerOptRef getInternalListenerManager() override {
-    return internal_listener_manager_;
-  }
-
   FileEventPtr createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
                                uint32_t events) override;
   Filesystem::WatcherPtr createFilesystemWatcher() override;
