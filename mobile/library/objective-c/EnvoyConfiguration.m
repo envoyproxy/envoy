@@ -126,7 +126,10 @@
                             self.enableHappyEyeballs ? @"ALL" : @"V4_PREFERRED"];
   [definitions appendFormat:@"- &dns_resolver_name envoy.network.dns_resolver.apple\n"];
   // No additional values are currently needed for Apple-based DNS resolver.
-  [definitions appendFormat:@"- &dns_resolver_config {}\n"];
+  [definitions
+      appendFormat:@"- &dns_resolver_config "
+                   @"{\"@type\":\"type.googleapis.com/"
+                   @"envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig\"}\n"];
   [definitions appendFormat:@"- &enable_interface_binding %@\n",
                             self.enableInterfaceBinding ? @"true" : @"false"];
   [definitions appendFormat:@"- &h2_connection_keepalive_idle_interval %.*fs\n", 3,
