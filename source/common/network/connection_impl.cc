@@ -888,8 +888,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->connectionInfoProvider().remoteAddress()->asString());
+  ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
+                       socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
