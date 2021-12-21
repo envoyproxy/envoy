@@ -86,7 +86,8 @@ public:
   virtual absl::optional<uint64_t> connectionID() const PURE;
 
   /**
-   * @return the name of the network interface used by the downstream connection, or unset if not available.
+   * @return the name of the network interface used by the downstream connection, or unset if not
+   *available.
    **/
   virtual absl::optional<std::string> interfaceName() const PURE;
 
