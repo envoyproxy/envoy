@@ -133,10 +133,6 @@ WIP_WARNING = (
     'breaking changes. Do not use this feature without understanding each of the previous '
     'points.\n\n')
 
-FILE_LEVEL_NOT_IMPLEMENTED = (
-    '.. warning::\n   Envoy does not provide any relevant implementation for this API at the moment. '
-    'Please ignore this page.\n\n')
-
 r = runfiles.Create()
 
 EXTENSION_DB = utils.from_yaml(r.Rlocation("envoy/source/extensions/extensions_metadata.yaml"))
@@ -751,6 +747,11 @@ class RstFormatVisitor(visitor.Visitor):
                 self.protodoc_manifest) + '\n'.join(nested_msgs) + '\n' + '\n'.join(nested_enums)
 
     def visit_file(self, file_proto, type_context, services, msgs, enums):
+        # If there is a file-level 'not-implemented-hide' annotation then return empty string.
+        if (annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION
+                in type_context.source_code_info.file_level_annotations):
+            return ''
+
         has_messages = True
         if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
             has_messages = False
@@ -776,11 +777,6 @@ class RstFormatVisitor(visitor.Visitor):
         # Also extract file level titles if any.
         header, comment = format_header_from_file(
             '=', type_context.source_code_info, file_proto.name, v2_link)
-
-        # If there is a file-level 'not-implemented-hide' annotation, only header and unimplemented warning is returned.
-        if (annotations.NOT_IMPLEMENTED_HIDE_ANNOTATION
-                in type_context.source_code_info.file_level_annotations):
-            return ':orphan:\n\n' + header + FILE_LEVEL_NOT_IMPLEMENTED
 
         # If there are no messages, we don't include in the doc tree (no support for
         # service rendering yet). We allow these files to be missing from the
