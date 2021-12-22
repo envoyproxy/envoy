@@ -350,9 +350,9 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-frozendict==2.1.1 \
-    --hash=sha256:655b879217dd445a2023e16154cc231febef802b5c812d5c2e822280ad69e1dc \
-    --hash=sha256:bbad8ef1a428f5e6f7e195742fd739f56a5a602f9cf9bbe86f55a4848b1fabd6
+frozendict==2.1.3 \
+    --hash=sha256:7a12336ba271066e1261a70d8ba97d5178392f3b317b31c6686e401423e70670 \
+    --hash=sha256:cfa47860932d549947157d68f246898f60b05da392f67219a913b85d8c36b1b2
     # via
     #   -r requirements.in
     #   envoy.base.runner
@@ -752,7 +752,6 @@ typing-extensions==3.10.0.2 \
     # via
     #   aiodocker
     #   aiohttp
-    #   gitpython
 uritemplate==3.0.1 \
     --hash=sha256:07620c3f3f8eed1f12600845892b0e036a2420acf513c53f7de0abd911a5894f \
     --hash=sha256:5af8ad10cec94f215e3f48112de2022e1d5a37ed427fbd88652fa908f2ab7cae
