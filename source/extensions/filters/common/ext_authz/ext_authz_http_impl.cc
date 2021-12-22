@@ -279,7 +279,8 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
-                       .setChildSpanName(config_->tracingName());
+                       .setChildSpanName(config_->tracingName())
+                       .setSampled(false);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
