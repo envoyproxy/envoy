@@ -385,20 +385,14 @@ void DnsResolverImpl::AddrInfoPendingResolution::startResolutionImpl(int family)
     case AF_INET:
       if (!available_interfaces_.v4_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v4 lookup");
-        ares_addrinfo* info = new ares_addrinfo;
-        info->nodes = nullptr;
-        info->cnames = nullptr;
-        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
+        onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
       break;
     case AF_INET6:
       if (!available_interfaces_.v6_available_) {
         ENVOY_LOG_EVENT(debug, "cares_resolution_filtered", "filtered v6 lookup");
-        ares_addrinfo* info = new ares_addrinfo;
-        info->nodes = nullptr;
-        info->cnames = nullptr;
-        onAresGetAddrInfoCallback(ARES_SUCCESS, 0, info);
+        onAresGetAddrInfoCallback(ARES_EBADFAMILY, 0, nullptr);
         return;
       }
       break;
