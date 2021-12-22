@@ -100,9 +100,12 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
   // then we don't need a setter or any of the optional stuff.
   socket_->connectionInfoProvider().setConnectionID(id());
   socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
+<<<<<<< HEAD
   if (ioHandle().interfaceName().has_value()) {
     socket_->connectionInfoProvider().setInterfaceName(ioHandle().interfaceName().value());
   }
+=======
+>>>>>>> 2db5d680fb41c90776b7d163153a60d590103754
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -896,6 +899,9 @@ void ClientConnectionImpl::connect() {
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
+  if (ioHandle().interfaceName().has_value()) {
+    socket_->connectionInfoProvider().setInterfaceName(ioHandle().interfaceName().value());
+  }
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
