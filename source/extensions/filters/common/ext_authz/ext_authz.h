@@ -124,7 +124,6 @@ public:
    * Called when a check request is complete. The resulting ResponsePtr is supplied.
    */
   virtual void onComplete(ResponsePtr&& response) PURE;
-
 };
 
 class Client {
