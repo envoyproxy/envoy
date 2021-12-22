@@ -27,11 +27,6 @@ updates:
     interval: "daily"
 
 - package-ecosystem: "pip"
-  directory: "/tools/dev"
-  schedule:
-    interval: "daily"
-
-- package-ecosystem: "pip"
   directory: "/tools/code_format"
   schedule:
     interval: "daily"
