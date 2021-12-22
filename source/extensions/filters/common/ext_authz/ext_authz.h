@@ -124,6 +124,18 @@ public:
    * Called when a check request is complete. The resulting ResponsePtr is supplied.
    */
   virtual void onComplete(ResponsePtr&& response) PURE;
+
+  void recordDuration(absl::optional<MonotonicTime> start_time,
+                      Filters::Common::ExtAuthz::ResponsePtr&& response) {
+    if (start_time.has_value()) {
+      ProtobufWkt::Value ext_authz_duration_value;
+
+      auto ext_authz_duration =
+          std::chrono::duration<double, std::milli>(start_time->time_since_epoch().count());
+      ext_authz_duration_value.set_number_value(ext_authz_duration.count());
+      (*response->dynamic_metadata.mutable_fields())["duration"] = ext_authz_duration_value;
+    }
+  }
 };
 
 class Client {

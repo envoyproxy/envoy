@@ -95,6 +95,9 @@ public:
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent();
   absl::optional<std::chrono::nanoseconds> lastDownstreamRxByteReceived();
 
+  absl::optional<std::chrono::duration<double, std::milli>>
+  recordDuration(absl::optional<MonotonicTime> start_time);
+
 private:
   const StreamInfo& stream_info_;
 };

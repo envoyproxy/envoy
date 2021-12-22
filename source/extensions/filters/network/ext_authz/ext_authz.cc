@@ -6,6 +6,7 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -25,7 +26,7 @@ void Filter::callCheck() {
                                                                config_->includePeerCertificate(),
                                                                config_->destinationLabels());
   // Store start time of ext_authz filter call
-  start_time_point_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
+  start_time_ = filter_callbacks_->connection().dispatcher().timeSource().monotonicTime();
   status_ = Status::Calling;
   config_->stats().active_.inc();
   config_->stats().total_.inc();
@@ -85,15 +86,16 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   }
 
   if (!response->dynamic_metadata.fields().empty()) {
-    ProtobufWkt::Value ext_authz_duration_value;
-    if (start_time_point_.has_value()) {
-      auto ext_authz_duration =
-          std::chrono::duration<double, std::milli>(start_time_point_->time_since_epoch().count());
-      ext_authz_duration_value.set_number_value(ext_authz_duration.count());
-    } else {
-      ext_authz_duration_value.set_null_value(ProtobufWkt::NULL_VALUE);
+
+    // Add duration of call to dynamic metadata if applicable
+    StreamInfo::TimingUtility timingUtility(filter_callbacks_->connection().streamInfo());
+    auto ext_authz_duration = timingUtility.recordDuration(start_time_);
+    if (ext_authz_duration.has_value()) {
+      ProtobufWkt::Value ext_authz_duration_value;
+      ext_authz_duration_value.set_number_value(ext_authz_duration->count());
+      (*response->dynamic_metadata.mutable_fields())["duration"] = ext_authz_duration_value;
     }
-    (*response->dynamic_metadata.mutable_fields())["duration"] = ext_authz_duration_value;
+
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
         NetworkFilterNames::get().ExtAuthorization, response->dynamic_metadata);
   }
