@@ -79,9 +79,9 @@ StatusOr<Address::InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_sto
   case AF_UNIX: {
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
     ASSERT(AF_UNIX == sun->sun_family);
-    RELEASE_ASSERT(ss_len == 0);
-    RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >=
-                                      offsetof(struct sockaddr_un, sun_path) + 1, "");
+    RELEASE_ASSERT(ss_len == 0, "");
+    RELEASE_ASSERT(static_cast<unsigned int>(ss_len) >= offsetof(struct sockaddr_un, sun_path) + 1,
+                   "");
     return Address::InstanceFactory::createInstancePtr<Address::PipeInstance>(sun, ss_len);
   }
   default:
