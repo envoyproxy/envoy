@@ -739,7 +739,9 @@ public:
 
   void testFilterAddresses(const std::vector<std::string>& ifaddrs,
                            const DnsLookupFamily lookup_family,
-                           const std::list<std::string>& expected_addresses) {
+                           const std::list<std::string>& expected_addresses,
+                           const DnsResolver::ResolutionStatus resolution_status =
+                               DnsResolver::ResolutionStatus::Success) {
     server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
     server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
 
@@ -777,9 +779,8 @@ public:
         .WillRepeatedly(Invoke(
             [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
 
-    resolveWithExpectations("some.good.domain", lookup_family,
-                            DnsResolver::ResolutionStatus::Success, expected_addresses, {},
-                            absl::nullopt);
+    resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
+                            expected_addresses, {}, absl::nullopt);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -1218,7 +1219,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplFilterUnroutableFamiliesTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutable) {
-  testFilterAddresses({}, DnsLookupFamily::Auto, {});
+  testFilterAddresses({}, DnsLookupFamily::Auto, {}, DnsResolver::ResolutionStatus::Failure);
 }
 
 TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutableV6) {
