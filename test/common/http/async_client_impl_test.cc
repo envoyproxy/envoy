@@ -274,7 +274,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
                                             .setParentSpan(parent_span_)
                                             .setChildSpanName(child_span_name_)
                                             .setSampled(false);
-  EXPECT_CALL(*child_span, setSampled(false));
+  EXPECT_CALL(*child_span, setSampled(_)).Times(0);
   EXPECT_CALL(*child_span, injectContext(_));
 
   auto* request = client_.send(std::move(message_), callbacks_, options);
