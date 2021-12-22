@@ -352,7 +352,8 @@ public:
   virtual void setUpstreamInterfaceName(const absl::string_view interface_name) PURE;
 
   /**
-   * @return interface name of the upstream connection's local socket, or absl::nullopt if not available.
+   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * available.
    */
   virtual absl::optional<std::string> upstreamInterfaceName() const PURE;
 
