@@ -89,18 +89,18 @@ protected:
   ssl_private_key_result_t res_;
 
   // A size for signing and decryption operation input chosen for tests.
-  static constexpr size_t IN_LEN = 32;
+  static constexpr size_t in_len_ = 32;
   // Test input bytes for signing and decryption chosen for tests.
-  static constexpr uint8_t IN[IN_LEN] = {0x7f};
+  static constexpr uint8_t in_[in_len_] = {0x7f};
 
   // Maximum size of out_ in all tests cases.
-  static constexpr size_t MAX_OUT_LEN = 128;
-  uint8_t out_[MAX_OUT_LEN] = {0};
+  static constexpr size_t max_out_len_ = 128;
+  uint8_t out_[max_out_len_] = {0};
 
   // Size of output in out_ from an operation.
   size_t out_len_ = 0;
 
-  const std::string QUEUE_SIZE_HISTOGRAM_NAME = "cryptomb.rsa_queue_sizes";
+  const std::string queue_size_histogram_name_ = "cryptomb.rsa_queue_sizes";
 };
 
 class CryptoMbProviderRsaTest : public CryptoMbProviderTest {
@@ -127,8 +127,8 @@ protected:
 TEST_F(CryptoMbProviderEcdsaTest, TestEcdsaSigning) {
   TestCallbacks cb;
   CryptoMbPrivateKeyConnection op(cb, *dispatcher_, bssl::UpRef(pkey_), queue_);
-  res_ = ecdsaPrivateKeySignForTest(&op, out_, &out_len_, MAX_OUT_LEN,
-                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
+  res_ = ecdsaPrivateKeySignForTest(&op, out_, &out_len_, max_out_len_,
+                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
 }
 
@@ -144,21 +144,21 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPkcs1Signing) {
   // Create MULTIBUFF_BATCH amount of signing operations.
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
     // Create request.
-    res_ = rsaPrivateKeySignForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN,
-                                    SSL_SIGN_RSA_PKCS1_SHA256, IN, IN_LEN);
+    res_ = rsaPrivateKeySignForTest(connections[i].get(), nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_RSA_PKCS1_SHA256, in_, in_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
+    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 }
@@ -175,21 +175,21 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaPssSigning) {
   // Create MULTIBUFF_BATCH amount of signing operations.
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
     // Create request.
-    res_ = rsaPrivateKeySignForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN,
-                                    SSL_SIGN_RSA_PSS_SHA256, IN, IN_LEN);
+    res_ = rsaPrivateKeySignForTest(connections[i].get(), nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_RSA_PSS_SHA256, in_, in_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
+    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 }
@@ -206,21 +206,21 @@ TEST_F(CryptoMbProviderRsaTest, TestRsaDecrypt) {
   // Create MULTIBUFF_BATCH amount of decryption operations.
   for (uint32_t i = 0; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
     // Create request.
-    res_ = rsaPrivateKeyDecryptForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN, IN,
-                                       IN_LEN);
+    res_ = rsaPrivateKeyDecryptForTest(connections[i].get(), nullptr, nullptr, max_out_len_, in_,
+                                       in_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
 
     // No processing done after first requests.
     // After the last request, the status is set only from the event loop which is not run. This
     // should still be "retry", the cryptographic result is present anyway.
-    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, MAX_OUT_LEN);
+    res_ = privateKeyCompleteForTest(connections[i].get(), nullptr, nullptr, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
   // Timeout does not have to be triggered when queue is at maximum size.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 }
@@ -240,37 +240,37 @@ TEST_F(CryptoMbProviderTest, TestErrors) {
   CryptoMbPrivateKeyConnection op_rsa(cb, *dispatcher_, bssl::UpRef(rsa_pkey), rsa_queue);
 
   // no operation defined
-  res_ = ecdsaPrivateKeySignForTest(nullptr, nullptr, nullptr, MAX_OUT_LEN,
-                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
+  res_ = ecdsaPrivateKeySignForTest(nullptr, nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeySignForTest(nullptr, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PSS_SHA256,
-                                  IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(nullptr, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PSS_SHA256,
+                                  in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeyDecryptForTest(nullptr, nullptr, nullptr, MAX_OUT_LEN, IN, IN_LEN);
+  res_ = rsaPrivateKeyDecryptForTest(nullptr, nullptr, nullptr, max_out_len_, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 
   // Unknown signature algorithm
-  res_ = ecdsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, MAX_OUT_LEN, 1234, IN, IN_LEN);
+  res_ = ecdsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, max_out_len_, 1234, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, MAX_OUT_LEN, 1234, IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, max_out_len_, 1234, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 
   // Wrong signature algorithm
-  res_ = ecdsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PSS_SHA256,
-                                    IN, IN_LEN);
+  res_ = ecdsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PSS_SHA256,
+                                    in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, MAX_OUT_LEN,
-                                  SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, max_out_len_,
+                                  SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 
   // Wrong operation type
-  res_ = ecdsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, MAX_OUT_LEN,
-                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, IN, IN_LEN);
+  res_ = ecdsaPrivateKeySignForTest(&op_rsa, nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_ECDSA_SECP256R1_SHA256, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PSS_SHA256,
-                                  IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(&op_ec, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PSS_SHA256,
+                                  in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
-  res_ = rsaPrivateKeyDecryptForTest(&op_ec, nullptr, nullptr, MAX_OUT_LEN, IN, IN_LEN);
+  res_ = rsaPrivateKeyDecryptForTest(&op_ec, nullptr, nullptr, max_out_len_, in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
@@ -279,18 +279,18 @@ TEST_F(CryptoMbProviderRsaTest, TestRSATimer) {
 
   // Successful operation with timer.
   CryptoMbPrivateKeyConnection op0(cbs[0], *dispatcher_, bssl::UpRef(pkey_), queue_);
-  res_ = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
-                                  IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(&op0, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PKCS1_SHA256,
+                                  in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op0, nullptr, nullptr, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op0, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op0, out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op0, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
@@ -300,18 +300,18 @@ TEST_F(CryptoMbProviderRsaTest, TestRSATimer) {
 
   CryptoMbPrivateKeyConnection op1(cbs[1], *dispatcher_, bssl::UpRef(pkey_), queue_);
 
-  res_ = rsaPrivateKeySignForTest(&op1, nullptr, nullptr, MAX_OUT_LEN, SSL_SIGN_RSA_PKCS1_SHA256,
-                                  IN, IN_LEN);
+  res_ = rsaPrivateKeySignForTest(&op1, nullptr, nullptr, max_out_len_, SSL_SIGN_RSA_PKCS1_SHA256,
+                                  in_, in_len_);
   EXPECT_EQ(res_, ssl_private_key_retry);
 
-  res_ = privateKeyCompleteForTest(&op1, nullptr, nullptr, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op1, nullptr, nullptr, max_out_len_);
   // No processing done yet after first request
   EXPECT_EQ(res_, ssl_private_key_retry);
 
   time_system_.advanceTimeAndRun(std::chrono::seconds(1), *dispatcher_,
                                  Event::Dispatcher::RunType::NonBlock);
 
-  res_ = privateKeyCompleteForTest(&op1, out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(&op1, out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_failure);
 }
 
@@ -328,8 +328,8 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   for (uint32_t i = 1; i < CryptoMbQueue::MULTIBUFF_BATCH; i++) {
     // Create correct amount of signing operations for current index.
     for (uint32_t j = 0; j < i; j++) {
-      res_ = rsaPrivateKeySignForTest(connections[j].get(), nullptr, nullptr, MAX_OUT_LEN,
-                                      SSL_SIGN_RSA_PKCS1_SHA256, IN, IN_LEN);
+      res_ = rsaPrivateKeySignForTest(connections[j].get(), nullptr, nullptr, max_out_len_,
+                                      SSL_SIGN_RSA_PKCS1_SHA256, in_, in_len_);
       EXPECT_EQ(res_, ssl_private_key_retry);
     }
 
@@ -337,12 +337,13 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
                                    Event::Dispatcher::RunType::NonBlock);
 
     out_len_ = 0;
-    res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, MAX_OUT_LEN);
+    res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
     EXPECT_EQ(res_, ssl_private_key_success);
     EXPECT_NE(out_len_, 0);
 
     // Check that current queue size is recorded.
-    std::vector<uint64_t> histogram_values(store_.histogramValues(QUEUE_SIZE_HISTOGRAM_NAME, true));
+    std::vector<uint64_t> histogram_values(
+        store_.histogramValues(queue_size_histogram_name_, true));
     EXPECT_EQ(histogram_values.size(), 1);
     EXPECT_EQ(histogram_values[0], i);
   }
@@ -350,8 +351,8 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   // Increment last queue size once.
   // Create an amount of signing operations equal to maximum queue size.
   for (uint32_t j = 0; j < CryptoMbQueue::MULTIBUFF_BATCH; j++) {
-    res_ = rsaPrivateKeySignForTest(connections[j].get(), nullptr, nullptr, MAX_OUT_LEN,
-                                    SSL_SIGN_RSA_PKCS1_SHA256, IN, IN_LEN);
+    res_ = rsaPrivateKeySignForTest(connections[j].get(), nullptr, nullptr, max_out_len_,
+                                    SSL_SIGN_RSA_PKCS1_SHA256, in_, in_len_);
     EXPECT_EQ(res_, ssl_private_key_retry);
   }
 
@@ -359,12 +360,12 @@ TEST_F(CryptoMbProviderRsaTest, TestRSAQueueSizeStatistics) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   out_len_ = 0;
-  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, MAX_OUT_LEN);
+  res_ = privateKeyCompleteForTest(connections[0].get(), out_, &out_len_, max_out_len_);
   EXPECT_EQ(res_, ssl_private_key_success);
   EXPECT_NE(out_len_, 0);
 
   // Check that last queue size is recorded.
-  std::vector<uint64_t> histogram_values(store_.histogramValues(QUEUE_SIZE_HISTOGRAM_NAME, true));
+  std::vector<uint64_t> histogram_values(store_.histogramValues(queue_size_histogram_name_, true));
   EXPECT_EQ(histogram_values.size(), 1);
   EXPECT_EQ(histogram_values[0], CryptoMbQueue::MULTIBUFF_BATCH);
 }
