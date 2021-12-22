@@ -87,7 +87,6 @@ public:
   virtual void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const PURE;
   virtual void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const PURE;
 
-
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can
    * potentially hold on to a mutex that will deadlock if the passed in functors try to create

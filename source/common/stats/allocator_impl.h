@@ -83,8 +83,8 @@ private:
   // protected by locks.
   mutable Thread::MutexBasicLockable mutex_;
 
-  template<class Set, class Fn> void pageHelper(
-      const Set* set, Fn stat_fn, absl::string_view start) const;
+  template <class Set, class Fn>
+  void pageHelper(const Set* set, Fn stat_fn, absl::string_view start) const;
 
   template <class StatType>
   using StatOrderedSet = absl::btree_set<StatType*, MetricHelper::LessThan>;

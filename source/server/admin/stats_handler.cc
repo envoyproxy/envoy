@@ -153,7 +153,7 @@ Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
 }
 
 class StatsHandler::Render {
- public:
+public:
   virtual ~Render() = default;
   virtual void counter(Stats::Counter&) PURE;
   virtual void gauge(Stats::Gauge&) PURE;
@@ -162,7 +162,7 @@ class StatsHandler::Render {
 };
 
 class StatsHandler::TextRender : public StatsHandler::Render {
- public:
+public:
   explicit TextRender(Buffer::Instance& response) : response_(response) {}
   void counter(Stats::Counter& counter) override {
     response_.add(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
@@ -181,15 +181,14 @@ class StatsHandler::TextRender : public StatsHandler::Render {
     }
   }
 
- private:
+private:
   Buffer::Instance& response_;
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
- public:
+public:
   JsonRender(Buffer::Instance& response, const Params& params)
-      : params_(params),
-        response_(response) {}
+      : params_(params), response_(response) {}
   virtual ~JsonRender() { render(); }
 
   void counter(Stats::Counter& counter) override {
@@ -239,7 +238,7 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
     }
   }
 
- private:
+private:
   void render() {
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
@@ -255,7 +254,7 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
     response_.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
-  template<class StatType, class Value> void add(StatType& stat, const Value& value) {
+  template <class StatType, class Value> void add(StatType& stat, const Value& value) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
     (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.name());
@@ -274,7 +273,7 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
 };
 
 class StatsHandler::Context {
- public:
+public:
   Context(const Params& params, Render& render) : params_(params), render_(render) {}
   absl::string_view start() { return params_.start_; }
 
@@ -401,9 +400,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   }
 #endif
 
-
   // Display plain stats if format query param is not there.
-  //statsAsText(counters_and_gauges, text_readouts, histograms, response);
+  // statsAsText(counters_and_gauges, text_readouts, histograms, response);
   return Http::Code::OK;
 }
 

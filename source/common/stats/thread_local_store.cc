@@ -997,8 +997,7 @@ void ThreadLocalStoreImpl::textReadoutPage(StatFn<TextReadout> f_stat,
   alloc_.textReadoutPage(f_stat, start);
 }
 
-void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_view start)
-    const {
+void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_view start) const {
   std::vector<ParentHistogramSharedPtr> histograms;
   {
     Thread::LockGuard lock(hist_mutex_);
@@ -1007,25 +1006,22 @@ void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_
       histograms.emplace_back(histogram_ptr);
     }
   }
-  //auto compare = [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
-  //return a->name() < b->name();
-    //};
+  // auto compare = [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
+  // return a->name() < b->name();
+  //};
   struct LessThan {
     bool operator()(const HistogramSharedPtr& a, const HistogramSharedPtr& b) {
       return cmp_(a.get(), b.get());
     }
-    bool operator()(const HistogramSharedPtr& a, StatName b) const {
-      return cmp_(a.get(), b);
-    }
+    bool operator()(const HistogramSharedPtr& a, StatName b) const { return cmp_(a.get(), b); }
     MetricHelper::LessThan cmp_;
   };
   LessThan cmp;
   std::sort(histograms.begin(), histograms.end(), cmp);
   StatNameManagedStorage start_name(start, const_cast<SymbolTable&>(constSymbolTable()));
-  for (auto iter = std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(),
-                                    cmp);
-       iter != histograms.end();
-       ++iter) {
+  for (auto iter =
+           std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
+       iter != histograms.end(); ++iter) {
     if (!f_stat(**iter)) {
       break;
     }

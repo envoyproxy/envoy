@@ -392,8 +392,8 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
   }
 }
 
-template<class Set, class Fn> void AllocatorImpl::pageHelper(
-    const Set* set, Fn f_stat, absl::string_view start) const {
+template <class Set, class Fn>
+void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start) const {
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
   for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {

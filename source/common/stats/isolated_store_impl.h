@@ -247,8 +247,7 @@ public:
     alloc_.textReadoutPage(f_stat, start);
   }
 
-  void histogramPage(StatFn<Histogram>, absl::string_view) const override {
-  }
+  void histogramPage(StatFn<Histogram>, absl::string_view) const override {}
 
   void scopePage(StatFn<const Scope> f_stat, absl::string_view /*start*/) const override {
     /** FIX THIS */
