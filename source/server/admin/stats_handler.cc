@@ -185,12 +185,118 @@ class StatsHandler::TextRender : public StatsHandler::Render {
   Buffer::Instance& response_;
 };
 
+class StatsHandler::JsonRender : public StatsHandler::Render {
+ public:
+  JsonRender(Buffer::Instance& response, const Params& params)
+      : params_(params),
+        response_(response) {}
+  virtual ~JsonRender() { render(); }
+
+  void counter(Stats::Counter& counter) override {
+    add(counter, ValueUtil::numberValue(counter.value()));
+  }
+  void gauge(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
+  void textReadout(Stats::TextReadout& text_readout) override {
+    add(text_readout, ValueUtil::stringValue(text_readout.value()));
+  }
+  void histogram(Stats::Histogram& histogram) override {
+    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
+    if (phist != nullptr) {
+      if (!found_used_histogram_) {
+        auto* histograms_obj_fields = histograms_obj_.mutable_fields();
+
+        // It is not possible for the supported quantiles to differ across histograms, so it is ok
+        // to send them once.
+        Stats::HistogramStatisticsImpl empty_statistics;
+        std::vector<ProtobufWkt::Value> supported_quantile_array;
+        for (double quantile : empty_statistics.supportedQuantiles()) {
+          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
+        }
+        (*histograms_obj_fields)["supported_quantiles"] =
+            ValueUtil::listValue(supported_quantile_array);
+        found_used_histogram_ = true;
+      }
+
+      ProtobufWkt::Struct computed_quantile;
+      auto* computed_quantile_fields = computed_quantile.mutable_fields();
+      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram.name());
+
+      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
+      for (size_t i = 0; i < phist->intervalStatistics().supportedQuantiles().size(); ++i) {
+        ProtobufWkt::Struct computed_quantile_value;
+        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
+        const auto& interval = phist->intervalStatistics().computedQuantiles()[i];
+        const auto& cumulative = phist->cumulativeStatistics().computedQuantiles()[i];
+        (*computed_quantile_value_fields)["interval"] =
+            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
+        (*computed_quantile_value_fields)["cumulative"] =
+            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
+
+        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
+      }
+      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+      computed_quantile_array_.push_back(ValueUtil::structValue(computed_quantile));
+    }
+  }
+
+ private:
+  void render() {
+    if (found_used_histogram_) {
+      auto* histograms_obj_fields = histograms_obj_.mutable_fields();
+      (*histograms_obj_fields)["computed_quantiles"] =
+          ValueUtil::listValue(computed_quantile_array_);
+      auto* histograms_obj_container_fields = histograms_obj_container_.mutable_fields();
+      (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj_);
+      stats_array_.push_back(ValueUtil::structValue(histograms_obj_container_));
+    }
+
+    auto* document_fields = document_.mutable_fields();
+    (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
+    response_.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
+  }
+
+  template<class StatType, class Value> void add(StatType& stat, const Value& value) {
+    ProtobufWkt::Struct stat_obj;
+    auto* stat_obj_fields = stat_obj.mutable_fields();
+    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.name());
+    (*stat_obj_fields)["value"] = value;
+    stats_array_.push_back(ValueUtil::structValue(stat_obj));
+  }
+
+  const StatsHandler::Params& params_;
+  ProtobufWkt::Struct document_;
+  std::vector<ProtobufWkt::Value> stats_array_;
+  ProtobufWkt::Struct histograms_obj_;
+  ProtobufWkt::Struct histograms_obj_container_;
+  std::vector<ProtobufWkt::Value> computed_quantile_array_;
+  bool found_used_histogram_{false};
+  Buffer::Instance& response_;
+};
+
 class StatsHandler::Context {
  public:
   Context(const Params& params, Render& render) : params_(params), render_(render) {}
   absl::string_view start() { return params_.start_; }
 
-  template <class StatType> bool checkEndOfPage(const StatType& /*metric*/) {
+  // Quick check to see if we're at the end of the page. If we are, we record the
+  // name of the stat we are going to reject.
+  template <class StatType> bool checkEndOfPage(const StatType& metric) {
+    if (params_.page_size_.has_value()) {
+      ASSERT(num_ <= params_.page_size_.value());
+      if (num_ == params_.page_size_.value()) {
+        return true;
+      } else if (next_start_.empty()) {
+        next_start_ = metric.name();
+      }
+    }
+    return false;
+  }
+
+  /*
+  template <class StatType> bool checkMetricAndEndOfPage(const StatType& metric) {
+    // Do a relatively fast check to see whether we have hit the end of the page,
+    //
+
     ++num_;
     if (params_.page_size_.has_value()) {
       if (num_ == params_.page_size_.value()) {
@@ -202,9 +308,14 @@ class StatsHandler::Context {
     }
     return false;
   }
+  */
 
-  template <class StatType> bool shouldShowMetric(const StatType& metric) const {
-    return params_.shouldShowMetric(metric);
+  template <class StatType> bool showMetric(const StatType& metric) {
+    if (params_.shouldShowMetric(metric)) {
+      ++num_;
+      return true;
+    }
+    return false;
   }
 
   Render& render() { return render_; }
@@ -218,68 +329,62 @@ class StatsHandler::Context {
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
-  // We render as HTML if a pagesize is specificed.
-  bool use_html = params.page_size_.has_value();
-
   std::unique_ptr<Render> render;
   if (params.format_ == Format::Json) {
-    render = std::make_unique<TextRender>(response); // JSON
+    render = std::make_unique<JsonRender>(response, params);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     render = std::make_unique<TextRender>(response);
   }
 
   Context context(params, *render);
 
-  std::vector<Stats::HistogramSharedPtr> histograms;
-  auto append_stats_from_scope = [&context, &histograms](const Stats::Scope& scope) {
-    Stats::IterateFn<Stats::Counter> cfn =
-        [&context](const Stats::CounterSharedPtr& counter) -> bool {
-      if (context.checkEndOfPage(counter)) {
-        return false;
-      }
-      if (context.shouldShowMetric(*counter)) {
-        context.render().counter(*counter);
-      }
-      return true;
-    };
-    scope.iterate(cfn, context.start());
-
-    Stats::IterateFn<Stats::Gauge> gfn = [&context](const Stats::GaugeSharedPtr& gauge) -> bool {
-      if (context.checkEndOfPage(gauge)) {
-        return false;
-      }
-      if (context.shouldShowMetric(*gauge)) {
-        ASSERT(gauge->importMode() != Stats::Gauge::ImportMode::Uninitialized);
-        context.render().gauge(*gauge);
-      }
-      return true;
-    };
-    scope.iterate(gfn, context.start());
-
-    Stats::IterateFn<Stats::TextReadout> tfn =
-        [&context](const Stats::TextReadoutSharedPtr& text_readout) -> bool {
-      if (context.checkEndOfPage(text_readout)) {
-        return false;
-      }
-      if (context.shouldShowMetric(*text_readout)) {
-        context.render().textReadout(*text_readout);
-      }
-      return true;
-    };
-    scope.iterate(tfn, context.start());
-
-    // Note that histograms are not in alphabetic order, so we need to collect
-    // all of them in a vector and sort before we can select out a page of them.
-    Stats::IterateFn<Stats::Histogram> hfn =
-        [&histograms, &context](const Stats::HistogramSharedPtr& histogram) -> bool {
-      if (context.shouldShowMetric(*histogram)) {
-        histograms.push_back(histogram);
-      }
-      return true;
-    };
-    scope.iterate(hfn, context.start());
+  auto tfn = [&context](Stats::TextReadout& text_readout) -> bool {
+    if (context.checkEndOfPage(text_readout)) {
+      return false;
+    }
+    if (context.showMetric(text_readout)) {
+      context.render().textReadout(text_readout);
+    }
+    return true;
   };
+  stats.textReadoutPage(tfn, context.start());
 
+  auto cfn = [&context](Stats::Counter& counter) -> bool {
+    if (context.checkEndOfPage(counter)) {
+      return false;
+    }
+    if (context.showMetric(counter)) {
+      context.render().counter(counter);
+    }
+    return true;
+  };
+  stats.counterPage(cfn, context.start());
+
+  auto gfn = [&context](Stats::Gauge& gauge) -> bool {
+    if (context.checkEndOfPage(gauge)) {
+      return false;
+    }
+    if (context.showMetric(gauge)) {
+      ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
+      context.render().gauge(gauge);
+    }
+    return true;
+  };
+  stats.gaugePage(gfn, context.start());
+
+  auto hfn = [&context](Stats::Histogram& histogram) -> bool {
+    if (context.checkEndOfPage(histogram)) {
+      return false;
+    }
+    if (context.showMetric(histogram)) {
+      context.render().histogram(histogram);
+    }
+    return true;
+  };
+  stats.histogramPage(hfn, context.start());
+
+#if 0
   if (params.scope_.has_value()) {
     Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
     stats.forEachScope([](size_t) {},
@@ -293,20 +398,9 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                          }
                          return true;
                        });
-  } else {
-    append_stats_from_scope(stats);
   }
+#endif
 
-  std::sort(histograms.begin(), histograms.end(),
-            [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
-              return a->name() < b->name();
-            });
-
-  if (params.format_ == Format::Json) {
-    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-    //response.add(statsAsJson(counters_and_gauges, text_readouts, histograms, params.pretty_));
-    return Http::Code::OK;
-  }
 
   // Display plain stats if format query param is not there.
   //statsAsText(counters_and_gauges, text_readouts, histograms, response);

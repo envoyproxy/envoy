@@ -36,10 +36,12 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
   void forEachCounter(SizeFn, StatFn<Counter>) const override;
-
   void forEachGauge(SizeFn, StatFn<Gauge>) const override;
-
   void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
+
+  void counterPage(StatFn<Counter> f_stat, absl::string_view start) const override;
+  void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const override;
+  void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const override;
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
@@ -80,6 +82,9 @@ private:
   // free() operations are made from the destructors of the individual stat objects, which are not
   // protected by locks.
   mutable Thread::MutexBasicLockable mutex_;
+
+  template<class Set, class Fn> void pageHelper(
+      const Set* set, Fn stat_fn, absl::string_view start) const;
 
   template <class StatType>
   using StatOrderedSet = absl::btree_set<StatType*, MetricHelper::LessThan>;

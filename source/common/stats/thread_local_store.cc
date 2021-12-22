@@ -984,6 +984,67 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   }
 }
 
+void ThreadLocalStoreImpl::counterPage(StatFn<Counter> f_stat, absl::string_view start) const {
+  alloc_.counterPage(f_stat, start);
+}
+
+void ThreadLocalStoreImpl::gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const {
+  alloc_.gaugePage(f_stat, start);
+}
+
+void ThreadLocalStoreImpl::textReadoutPage(StatFn<TextReadout> f_stat,
+                                           absl::string_view start) const {
+  alloc_.textReadoutPage(f_stat, start);
+}
+
+void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_view start)
+    const {
+  std::vector<ParentHistogramSharedPtr> histograms;
+  {
+    Thread::LockGuard lock(hist_mutex_);
+    histograms.reserve(histogram_set_.size());
+    for (const auto& histogram_ptr : histogram_set_) {
+      histograms.emplace_back(histogram_ptr);
+    }
+  }
+  //auto compare = [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
+  //return a->name() < b->name();
+    //};
+  struct LessThan {
+    bool operator()(const HistogramSharedPtr& a, const HistogramSharedPtr& b) {
+      return cmp_(a.get(), b.get());
+    }
+    bool operator()(const HistogramSharedPtr& a, StatName b) const {
+      return cmp_(a.get(), b);
+    }
+    MetricHelper::LessThan cmp_;
+  };
+  LessThan cmp;
+  std::sort(histograms.begin(), histograms.end(), cmp);
+  StatNameManagedStorage start_name(start, const_cast<SymbolTable&>(constSymbolTable()));
+  for (auto iter = std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(),
+                                    cmp);
+       iter != histograms.end();
+       ++iter) {
+    if (!f_stat(**iter)) {
+      break;
+    }
+  }
+}
+
+void ThreadLocalStoreImpl::scopePage(StatFn<const Scope> f_scope, absl::string_view) const {
+  // FIX THIS
+  Thread::LockGuard lock(lock_);
+  if (!f_scope(*default_scope_)) {
+    return;
+  }
+  for (ScopeImpl* scope : scopes_) {
+    if (!f_scope(*scope)) {
+      return;
+    }
+  }
+}
+
 void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   alloc_.forEachSinkedCounter(f_size, f_stat);
 }

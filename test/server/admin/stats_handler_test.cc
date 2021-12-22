@@ -57,7 +57,6 @@ public:
   Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Api::MockApi> api_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;

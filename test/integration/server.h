@@ -284,6 +284,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+
   void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachCounter(f_size, f_stat);
@@ -301,6 +302,29 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
   }
+
+  void counterPage(StatFn<Counter> f_stat, absl::string_view start) const override {
+    Thread::LockGuard lock(lock_);
+    store_.counterPage(f_stat, start);
+  }
+  void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const override {
+    Thread::LockGuard lock(lock_);
+    store_.gaugePage(f_stat, start);
+  }
+  void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const override {
+    Thread::LockGuard lock(lock_);
+    store_.textReadoutPage(f_stat, start);
+  }
+  void histogramPage(StatFn<Histogram> f_stat, absl::string_view start) const override {
+    Thread::LockGuard lock(lock_);
+    store_.histogramPage(f_stat, start);
+  }
+  void scopePage(StatFn<const Scope> /*f_scope*/, absl::string_view /*start*/) const override {
+    ASSERT(false);
+    /*Thread::LockGuard lock(lock_);
+      store_.scopePage(f_size, f_scope);*/
+  }
+
   void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachSinkedCounter(f_size, f_stat);

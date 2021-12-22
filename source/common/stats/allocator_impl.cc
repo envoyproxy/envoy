@@ -392,6 +392,29 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
   }
 }
 
+template<class Set, class Fn> void AllocatorImpl::pageHelper(
+    const Set* set, Fn f_stat, absl::string_view start) const {
+  StatNameManagedStorage start_name(start, symbol_table_);
+  Thread::LockGuard lock(mutex_);
+  for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {
+    if (!f_stat(**iter)) {
+      return;
+    }
+  }
+}
+
+void AllocatorImpl::counterPage(StatFn<Counter> f_stat, absl::string_view start) const {
+  pageHelper(&counters_, f_stat, start);
+}
+
+void AllocatorImpl::gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const {
+  pageHelper(&gauges_, f_stat, start);
+}
+
+void AllocatorImpl::textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const {
+  pageHelper(&text_readouts_, f_stat, start);
+}
+
 void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   if (sink_predicates_ != nullptr) {
     Thread::LockGuard lock(mutex_);
