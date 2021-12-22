@@ -78,13 +78,41 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   if (!Utility::filterParam(params, response, filter_)) {
     return Http::Code::BadRequest;
   }
+  if (filter_.has_value()) {
+    filter_string_ = params.find("filter")->second;
+  }
+
+  Http::Utility::QueryParams::const_iterator pagesize_iter = params.find("pagesize");
+  if (pagesize_iter != params.end()) {
+    // We don't accept arbitrary page sizes as they might be dangerous.
+    if (pagesize_iter->second == "25") {
+      page_size_ = 25;
+    } else if (pagesize_iter->second == "100") {
+      page_size_ = 100;
+    } else if (pagesize_iter->second == "1000") {
+      page_size_ = 1000;
+    } else if (pagesize_iter->second == "unlimited") {
+      page_size_ = absl::nullopt;
+    } else {
+      response.add("pagesize must be 25, 100, 1000, or unlimited");
+      return Http::Code::BadRequest;
+    }
+  }
 
   const absl::optional<std::string> format_value = Utility::formatParam(params);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
       format_ = Format::Prometheus;
+      if (page_size_.has_value() && format_ != Format::Text) {
+        response.add("pagesize cannot be set for Promsetheus");
+        return Http::Code::BadRequest;
+      }
     } else if (format_value.value() == "json") {
       format_ = Format::Json;
+      if (page_size_.has_value() && format_ != Format::Text) {
+        response.add("pagesize cannot be set for Json");
+        return Http::Code::BadRequest;
+      }
     } else if (format_value.value() == "text") {
       format_ = Format::Text;
     } else {
@@ -98,19 +126,9 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     scope_ = scope_iter->second;
   }
 
-  Http::Utility::QueryParams::const_iterator pagesize_iter = params.find("pagesize");
-  if (pagesize_iter != params.end()) {
-    // We don't accept arbitrary page sizes as they might be dangerous.
-    if (pagesize_iter->second == "25") {
-      page_size_ = 25;
-    } else if (pagesize_iter->second == "100") {
-      page_size_ = 100;
-    } else if (pagesize_iter->second == "1000") {
-      page_size_ = 1000;
-    } else {
-      response.add("pagesize must be 25, 100, or 1000");
-      return Http::Code::NotFound;
-    }
+  Http::Utility::QueryParams::const_iterator start_iter = params.find("start");
+  if (start_iter != params.end()) {
+    start_ = start_iter->second;
   }
 
   return Http::Code::OK;
@@ -283,9 +301,10 @@ public:
     if (params_.page_size_.has_value()) {
       ASSERT(num_ <= params_.page_size_.value());
       if (num_ == params_.page_size_.value()) {
+        if (next_start_.empty()) {
+          next_start_ = metric.name();
+        }
         return true;
-      } else if (next_start_.empty()) {
-        next_start_ = metric.name();
       }
     }
     return false;
@@ -329,11 +348,18 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
   std::unique_ptr<Render> render;
+  bool add_paging_controls = false;
+
   if (params.format_ == Format::Json) {
     render = std::make_unique<JsonRender>(response, params);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     render = std::make_unique<TextRender>(response);
+    if (params.page_size_.has_value()) {
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+      add_paging_controls = true;
+      response.add("<pre>\n");
+    }
   }
 
   Context context(params, *render);
@@ -399,6 +425,19 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                        });
   }
 #endif
+
+  if (add_paging_controls) {
+    response.add("</pre>\n");
+    if (!context.next_start_.empty()) {
+      response.add(absl::StrCat("<a href='stats?start=", context.next_start_,
+                                "&pagesize=", params.page_size_.value(),
+                                (params.filter_.has_value()
+                                 ? absl::StrCat("&filter=", params.filter_string_) : ""),
+                                params.used_only_ ? "&usedonly" : "",
+                                "'>Next Page</a>\n"));
+    }
+  }
+
 
   // Display plain stats if format query param is not there.
   // statsAsText(counters_and_gauges, text_readouts, histograms, response);
