@@ -703,9 +703,27 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
+  absl::string_view method = downstream_headers_->getMethodValue();
+  const bool is_safe_method = (method == Http::Headers::get().MethodValues.Get ||
+                               method == Http::Headers::get().MethodValues.Head ||
+                               method == Http::Headers::get().MethodValues.Options ||
+                               method == Http::Headers::get().MethodValues.Trace);
 
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+  if (retry_state_ == nullptr) {
+    ENVOY_LOG(
+        warn,
+        "No retry policy is configured. There won't be any fallback for alt_svc protocol failure.");
+  }
+  // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on 425
+  // response. In addition to this, the decisions should also depend on reset retry policies.
+  const bool can_handle_too_early_response =
+      retry_state_ != nullptr &&
+      retry_state_->wouldRetryFromRetriableStatusCode(Http::Code::TooEarly);
+  // The request should only be sent as early data iff the policy will retry on 425 and it has safe
+  // method.
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool),
+      /*has_early_data=*/is_safe_method && can_handle_too_early_response, /*use_alt_svc=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -858,6 +876,7 @@ void Filter::cleanup() {
   // list as appropriate.
   ASSERT(upstream_requests_.empty());
 
+  std::cerr << "============= cleanup\n";
   retry_state_.reset();
   if (response_timeout_) {
     response_timeout_->disableTimer();
@@ -972,7 +991,12 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
 
   if (!downstream_response_started_ && retry_state_) {
     RetryStatus retry_status =
-        retry_state_->shouldHedgeRetryPerTryTimeout([this]() -> void { doRetry(); });
+        retry_state_->shouldHedgeRetryPerTryTimeout([this, &upstream_request]() -> void {
+          // Without any knowledge about what's going on in the connection pool, retry the request
+          // with the safest settings which is no early data but keep using or not using alt-svc as
+          // before. In this way, QUIC won't be fasely marked as broken.
+          doRetry(/*has_early_data*/ false, upstream_request.useAltSvc());
+        });
 
     if (retry_status == RetryStatus::Yes) {
       runRetryOptionsPredicates(upstream_request);
@@ -1116,15 +1140,26 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                              UpstreamRequest& upstream_request) {
+
   // We don't retry if we already started the response, don't have a retry policy defined,
   // or if we've already retried this upstream request (currently only possible if a per
   // try timeout occurred and hedge_on_per_try_timeout is enabled).
   if (downstream_response_started_ || !retry_state_ || upstream_request.retried()) {
     return false;
   }
-
-  const RetryStatus retry_status =
-      retry_state_->shouldRetryReset(reset_reason, [this]() -> void { doRetry(); });
+  absl::optional<bool> was_using_alt_svc;
+  if (upstream_request.hasUpstream()) {
+    was_using_alt_svc = upstream_request.streamInfo().protocol().has_value() &&
+                        upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3;
+  }
+  const RetryStatus retry_status = retry_state_->shouldRetryReset(
+      reset_reason, was_using_alt_svc,
+      [this, has_early_data = upstream_request.hasEarlyData()](bool use_alt_svc) -> void {
+        // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
+        // the original request is retried with the same has_early_data setting, it will not be sent
+        // as early data by the underlying connection pool grid.
+        doRetry(has_early_data, use_alt_svc);
+      });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);
     pending_retries_++;
@@ -1177,15 +1212,15 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
 
   const StreamInfo::ResponseFlag response_flags = streamResetReasonToResponseFlag(reset_reason);
 
-  const std::string body =
-      absl::StrCat("upstream connect error or disconnect/reset before headers. reset reason: ",
-                   Http::Utility::resetReasonToString(reset_reason),
-                   Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
-                           !transport_failure_reason.empty()
-                       ? ", transport failure reason: "
-                       : "",
-                   transport_failure_reason);
+  const std::string body = absl::StrCat(
+      "upstream connect error or disconnect/reset before headers.", (is_retry_ ? "" : " not"),
+      " retried. and the latest reset reason: ", Http::Utility::resetReasonToString(reset_reason),
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http_transport_failure_reason_in_body") &&
+              !transport_failure_reason.empty()
+          ? ", transport failure reason: "
+          : "",
+      transport_failure_reason);
   const std::string& basic_details =
       downstream_response_started_ ? StreamInfo::ResponseCodeDetails::get().LateUpstreamReset
                                    : StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset;
@@ -1339,10 +1374,15 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       // We already retried this request (presumably for a per try timeout) so
       // we definitely won't retry it again. Check if we would have retried it
       // if we could.
-      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers);
+      bool dumb;
+      could_not_retry = retry_state_->wouldRetryFromHeaders(*headers, *downstream_headers_, dumb) !=
+                        RetryState::RetryDecision::NoRetry;
     } else {
-      const RetryStatus retry_status =
-          retry_state_->shouldRetryHeaders(*headers, [this]() -> void { doRetry(); });
+      const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
+          *headers, *downstream_headers_, /*had_early_data=*/upstream_request.hasEarlyData(),
+          [this, use_alt_svc = upstream_request.useAltSvc()](bool as_early_data) -> void {
+            doRetry(as_early_data, use_alt_svc);
+          });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);
         pending_retries_++;
@@ -1679,7 +1719,7 @@ void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
   }
 }
 
-void Filter::doRetry() {
+void Filter::doRetry(bool has_early_data, bool use_alt_svc) {
   ENVOY_STREAM_LOG(debug, "performing retry", *callbacks_);
 
   is_retry_ = true;
@@ -1701,8 +1741,8 @@ void Filter::doRetry() {
     cleanup();
     return;
   }
-  UpstreamRequestPtr upstream_request =
-      std::make_unique<UpstreamRequest>(*this, std::move(generic_conn_pool));
+  UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
+      *this, std::move(generic_conn_pool), has_early_data, use_alt_svc);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

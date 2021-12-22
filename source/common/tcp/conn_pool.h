@@ -28,8 +28,9 @@ struct TcpAttachContext : public Envoy::ConnectionPool::AttachContext {
 
 class TcpPendingStream : public Envoy::ConnectionPool::PendingStream {
 public:
-  TcpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, TcpAttachContext& context)
-      : Envoy::ConnectionPool::PendingStream(parent), context_(context) {}
+  TcpPendingStream(Envoy::ConnectionPool::ConnPoolImplBase& parent, bool has_early_data,
+                   TcpAttachContext& context)
+      : Envoy::ConnectionPool::PendingStream(parent, has_early_data), context_(context) {}
   Envoy::ConnectionPool::AttachContext& context() override { return context_; }
 
   TcpAttachContext context_;
@@ -178,16 +179,16 @@ public:
   }
   ConnectionPool::Cancellable* newConnection(Tcp::ConnectionPool::Callbacks& callbacks) override {
     TcpAttachContext context(&callbacks);
-    return newStreamImpl(context);
+    return newStreamImpl(context, /*has_early_data=*/false);
   }
   bool maybePreconnect(float preconnect_ratio) override {
     return maybePreconnectImpl(preconnect_ratio);
   }
 
-  ConnectionPool::Cancellable*
-  newPendingStream(Envoy::ConnectionPool::AttachContext& context) override {
-    Envoy::ConnectionPool::PendingStreamPtr pending_stream =
-        std::make_unique<TcpPendingStream>(*this, typedContext<TcpAttachContext>(context));
+  ConnectionPool::Cancellable* newPendingStream(Envoy::ConnectionPool::AttachContext& context,
+                                                bool has_early_data) override {
+    Envoy::ConnectionPool::PendingStreamPtr pending_stream = std::make_unique<TcpPendingStream>(
+        *this, has_early_data, typedContext<TcpAttachContext>(context));
     return addPendingStream(std::move(pending_stream));
   }
 

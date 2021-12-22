@@ -102,6 +102,8 @@ enum class PoolFailureReason {
   RemoteConnectionFailure,
   // A timeout occurred while creating a new connection.
   Timeout,
+  // The pool isn't qualified according to the requirment of the new connection.
+  NotQualified,
 };
 
 } // namespace ConnectionPool

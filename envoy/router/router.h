@@ -338,7 +338,15 @@ public:
  */
 class RetryState {
 public:
+  enum class RetryDecision {
+    RetryNoBackoff,
+    RetryWithBackoff,
+    NoRetry,
+  };
+
   using DoRetryCallback = std::function<void()>;
+  using DoRetryResetCallback = std::function<void(bool use_alt_svc)>;
+  using DoRetryHeaderCallback = std::function<void(bool as_early_data)>;
 
   virtual ~RetryState() = default;
 
@@ -366,7 +374,8 @@ public:
    *         called. Calling code should proceed with error handling.
    */
   virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
-                                         DoRetryCallback callback) PURE;
+                                         const Http::RequestHeaderMap& original_request,
+                                         bool had_early_data, DoRetryHeaderCallback callback) PURE;
 
   /**
    * Determines whether given response headers would be retried by the retry policy, assuming
@@ -376,7 +385,11 @@ public:
    * @param response_headers supplies the response headers.
    * @return bool true if a retry would be warranted based on the retry policy.
    */
-  virtual bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) PURE;
+  virtual RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
+                                              const Http::RequestHeaderMap& original_request,
+                                              bool& retry_as_early_data) PURE;
+
+  virtual bool wouldRetryFromRetriableStatusCode(Http::Code code) const PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
@@ -388,8 +401,9 @@ public:
    *         in the future. Otherwise a retry should not take place and the callback will never be
    *         called. Calling code should proceed with error handling.
    */
-  virtual RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
-                                       DoRetryCallback callback) PURE;
+  virtual RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
+                                       absl::optional<bool> was_using_alt_svc,
+                                       DoRetryResetCallback callback) PURE;
 
   /**
    * Determine whether a "hedged" retry should be sent after the per try
@@ -1223,6 +1237,16 @@ public:
    * @return return the connection for the downstream stream.
    */
   virtual const Network::Connection& connection() const PURE;
+  /**
+   * @return return true if the downstream request has early data and the early hasn't been
+   * rejected.
+   */
+  virtual bool hasEarlyData() const PURE;
+  /**
+   * @return return true if the downstream request can be sent to upstream using
+   * protocols advertised in Alt-Svc by the upstream.
+   */
+  virtual bool useAltSvc() const PURE;
 };
 
 /**

@@ -121,6 +121,9 @@ public:
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
 
+protected:
+  bool usesAltSvc() const override { return true; }
+
 private:
   // Store quic helpers which can be shared between connections and must live
   // beyond the lifetime of individual connections.

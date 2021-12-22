@@ -706,9 +706,17 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("503", response->headers().getStatusValue());
-  EXPECT_EQ("upstream connect error or disconnect/reset before headers. reset reason: connection "
-            "termination",
-            response->body());
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    // The request was retried over non-existing TCP connection pool and, of course, failed again.
+    EXPECT_EQ("upstream connect error or disconnect/reset before headers. retried. and the latest "
+              "reset reason: connection failure",
+              response->body());
+
+  } else {
+    EXPECT_EQ("upstream connect error or disconnect/reset before headers. not retried. and the "
+              "latest reset reason: connection termination",
+              response->body());
+  }
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(

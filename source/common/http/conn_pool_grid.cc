@@ -17,11 +17,12 @@ absl::string_view describePool(const ConnectionPool::Instance& pool) {
 ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
                                                      Http::ResponseDecoder& decoder,
                                                      PoolIterator pool_it,
-                                                     ConnectionPool::Callbacks& callbacks)
+                                                     ConnectionPool::Callbacks& callbacks,
+                                                     bool has_early_data, bool should_use_alt_svc)
     : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it) {}
+      current_(pool_it), has_early_data_(has_early_data), should_use_alt_svc_(should_use_alt_svc) {}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
@@ -35,7 +36,9 @@ ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::~ConnectionAttem
 
 ConnectivityGrid::StreamCreationResult
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::newStream() {
-  auto* cancellable = pool().newStream(parent_.decoder_, *this);
+  ASSERT(!parent_.grid_.isPoolHttp3(pool()) || parent_.should_use_alt_svc_);
+  auto* cancellable = pool().newStream(parent_.decoder_, *this, parent_.has_early_data_,
+                                       parent_.should_use_alt_svc_);
   if (cancellable == nullptr) {
     return StreamCreationResult::ImmediateResult;
   }
@@ -261,7 +264,9 @@ bool ConnectivityGrid::hasActiveConnections() const {
 }
 
 ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& decoder,
-                                                         ConnectionPool::Callbacks& callbacks) {
+                                                         ConnectionPool::Callbacks& callbacks,
+                                                         bool has_early_data,
+                                                         bool should_use_alt_svc) {
   ASSERT(!deferred_deleting_);
 
   // New streams should not be created during draining.
@@ -271,12 +276,13 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (!shouldAttemptHttp3()) {
+  if (!shouldAttemptHttp3() || !should_use_alt_svc) {
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;
   }
-  auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks);
+  auto wrapped_callback = std::make_unique<WrapperCallbacks>(*this, decoder, pool, callbacks,
+                                                             has_early_data, should_use_alt_svc);
   ConnectionPool::Cancellable* ret = wrapped_callback.get();
   LinkedList::moveIntoList(std::move(wrapped_callback), wrapped_callbacks_);
   if (wrapped_callbacks_.front()->newStream() == StreamCreationResult::ImmediateResult) {

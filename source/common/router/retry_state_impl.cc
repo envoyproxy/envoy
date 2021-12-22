@@ -138,7 +138,7 @@ RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
   if (!retry_timer_) {
-    retry_timer_ = dispatcher_.createTimer([this]() -> void { callback_(); });
+    retry_timer_ = dispatcher_.createTimer([this]() -> void { backoff_callback_(); });
   }
 
   if (ratelimited_backoff_strategy_ != nullptr) {
@@ -225,17 +225,21 @@ RetryStateImpl::parseResetInterval(const Http::ResponseHeaderMap& response_heade
 }
 
 void RetryStateImpl::resetRetry() {
-  if (callback_) {
+  if (backoff_callback_) {
     cluster_.resourceManager(priority_).retries().dec();
-    callback_ = nullptr;
+    backoff_callback_ = nullptr;
+  }
+  if (next_loop_callback_ != nullptr) {
+    cluster_.resourceManager(priority_).retries().dec();
+    next_loop_callback_ = nullptr;
   }
 }
 
-RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callback) {
+RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallback callback) {
   // If a callback is armed from a previous shouldRetry and we don't need to
   // retry this particular request, we can infer that we did a retry earlier
   // and it was successful.
-  if (callback_ && !would_retry) {
+  if ((backoff_callback_ || next_loop_callback_) && would_retry == RetryDecision::NoRetry) {
     cluster_.stats().upstream_rq_retry_success_.inc();
     if (vcluster_) {
       vcluster_->stats().upstream_rq_retry_success_.inc();
@@ -244,7 +248,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   resetRetry();
 
-  if (!would_retry) {
+  if (would_retry == RetryDecision::NoRetry) {
     return RetryStatus::No;
   }
 
@@ -272,24 +276,34 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
     return RetryStatus::No;
   }
 
-  ASSERT(!callback_);
-  callback_ = callback;
+  ASSERT(!backoff_callback_ && !next_loop_callback_);
   cluster_.resourceManager(priority_).retries().inc();
   cluster_.stats().upstream_rq_retry_.inc();
   if (vcluster_) {
     vcluster_->stats().upstream_rq_retry_.inc();
   }
-  enableBackoffTimer();
+  if (would_retry == RetryDecision::RetryWithBackoff) {
+    backoff_callback_ = callback;
+    enableBackoffTimer();
+  } else {
+    next_loop_callback_ = dispatcher_.createSchedulableCallback(callback);
+    next_loop_callback_->scheduleCallbackNextIteration();
+  }
   return RetryStatus::Yes;
 }
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
-                                               DoRetryCallback callback) {
-  const bool would_retry = wouldRetryFromHeaders(response_headers);
+                                               const Http::RequestHeaderMap& original_request,
+                                               bool had_early_data,
+                                               DoRetryHeaderCallback callback) {
+  // This may be overridden in wouldRetryFromHeaders().
+  bool retry_as_early_data = had_early_data;
+  const RetryDecision retry_decision =
+      wouldRetryFromHeaders(response_headers, original_request, retry_as_early_data);
 
   // Yes, we will retry based on the headers - try to parse a rate limited reset interval from the
   // response.
-  if (would_retry && !reset_headers_.empty()) {
+  if (retry_decision == RetryDecision::RetryWithBackoff && !reset_headers_.empty()) {
     const auto backoff_interval = parseResetInterval(response_headers);
     if (backoff_interval.has_value() && (backoff_interval.value().count() > 1L)) {
       ratelimited_backoff_strategy_ = std::make_unique<JitteredLowerBoundBackOffStrategy>(
@@ -297,12 +311,21 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
     }
   }
 
-  return shouldRetry(would_retry, callback);
+  return shouldRetry(retry_decision,
+                     [retry_as_early_data, callback]() { callback(retry_as_early_data); });
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,
-                                             DoRetryCallback callback) {
-  return shouldRetry(wouldRetryFromReset(reset_reason), callback);
+                                             absl::optional<bool> was_using_alt_svc,
+                                             DoRetryResetCallback callback) {
+
+  // By default retry with the same protocl if the original request already had an encoder of
+  // certain protocol. Following wouldRetryFromReset() may override it.
+  bool retry_with_alt_svc = was_using_alt_svc.has_value() ? was_using_alt_svc.value() : true;
+  const RetryDecision retry_decision =
+      wouldRetryFromReset(reset_reason, was_using_alt_svc, retry_with_alt_svc);
+  return shouldRetry(retry_decision,
+                     [retry_with_alt_svc, callback]() { callback(retry_with_alt_svc); });
 }
 
 RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) {
@@ -313,39 +336,54 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
   // retries are associated with a stream reset which is analogous to a gateway
   // error. When hedging on per try timeout is enabled, however, there is no
   // stream reset.
-  return shouldRetry(true, callback);
+  return shouldRetry(RetryState::RetryDecision::RetryWithBackoff, callback);
 }
 
-bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) {
+RetryState::RetryDecision
+RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
+                                      const Http::RequestHeaderMap& original_request,
+                                      bool& retry_as_early_data) {
   // A response that contains the x-envoy-ratelimited header comes from an upstream envoy.
   // We retry these only when the envoy-ratelimited policy is in effect.
   if (response_headers.EnvoyRateLimited() != nullptr) {
-    return retry_on_ & RetryPolicy::RETRY_ON_ENVOY_RATE_LIMITED;
+    return (retry_on_ & RetryPolicy::RETRY_ON_ENVOY_RATE_LIMITED) ? RetryDecision::RetryWithBackoff
+                                                                  : RetryDecision::NoRetry;
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_5XX) {
     if (Http::CodeUtility::is5xx(Http::Utility::getResponseStatus(response_headers))) {
-      return true;
+      return RetryDecision::RetryWithBackoff;
     }
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_GATEWAY_ERROR) {
     if (Http::CodeUtility::isGatewayError(Http::Utility::getResponseStatus(response_headers))) {
-      return true;
+      return RetryDecision::RetryWithBackoff;
     }
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_4XX)) {
     Http::Code code = static_cast<Http::Code>(Http::Utility::getResponseStatus(response_headers));
     if (code == Http::Code::Conflict) {
-      return true;
+      return RetryDecision::RetryWithBackoff;
     }
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
     for (auto code : retriable_status_codes_) {
-      if (Http::Utility::getResponseStatus(response_headers) == code) {
-        return true;
+      uint32_t status_code = Http::Utility::getResponseStatus(response_headers);
+      if (status_code == code) {
+        if (static_cast<Http::Code>(code) != Http::Code::TooEarly) {
+          return RetryDecision::RetryWithBackoff;
+        }
+        if (original_request.get(Http::Headers::get().EarlyData).empty()) {
+          ASSERT(retry_as_early_data);
+          // Retry iff the downstream request wasn't sent as early data. Otherwise, regardless if
+          // the request was sent as early date in upstream or not, don't retry. Instead, forwarding
+          // the response to downstream.
+          retry_as_early_data = false;
+          return RetryDecision::RetryNoBackoff;
+        }
       }
     }
   }
@@ -353,7 +391,7 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& respon
   if (retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_HEADERS) {
     for (const auto& retriable_header : retriable_headers_) {
       if (retriable_header->matchesHeaders(response_headers)) {
-        return true;
+        return RetryDecision::RetryWithBackoff;
       }
     }
   }
@@ -374,41 +412,72 @@ bool RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& respon
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE)) ||
           (status.value() == Grpc::Status::Internal &&
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_INTERNAL))) {
-        return true;
+        return RetryDecision::RetryWithBackoff;
       }
     }
   }
 
-  return false;
+  return RetryDecision::NoRetry;
 }
 
-bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason) {
+RetryState::RetryDecision
+RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
+                                    absl::optional<bool> was_using_alt_svc,
+                                    bool& retry_with_alt_svc) {
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
   if (reset_reason == Http::StreamResetReason::Overflow) {
-    return false;
+    return RetryDecision::NoRetry;
+  }
+
+  if (reset_reason != Http::StreamResetReason::ConnectionFailure) {
+    ASSERT(was_using_alt_svc.has_value());
+    if (*was_using_alt_svc) {
+      // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
+      // Http/3.
+      retry_with_alt_svc = false;
+      // TODO(danzh) consider making the retry configurable.
+      return RetryDecision::RetryNoBackoff;
+    }
+  } else {
+    if (was_using_alt_svc.has_value()) {
+      // Already got request encoder, so this must be a 0-RTT handshake failure. Retry immediately.
+      // TODO(danzh) consider making the retry configurable.
+      ASSERT(was_using_alt_svc.value());
+      return RetryDecision::RetryNoBackoff;
+    }
+    if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {
+      // This is a pool failure.
+      return RetryDecision::RetryWithBackoff;
+    }
   }
 
   if (retry_on_ & RetryPolicy::RETRY_ON_RESET) {
-    return true;
+    return RetryDecision::RetryWithBackoff;
   }
 
   if (retry_on_ & (RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GATEWAY_ERROR)) {
     // Currently we count an upstream reset as a "5xx" (since it will result in
     // one). With RETRY_ON_RESET we may eventually remove these policies.
-    return true;
+    return RetryDecision::RetryWithBackoff;
   }
 
   if ((retry_on_ & RetryPolicy::RETRY_ON_REFUSED_STREAM) &&
       reset_reason == Http::StreamResetReason::RemoteRefusedStreamReset) {
-    return true;
+    return RetryDecision::RetryWithBackoff;
   }
 
-  if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE) &&
-      reset_reason == Http::StreamResetReason::ConnectionFailure) {
-    return true;
-  }
+  return RetryDecision::NoRetry;
+}
 
+bool RetryStateImpl::wouldRetryFromRetriableStatusCode(Http::Code status_code) const {
+  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
+    for (auto code : retriable_status_codes_) {
+      if (status_code == static_cast<Http::Code>(code)) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 

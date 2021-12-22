@@ -103,8 +103,8 @@ public:
    * @warning Do not call cancel() from the callbacks, as the request is implicitly canceled when
    *          the callbacks are called.
    */
-  virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder,
-                                 Callbacks& callbacks) PURE;
+  virtual Cancellable* newStream(Http::ResponseDecoder& response_decoder, Callbacks& callbacks,
+                                 bool has_early_data, bool should_use_alt_svc) PURE;
 
   /**
    * Returns a user-friendly protocol description for logging.

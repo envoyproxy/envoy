@@ -36,7 +36,8 @@ class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
                         public LinkedObject<UpstreamRequest>,
                         public GenericConnectionPoolCallbacks {
 public:
-  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool);
+  UpstreamRequest(RouterFilterInterface& parent, std::unique_ptr<GenericConnPool>&& conn_pool,
+                  bool has_early_data, bool use_alt_svc);
   ~UpstreamRequest() override;
 
   void encodeHeaders(bool end_stream);
@@ -67,6 +68,8 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
+  bool hasEarlyData() const override;
+  bool useAltSvc() const override { return use_alt_svc_; }
 
   void disableDataFromDownstreamForFlowControl();
   void enableDataFromDownstreamForFlowControl();
@@ -119,6 +122,7 @@ public:
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
+  bool hasUpstream() const { return upstream_ != nullptr; }
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
@@ -181,6 +185,8 @@ private:
   bool record_timeout_budget_ : 1;
 
   Event::TimerPtr max_stream_duration_timer_;
+  bool has_early_data_;
+  bool use_alt_svc_ : 1;
 };
 
 } // namespace Router

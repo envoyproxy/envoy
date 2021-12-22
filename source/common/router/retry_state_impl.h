@@ -56,12 +56,20 @@ public:
   absl::optional<std::chrono::milliseconds>
   parseResetInterval(const Http::ResponseHeaderMap& response_headers) const override;
   RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
-                                 DoRetryCallback callback) override;
+                                 const Http::RequestHeaderMap& original_request,
+                                 bool had_early_data, DoRetryHeaderCallback callback) override;
   // Returns true if the retry policy would retry the passed headers. Does not
   // take into account circuit breaking or remaining tries.
-  bool wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers) override;
-  RetryStatus shouldRetryReset(const Http::StreamResetReason reset_reason,
-                               DoRetryCallback callback) override;
+  RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
+                                      const Http::RequestHeaderMap& original_request,
+                                      bool& retry_as_early_data) override;
+  bool wouldRetryFromRetriableStatusCode(Http::Code code) const override;
+  RetryDecision wouldRetryFromReset(const Http::StreamResetReason reset_reason,
+                                    absl::optional<bool> was_using_alt_svc,
+                                    bool& retry_with_alt_svc);
+  RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
+                               absl::optional<bool> was_using_alt_svc,
+                               DoRetryResetCallback callback) override;
   RetryStatus shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) override;
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
@@ -100,8 +108,7 @@ private:
 
   void enableBackoffTimer();
   void resetRetry();
-  bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
-  RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
+  RetryStatus shouldRetry(RetryDecision would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
   const VirtualCluster* vcluster_;
@@ -111,7 +118,8 @@ private:
   TimeSource& time_source_;
   uint32_t retry_on_{};
   uint32_t retries_remaining_{};
-  DoRetryCallback callback_;
+  DoRetryCallback backoff_callback_;
+  Event::SchedulableCallbackPtr next_loop_callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
   BackOffStrategyPtr backoff_strategy_;

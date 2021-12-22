@@ -42,7 +42,8 @@ namespace Envoy {
 namespace Router {
 
 UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
-                                 std::unique_ptr<GenericConnPool>&& conn_pool)
+                                 std::unique_ptr<GenericConnPool>&& conn_pool, bool has_early_data,
+                                 bool use_alt_svc)
     : parent_(parent), conn_pool_(std::move(conn_pool)), grpc_rq_success_deferred_(false),
       stream_info_(parent_.callbacks()->dispatcher().timeSource(), nullptr),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
@@ -50,7 +51,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
+      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
+      has_early_data_(has_early_data), use_alt_svc_(use_alt_svc) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -304,7 +306,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
-  clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
@@ -312,6 +313,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   } else {
     deferred_reset_reason_ = reason;
   }
+  clearRequestEncoder();
 }
 
 void UpstreamRequest::resetStream() {
@@ -395,6 +397,8 @@ void UpstreamRequest::onPoolFailure(ConnectionPool::PoolFailureReason reason,
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     reset_reason = Http::StreamResetReason::ConnectionFailure;
+  case ConnectionPool::PoolFailureReason::NotQualified:
+    reset_reason = Http::StreamResetReason::ConnectionFailure;
   }
 
   // Mimic an upstream reset.
@@ -408,7 +412,7 @@ void UpstreamRequest::onPoolReady(
     const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
-  ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
+  ENVOY_STREAM_LOG(debug, "============ pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
@@ -623,6 +627,8 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
     --downstream_data_disabled_;
   }
 }
+
+bool UpstreamRequest::hasEarlyData() const { return has_early_data_; }
 
 } // namespace Router
 } // namespace Envoy

@@ -7,6 +7,7 @@
 
 using testing::_;
 using testing::DoAll;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -30,8 +31,12 @@ MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
-  EXPECT_CALL(*this, shouldRetryHeaders(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryHeaders(_, _, _, _))
+      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&, bool,
+                              DoRetryHeaderCallback callback) {
+        callback_ = [&]() { callback(true); };
+        return RetryStatus::Yes;
+      }));
 }
 
 void MockRetryState::expectHedgedPerTryTimeoutRetry() {
@@ -40,8 +45,12 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _))
-      .WillOnce(DoAll(SaveArg<1>(&callback_), Return(RetryStatus::Yes)));
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+      .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool>,
+                              DoRetryResetCallback callback) {
+        callback_ = [&]() { callback(true); };
+        return RetryStatus::Yes;
+      }));
 }
 
 MockRetryState::~MockRetryState() = default;

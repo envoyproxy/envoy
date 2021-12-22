@@ -22,9 +22,10 @@ public:
    */
   Envoy::Http::ConnectionPool::Cancellable*
   newStream(Http::ResponseDecoder& response_decoder,
-            Envoy::Http::ConnectionPool::Callbacks& callbacks) {
+            Envoy::Http::ConnectionPool::Callbacks& callbacks, bool has_early_data,
+            bool use_alt_svc) {
     on_new_stream_();
-    return pool_->newStream(response_decoder, callbacks);
+    return pool_->newStream(response_decoder, callbacks, has_early_data, use_alt_svc);
   }
   bool hasActiveConnections() const { return pool_->hasActiveConnections(); };
 

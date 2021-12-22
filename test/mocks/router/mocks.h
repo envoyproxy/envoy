@@ -175,10 +175,15 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, parseResetInterval,
               (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
-              (const Http::ResponseHeaderMap& response_headers, DoRetryCallback callback));
-  MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::ResponseHeaderMap& response_headers));
+              (const Http::ResponseHeaderMap& response_headers,
+               const Http::RequestHeaderMap& original_request, bool had_early_data,
+               DoRetryHeaderCallback callback));
+  MOCK_METHOD(RetryState::RetryDecision, wouldRetryFromHeaders,
+              (const Http::ResponseHeaderMap& response_headers,
+               const Http::RequestHeaderMap& original_request, bool& retry_as_early_data));
   MOCK_METHOD(RetryStatus, shouldRetryReset,
-              (const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+              (const Http::StreamResetReason reset_reason, absl::optional<bool> was_using_alt_svc,
+               DoRetryResetCallback callback));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
@@ -583,6 +588,8 @@ public:
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(bool, hasEarlyData, (), (const));
+  MOCK_METHOD(bool, useAltSvc, (), (const));
 };
 
 class MockGenericConnectionPoolCallbacks : public GenericConnectionPoolCallbacks {
