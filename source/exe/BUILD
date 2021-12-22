@@ -97,6 +97,8 @@ envoy_cc_library(
     name = "envoy_common_with_core_extensions_lib",
     deps = [
         "//source/common/event:libevent_lib",
+        # TODO(rojkov): drop io_uring dependency when it's fully integrated.
+        "//source/common/io:io_uring_impl_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:thread_local_store_lib",
