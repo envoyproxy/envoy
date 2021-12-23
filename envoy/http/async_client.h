@@ -294,7 +294,7 @@ public:
       child_span_name_ = child_span_name;
       return *this;
     }
-    RequestOptions& setSampled(bool sampled) {
+    RequestOptions& setSampled(absl::optional<bool> sampled) {
       sampled_ = sampled;
       return *this;
     }
