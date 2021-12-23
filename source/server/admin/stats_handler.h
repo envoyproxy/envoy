@@ -53,6 +53,8 @@ public:
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response, AdminStream&);
 
+  Admin::UrlHandler statsHandler();
+
 private:
   class Context;
   class JsonRender;
@@ -82,12 +84,13 @@ private:
     absl::optional<std::regex> filter_;
     absl::optional<std::string> scope_;
     absl::optional<uint32_t> page_size_;
+    Http::Utility::QueryParams query_;
   };
 
   friend class StatsHandlerTest;
 
-  static Http::Code stats(const Params& parmams, Stats::Store& store,
-                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
+  Http::Code stats(const Params& parmams, Stats::Store& store,
+                   Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,

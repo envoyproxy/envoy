@@ -211,18 +211,6 @@ public:
 
 private:
   /**
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const HandlerCb handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-    const ParamDescriptorVec params_;
-  };
-
-  /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
   struct NullRouteConfigProvider : public Router::RouteConfigProvider {

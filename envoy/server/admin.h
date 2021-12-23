@@ -83,13 +83,11 @@ public:
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
-  struct ParamValues {
+  /*struct ParamValues {
     absl::flat_hash_map<std::string, bool> boolean_map_;
     absl::flat_hash_map<std::string, int64_t> integer_map_;
     absl::flat_hash_map<std::string, std::string> string_map_;
-  };
-
-  virtual ~Admin() = default;
+    };*/
 
   /**
    * Callback for admin URL handlers.
@@ -104,6 +102,20 @@ public:
   using HandlerCb = std::function<Http::Code(
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::Instance& response, AdminStream& admin_stream)>;
+
+  /**
+   * Individual admin handler including prefix, help text, and callback.
+   */
+  struct UrlHandler {
+    const std::string prefix_;
+    const std::string help_text_;
+    const HandlerCb handler_;
+    const bool removable_;
+    const bool mutates_server_state_;
+    const ParamDescriptorVec params_;
+  };
+
+  virtual ~Admin() = default;
 
   /**
    * Add an admin handler.

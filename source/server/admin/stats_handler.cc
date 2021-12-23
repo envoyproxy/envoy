@@ -9,6 +9,7 @@
 #include "source/common/html/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
+#include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/prometheus_stats.h"
 #include "source/server/admin/utils.h"
 
@@ -71,19 +72,19 @@ Http::Code StatsHandler::handlerStatsRecentLookupsEnable(absl::string_view,
 }
 
 Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& response) {
-  const Http::Utility::QueryParams params = Http::Utility::parseAndDecodeQueryString(url);
-  used_only_ = params.find("usedonly") != params.end();
-  pretty_ = params.find("pretty") != params.end();
-  text_readouts_ = params.find("text_readouts") != params.end();
-  if (!Utility::filterParam(params, response, filter_)) {
+  query_ = Http::Utility::parseAndDecodeQueryString(url);
+  used_only_ = query_.find("usedonly") != query_.end();
+  pretty_ = query_.find("pretty") != query_.end();
+  text_readouts_ = query_.find("text_readouts") != query_.end();
+  if (!Utility::filterParam(query_, response, filter_)) {
     return Http::Code::BadRequest;
   }
   if (filter_.has_value()) {
-    filter_string_ = params.find("filter")->second;
+    filter_string_ = query_.find("filter")->second;
   }
 
-  Http::Utility::QueryParams::const_iterator pagesize_iter = params.find("pagesize");
-  if (pagesize_iter != params.end()) {
+  Http::Utility::QueryParams::const_iterator pagesize_iter = query_.find("pagesize");
+  if (pagesize_iter != query_.end()) {
     // We don't accept arbitrary page sizes as they might be dangerous.
     if (pagesize_iter->second == "25") {
       page_size_ = 25;
@@ -99,7 +100,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
-  const absl::optional<std::string> format_value = Utility::formatParam(params);
+  const absl::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
       format_ = Format::Prometheus;
@@ -121,13 +122,13 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
-  Http::Utility::QueryParams::const_iterator scope_iter = params.find("scope");
-  if (scope_iter != params.end()) {
+  Http::Utility::QueryParams::const_iterator scope_iter = query_.find("scope");
+  if (scope_iter != query_.end()) {
     scope_ = scope_iter->second;
   }
 
-  Http::Utility::QueryParams::const_iterator start_iter = params.find("start");
-  if (start_iter != params.end()) {
+  Http::Utility::QueryParams::const_iterator start_iter = query_.find("start");
+  if (start_iter != query_.end()) {
     start_ = start_iter->second;
   }
 
@@ -358,7 +359,11 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     if (params.page_size_.has_value()) {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
       add_paging_controls = true;
-      response.add("<pre>\n");
+      AdminHtmlGenerator html(response);
+      html.renderHead();
+      html.renderUrlHandler(statsHandler(), params.query_);
+      html.renderTail();
+      response.add("<body><pre>\n");
     }
   }
 
@@ -427,7 +432,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 #endif
 
   if (add_paging_controls) {
-    response.add("</pre>\n");
+    response.add("</pre></body>\n");
     if (!context.next_start_.empty()) {
       response.add(absl::StrCat("<a href='stats?start=", context.next_start_,
                                 "&pagesize=", params.page_size_.value(),
@@ -635,6 +640,22 @@ std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& cou
 
   ENVOY_LOG_MISC(error, "pretty_print={}", pretty_print);
   return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
+}
+
+Admin::UrlHandler StatsHandler::statsHandler() {
+  return {"/stats",
+    "Print server stats.",
+    MAKE_ADMIN_HANDLER(handlerStats),
+    false,
+    false,
+    {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+       "Only include stats that have been written by system since restart"},
+     {Admin::ParamDescriptor::Type::String, "filter",
+      "Regular expression (ecmascript) for filtering stats"},
+     {Admin::ParamDescriptor::Type::Enum,
+      "pagesize",
+      "Number of stats to show per page. Plain text used if unlimited.",
+      {"25", "100", "1000", "unlimited"}}}};
 }
 
 } // namespace Server

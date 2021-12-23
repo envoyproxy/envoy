@@ -23,7 +23,6 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/common/html/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -34,6 +33,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
+#include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/utils.h"
 #include "source/server/listener_impl.h"
 
@@ -44,95 +44,6 @@
 
 namespace Envoy {
 namespace Server {
-
-namespace {
-
-/**
- * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
- * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
- * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
- * below.
- *
- * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
- * because it's transparent, but is also 67646 bytes, which is annoying to inline. We could
- * just reference that rather than inlining it, but then the favicon won't work when visiting
- * the admin page from a network that can't see the internet.
- */
-const char EnvoyFavicon[] =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
-    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
-    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
-    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59Cr"
-    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
-    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
-    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
-    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
-    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
-
-const char AdminHtmlStart[] = R"(
-<head>
-  <title>Envoy Admin</title>
-  <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
-  <style>
-    .home-table {
-      font-family: sans-serif;
-      font-size: medium;
-      border-collapse: collapse;
-      border-spacing: 0;
-    }
-
-    .home-data {
-      text-align: left;
-      padding: 4px;
-    }
-
-    .home-form {
-      margin-bottom: 0;
-    }
-
-    .button-as-link {
-      background: none!important;
-      border: none;
-      padding: 0!important;
-      font-family: sans-serif;
-      font-size: medium;
-      color: #069;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-
-    .gray {
-      background-color: #dddddd;
-    }
-
-    .vert-space {
-      height: 4px;
-    }
-
-    .option {
-      padding-bottom: 4px;
-      padding-top: 4px;
-      padding-right: 4px;
-      padding-left: 20px;
-      text-align: right;
-    }
-  </style>
-</head>
-<body>
-  <table class='home-table'>
-    <thead>
-      <th class='home-data'>Command</th>
-      <th class='home-data'>Description</th>
-    </thead>
-    <tbody>
-)";
-
-const char AdminHtmlEnd[] = R"(
-    </tbody>
-  </table>
-</body>
-)";
-} // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
@@ -293,19 +204,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
            false,
            false,
            {}},
-          {"/stats",
-           "Print server stats. Plain text is used if pagesize is unlimited, HTML for paging",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStats),
-           false,
-           false,
-           {{ParamDescriptor::Type::Boolean, "usedonly",
-             "Only include stats that have been written by system since restart"},
-            {ParamDescriptor::Type::String, "filter",
-             "Regular expression (ecmascript) for filtering stats"},
-            {ParamDescriptor::Type::Enum,
-             "pagesize",
-             "Number of stats to show per page",
-             {"25", "100", "1000", "unlimited"}}}},
+          stats_handler_.statsHandler(),
           {"/stats/json",
            "print stats as with HTML paging",
            MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsJson),
@@ -517,80 +416,15 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-
-  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
+  AdminHtmlGenerator gen(response);
+  gen.renderHead();
 
   // Prefix order is used during searching, but for printing do them in alpha order.
-  int index = 0;
+  OptRef<const Http::Utility::QueryParams> no_query_params;
   for (const UrlHandler* handler : sortedHandlers()) {
-    absl::string_view path = handler->prefix_;
-
-    if (path == "/") {
-      continue; // No need to print self-link to index page.
-    }
-
-    // Remove the leading slash from the link, so that the admin page can be
-    // rendered as part of another console, on a sub-path.
-    //
-    // E.g. consider a downstream dashboard that embeds the Envoy admin console.
-    // In that case, the "/stats" endpoint would be at
-    // https://DASHBOARD/envoy_admin/stats. If the links we present on the home
-    // page are absolute (e.g. "/stats") they won't work in the context of the
-    // dashboard. Removing the leading slash, they will work properly in both
-    // the raw admin console and when embedded in another page and URL
-    // hierarchy.
-    ASSERT(!path.empty());
-    ASSERT(path[0] == '/');
-    path = path.substr(1);
-
-    // Alternate gray and white param-blocks. The pure CSS way of doing based on
-    // row index doesn't work correctly for us we are using a row for each
-    // parameter, and we want each endpoint/option-block to be colored the same.
-    const char* row_class = (++index & 1) ? " class='gray'" : "";
-
-    // For handlers that mutate state, render the link as a button in a POST form,
-    // rather than an anchor tag. This should discourage crawlers that find the /
-    // page from accidentally mutating all the server state by GETting all the hrefs.
-    const char* button_style = handler->mutates_server_state_ ? "" : " class='button-as-link'";
-    const char* method = handler->mutates_server_state_ ? "post" : "get";
-    response.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
-                              "  <td class='home-data'><form action='", path, "' method='", method,
-                              "' id='", path,
-                              "' class='home-form'>\n"
-                              "    <button",
-                              button_style, ">", path, "</button>\n",
-                              "  </form></td>\n"
-                              "  <td class='home-data'>",
-                              Html::Utility::sanitize(handler->help_text_), "</td>\n", "</tr>\n"));
-
-    std::vector<std::string> params;
-    for (const ParamDescriptor& param : handler->params_) {
-      response.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'>"));
-      switch (param.type_) {
-      case ParamDescriptor::Type::Boolean:
-        response.add(absl::StrCat("<input type='checkbox' name='", param.id_, "' id='", param.id_,
-                                  "' form='", path, "'/>"));
-        break;
-      case ParamDescriptor::Type::String:
-        response.add(absl::StrCat("<input type='text' name='", param.id_, "' id='", param.id_,
-                                  "' form='", path, "'/>"));
-        break;
-      case ParamDescriptor::Type::Enum:
-        response.add(absl::StrCat("\n    <select name='", param.id_, "' id='", param.id_,
-                                  "' form='", path, "'>\n"));
-        for (const std::string& choice : param.enum_choices_) {
-          std::string sanitized = Html::Utility::sanitize(choice);
-          response.add(
-              absl::StrCat("      <option value='", sanitized, "'>", sanitized, "</option>\n"));
-        }
-        response.add("    </select>\n  ");
-        break;
-      }
-      response.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
-                                Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
-    }
+    gen.renderUrlHandler(*handler, no_query_params);
   }
-  response.add(AdminHtmlEnd);
+  gen.renderTail();
   return Http::Code::OK;
 }
 
