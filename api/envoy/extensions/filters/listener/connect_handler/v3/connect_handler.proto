@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.listener.connect_handler.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.listener.connect_handler.v3";
+option java_outer_classname = "ConnectHandlerProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Connect Handler Filter]
+// Detect and terminate HTTP/1 CONNECT request.
+// [#extension: envoy.filters.listener.connect_handler]
+
+message ConnectHandler {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.listener.http_inspector.v2.ConnectHandler";
+}

@@ -110,6 +110,7 @@ proto_library(
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",
         "//envoy/extensions/filters/http/tap/v3:pkg",
         "//envoy/extensions/filters/http/wasm/v3:pkg",
+        "//envoy/extensions/filters/listener/connect_handler/v3:pkg",
         "//envoy/extensions/filters/listener/http_inspector/v3:pkg",
         "//envoy/extensions/filters/listener/original_dst/v3:pkg",
         "//envoy/extensions/filters/listener/original_src/v3:pkg",
