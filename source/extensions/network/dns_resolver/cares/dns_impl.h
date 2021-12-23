@@ -109,11 +109,14 @@ private:
   private:
     void startResolutionImpl(int family);
 
+    // Holds the availability of non-loopback network interfaces for the system.
     struct AvailableInterfaces {
       bool v4_available_;
       bool v6_available_;
     };
 
+    // Return the currently available network interfaces.
+    // Note: this call uses syscalls.
     static AvailableInterfaces availableInterfaces();
 
     // Perform a second resolution under certain conditions. If dns_lookup_family_ is V4Preferred
@@ -124,6 +127,7 @@ private:
     bool lookup_all_ = false;
     int family_ = AF_INET;
     const DnsLookupFamily dns_lookup_family_;
+    // Queried for at construction time.
     const AvailableInterfaces available_interfaces_;
   };
 

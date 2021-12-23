@@ -433,6 +433,10 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
   DnsResolverImpl::AddrInfoPendingResolution::AvailableInterfaces available_interfaces{false,
                                                                                        false};
   for (const auto& interface_address : interface_addresses) {
+    if (!interface_address.interface_addr_->ip()) {
+      return;
+    }
+
     if (Network::Utility::isLoopbackAddress(*interface_address.interface_addr_)) {
       continue;
     }
