@@ -434,7 +434,7 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
                                                                                        false};
   for (const auto& interface_address : interface_addresses) {
     if (!interface_address.interface_addr_->ip()) {
-      return;
+      continue;
     }
 
     if (Network::Utility::isLoopbackAddress(*interface_address.interface_addr_)) {
