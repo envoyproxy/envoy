@@ -434,15 +434,12 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   if (add_paging_controls) {
     response.add("</pre></body>\n");
     if (!context.next_start_.empty()) {
-      response.add(absl::StrCat("<a href='stats?start=", context.next_start_,
-                                "&pagesize=", params.page_size_.value(),
-                                (params.filter_.has_value()
-                                 ? absl::StrCat("&filter=", params.filter_string_) : ""),
-                                params.used_only_ ? "&usedonly" : "",
-                                "'>Next Page</a>\n"));
+      response.add(absl::StrCat(
+          "<a href='stats?start=", context.next_start_, "&pagesize=", params.page_size_.value(),
+          (params.filter_.has_value() ? absl::StrCat("&filter=", params.filter_string_) : ""),
+          params.used_only_ ? "&usedonly" : "", "'>Next Page</a>\n"));
     }
   }
-
 
   // Display plain stats if format query param is not there.
   // statsAsText(counters_and_gauges, text_readouts, histograms, response);
@@ -644,18 +641,18 @@ std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& cou
 
 Admin::UrlHandler StatsHandler::statsHandler() {
   return {"/stats",
-    "Print server stats.",
-    MAKE_ADMIN_HANDLER(handlerStats),
-    false,
-    false,
-    {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
-       "Only include stats that have been written by system since restart"},
-     {Admin::ParamDescriptor::Type::String, "filter",
-      "Regular expression (ecmascript) for filtering stats"},
-     {Admin::ParamDescriptor::Type::Enum,
-      "pagesize",
-      "Number of stats to show per page. Plain text used if unlimited.",
-      {"25", "100", "1000", "unlimited"}}}};
+          "Print server stats.",
+          MAKE_ADMIN_HANDLER(handlerStats),
+          false,
+          false,
+          {{Admin::ParamDescriptor::Type::Boolean, "usedonly",
+            "Only include stats that have been written by system since restart"},
+           {Admin::ParamDescriptor::Type::String, "filter",
+            "Regular expression (ecmascript) for filtering stats"},
+           {Admin::ParamDescriptor::Type::Enum,
+            "pagesize",
+            "Number of stats to show per page. Plain text used if unlimited.",
+            {"25", "100", "1000", "unlimited"}}}};
 }
 
 } // namespace Server

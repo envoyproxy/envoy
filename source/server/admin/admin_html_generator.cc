@@ -102,9 +102,7 @@ void AdminHtmlGenerator::renderHead() {
   response_.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
 }
 
-void AdminHtmlGenerator::renderTail() {
-  response_.add(AdminHtmlEnd);
-}
+void AdminHtmlGenerator::renderTail() { response_.add(AdminHtmlEnd); }
 
 void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
                                           OptRef<const Http::Utility::QueryParams> query) {
@@ -161,31 +159,29 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
     }
 
     switch (param.type_) {
-      case Admin::ParamDescriptor::Type::Boolean:
-        response_.add(absl::StrCat("<input type='checkbox' name='", param.id_, "' id='", param.id_,
-                                   "' form='", path, "'", value.empty() ? "" : " checked", "/>"));
-        break;
-      case Admin::ParamDescriptor::Type::String:
-        response_.add(absl::StrCat("<input type='text' name='", param.id_, "' id='", param.id_,
-                                   "' form='", path, "'",
-                                   value.empty() ? "" : absl::StrCat(" value='", value, "'"),
-                                   "/>"));
-        break;
-      case Admin::ParamDescriptor::Type::Enum:
-        response_.add(absl::StrCat("\n    <select name='", param.id_, "' id='", param.id_,
-                                   "' form='", path, "'>\n"));
-        for (const std::string& choice : param.enum_choices_) {
-          std::string sanitized = Html::Utility::sanitize(choice);
-          response_.add(
-              absl::StrCat("      <option value='", sanitized, "'",
-                           (value == sanitized) ? " selected" : "",
-                           ">", sanitized, "</option>\n"));
-        }
-        response_.add("    </select>\n  ");
-        break;
+    case Admin::ParamDescriptor::Type::Boolean:
+      response_.add(absl::StrCat("<input type='checkbox' name='", param.id_, "' id='", param.id_,
+                                 "' form='", path, "'", value.empty() ? "" : " checked", "/>"));
+      break;
+    case Admin::ParamDescriptor::Type::String:
+      response_.add(absl::StrCat("<input type='text' name='", param.id_, "' id='", param.id_,
+                                 "' form='", path, "'",
+                                 value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+      break;
+    case Admin::ParamDescriptor::Type::Enum:
+      response_.add(absl::StrCat("\n    <select name='", param.id_, "' id='", param.id_, "' form='",
+                                 path, "'>\n"));
+      for (const std::string& choice : param.enum_choices_) {
+        std::string sanitized = Html::Utility::sanitize(choice);
+        response_.add(absl::StrCat("      <option value='", sanitized, "'",
+                                   (value == sanitized) ? " selected" : "", ">", sanitized,
+                                   "</option>\n"));
+      }
+      response_.add("    </select>\n  ");
+      break;
     }
     response_.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
-                              Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
+                               Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
   }
 }
 
