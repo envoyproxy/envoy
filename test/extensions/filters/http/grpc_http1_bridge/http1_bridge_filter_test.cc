@@ -293,8 +293,8 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufNotUpgradedToGrpc) {
   EXPECT_EQ("200", response_headers.get_(":status"));
 }
 
-// Verifies that requests with protobuf content are framed as gRPC when the filterned is configured
-// as such
+// Verifies that requests with protobuf content are framed as gRPC when the filter is configured as
+// such
 TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   initialize(true);
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
