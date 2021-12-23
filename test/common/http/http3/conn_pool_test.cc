@@ -1,6 +1,7 @@
 #include "source/common/http/http3/conn_pool.h"
 #include "source/common/quic/quic_transport_socket_factory.h"
 
+#include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -139,6 +140,17 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
             options->max_concurrent_streams().value());
   EXPECT_EQ(info.quic_config_.GetInitialMaxStreamDataBytesIncomingBidirectionalToSend(),
             options->initial_stream_window_size().value());
+}
+
+TEST_F(Http3ConnPoolImplTest, NewStreamFail) {
+  initialize();
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*has_early_data=*/false,
+                                      /*should_use_alt_svc=*/false));
+  EXPECT_EQ(callbacks.reason_, ConnectionPool::PoolFailureReason::NotQualified);
 }
 
 } // namespace Http3

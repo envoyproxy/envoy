@@ -22,7 +22,13 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
     : grid_(grid), decoder_(decoder), inner_callbacks_(&callbacks),
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
-      current_(pool_it), has_early_data_(has_early_data), should_use_alt_svc_(should_use_alt_svc) {}
+      current_(pool_it), has_early_data_(has_early_data), should_use_alt_svc_(should_use_alt_svc) {
+  if (!should_use_alt_svc) {
+    // If alt_svc is explicitly disabled, there must have been a failed request over Http3 and the
+    // failure must be post-handshake.
+    http3_attempt_failed_ = true;
+  }
+}
 
 ConnectivityGrid::WrapperCallbacks::ConnectionAttemptCallbacks::ConnectionAttemptCallbacks(
     WrapperCallbacks& parent, PoolIterator it)
