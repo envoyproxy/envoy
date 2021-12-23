@@ -208,7 +208,7 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
   JsonRender(Buffer::Instance& response, const Params& params)
       : params_(params), response_(response) {}
-  virtual ~JsonRender() { render(); }
+  ~JsonRender() override { render(); }
 
   void counter(Stats::Counter& counter) override {
     add(counter, ValueUtil::numberValue(counter.value()));
