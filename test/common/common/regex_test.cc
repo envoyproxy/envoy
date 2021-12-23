@@ -8,7 +8,6 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-#include "xds/type/matcher/v3/regex.pb.h"
 
 namespace Envoy {
 namespace Regex {
@@ -157,7 +156,7 @@ TEST(Utility, ParseRegex) {
     EXPECT_EQ(0, warn_count.value());
   }
 
-  // Verify that XDS regex configs can be converted into regex compiled matchers.
+  // Verify that typed configs can be converted into regex compiled matchers.
   {
     const std::string yaml_string = R"EOF(
 engine:
@@ -166,24 +165,9 @@ engine:
     "@type": type.googleapis.com/envoy.type.matcher.v3.RegexMatcher.GoogleRE2
 regex: /asdf/.*
 )EOF";
-    xds::type::matcher::v3::RegexMatcher matcher;
+    envoy::type::matcher::v3::RegexMatcher matcher;
     TestUtility::loadFromYaml(yaml_string, matcher);
-    const auto compiled_matcher =
-        Utility::parseRegex(matcher, ProtobufMessage::getStrictValidationVisitor());
-    const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
-    EXPECT_TRUE(compiled_matcher->match(long_string));
-  }
-
-  // Verify that XDS regex configs with deprecated fields can be converted into regex compiled
-  // matchers.
-  {
-    xds::type::matcher::v3::RegexMatcher matcher;
-    matcher.mutable_google_re2();
-    matcher.set_regex("/asdf/.*");
-    const auto compiled_matcher =
-        Utility::parseRegex(matcher, ProtobufMessage::getStrictValidationVisitor());
-    const std::string long_string = "/asdf/" + std::string(50 * 1024, 'a');
-    EXPECT_TRUE(compiled_matcher->match(long_string));
+    EXPECT_NO_THROW(Utility::parseRegex(matcher, ProtobufMessage::getStrictValidationVisitor()));
   }
 }
 

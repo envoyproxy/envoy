@@ -96,10 +96,10 @@ public:
   /**
    * Construct a compiled regex matcher from a match config.
    */
-  template <class RegexMatcherType = xds::type::matcher::v3::RegexMatcher>
+  template <class RegexMatcherType>
   static CompiledMatcherPtr parseRegex(const RegexMatcherType& matcher,
                                        ProtobufMessage::ValidationVisitor& validation_visitor) {
-    // Fall back to deprecated google_re2 field.
+    // Fall back to the google_re2 field.
     if (matcher.has_google_re2()) {
       return parseRegex(matcher);
     }

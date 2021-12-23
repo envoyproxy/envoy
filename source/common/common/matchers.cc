@@ -64,26 +64,6 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
   };
 }
 
-template <>
-StringMatcherImpl<xds::type::matcher::v3::StringMatcher>::StringMatcherImpl(
-    const xds::type::matcher::v3::StringMatcher& matcher,
-    ProtobufMessage::ValidationVisitor& validation_visitor)
-    : matcher_(matcher) {
-  if (matcher.match_pattern_case() ==
-      xds::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex) {
-    if (matcher.ignore_case()) {
-      ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
-    }
-    regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), validation_visitor);
-  } else if (matcher.match_pattern_case() ==
-             xds::type::matcher::v3::StringMatcher::MatchPatternCase::kContains) {
-    if (matcher_.ignore_case()) {
-      // Cache the lowercase conversion of the Contains matcher for future use
-      lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
-    }
-  }
-}
-
 ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher) : matcher_(matcher) {
   ASSERT(matcher_.match_pattern_case() ==
          envoy::type::matcher::v3::ListMatcher::MatchPatternCase::kOneOf);

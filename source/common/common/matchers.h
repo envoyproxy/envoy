@@ -102,8 +102,21 @@ public:
     }
   }
 
-  explicit StringMatcherImpl(const StringMatcherType& matcher, ProtobufMessage::ValidationVisitor&)
-      : StringMatcherImpl(matcher) {}
+  explicit StringMatcherImpl(const StringMatcherType& matcher,
+                             ProtobufMessage::ValidationVisitor& validation_visitor)
+      : matcher_(matcher) {
+    if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kSafeRegex) {
+      if (matcher.ignore_case()) {
+        ExceptionUtil::throwEnvoyException("ignore_case has no effect for safe_regex.");
+      }
+      regex_ = Regex::Utility::parseRegex(matcher_.safe_regex(), validation_visitor);
+    } else if (matcher.match_pattern_case() == StringMatcherType::MatchPatternCase::kContains) {
+      if (matcher_.ignore_case()) {
+        // Cache the lowercase conversion of the Contains matcher for future use
+        lowercase_contains_match_ = absl::AsciiStrToLower(matcher_.contains());
+      }
+    }
+  }
 
   // StringMatcher
   bool match(const absl::string_view value) const override {
