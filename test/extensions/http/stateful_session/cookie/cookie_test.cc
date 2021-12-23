@@ -19,7 +19,7 @@ TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
   EXPECT_THROW_WITH_MESSAGE(std::make_shared<CookieBasedSessionStateFactory>(config),
                             EnvoyException,
                             "Cookie key cannot be empty for cookie based stateful session sticky");
-  config.set_name("override_host");
+  config.mutable_cookie()->set_name("override_host");
 
   EXPECT_NO_THROW(std::make_shared<CookieBasedSessionStateFactory>(config));
 }
@@ -29,7 +29,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
   {
     CookieBasedSessionStateProto config;
-    config.set_name("override_host");
+    config.mutable_cookie()->set_name("override_host");
     CookieBasedSessionStateFactory factory(config);
 
     // No valid address in the request headers.
@@ -52,9 +52,9 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
   {
     CookieBasedSessionStateProto config;
-    config.set_name("override_host");
-    config.set_path("/path");
-    config.mutable_ttl()->set_seconds(5);
+    config.mutable_cookie()->set_name("override_host");
+    config.mutable_cookie()->set_path("/path");
+    config.mutable_cookie()->mutable_ttl()->set_seconds(5);
     CookieBasedSessionStateFactory factory(config);
 
     // Get upstream address from request headers.

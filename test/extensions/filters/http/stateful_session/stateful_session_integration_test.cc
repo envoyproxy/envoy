@@ -98,9 +98,10 @@ typed_config:
     name: envoy.http.stateful_session.cookie
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-      name: global-session-cookie
-      path: /path
-      ttl: 120s
+      cookie:
+        name: global-session-cookie
+        path: /path
+        ttl: 120s
 )EOF";
 
 static const std::string DISABLE_STATEFUL_SESSION =
@@ -117,9 +118,10 @@ stateful_session:
     name: envoy.http.stateful_session.cookie
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.stateful_session.cookie.v3.CookieBasedSessionState
-      name: route-session-cookie
-      path: /path
-      ttl: 120s
+      cookie:
+        name: route-session-cookie
+        path: /path
+        ttl: 120s
 )EOF";
 
 TEST_F(StatefulSessionIntegrationTest, NormalStatefulSession) {

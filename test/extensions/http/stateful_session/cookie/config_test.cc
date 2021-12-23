@@ -19,9 +19,10 @@ TEST(CookieBasedSessionStateFactoryConfigTest, Basic) {
 
   CookieBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-    name: override_host
-    path: /path
-    ttl: 5s
+    cookie:
+      name: override_host
+      path: /path
+      ttl: 5s
   )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
@@ -36,9 +37,10 @@ TEST(CookieBasedSessionStateFactoryConfigTest, NegativeTTL) {
 
   CookieBasedSessionStateProto proto_config;
   const std::string yaml = R"EOF(
-    name: override_host
-    path: /path
-    ttl: -1s
+    cookie:
+      name: override_host
+      path: /path
+      ttl: -1s
   )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 

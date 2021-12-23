@@ -21,7 +21,8 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
 
 CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
     const CookieBasedSessionStateProto& config)
-    : name_(config.name()), path_(config.path()), ttl_(config.ttl().seconds()) {
+    : name_(config.cookie().name()), ttl_(config.cookie().ttl().seconds()),
+      path_(config.cookie().path()) {
   if (name_.empty()) {
     throw EnvoyException("Cookie key cannot be empty for cookie based stateful session sticky");
   }

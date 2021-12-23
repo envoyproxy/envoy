@@ -54,8 +54,8 @@ private:
   }
 
   const std::string name_;
-  const std::string path_;
   const std::chrono::seconds ttl_;
+  const std::string path_;
 };
 
 } // namespace Cookie
