@@ -150,7 +150,8 @@ public:
   virtual void setConnectionID(uint64_t id) PURE;
 
   /**
-   * @param interface_name the name of the network interface used by the local end of the connection.
+   * @param interface_name the name of the network interface used by the local end of the
+   *connection.
    **/
   virtual void setInterfaceName(absl::string_view interface_name) PURE;
 

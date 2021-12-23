@@ -52,7 +52,7 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
-  absl::optional<std::string_view> interfaceName() const override { return interface_name_; }
+  absl::optional<absl::string_view> interfaceName() const override { return interface_name_; }
   void setInterfaceName(absl::string_view interface_name) override {
     interface_name_ = std::string(interface_name);
   }

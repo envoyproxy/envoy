@@ -32,7 +32,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
     upstream_connection_interface_name_ = std::string(interface_name);
   }
 
-  absl::optional<std::string_view> upstreamInterfaceName() const override {
+  absl::optional<absl::string_view> upstreamInterfaceName() const override {
     return upstream_connection_interface_name_;
   }
 

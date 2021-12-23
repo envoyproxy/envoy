@@ -355,7 +355,7 @@ public:
    * @return interface name of the upstream connection's local socket, or absl::nullopt if not
    * available.
    */
-  virtual absl::optional<std::string_view> upstreamInterfaceName() const PURE;
+  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
 
   /**
    * @param connection_info sets the upstream ssl connection.
