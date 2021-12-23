@@ -256,9 +256,9 @@ AsyncRequestImpl::AsyncRequestImpl(RequestMessagePtr&& request, AsyncClientImpl&
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();
   }
-  if (options.sampled_) {
-    // Force span to get sampled; otherwise keep sampling status of the parent
-    child_span_->setSampled(true);
+  if (options.sampled_.has_value()) {
+    // Change span's sampling status; otherwise keep sampling status of the parent
+    child_span_->setSampled(options.sampled_.value());
   }
 }
 

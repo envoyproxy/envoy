@@ -13,6 +13,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -280,7 +281,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setTimeout(config_->timeout())
                        .setParentSpan(parent_span)
                        .setChildSpanName(config_->tracingName())
-                       .setSampled(false);
+                       .setSampled(absl::nullopt);
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }

@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/printers.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -273,7 +274,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   AsyncClient::RequestOptions options = AsyncClient::RequestOptions()
                                             .setParentSpan(parent_span_)
                                             .setChildSpanName(child_span_name_)
-                                            .setSampled(false);
+                                            .setSampled(absl::nullopt);
   EXPECT_CALL(*child_span, setSampled(_)).Times(0);
   EXPECT_CALL(*child_span, injectContext(_));
 
