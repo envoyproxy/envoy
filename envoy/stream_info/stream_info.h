@@ -434,8 +434,9 @@ public:
   virtual void setResponseCode(uint32_t code) PURE;
 
   /**
-   * @param rc_details the response code details string to set for this request.
-   * See ResponseCodeDetailValues above for well-known constants.
+   * @param rc_details the response code details string to set for this request. It should not
+   * contain any empty or space characters (' ', '\t', '\f', '\v', '\n', '\r'). See
+   * ResponseCodeDetailValues above for well-known constants.
    */
   virtual void setResponseCodeDetails(absl::string_view rc_details) PURE;
 

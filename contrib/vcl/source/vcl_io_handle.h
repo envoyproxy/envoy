@@ -72,6 +72,8 @@ public:
   void resetFileEvents() override;
   IoHandlePtr duplicate() override;
 
+  absl::optional<std::string> interfaceName() override { return absl::nullopt; }
+
   void cb(uint32_t events) { cb_(events); }
   void setCb(Event::FileReadyCb cb) { cb_ = cb; }
   void updateEvents(uint32_t events);
