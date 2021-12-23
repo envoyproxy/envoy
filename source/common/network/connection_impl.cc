@@ -924,7 +924,8 @@ void ClientConnectionImpl::connect() {
 
 void ClientConnectionImpl::onConnected() {
   stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
-  if (ioHandle().interfaceName().has_value()) {
+    // There are no meaningful socket source address semantics for non-IP sockets, so skip.
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() && ioHandle().interfaceName().has_value()) {
     socket_->connectionInfoProvider().setInterfaceName(ioHandle().interfaceName().value());
   }
   ConnectionImpl::onConnected();
