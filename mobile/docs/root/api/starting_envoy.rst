@@ -371,6 +371,34 @@ on supported platforms (iOS 12+) to update the preferred Envoy network cluster (
   // Swift
   builder.enableNetworkPathMonitor()
 
+~~~~~~~~~~~~~~~~~~~~~~~
+``enableHappyEyeballs``
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether to use Happy Eyeballs when multiple IP stacks may be supported.
+
+**Example**::
+
+  // Kotlin
+  builder.enableHappyEyeballs(true)
+
+  // Swift
+  builder.enableHappyEyeballs(true)
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableInterfaceBinding``
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Specify whether sockets may attempt to bind to a specific interface, based on network conditions.
+
+**Example**::
+
+  // Kotlin
+  builder.enableInterfaceBinding(true)
+
+  // Swift
+  builder.enableInterfaceBinding(true)
+
 ----------------------
 Advanced configuration
 ----------------------
