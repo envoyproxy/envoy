@@ -38,7 +38,7 @@ public:
 
   /**
    * @param headers the headers to parse.
-   * @return bool indicating whether content-type is gRPC.
+   * @return bool indicating whether content-type is Protobuf.
    */
   static bool hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers);
 

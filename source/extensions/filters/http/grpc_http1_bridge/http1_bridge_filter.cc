@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -19,11 +20,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-static void updateContentLength(Http::RequestHeaderMap& headers, uint64_t delta) {
-  const auto length_header = headers.getContentLengthValue();
+void Http1BridgeFilter::updateContentLength(Http::RequestHeaderMap& headers, uint64_t delta) {
   uint64_t length;
-  if (absl::SimpleAtoi(length_header, &length)) {
-    headers.setContentLength(length + delta);
+  if (absl::SimpleAtoi(headers.getContentLengthValue(), &length)) {
+    if (length <= std::numeric_limits<uint64_t>::max() - delta) {
+      headers.setContentLength(length + delta);
+    } else {
+      ENVOY_LOG(debug, "Unabled to update content lenght for protobuf to gRPC upgrade (overflow)");
+    }
   }
 }
 

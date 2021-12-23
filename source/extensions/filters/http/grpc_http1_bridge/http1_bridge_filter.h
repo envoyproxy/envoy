@@ -1,8 +1,11 @@
 #pragma once
 
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_bridge/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -14,10 +17,12 @@ namespace GrpcHttp1Bridge {
  * See
  * https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/grpc_http1_bridge_filter
  */
-class Http1BridgeFilter : public Http::StreamFilter {
+class Http1BridgeFilter : public Http::StreamFilter, Logger::Loggable<Logger::Id::http> {
 public:
-  explicit Http1BridgeFilter(Grpc::Context& context, bool upgrade_protobuf_to_grpc)
-      : context_(context), upgrade_protobuf_(upgrade_protobuf_to_grpc) {}
+  explicit Http1BridgeFilter(
+      Grpc::Context& context,
+      const envoy::extensions::filters::http::grpc_http1_bridge::v3::Config& proto_config)
+      : context_(context), upgrade_protobuf_(proto_config.upgrade_protobuf_to_grpc()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -59,6 +64,7 @@ public:
 private:
   void chargeStat(const Http::ResponseHeaderOrTrailerMap& headers);
   void setupStatTracking(const Http::RequestHeaderMap& headers);
+  void updateContentLength(Http::RequestHeaderMap& headers, uint64_t delta);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

@@ -37,8 +37,7 @@ bool Common::hasGrpcContentType(const Http::RequestOrResponseHeaderMap& headers)
 }
 
 bool Common::hasProtobufContentType(const Http::RequestOrResponseHeaderMap& headers) {
-  const absl::string_view content_type = headers.getContentTypeValue();
-  return absl::EqualsIgnoreCase(content_type, Http::Headers::get().ContentTypeValues.Protobuf);
+  return headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Protobuf;
 }
 
 bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
