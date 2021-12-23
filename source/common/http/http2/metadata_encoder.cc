@@ -142,6 +142,9 @@ public:
     return std::make_pair(static_cast<int64_t>(to_copy), payload_.length() == 0);
   }
 
+  // TODO: implement this method
+  void OnFailure() override {}
+
 private:
   Buffer::OwnedImpl payload_;
   const size_t original_payload_length_;
