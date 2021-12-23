@@ -27,6 +27,18 @@ public:
     store_->addSink(sink_);
   }
 
+  std::shared_ptr<MockInstance> setupMockedInstance() {
+    auto instance = std::make_shared<MockInstance>();
+    EXPECT_CALL(stats_config_, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+    EXPECT_CALL(*instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config_));
+    EXPECT_CALL(api_, customStatNamespaces())
+        .WillRepeatedly(testing::ReturnRef(customNamespaces()));
+    EXPECT_CALL(*instance, api()).WillRepeatedly(testing::ReturnRef(api_));
+    return instance;
+  }
+
   Http::Code handlerStats(absl::string_view url, Buffer::Instance& response) {
     Http::TestResponseHeaderMapImpl response_headers;
     StatsHandler::Params params;
@@ -34,7 +46,9 @@ public:
     if (code != Http::Code::OK) {
       return code;
     }
-    return StatsHandler::stats(params, *store_, response_headers, response);
+    std::shared_ptr<MockInstance> instance = setupMockedInstance();
+    StatsHandler handler(*instance);
+    return handler.stats(params, *store_, response_headers, response);
   }
 
   Http::Code statsAsJsonHandler(std::string& data, absl::string_view params = "") {
@@ -54,6 +68,8 @@ public:
     tls_.shutdownThread();
   }
 
+  Api::MockApi api_;
+  Configuration::MockStatsConfig stats_config_;
   Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -741,19 +757,6 @@ public:
   Http::TestResponseHeaderMapImpl response_headers;
   Buffer::OwnedImpl data;
   MockAdminStream admin_stream;
-  Configuration::MockStatsConfig stats_config;
-  Api::MockApi api;
-
-  std::shared_ptr<MockInstance> setupMockedInstance() {
-    auto instance = std::make_shared<MockInstance>();
-    EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
-    store_->initializeThreading(main_thread_dispatcher_, tls_);
-    EXPECT_CALL(*instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
-    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
-    EXPECT_CALL(api, customStatNamespaces()).WillRepeatedly(testing::ReturnRef(customNamespaces()));
-    EXPECT_CALL(*instance, api()).WillRepeatedly(testing::ReturnRef(api));
-    return instance;
-  }
 
   void createTestStats() {
     Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
