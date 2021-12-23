@@ -326,6 +326,11 @@ public:
    *  returned.
    */
   virtual absl::optional<std::chrono::milliseconds> lastRoundTripTime() PURE;
+
+  /**
+   * @return the interface name for the socket, if the OS supports it. Otherwise, absl::nullopt.
+   */
+  virtual absl::optional<std::string> interfaceName() PURE;
 };
 
 using IoHandlePtr = std::unique_ptr<IoHandle>;

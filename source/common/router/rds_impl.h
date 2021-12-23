@@ -82,9 +82,7 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
 private:
   ConfigConstSharedPtr config_;

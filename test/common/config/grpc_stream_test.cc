@@ -226,7 +226,7 @@ TEST_F(GrpcStreamTest, QueueSizeStat) {
 }
 
 // Just to add coverage to the no-op implementations of these callbacks (without exposing us to
-// crashes from a badly behaved peer like NOT_IMPLEMENTED_GCOVR_EXCL_LINE would).
+// crashes from a badly behaved peer like PANIC("not implemented") would).
 TEST_F(GrpcStreamTest, HeaderTrailerJustForCodeCoverage) {
   Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{}};
   grpc_stream_.onReceiveInitialMetadata(std::move(response_headers));
