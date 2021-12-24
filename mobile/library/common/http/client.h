@@ -228,7 +228,10 @@ private:
     // It only has an effect in explicit flow control mode, where when all buffers are drained,
     // on_send_window_available callbacks are called.
     void readDisable(bool disable) override;
-    uint32_t bufferLimit() override { return 65000; }
+    uint32_t bufferLimit() override {
+      // 1Mb
+      return 1024000;
+    }
     // Not applicable
     void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {
       // Acounting became default in https://github.com/envoyproxy/envoy/pull/17702 but is a no=op.
