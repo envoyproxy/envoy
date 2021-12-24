@@ -115,7 +115,7 @@ public:
   }
 
   uint64_t copyOutToSlices(uint64_t, Buffer::RawSlice*, uint64_t) const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   void drain(uint64_t size) override {
