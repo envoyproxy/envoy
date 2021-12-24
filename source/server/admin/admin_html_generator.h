@@ -18,6 +18,9 @@ public:
   void renderTail();
   void renderUrlHandler(const Admin::UrlHandler& handler,
                         OptRef<const Http::Utility::QueryParams> query);
+  void renderInput(absl::string_view id, absl::string_view path, Admin::ParamDescriptor::Type type,
+                   OptRef<const Http::Utility::QueryParams> query,
+                   const std::vector<std::string>& enum_choices);
 
 private:
   Buffer::Instance& response_;

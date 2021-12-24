@@ -78,6 +78,12 @@ const char AdminHtmlStart[] = R"(
       text-align: right;
     }
   </style>
+  <script>
+    function next(start) {
+      document.getElementById("start").value = start;
+      document.getElementById("stats").submit();
+    }
+  </script>
 </head>
 <body>
   <table class='home-table'>
@@ -149,39 +155,48 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   std::vector<std::string> params;
   for (const Admin::ParamDescriptor& param : handler.params_) {
     response_.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'>"));
-
-    std::string value;
-    if (query.has_value()) {
-      auto iter = query->find(param.id_);
-      if (iter != query->end()) {
-        value = iter->second;
-      }
-    }
-
-    switch (param.type_) {
-    case Admin::ParamDescriptor::Type::Boolean:
-      response_.add(absl::StrCat("<input type='checkbox' name='", param.id_, "' id='", param.id_,
-                                 "' form='", path, "'", value.empty() ? "" : " checked", "/>"));
-      break;
-    case Admin::ParamDescriptor::Type::String:
-      response_.add(absl::StrCat("<input type='text' name='", param.id_, "' id='", param.id_,
-                                 "' form='", path, "'",
-                                 value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
-      break;
-    case Admin::ParamDescriptor::Type::Enum:
-      response_.add(absl::StrCat("\n    <select name='", param.id_, "' id='", param.id_, "' form='",
-                                 path, "'>\n"));
-      for (const std::string& choice : param.enum_choices_) {
-        std::string sanitized = Html::Utility::sanitize(choice);
-        response_.add(absl::StrCat("      <option value='", sanitized, "'",
-                                   (value == sanitized) ? " selected" : "", ">", sanitized,
-                                   "</option>\n"));
-      }
-      response_.add("    </select>\n  ");
-      break;
-    }
+    renderInput(param.id_, path, param.type_, query, param.enum_choices_);
     response_.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
                                Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
+  }
+}
+
+void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view path,
+                                     Admin::ParamDescriptor::Type type,
+                                     OptRef<const Http::Utility::QueryParams> query,
+                                     const std::vector<std::string>& enum_choices) {
+  std::string value;
+  if (query.has_value()) {
+    auto iter = query->find(std::string(id));
+    if (iter != query->end()) {
+      value = iter->second;
+    }
+  }
+
+  switch (type) {
+  case Admin::ParamDescriptor::Type::Boolean:
+    response_.add(absl::StrCat("<input type='checkbox' name='", id, "' id='", id, "' form='", path,
+                               "'", value.empty() ? "" : " checked", "/>"));
+    break;
+  case Admin::ParamDescriptor::Type::String:
+    response_.add(absl::StrCat("<input type='text' name='", id, "' id='", id, "' form='", path, "'",
+                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+    break;
+  case Admin::ParamDescriptor::Type::Hidden:
+    response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
+                               "'", value.empty() ? "" : absl::StrCat(" value='", value, "'"),
+                               "/>"));
+    break;
+  case Admin::ParamDescriptor::Type::Enum:
+    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'>\n"));
+    for (const std::string& choice : enum_choices) {
+      std::string sanitized = Html::Utility::sanitize(choice);
+      response_.add(absl::StrCat("      <option value='", sanitized, "'",
+                                 (value == sanitized) ? " selected" : "", ">", sanitized,
+                                 "</option>\n"));
+    }
+    response_.add("    </select>\n  ");
+    break;
   }
 }
 

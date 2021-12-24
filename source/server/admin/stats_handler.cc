@@ -362,8 +362,9 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       AdminHtmlGenerator html(response);
       html.renderHead();
       html.renderUrlHandler(statsHandler(), params.query_);
+      html.renderInput("start", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
       html.renderTail();
-      response.add("<body><pre>\n");
+      response.add("<body>\n  <pre>\n");
     }
   }
 
@@ -432,13 +433,12 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 #endif
 
   if (add_paging_controls) {
-    response.add("</pre></body>\n");
+    response.add("  </pre>\n");
     if (!context.next_start_.empty()) {
-      response.add(absl::StrCat(
-          "<a href='stats?start=", context.next_start_, "&pagesize=", params.page_size_.value(),
-          (params.filter_.has_value() ? absl::StrCat("&filter=", params.filter_string_) : ""),
-          params.used_only_ ? "&usedonly" : "", "'>Next Page</a>\n"));
+      response.add(
+          absl::StrCat("  <a href='javascript:next(\"", context.next_start_, "\")'>Next</a>\n"));
     }
+    response.add("</body>\n");
   }
 
   // Display plain stats if format query param is not there.
