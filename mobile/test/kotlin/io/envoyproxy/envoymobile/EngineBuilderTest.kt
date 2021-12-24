@@ -40,6 +40,26 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `enabling happy eyeballs overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.enableHappyEyeballs(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.enableHappyEyeballs).isTrue()
+  }
+
+  @Test
+  fun `enabling interface binding overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.enableInterfaceBinding(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.enableInterfaceBinding).isTrue()
+  }
+
+  @Test
   fun `specifying connection timeout overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
