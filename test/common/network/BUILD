@@ -404,6 +404,7 @@ envoy_cc_test(
         "//source/common/network:address_lib",
         "//test/mocks/api:api_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
