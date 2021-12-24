@@ -295,7 +295,6 @@ public:
       return *this;
     }
     RequestOptions& setSampled(absl::optional<bool> sampled) {
-      sampled_.reset();
       sampled_ = sampled;
       return *this;
     }
