@@ -1,4 +1,5 @@
 #include <memory>
+#include <string>
 
 #include "envoy/api/io_error.h"
 
@@ -1120,40 +1121,44 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     EXPECT_EQ(data.size(),
               buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
     reservation.commit(data.size());
-    EXPECT_EQ(data, buffer.toString());
+    EXPECT_EQ(data, buf.toString());
   }
   // Test the destination buffer has smaller slice than the source buffer.
   {
-    Buffer::OwnedImpl buf;
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("aa", 2);
-    buf.appendSliceForTest("a", 1);
-    auto reservation = buf.reserveForRead();
+    Buffer::OwnedImpl src_buf;
+    std::string data;
+    for (auto i = 0; i < (32 * 1024); i++) {
+      data.append(std::to_string(i % 10));
+    }
+    // Build the source buffer to have a single 32KB slice.
+    src_buf.appendSliceForTest(data);
+
+    Buffer::OwnedImpl dest_buf;
+    // The destination buffer are expected to have 8 Slices, each slice has 16KB buffer.
+    auto reservation = dest_buf.reserveForRead();
+    // Copy single 32 KB slice's data to 8 * 16KB slices.
     EXPECT_EQ(data.size(),
-              buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+              src_buf.copyOutToSlices(32 * 1024, reservation.slices(), reservation.numSlices()));
     reservation.commit(data.size());
-    EXPECT_EQ(data, buffer.toString());
+    EXPECT_EQ(data, dest_buf.toString());
   }
   // Test the source buffer has smaller slice than the destination buffer.
   {
+    Buffer::OwnedImpl src_buf;
+    // Build the source buffer to have 7 slices.
+    src_buf.appendSliceForTest("He", 2);
+    src_buf.appendSliceForTest("ll", 2);
+    src_buf.appendSliceForTest("o,", 2);
+    src_buf.appendSliceForTest(" W", 2);
+    src_buf.appendSliceForTest("or", 2);
+    src_buf.appendSliceForTest("ld", 2);
+    src_buf.appendSliceForTest("!", 1);
     Buffer::OwnedImpl dest_buf;
-    dest_buf.appendSliceForTest("He", 2);
-    dest_buf.appendSliceForTest("ll", 2);
-    dest_buf.appendSliceForTest("o,", 2);
-    dest_buf.appendSliceForTest(" W", 2);
-    dest_buf.appendSliceForTest("or", 2);
-    dest_buf.appendSliceForTest("ld", 2);
-    dest_buf.appendSliceForTest("!", 1);
-    Buffer::OwnedImpl buf;
-    auto reservation = buf.reserveForRead();
+    auto reservation = dest_buf.reserveForRead();
     EXPECT_EQ(data.size(),
-              buffer.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
+              src_buf.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
     reservation.commit(data.size());
-    EXPECT_EQ(data, buffer.toString());
+    EXPECT_EQ(data, dest_buf.toString());
   }
 }
 

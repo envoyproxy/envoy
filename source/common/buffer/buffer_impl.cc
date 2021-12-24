@@ -133,15 +133,17 @@ uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices
     auto length_to_copy = std::min(
         src_slice.dataSize() - src_slice_off,
         std::min(static_cast<uint64_t>(dest_slice.len_), total_length_to_read - num_bytes_read));
-    memcpy(dest_slice.mem_, src_slice.data(), length_to_copy); // NOLINT(safe-memcpy)
-    dest_slice.len_ = length_to_copy;
-    src_slice_off = src_slice.dataSize() - src_slice_off - length_to_copy;
-    dest_slice_off = dest_slice.len_ - dest_slice_off - length_to_copy;
-    if (src_slice_off == 0) {
+    memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_off, // NOLINT(safe-memcpy)
+           src_slice.data() + src_slice_off, length_to_copy);
+    src_slice_off = src_slice_off + length_to_copy;
+    dest_slice_off = dest_slice_off + length_to_copy;
+    if (src_slice_off == src_slice.dataSize()) {
       num_src_slices_read++;
+      src_slice_off = 0;
     }
-    if (dest_slice_off == 0) {
+    if (dest_slice_off == dest_slice.len_) {
       num_dest_slices_read++;
+      dest_slice_off = 0;
     }
     num_bytes_read += length_to_copy;
   }
