@@ -20,11 +20,15 @@ public:
                         OptRef<const Http::Utility::QueryParams> query);
   void renderInput(absl::string_view id, absl::string_view path, Admin::ParamDescriptor::Type type,
                    OptRef<const Http::Utility::QueryParams> query,
-                   const std::vector<std::string>& enum_choices);
+                   const std::vector<absl::string_view>& enum_choices);
+  void setSubmitOnChange(bool submit_on_change) { submit_on_change_ = submit_on_change; }
+  void setVisibleSubmit(bool visible_submit) { visible_submit_ = visible_submit; }
 
 private:
   Buffer::Instance& response_;
   int index_{0};
+  bool submit_on_change_{false};
+  bool visible_submit_{true};
 };
 
 } // namespace Server

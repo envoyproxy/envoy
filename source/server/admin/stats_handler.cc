@@ -16,6 +16,16 @@
 namespace Envoy {
 namespace Server {
 
+namespace {
+
+constexpr absl::string_view AllLabel = "All";
+constexpr absl::string_view CountersLabel = "Counters";
+constexpr absl::string_view GaugesLabel = "Gauges";
+constexpr absl::string_view HistogramsLabel = "Histograms";
+constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
+
+} // namespace
+
 const uint64_t RecentLookupsCapacity = 100;
 
 StatsHandler::StatsHandler(Server::Instance& server) : HandlerContextBase(server) {}
@@ -100,22 +110,31 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
+  auto type_iter = query_.find("type");
+  if (type_iter != query_.end()) {
+    if (type_iter->second == GaugesLabel) {
+      type_ = Type::Gauges;
+    } else if (type_iter->second == CountersLabel) {
+      type_ = Type::Counters;
+    } else if (type_iter->second == HistogramsLabel) {
+      type_ = Type::Histograms;
+    } else if (type_iter->second == TextReadoutsLabel) {
+      type_ = Type::TextReadouts;
+    } else if (type_iter->second == AllLabel) {
+      type_ = Type::All;
+    }
+  }
+
   const absl::optional<std::string> format_value = Utility::formatParam(query_);
   if (format_value.has_value()) {
     if (format_value.value() == "prometheus") {
       format_ = Format::Prometheus;
-      if (page_size_.has_value() && format_ != Format::Text) {
-        response.add("pagesize cannot be set for Promsetheus");
-        return Http::Code::BadRequest;
-      }
     } else if (format_value.value() == "json") {
       format_ = Format::Json;
-      if (page_size_.has_value() && format_ != Format::Text) {
-        response.add("pagesize cannot be set for Json");
-        return Http::Code::BadRequest;
-      }
     } else if (format_value.value() == "text") {
       format_ = Format::Text;
+    } else if (format_value.value() == "html") {
+      format_ = Format::Html;
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
       return Http::Code::NotFound;
@@ -293,8 +312,9 @@ private:
 
 class StatsHandler::Context {
 public:
-  Context(const Params& params, Render& render) : params_(params), render_(render) {}
-  absl::string_view start() { return params_.start_; }
+  Context(const Params& params, Render& render)
+      : params_(params),
+        render_(render) {}
 
   // Quick check to see if we're at the end of the page. If we are, we record the
   // name of the stat we are going to reject.
@@ -337,6 +357,33 @@ public:
     return false;
   }
 
+  template<class StatType> void emit(
+      Buffer::Instance& response,
+      Type type, absl::string_view label,
+      std::function<void(StatType& stat_type)> render_fn,
+      std::function<void(Stats::StatFn<StatType> stat_fn, absl::string_view start)> page_fn) {
+    if (params_.type_ == Type::All || params_.type_ == type) {
+      bool written = false;
+      auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
+        if (checkEndOfPage(stat)) {
+          return false;
+        }
+        if (showMetric(stat)) {
+          if (!written && params_.format_ == Format::Html) {
+            response.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
+            written = true;
+          }
+          render_fn(stat);
+        }
+        return true;
+      };
+      page_fn(stat_fn, params_.start_);
+      if (written) {
+        response.add("</pre>\n");
+      }
+    }
+  }
+
   Render& render() { return render_; }
 
   int64_t num_{-1};
@@ -349,71 +396,53 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Http::ResponseHeaderMap& response_headers,
                                Buffer::Instance& response) {
   std::unique_ptr<Render> render;
-  bool add_paging_controls = false;
 
   if (params.format_ == Format::Json) {
     render = std::make_unique<JsonRender>(response, params);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     render = std::make_unique<TextRender>(response);
-    if (params.page_size_.has_value()) {
+    if (params.format_ == Format::Html) {
       response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-      add_paging_controls = true;
       AdminHtmlGenerator html(response);
+      html.setVisibleSubmit(false);
+      html.setSubmitOnChange(true);
       html.renderHead();
       html.renderUrlHandler(statsHandler(), params.query_);
       html.renderInput("start", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
       html.renderTail();
-      response.add("<body>\n  <pre>\n");
+      response.add("<body>\n");
+    } else {
+      ASSERT(params.format_ == Format::Text);
     }
   }
 
   Context context(params, *render);
 
-  auto tfn = [&context](Stats::TextReadout& text_readout) -> bool {
-    if (context.checkEndOfPage(text_readout)) {
-      return false;
-    }
-    if (context.showMetric(text_readout)) {
-      context.render().textReadout(text_readout);
-    }
-    return true;
-  };
-  stats.textReadoutPage(tfn, context.start());
-
-  auto cfn = [&context](Stats::Counter& counter) -> bool {
-    if (context.checkEndOfPage(counter)) {
-      return false;
-    }
-    if (context.showMetric(counter)) {
-      context.render().counter(counter);
-    }
-    return true;
-  };
-  stats.counterPage(cfn, context.start());
-
-  auto gfn = [&context](Stats::Gauge& gauge) -> bool {
-    if (context.checkEndOfPage(gauge)) {
-      return false;
-    }
-    if (context.showMetric(gauge)) {
-      ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
-      context.render().gauge(gauge);
-    }
-    return true;
-  };
-  stats.gaugePage(gfn, context.start());
-
-  auto hfn = [&context](Stats::Histogram& histogram) -> bool {
-    if (context.checkEndOfPage(histogram)) {
-      return false;
-    }
-    if (context.showMetric(histogram)) {
-      context.render().histogram(histogram);
-    }
-    return true;
-  };
-  stats.histogramPage(hfn, context.start());
+  context.emit<Stats::TextReadout>(
+      response, Type::TextReadouts, TextReadoutsLabel,
+      [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
+      [&stats](Stats::StatFn<Stats::TextReadout> render, absl::string_view start) {
+        stats.textReadoutPage(render, start);
+      });
+  context.emit<Stats::Counter>(
+      response, Type::Counters, CountersLabel,
+      [&context](Stats::Counter& counter) { context.render().counter(counter); },
+      [&stats](Stats::StatFn<Stats::Counter> render, absl::string_view start) {
+        stats.counterPage(render, start);
+      });
+  context.emit<Stats::Gauge>(
+      response, Type::Gauges, GaugesLabel,
+      [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
+      [&stats](Stats::StatFn<Stats::Gauge> render, absl::string_view start) {
+        stats.gaugePage(render, start);
+      });
+  context.emit<Stats::Histogram>(
+      response, Type::Histograms, HistogramsLabel,
+      [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
+      [&stats](Stats::StatFn<Stats::Histogram> render, absl::string_view start) {
+        stats.histogramPage(render, start);
+      });
 
 #if 0
   if (params.scope_.has_value()) {
@@ -432,7 +461,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   }
 #endif
 
-  if (add_paging_controls) {
+  if (params.format_ == Format::Html) {
     response.add("  </pre>\n");
     if (!context.next_start_.empty()) {
       response.add(
@@ -650,9 +679,17 @@ Admin::UrlHandler StatsHandler::statsHandler() {
            {Admin::ParamDescriptor::Type::String, "filter",
             "Regular expression (ecmascript) for filtering stats"},
            {Admin::ParamDescriptor::Type::Enum,
+            "format",
+            "File format to use.",
+            {"html", "text", "json", "prometheus"}},
+           {Admin::ParamDescriptor::Type::Enum,
             "pagesize",
-            "Number of stats to show per page. Plain text used if unlimited.",
-            {"25", "100", "1000", "unlimited"}}}};
+            "Number of stats to show per page..",
+            {"25", "100", "1000", "unlimited"}},
+           {Admin::ParamDescriptor::Type::Enum,
+            "type",
+            "Stat types to include.",
+            {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
 }
 
 } // namespace Server

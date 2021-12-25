@@ -1,5 +1,7 @@
 #include "source/server/admin/admin_html_generator.h"
 
+#include <algorithm>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/html/utility.h"
@@ -142,20 +144,25 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   // page from accidentally mutating all the server state by GETting all the hrefs.
   const char* button_style = handler.mutates_server_state_ ? "" : " class='button-as-link'";
   const char* method = handler.mutates_server_state_ ? "post" : "get";
-  response_.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
-                             "  <td class='home-data'><form action='", path, "' method='", method,
-                             "' id='", path,
-                             "' class='home-form'>\n"
-                             "    <button",
-                             button_style, ">", path, "</button>\n",
-                             "  </form></td>\n"
-                             "  <td class='home-data'>",
-                             Html::Utility::sanitize(handler.help_text_), "</td>\n", "</tr>\n"));
+  if (visible_submit_) {
+    response_.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
+                               "  <td class='home-data'><form action='", path, "' method='", method,
+                               "' id='", path,
+                               "' class='home-form'>\n",
+                               "    <button", button_style, ">", path, "</button>\n",
+                               "  </form></td>\n"
+                               "  <td class='home-data'>",
+                               Html::Utility::sanitize(handler.help_text_), "</td>\n", "</tr>\n"));
+  } else {
+    response_.add(absl::StrCat("\n<form action='", path, "' method='", method,
+                               "' id='", path,
+                               "' class='home-form'></form>\n"));
+  }
 
   std::vector<std::string> params;
   for (const Admin::ParamDescriptor& param : handler.params_) {
     response_.add(absl::StrCat("<tr", row_class, ">\n", "  <td class='option'>"));
-    renderInput(param.id_, path, param.type_, query, param.enum_choices_);
+    renderInput(param.id_, path, param.type_, query, param.choices_);
     response_.add(absl::StrCat("</td>\n", "  <td class='home-data'>",
                                Html::Utility::sanitize(param.help_), "</td>\n", "</tr>\n"));
   }
@@ -164,7 +171,7 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
 void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view path,
                                      Admin::ParamDescriptor::Type type,
                                      OptRef<const Http::Utility::QueryParams> query,
-                                     const std::vector<std::string>& enum_choices) {
+                                     const std::vector<absl::string_view>& choices) {
   std::string value;
   if (query.has_value()) {
     auto iter = query->find(std::string(id));
@@ -173,23 +180,43 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     }
   }
 
+  std::string on_change;
+  if (submit_on_change_) {
+    on_change = absl::StrCat(" onchange='", path, ".submit()'");
+  }
+
   switch (type) {
   case Admin::ParamDescriptor::Type::Boolean:
     response_.add(absl::StrCat("<input type='checkbox' name='", id, "' id='", id, "' form='", path,
-                               "'", value.empty() ? "" : " checked", "/>"));
+                               "'", on_change, value.empty() ? "" : " checked", "/>"));
     break;
   case Admin::ParamDescriptor::Type::String:
     response_.add(absl::StrCat("<input type='text' name='", id, "' id='", id, "' form='", path, "'",
-                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+                               on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
   case Admin::ParamDescriptor::Type::Hidden:
     response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
-                               "'", value.empty() ? "" : absl::StrCat(" value='", value, "'"),
+                               "'", on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"),
                                "/>"));
     break;
+  case Admin::ParamDescriptor::Type::Mask: {
+    response_.add("<table class='home-table'><tbody>\n");
+    for (size_t row = 0; row < (choices.size() + 1) / 2; ++row) {
+      response_.add("  <tr>\n    ");
+      uint32_t last_index = std::min(2*(row+1), choices.size());
+      for (size_t i = 2*row; i < last_index; ++i) {
+        response_.add(absl::StrCat(
+            "    <td><input type='checkbox' name='",
+            choices[i], "' id='", choices[i], "' checked>", choices[i], "</input></td>\n"));
+      }
+      response_.add("  </tr>\n");
+    }
+    response_.add("</tbody></table>\n  ");
+    break;
+  }
   case Admin::ParamDescriptor::Type::Enum:
-    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'>\n"));
-    for (const std::string& choice : enum_choices) {
+    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'", on_change, ">\n"));
+    for (absl::string_view choice : choices) {
       std::string sanitized = Html::Utility::sanitize(choice);
       response_.add(absl::StrCat("      <option value='", sanitized, "'",
                                  (value == sanitized) ? " selected" : "", ">", sanitized,
