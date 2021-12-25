@@ -984,20 +984,20 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   }
 }
 
-void ThreadLocalStoreImpl::counterPage(StatFn<Counter> f_stat, absl::string_view start) const {
+void ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start) const {
   alloc_.counterPage(f_stat, start);
 }
 
-void ThreadLocalStoreImpl::gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const {
+void ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const {
   alloc_.gaugePage(f_stat, start);
 }
 
-void ThreadLocalStoreImpl::textReadoutPage(StatFn<TextReadout> f_stat,
+void ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat,
                                            absl::string_view start) const {
   alloc_.textReadoutPage(f_stat, start);
 }
 
-void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_view start) const {
+void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_view start) const {
   std::vector<ParentHistogramSharedPtr> histograms;
   {
     Thread::LockGuard lock(hist_mutex_);
@@ -1006,9 +1006,6 @@ void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_
       histograms.emplace_back(histogram_ptr);
     }
   }
-  // auto compare = [](const Stats::HistogramSharedPtr& a, const Stats::HistogramSharedPtr& b) {
-  // return a->name() < b->name();
-  //};
   struct LessThan {
     bool operator()(const HistogramSharedPtr& a, const HistogramSharedPtr& b) {
       return cmp_(a.get(), b.get());
@@ -1028,7 +1025,7 @@ void ThreadLocalStoreImpl::histogramPage(StatFn<Histogram> f_stat, absl::string_
   }
 }
 
-void ThreadLocalStoreImpl::scopePage(StatFn<const Scope> f_scope, absl::string_view) const {
+void ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_view) const {
   // FIX THIS
   Thread::LockGuard lock(lock_);
   if (!f_scope(*default_scope_)) {

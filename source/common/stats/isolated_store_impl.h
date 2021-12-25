@@ -106,9 +106,7 @@ public:
       f_size(stats_.size());
     }
     for (auto const& stat : stats_) {
-      if (!f_stat(*stat.second)) {
-        return;
-      }
+      f_stat(*stat.second);
     }
   }
 
@@ -235,21 +233,21 @@ public:
     f_stat(scope);
   }
 
-  void counterPage(StatFn<Counter> f_stat, absl::string_view start) const override {
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override {
     alloc_.counterPage(f_stat, start);
   }
 
-  void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const override {
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override {
     alloc_.gaugePage(f_stat, start);
   }
 
-  void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const override {
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override {
     alloc_.textReadoutPage(f_stat, start);
   }
 
-  void histogramPage(StatFn<Histogram>, absl::string_view) const override {}
+  void histogramPage(PageFn<Histogram>, absl::string_view) const override {}
 
-  void scopePage(StatFn<const Scope> f_stat, absl::string_view /*start*/) const override {
+  void scopePage(PageFn<const Scope> f_stat, absl::string_view /*start*/) const override {
     /** FIX THIS */
     const Scope& scope = *this;
     f_stat(scope);

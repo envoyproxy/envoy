@@ -303,23 +303,23 @@ public:
     store_.forEachScope(f_size, f_scope);
   }
 
-  void counterPage(StatFn<Counter> f_stat, absl::string_view start) const override {
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override {
     Thread::LockGuard lock(lock_);
     store_.counterPage(f_stat, start);
   }
-  void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const override {
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override {
     Thread::LockGuard lock(lock_);
     store_.gaugePage(f_stat, start);
   }
-  void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const override {
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override {
     Thread::LockGuard lock(lock_);
     store_.textReadoutPage(f_stat, start);
   }
-  void histogramPage(StatFn<Histogram> f_stat, absl::string_view start) const override {
+  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start) const override {
     Thread::LockGuard lock(lock_);
     store_.histogramPage(f_stat, start);
   }
-  void scopePage(StatFn<const Scope> /*f_scope*/, absl::string_view /*start*/) const override {
+  void scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/) const override {
     ASSERT(false);
     /*Thread::LockGuard lock(lock_);
       store_.scopePage(f_size, f_scope);*/

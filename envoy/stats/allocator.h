@@ -83,9 +83,9 @@ public:
   virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
-  virtual void counterPage(StatFn<Counter> f_stat, absl::string_view start) const PURE;
-  virtual void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const PURE;
-  virtual void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const PURE;
+  virtual void counterPage(PageFn<Counter> f_stat, absl::string_view start) const PURE;
+  virtual void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const PURE;
+  virtual void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const PURE;
 
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can

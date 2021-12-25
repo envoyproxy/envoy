@@ -358,7 +358,7 @@ public:
   template <class StatType>
   void emit(Buffer::Instance& response, Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
-            std::function<void(Stats::StatFn<StatType> stat_fn, absl::string_view start)> page_fn) {
+            std::function<void(Stats::PageFn<StatType> stat_fn, absl::string_view start)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
       bool written = false;
       auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
@@ -419,25 +419,25 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   context.emit<Stats::TextReadout>(
       response, Type::TextReadouts, TextReadoutsLabel,
       [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
-      [&stats](Stats::StatFn<Stats::TextReadout> render, absl::string_view start) {
+      [&stats](Stats::PageFn<Stats::TextReadout> render, absl::string_view start) {
         stats.textReadoutPage(render, start);
       });
   context.emit<Stats::Counter>(
       response, Type::Counters, CountersLabel,
       [&context](Stats::Counter& counter) { context.render().counter(counter); },
-      [&stats](Stats::StatFn<Stats::Counter> render, absl::string_view start) {
+      [&stats](Stats::PageFn<Stats::Counter> render, absl::string_view start) {
         stats.counterPage(render, start);
       });
   context.emit<Stats::Gauge>(
       response, Type::Gauges, GaugesLabel,
       [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
-      [&stats](Stats::StatFn<Stats::Gauge> render, absl::string_view start) {
+      [&stats](Stats::PageFn<Stats::Gauge> render, absl::string_view start) {
         stats.gaugePage(render, start);
       });
   context.emit<Stats::Histogram>(
       response, Type::Histograms, HistogramsLabel,
       [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
-      [&stats](Stats::StatFn<Stats::Histogram> render, absl::string_view start) {
+      [&stats](Stats::PageFn<Stats::Histogram> render, absl::string_view start) {
         stats.histogramPage(render, start);
       });
 

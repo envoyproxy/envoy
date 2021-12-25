@@ -39,9 +39,9 @@ public:
   void forEachGauge(SizeFn, StatFn<Gauge>) const override;
   void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
 
-  void counterPage(StatFn<Counter> f_stat, absl::string_view start) const override;
-  void gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const override;
-  void textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const override;
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override;
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override;
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override;
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;

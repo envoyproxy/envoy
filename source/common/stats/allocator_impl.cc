@@ -362,9 +362,7 @@ void AllocatorImpl::forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const 
     f_size(counters_.size());
   }
   for (auto& counter : counters_) {
-    if (!f_stat(*counter)) {
-      return;
-    }
+    f_stat(*counter);
   }
 }
 
@@ -374,9 +372,7 @@ void AllocatorImpl::forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const {
     f_size(gauges_.size());
   }
   for (auto& gauge : gauges_) {
-    if (!f_stat(*gauge)) {
-      return;
-    }
+    f_stat(*gauge);
   }
 }
 
@@ -386,9 +382,7 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
     f_size(text_readouts_.size());
   }
   for (auto& text_readout : text_readouts_) {
-    if (!f_stat(*text_readout)) {
-      return;
-    }
+    f_stat(*text_readout);
   }
 }
 
@@ -403,15 +397,15 @@ void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
   }
 }
 
-void AllocatorImpl::counterPage(StatFn<Counter> f_stat, absl::string_view start) const {
+void AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start) const {
   pageHelper(&counters_, f_stat, start);
 }
 
-void AllocatorImpl::gaugePage(StatFn<Gauge> f_stat, absl::string_view start) const {
+void AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const {
   pageHelper(&gauges_, f_stat, start);
 }
 
-void AllocatorImpl::textReadoutPage(StatFn<TextReadout> f_stat, absl::string_view start) const {
+void AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const {
   pageHelper(&text_readouts_, f_stat, start);
 }
 
@@ -420,9 +414,7 @@ void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_counters_.size());
     for (auto counter : sinked_counters_) {
-      if (!f_stat(*counter)) {
-        return;
-      }
+      f_stat(*counter);
     }
   } else {
     forEachCounter(f_size, f_stat);
@@ -434,9 +426,7 @@ void AllocatorImpl::forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) cons
     Thread::LockGuard lock(mutex_);
     f_size(sinked_gauges_.size());
     for (auto gauge : sinked_gauges_) {
-      if (!f_stat(*gauge)) {
-        return;
-      }
+      f_stat(*gauge);
     }
   } else {
     forEachGauge(f_size, f_stat);
@@ -448,9 +438,7 @@ void AllocatorImpl::forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> 
     Thread::LockGuard lock(mutex_);
     f_size(sinked_text_readouts_.size());
     for (auto text_readout : sinked_text_readouts_) {
-      if (!f_stat(*text_readout)) {
-        return;
-      }
+      f_stat(*text_readout);
     }
   } else {
     forEachTextReadout(f_size, f_stat);
