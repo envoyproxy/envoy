@@ -86,13 +86,14 @@ private:
     bool used_only_{false};
     bool text_readouts_{false};
     bool pretty_{false};
-    Format format_{Format::Text}; // If no format= argument we use Text, but UI defaults to HTML.
+    Format format_{Format::Text}; // If no `format=` param we use Text, but UI defaults to HTML.
     Type type_{Type::All};
     std::string start_;
     std::string filter_string_;
     absl::optional<std::regex> filter_;
     absl::optional<std::string> scope_;
-    absl::optional<uint32_t> page_size_; // If no pagesize= argument we use unlimited, but UI defaults to 25.
+    absl::optional<uint32_t> page_size_; // If no `pagesize=` param we use unlimited,
+                                         // but UI defaults to 25.
     Http::Utility::QueryParams query_;
   };
 

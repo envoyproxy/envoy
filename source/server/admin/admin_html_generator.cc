@@ -147,15 +147,13 @@ void AdminHtmlGenerator::renderUrlHandler(const Admin::UrlHandler& handler,
   if (visible_submit_) {
     response_.add(absl::StrCat("\n<tr class='vert-space'></tr>\n", "<tr", row_class, ">\n",
                                "  <td class='home-data'><form action='", path, "' method='", method,
-                               "' id='", path,
-                               "' class='home-form'>\n",
-                               "    <button", button_style, ">", path, "</button>\n",
+                               "' id='", path, "' class='home-form'>\n", "    <button",
+                               button_style, ">", path, "</button>\n",
                                "  </form></td>\n"
                                "  <td class='home-data'>",
                                Html::Utility::sanitize(handler.help_text_), "</td>\n", "</tr>\n"));
   } else {
-    response_.add(absl::StrCat("\n<form action='", path, "' method='", method,
-                               "' id='", path,
+    response_.add(absl::StrCat("\n<form action='", path, "' method='", method, "' id='", path,
                                "' class='home-form'></form>\n"));
   }
 
@@ -192,22 +190,22 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     break;
   case Admin::ParamDescriptor::Type::String:
     response_.add(absl::StrCat("<input type='text' name='", id, "' id='", id, "' form='", path, "'",
-                               on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
+                               on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"),
+                               "/>"));
     break;
   case Admin::ParamDescriptor::Type::Hidden:
     response_.add(absl::StrCat("<input type='hidden' name='", id, "' id='", id, "' form='", path,
-                               "'", on_change, value.empty() ? "" : absl::StrCat(" value='", value, "'"),
-                               "/>"));
+                               "'", on_change,
+                               value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
   case Admin::ParamDescriptor::Type::Mask: {
     response_.add("<table class='home-table'><tbody>\n");
     for (size_t row = 0; row < (choices.size() + 1) / 2; ++row) {
       response_.add("  <tr>\n    ");
-      uint32_t last_index = std::min(2*(row+1), choices.size());
-      for (size_t i = 2*row; i < last_index; ++i) {
-        response_.add(absl::StrCat(
-            "    <td><input type='checkbox' name='",
-            choices[i], "' id='", choices[i], "' checked>", choices[i], "</input></td>\n"));
+      uint32_t last_index = std::min(2 * (row + 1), choices.size());
+      for (size_t i = 2 * row; i < last_index; ++i) {
+        response_.add(absl::StrCat("    <td><input type='checkbox' name='", choices[i], "' id='",
+                                   choices[i], "' checked>", choices[i], "</input></td>\n"));
       }
       response_.add("  </tr>\n");
     }
@@ -215,7 +213,8 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
     break;
   }
   case Admin::ParamDescriptor::Type::Enum:
-    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'", on_change, ">\n"));
+    response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'",
+                               on_change, ">\n"));
     for (absl::string_view choice : choices) {
       std::string sanitized = Html::Utility::sanitize(choice);
       response_.add(absl::StrCat("      <option value='", sanitized, "'",

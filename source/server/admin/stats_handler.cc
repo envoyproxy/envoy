@@ -312,9 +312,7 @@ private:
 
 class StatsHandler::Context {
 public:
-  Context(const Params& params, Render& render)
-      : params_(params),
-        render_(render) {}
+  Context(const Params& params, Render& render) : params_(params), render_(render) {}
 
   // Quick check to see if we're at the end of the page. If we are, we record the
   // name of the stat we are going to reject.
@@ -357,11 +355,10 @@ public:
     return false;
   }
 
-  template<class StatType> void emit(
-      Buffer::Instance& response,
-      Type type, absl::string_view label,
-      std::function<void(StatType& stat_type)> render_fn,
-      std::function<void(Stats::StatFn<StatType> stat_fn, absl::string_view start)> page_fn) {
+  template <class StatType>
+  void emit(Buffer::Instance& response, Type type, absl::string_view label,
+            std::function<void(StatType& stat_type)> render_fn,
+            std::function<void(Stats::StatFn<StatType> stat_fn, absl::string_view start)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
       bool written = false;
       auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
