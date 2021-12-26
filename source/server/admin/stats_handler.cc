@@ -501,10 +501,8 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
 )";
 
   Stats::StatNameHashSet prefixes;
-  server_.stats().forEachScope([](size_t) {},
-                               [&prefixes](const Stats::Scope& scope) {
-                                 prefixes.insert(scope.prefix());
-                               });
+  server_.stats().forEachScope(
+      [](size_t) {}, [&prefixes](const Stats::Scope& scope) { prefixes.insert(scope.prefix()); });
   std::vector<std::string> lines, names;
   names.reserve(prefixes.size());
   lines.reserve(prefixes.size() + 2);
