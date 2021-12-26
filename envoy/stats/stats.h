@@ -207,5 +207,10 @@ template <typename Stat> using StatFn = std::function<bool(Stat&)>;
  */
 template <typename Stat> using PageFn = std::function<bool(Stat&)>;
 
+enum class PageDirection {
+  Forward,
+  Backward,
+};
+
 } // namespace Stats
 } // namespace Envoy

@@ -971,16 +971,14 @@ void ThreadLocalStoreImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout>
 }
 
 void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
-                                        std::function<bool(const Scope&)> f_scope) const {
+                                        StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
   f_size(scopes_.size() + 1 /* for default_scope_ */);
   if (!f_scope(*default_scope_)) {
     return;
   }
   for (ScopeImpl* scope : scopes_) {
-    if (!f_scope(*scope)) {
-      return;
-    }
+    f_scope(*scope);
   }
 }
 
