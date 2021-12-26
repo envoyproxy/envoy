@@ -233,21 +233,21 @@ public:
     f_stat(scope);
   }
 
-  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override {
-    alloc_.counterPage(f_stat, start);
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override {
+    alloc_.counterPage(f_stat, start, direction);
   }
 
-  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override {
-    alloc_.gaugePage(f_stat, start);
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override {
+    alloc_.gaugePage(f_stat, start, direction);
   }
 
-  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override {
-    alloc_.textReadoutPage(f_stat, start);
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override {
+    alloc_.textReadoutPage(f_stat, start, direction);
   }
 
-  void histogramPage(PageFn<Histogram>, absl::string_view) const override {}
+  void histogramPage(PageFn<Histogram>, absl::string_view, PageDirection) const override {}
 
-  void scopePage(PageFn<const Scope> f_stat, absl::string_view /*start*/) const override {
+  void scopePage(PageFn<const Scope> f_stat, absl::string_view /*start*/, PageDirection) const override {
     /** FIX THIS */
     const Scope& scope = *this;
     f_stat(scope);

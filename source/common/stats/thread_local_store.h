@@ -249,11 +249,11 @@ public:
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
-  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override;
-  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override;
-  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override;
-  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start) const override;
-  void scopePage(PageFn<const Scope> f_stat, absl::string_view start) const override;
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override;
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override;
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override;
+  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const override;
+  void scopePage(PageFn<const Scope> f_stat, absl::string_view start, PageDirection direction) const override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }

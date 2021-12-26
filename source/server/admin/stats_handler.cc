@@ -420,25 +420,25 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       response, Type::TextReadouts, TextReadoutsLabel,
       [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
       [&stats](Stats::PageFn<Stats::TextReadout> render, absl::string_view start) {
-        stats.textReadoutPage(render, start);
+        stats.textReadoutPage(render, start, Stats::PageDirection::Forward);
       });
   context.emit<Stats::Counter>(
       response, Type::Counters, CountersLabel,
       [&context](Stats::Counter& counter) { context.render().counter(counter); },
       [&stats](Stats::PageFn<Stats::Counter> render, absl::string_view start) {
-        stats.counterPage(render, start);
+        stats.counterPage(render, start, Stats::PageDirection::Forward);
       });
   context.emit<Stats::Gauge>(
       response, Type::Gauges, GaugesLabel,
       [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
       [&stats](Stats::PageFn<Stats::Gauge> render, absl::string_view start) {
-        stats.gaugePage(render, start);
+        stats.gaugePage(render, start, Stats::PageDirection::Forward);
       });
   context.emit<Stats::Histogram>(
       response, Type::Histograms, HistogramsLabel,
       [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
       [&stats](Stats::PageFn<Stats::Histogram> render, absl::string_view start) {
-        stats.histogramPage(render, start);
+        stats.histogramPage(render, start, Stats::PageDirection::Forward);
       });
 
 #if 0
@@ -501,8 +501,9 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
 )";
 
   Stats::StatNameHashSet prefixes;
-  server_.stats().forEachScope(
-      [](size_t) {}, [&prefixes](const Stats::Scope& scope) { prefixes.insert(scope.prefix()); });
+  Stats::StatFn<const Stats::Scope> add_scope = [&prefixes](const Stats::Scope& scope) {
+    prefixes.insert(scope.prefix()); };
+  server_.stats().forEachScope([](size_t) {}, add_scope);
   std::vector<std::string> lines, names;
   names.reserve(prefixes.size());
   lines.reserve(prefixes.size() + 2);

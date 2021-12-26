@@ -297,29 +297,28 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
-  void forEachScope(std::function<void(std::size_t)> f_size,
-                    std::function<StatFn(const Scope)> f_scope) const override {
+  void forEachScope(std::function<void(std::size_t)> f_size, StatFn<const Scope> f_scope) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
   }
 
-  void counterPage(PageFn<Counter> f_stat, absl::string_view start) const override {
+  void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.counterPage(f_stat, start);
+    store_.counterPage(f_stat, start, direction);
   }
-  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const override {
+  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.gaugePage(f_stat, start);
+    store_.gaugePage(f_stat, start, direction);
   }
-  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const override {
+  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.textReadoutPage(f_stat, start);
+    store_.textReadoutPage(f_stat, start, direction);
   }
-  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start) const override {
+  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.histogramPage(f_stat, start);
+    store_.histogramPage(f_stat, start, direction);
   }
-  void scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/) const override {
+  void scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/, PageDirection) const override {
     ASSERT(false);
     /*Thread::LockGuard lock(lock_);
       store_.scopePage(f_size, f_scope);*/

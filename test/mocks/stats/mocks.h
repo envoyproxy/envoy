@@ -299,10 +299,10 @@ public:
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
   MOCK_METHOD(void, forEachScope, (SizeFn, StatFn<const Scope>), (const));
-  MOCK_METHOD(void, counterPage, (PageFn<Counter>, absl::string_view), (const));
-  MOCK_METHOD(void, gaugePage, (PageFn<Gauge>, absl::string_view), (const));
-  MOCK_METHOD(void, textreadoutPage, (PageFn<TextReadout>, absl::string_view), (const));
-  MOCK_METHOD(void, scopePage, (PageFn<const Scope&>, absl::string_view), (const));
+  MOCK_METHOD(void, counterPage, (PageFn<Counter>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(void, gaugePage, (PageFn<Gauge>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(void, textreadoutPage, (PageFn<TextReadout>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(void, scopePage, (PageFn<const Scope&>, absl::string_view, PageDirection), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

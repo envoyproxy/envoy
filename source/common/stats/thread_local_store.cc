@@ -974,28 +974,28 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
                                         StatFn<const Scope> f_scope) const {
   Thread::LockGuard lock(lock_);
   f_size(scopes_.size() + 1 /* for default_scope_ */);
-  if (!f_scope(*default_scope_)) {
-    return;
-  }
+  f_scope(*default_scope_);
   for (ScopeImpl* scope : scopes_) {
     f_scope(*scope);
   }
 }
 
-void ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start) const {
-  alloc_.counterPage(f_stat, start);
+void ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
+                                       PageDirection direction) const {
+  alloc_.counterPage(f_stat, start, direction);
 }
 
-void ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const {
-  alloc_.gaugePage(f_stat, start);
+void ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+  alloc_.gaugePage(f_stat, start, direction);
 }
 
 void ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat,
-                                           absl::string_view start) const {
-  alloc_.textReadoutPage(f_stat, start);
+                                           absl::string_view start, PageDirection direction) const {
+  alloc_.textReadoutPage(f_stat, start, direction);
 }
 
-void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_view start) const {
+void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_view start,
+                                         PageDirection direction) const {
   std::vector<ParentHistogramSharedPtr> histograms;
   {
     Thread::LockGuard lock(hist_mutex_);
@@ -1014,16 +1014,28 @@ void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_
   LessThan cmp;
   std::sort(histograms.begin(), histograms.end(), cmp);
   StatNameManagedStorage start_name(start, const_cast<SymbolTable&>(constSymbolTable()));
-  for (auto iter =
-           std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
-       iter != histograms.end(); ++iter) {
-    if (!f_stat(**iter)) {
-      break;
+  if (direction == PageDirection::Forward) {
+    for (auto iter =
+             std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
+         iter != histograms.end(); ++iter) {
+      if (!f_stat(**iter)) {
+        break;
+      }
+    }
+  } else {
+    // FIX THIS
+    for (auto iter =
+             std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
+         iter != histograms.end(); ++iter) {
+      if (!f_stat(**iter)) {
+        break;
+      }
     }
   }
 }
 
-void ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_view) const {
+void ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_view,
+                                     PageDirection /*direction*/) const {
   // FIX THIS
   Thread::LockGuard lock(lock_);
   if (!f_scope(*default_scope_)) {

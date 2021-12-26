@@ -198,7 +198,7 @@ using SizeFn = std::function<void(std::size_t)>;
 /**
  * Callback invoked for each stat during iteration.
  */
-template <typename Stat> using StatFn = std::function<bool(Stat&)>;
+template <typename Stat> using StatFn = std::function<void(Stat&)>;
 
 /**
  * Callback invoked for each stat during iteration.

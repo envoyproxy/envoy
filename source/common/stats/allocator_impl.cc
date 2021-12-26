@@ -387,26 +387,36 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
 }
 
 template <class Set, class Fn>
-void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start) const {
+void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start, PageDirection direction) const {
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
-  for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {
-    if (!f_stat(**iter)) {
-      return;
+  if (direction == PageDirection::Forward) {
+    for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {
+      if (!f_stat(**iter)) {
+        return;
+      }
+    }
+  } else {
+    auto iter = set->upper_bound(start_name.statName());
+    for (std::reverse_iterator<decltype(iter)> rit{iter}; rit != set->rend(); ++rit) {
+      if (!f_stat(**iter)) {
+        return;
+      }
     }
   }
 }
 
-void AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start) const {
-  pageHelper(&counters_, f_stat, start);
+void AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const {
+  pageHelper(&counters_, f_stat, start, direction);
 }
 
-void AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start) const {
-  pageHelper(&gauges_, f_stat, start);
+void AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+  pageHelper(&gauges_, f_stat, start, direction);
 }
 
-void AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start) const {
-  pageHelper(&text_readouts_, f_stat, start);
+void AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+                                    PageDirection direction) const {
+  pageHelper(&text_readouts_, f_stat, start, direction);
 }
 
 void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
