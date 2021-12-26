@@ -117,14 +117,12 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = request_properties->mutable_request_headers();
 
     for (const auto& header : request_headers_to_log_) {
-      // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-      // values.
       const auto entry = request_headers.get(header);
-      if (!entry.empty()) {
         const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-            request_headers, Http::LowerCaseString(header));
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
-      }
+            request_headers, header);
+	if(!entry.empty()) {
+        	logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+	}
     }
   }
 
@@ -142,14 +140,12 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_headers();
 
     for (const auto& header : response_headers_to_log_) {
-      // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-      // values.
-      const auto entry = response_headers.get(header);
-      if (!entry.empty()) {
+	const auto entry = response_headers.get(header);
         const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-            response_headers, Http::LowerCaseString(header));
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
-      }
+            response_headers, header);
+	if(!entry.empty()) {
+		logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+	}
     }
   }
 
@@ -157,14 +153,12 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
     auto* logged_headers = response_properties->mutable_response_trailers();
 
     for (const auto& header : response_trailers_to_log_) {
-      // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header
-      // values.
-      const auto entry = response_trailers.get(header);
-      if (!entry.empty()) {
+	const auto entry = response_trailers.get(header) ;
         const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-            response_trailers, Http::LowerCaseString(header));
-        logged_headers->insert({header.get(), std::string(all_values.result().value())});
-      }
+            response_trailers, header);
+	if(!entry.empty()){
+		logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+	}
     }
   }
 
