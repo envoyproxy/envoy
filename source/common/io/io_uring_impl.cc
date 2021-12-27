@@ -1,3 +1,5 @@
+#if defined(__linux__)
+
 #include "source/common/io/io_uring_impl.h"
 
 #include <sys/eventfd.h>
@@ -136,3 +138,4 @@ IoUringResult IoUringImpl::submit() {
 
 } // namespace Io
 } // namespace Envoy
+#endif // defined(__linux__)
