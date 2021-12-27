@@ -1,3 +1,5 @@
+#include <ares.h>
+
 #include <list>
 #include <memory>
 #include <string>
@@ -130,122 +132,34 @@ private:
         // lookup in the `hosts_aaaa_` host map.
         char* name;
         ASSERT_EQ(ARES_SUCCESS, ares_expand_name(question, request, size_, &name, &name_len));
-        const std::list<std::string>* ips = nullptr;
         // We only expect resources of type A or AAAA.
         const int q_type = DNS_QUESTION_TYPE(question + name_len);
-        std::string cname;
-        // check if we have a cname. If so, we will need to send a response element with the cname
-        // and lookup the ips of the cname and send back those ips (if any) too
-        auto cit = parent_.cnames_.find(name);
-        if (cit != parent_.cnames_.end()) {
-          cname = cit->second;
-        }
-        const char* hostLookup = name;
-        const unsigned char* ip_question = question;
-        long ip_name_len = name_len;
-        std::string encodedCname;
+
+        auto lookup_name = std::string(name);
+
+        auto encoded_name = TestDnsServerQuery::encodeDnsName(name);
+        std::string encoded_cname;
+        const auto cname = lookupCname(lookup_name);
+
         if (!cname.empty()) {
           ASSERT_TRUE(cname.size() <= 253);
-          hostLookup = cname.c_str();
-          encodedCname = TestDnsServerQuery::encodeDnsName(cname);
-          ip_question = reinterpret_cast<const unsigned char*>(encodedCname.c_str());
-          ip_name_len =
-              encodedCname.size() + 1; //+1 as we need to include the final null terminator
+          lookup_name = const_cast<char*>(cname.c_str());
+          encoded_cname = TestDnsServerQuery::encodeDnsName(cname);
         }
-        ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
-        if (q_type == T_A) {
-          auto it = parent_.hosts_a_.find(hostLookup);
-          if (it != parent_.hosts_a_.end()) {
-            ips = &it->second;
-          }
-        } else {
-          auto it = parent_.hosts_aaaa_.find(hostLookup);
-          if (it != parent_.hosts_aaaa_.end()) {
-            ips = &it->second;
-          }
-        }
+
         ares_free_string(name);
 
-        int answer_size = ips != nullptr ? ips->size() : 0;
-        answer_size += !encodedCname.empty() ? 1 : 0;
+        ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
+        if (q_type == T_A || q_type == T_AAAA) {
+          const auto addrs = getAddrs(q_type, lookup_name);
+          auto buf = createAddrResolutionBuffer(q_type, addrs, request, name_len, encoded_cname,
+                                                encoded_name);
+          parent_.connection_->write(buf, false);
 
-        // The response begins with the initial part of the request
-        // (including the question section).
-        const size_t response_base_len = HFIXEDSZ + name_len + QFIXEDSZ;
-        absl::FixedArray<unsigned char> response_buf(response_base_len);
-        unsigned char* response_base = response_buf.begin();
-        memcpy(response_base, request, response_base_len);
-        DNS_HEADER_SET_QR(response_base, 1);
-        DNS_HEADER_SET_AA(response_base, 0);
-        if (parent_.refused_) {
-          DNS_HEADER_SET_RCODE(response_base, REFUSED);
-        } else {
-          DNS_HEADER_SET_RCODE(response_base, answer_size > 0 ? NOERROR : NXDOMAIN);
+          // Reset query state, time for the next one.
+          buffer_.drain(size_);
+          size_ = 0;
         }
-        DNS_HEADER_SET_ANCOUNT(response_base, answer_size);
-        DNS_HEADER_SET_NSCOUNT(response_base, 0);
-        DNS_HEADER_SET_ARCOUNT(response_base, 0);
-        // Total response size will be computed according to cname response size + ip response sizes
-        size_t response_ip_rest_len;
-        if (q_type == T_A) {
-          response_ip_rest_len =
-              ips != nullptr ? ips->size() * (ip_name_len + RRFIXEDSZ + sizeof(in_addr)) : 0;
-        } else {
-          response_ip_rest_len =
-              ips != nullptr ? ips->size() * (ip_name_len + RRFIXEDSZ + sizeof(in6_addr)) : 0;
-        }
-        size_t response_cname_len =
-            !encodedCname.empty() ? name_len + RRFIXEDSZ + encodedCname.size() + 1 : 0;
-        const uint16_t response_size_n =
-            htons(response_base_len + response_ip_rest_len + response_cname_len);
-        Buffer::OwnedImpl write_buffer;
-        // Write response header
-        write_buffer.add(&response_size_n, sizeof(response_size_n));
-        write_buffer.add(response_base, response_base_len);
-
-        // if we have a cname, create a resource record
-        if (!encodedCname.empty()) {
-          unsigned char cname_rr_fixed[RRFIXEDSZ];
-          DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
-          DNS_RR_SET_LEN(cname_rr_fixed, encodedCname.size() + 1);
-          DNS_RR_SET_CLASS(cname_rr_fixed, C_IN);
-          DNS_RR_SET_TTL(cname_rr_fixed, parent_.record_ttl_.count());
-          write_buffer.add(question, name_len);
-          write_buffer.add(cname_rr_fixed, RRFIXEDSZ);
-          write_buffer.add(encodedCname.c_str(), encodedCname.size() + 1);
-        }
-
-        // Create a resource record for each IP found in the host map.
-        unsigned char response_rr_fixed[RRFIXEDSZ];
-        if (q_type == T_A) {
-          DNS_RR_SET_TYPE(response_rr_fixed, T_A);
-          DNS_RR_SET_LEN(response_rr_fixed, sizeof(in_addr));
-        } else {
-          DNS_RR_SET_TYPE(response_rr_fixed, T_AAAA);
-          DNS_RR_SET_LEN(response_rr_fixed, sizeof(in6_addr));
-        }
-        DNS_RR_SET_CLASS(response_rr_fixed, C_IN);
-        DNS_RR_SET_TTL(response_rr_fixed, parent_.record_ttl_.count());
-        if (ips != nullptr) {
-          for (const auto& it : *ips) {
-            write_buffer.add(ip_question, ip_name_len);
-            write_buffer.add(response_rr_fixed, RRFIXEDSZ);
-            if (q_type == T_A) {
-              in_addr addr;
-              ASSERT_EQ(1, inet_pton(AF_INET, it.c_str(), &addr));
-              write_buffer.add(&addr, sizeof(addr));
-            } else {
-              in6_addr addr;
-              ASSERT_EQ(1, inet_pton(AF_INET6, it.c_str(), &addr));
-              write_buffer.add(&addr, sizeof(addr));
-            }
-          }
-        }
-        parent_.connection_->write(write_buffer, false);
-
-        // Reset query state, time for the next one.
-        buffer_.drain(size_);
-        size_ = 0;
       }
     }
 
@@ -255,6 +169,141 @@ private:
     // client to indicate the next DNS query size.
     uint16_t size_ = 0;
     Buffer::OwnedImpl buffer_;
+
+    std::string lookupCname(const std::string& name) {
+      std::string cname;
+      // check if we have a cname. If so, we will need to send a response element with the cname
+      // and lookup the ips of the cname and send back those ips (if any) too
+      auto cit = parent_.cnames_.find(name);
+      if (cit != parent_.cnames_.end()) {
+        cname = cit->second;
+      }
+
+      return cname;
+    }
+
+    const std::list<std::string> getAddrs(const int q_type, const std::string& name) {
+      std::list<std::string> ips;
+      if (q_type == T_A) {
+        auto it = parent_.hosts_a_.find(name);
+        if (it != parent_.hosts_a_.end()) {
+          ips = it->second;
+        }
+      } else if (q_type == T_AAAA) {
+        auto it = parent_.hosts_aaaa_.find(name);
+        if (it != parent_.hosts_aaaa_.end()) {
+          ips = it->second;
+        }
+      }
+      return ips;
+    }
+
+    size_t getAnswersLen(int q_type, const std::list<std::string>& addrs, int query_name_len,
+                         const std::string& cname) {
+      size_t len = 0;
+
+      if (!cname.empty()) {
+        len += query_name_len + RRFIXEDSZ + cname.length() + 1;
+        query_name_len = cname.length() + 1;
+      }
+
+      if (q_type == T_A) {
+        len += addrs.size() * (query_name_len + RRFIXEDSZ + sizeof(in_addr));
+      } else if (q_type == T_AAAA) {
+        len += addrs.size() * (query_name_len + RRFIXEDSZ + sizeof(in6_addr));
+      }
+
+      return len;
+    }
+
+    void writeHeaderAndQuestion(Buffer::OwnedImpl& buf, uint16_t answer_count,
+                                uint16_t answer_byte_len, size_t qfield_size,
+                                unsigned char* request) {
+      const size_t response_base_len = HFIXEDSZ + qfield_size;
+      absl::FixedArray<unsigned char> response_buf(response_base_len);
+      unsigned char* response_base = response_buf.begin();
+      memcpy(response_base, request, response_base_len);
+      DNS_HEADER_SET_QR(response_base, 1);
+      DNS_HEADER_SET_AA(response_base, 0);
+      if (parent_.refused_) {
+        DNS_HEADER_SET_RCODE(response_base, REFUSED);
+      } else {
+        DNS_HEADER_SET_RCODE(response_base, answer_count > 0 ? NOERROR : NXDOMAIN);
+      }
+      DNS_HEADER_SET_ANCOUNT(response_base, answer_count);
+      DNS_HEADER_SET_NSCOUNT(response_base, 0);
+      DNS_HEADER_SET_ARCOUNT(response_base, 0);
+      const uint16_t response_size_n = htons(response_base_len + answer_byte_len);
+
+      // Write response header
+      buf.add(&response_size_n, sizeof(response_size_n));
+      buf.add(response_base, response_base_len);
+    }
+
+    void writeAddrRecord(Buffer::OwnedImpl& buf, const std::list<std::string>& ips, int q_type,
+                         const std::string& name) {
+      // Create a resource record for each IP found in the host map.
+      unsigned char response_rr_fixed[RRFIXEDSZ];
+      if (q_type == T_A) {
+        DNS_RR_SET_TYPE(response_rr_fixed, T_A);
+        DNS_RR_SET_LEN(response_rr_fixed, sizeof(in_addr));
+      } else {
+        DNS_RR_SET_TYPE(response_rr_fixed, T_AAAA);
+        DNS_RR_SET_LEN(response_rr_fixed, sizeof(in6_addr));
+      }
+      DNS_RR_SET_CLASS(response_rr_fixed, C_IN);
+      DNS_RR_SET_TTL(response_rr_fixed, parent_.record_ttl_.count());
+
+      for (const auto& it : ips) {
+        buf.add(name.c_str(), name.size() + 1);
+        buf.add(response_rr_fixed, RRFIXEDSZ);
+        if (q_type == T_A) {
+          in_addr addr;
+          ASSERT_EQ(1, inet_pton(AF_INET, it.c_str(), &addr));
+          buf.add(&addr, sizeof(addr));
+        } else {
+          in6_addr addr;
+          ASSERT_EQ(1, inet_pton(AF_INET6, it.c_str(), &addr));
+          buf.add(&addr, sizeof(addr));
+        }
+      }
+    }
+
+    void writeCnameRecord(Buffer::OwnedImpl& buf, const std::string& cname,
+                          const std::string& encoded_name) {
+      unsigned char cname_rr_fixed[RRFIXEDSZ];
+      DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
+      DNS_RR_SET_LEN(cname_rr_fixed, cname.size() + 1);
+      DNS_RR_SET_CLASS(cname_rr_fixed, C_IN);
+      DNS_RR_SET_TTL(cname_rr_fixed, parent_.record_ttl_.count());
+      buf.add(encoded_name.c_str(), encoded_name.size() + 1);
+      buf.add(cname_rr_fixed, RRFIXEDSZ);
+      buf.add(cname.c_str(), cname.size() + 1);
+    }
+
+    Buffer::OwnedImpl createAddrResolutionBuffer(const int q_type, const std::list<std::string> ips,
+                                                 unsigned char* request, long name_len,
+                                                 const std::string& encoded_cname,
+                                                 const std::string& encoded_name) {
+      Buffer::OwnedImpl write_buffer;
+      const size_t qfield_size = name_len + QFIXEDSZ;
+      const size_t answer_byte_len = getAnswersLen(q_type, ips, name_len, encoded_cname);
+      int answer_count = ips.size();
+      answer_count += !encoded_cname.empty() ? 1 : 0;
+
+      // Write response header
+      writeHeaderAndQuestion(write_buffer, answer_count, answer_byte_len, qfield_size, request);
+
+      // if we have a cname, create a resource record
+      if (!encoded_cname.empty()) {
+        writeCnameRecord(write_buffer, encoded_cname, encoded_name);
+        writeAddrRecord(write_buffer, ips, q_type, encoded_cname);
+      } else {
+        writeAddrRecord(write_buffer, ips, q_type, encoded_name);
+      }
+
+      return write_buffer;
+    }
   };
 
 private:
