@@ -447,6 +447,11 @@ void UpstreamRequest::onPoolReady(
     upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
   }
 
+  if (info.downstreamAddressProvider().interfaceName().has_value()) {
+    upstream_info.setUpstreamInterfaceName(
+        info.downstreamAddressProvider().interfaceName().value());
+  }
+
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
   StreamInfo::StreamInfo::syncUpstreamAndDownstreamBytesMeter(parent_.callbacks()->streamInfo(),
                                                               stream_info_);
