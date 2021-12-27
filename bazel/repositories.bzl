@@ -208,6 +208,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _com_lightstep_tracer_cpp()
+    _io_hyperscan()
     _io_opentracing_cpp()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
@@ -496,6 +497,12 @@ def _com_github_nghttp2_nghttp2():
     native.bind(
         name = "nghttp2",
         actual = "@envoy//bazel/foreign_cc:nghttp2",
+    )
+
+def _io_hyperscan():
+    external_http_archive(
+        name = "io_hyperscan",
+        build_file_content = BUILD_ALL_CONTENT,
     )
 
 def _io_opentracing_cpp():

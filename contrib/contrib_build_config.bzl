@@ -35,4 +35,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
+
+    #
+    # Regex
+    #
+
+    "envoy.regex.hyperscan":                                    "//contrib/hyperscan/source:config",
 }

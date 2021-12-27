@@ -328,6 +328,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2021-10-19",
         cpe = "cpe:2.3:a:nghttp2:nghttp2:*",
     ),
+    io_hyperscan = dict(
+        project_name = "Hyperscan",
+        project_desc = "High-performance regular expression matching library",
+        project_url = "https://hyperscan.io",
+        version = "5.4.0",
+        sha256 = "e51aba39af47e3901062852e5004d127fa7763b5dbbc16bcca4265243ffa106f",
+        strip_prefix = "hyperscan-{version}",
+        urls = ["https://github.com/intel/hyperscan/archive/v{version}.tar.gz"],
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2021-01-13",
+        cpe = "N/A",
+    ),
     io_opentracing_cpp = dict(
         project_name = "OpenTracing",
         project_desc = "Vendor-neutral APIs and instrumentation for distributed tracing",
