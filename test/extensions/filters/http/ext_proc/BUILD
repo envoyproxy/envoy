@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -188,12 +189,18 @@ envoy_extension_cc_test_library(
     ],
 )
 
+envoy_proto_library(
+    name = "ext_proc_grpc_fuzz_proto",
+    srcs = ["ext_proc_grpc_fuzz.proto"],
+)
+
 envoy_cc_fuzz_test(
     name = "ext_proc_grpc_fuzz_test",
     srcs = ["ext_proc_grpc_fuzz.cc"],
     corpus = "ext_proc_grpc_corpus",
     deps = [
         ":ext_proc_grpc_fuzz_lib",
+        ":ext_proc_grpc_fuzz_proto_cc_proto",
         ":test_processor_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_proc:config",

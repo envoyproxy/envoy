@@ -25,9 +25,11 @@
 #include "source/common/network/address_impl.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz.pb.validate.h"
 #include "test/extensions/filters/http/ext_proc/ext_proc_grpc_fuzz_helper.h"
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
@@ -222,20 +224,20 @@ public:
   Grpc::ClientType client_type_;
 };
 
-DEFINE_FUZZER(const uint8_t* buf, size_t len) {
-  // Split the buffer into two buffers with at least 1 byte
-  if (len < 2) {
+DEFINE_PROTO_FUZZER(const test::extensions::filters::http::ext_proc::ExtProcGrpcTestCase& input) {
+  try {
+    TestUtility::validate(input);
+  } catch (const ProtoValidationException& e) {
+    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
 
-  // External Process and downstream are on different threads so they should
-  // have separate data providers
-  const size_t downstream_buf_len = len / 2;
-  const size_t ext_proc_buf_len = len - downstream_buf_len;
-
-  // downstream buf starts at 0, ext_prob buf starts at buf[downstream_buf_len]
-  FuzzedDataProvider downstream_provider(buf, downstream_buf_len);
-  FuzzedDataProvider ext_proc_provider(&buf[downstream_buf_len], ext_proc_buf_len);
+  // have separate data providers.
+  FuzzedDataProvider downstream_provider(
+      reinterpret_cast<const uint8_t*>(input.downstream_data().data()),
+      input.downstream_data().size());
+  FuzzedDataProvider ext_proc_provider(
+      reinterpret_cast<const uint8_t*>(input.ext_proc_data().data()), input.ext_proc_data().size());
 
   // Get IP and gRPC version from environment
   ExtProcIntegrationFuzz fuzzer(TestEnvironment::getIpVersionsForTest()[0],

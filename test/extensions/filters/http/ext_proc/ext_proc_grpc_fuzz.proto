@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test.extensions.filters.http.ext_proc;
+
+// Structured input for ext_proc_grpc_fuzz_test.
+message ExtProcGrpcTestCase {
+  bytes downstream_data = 1;
+  bytes ext_proc_data = 2;
+}
