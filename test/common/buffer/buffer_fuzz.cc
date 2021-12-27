@@ -209,11 +209,8 @@ public:
 
   uint8_t* inlineReserve(uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
-    return reinterpret_cast<uint8_t*>(mutableEnd());
-  }
-  void inlineCommit(uint64_t size) override {
-    FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     size_ += size;
+    return reinterpret_cast<uint8_t*>(mutableEnd());
   }
 
   std::array<char, 2 * TotalMaxAllocation> data_;

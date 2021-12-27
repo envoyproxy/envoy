@@ -472,15 +472,19 @@ public:
 
     static_assert(sizeof...(args) >= 2, "At least two arguments");
 
-    constexpr auto write_helper = [](uint8_t** dst, absl::string_view v) {
+    constexpr auto writer = [](uint8_t** dst, absl::string_view v) {
       memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
       *dst += v.size();
     };
 
     total_size_to_write = (absl::string_view(args).size() + ...);
-    auto* dst_memory_to_write = inlineReserve(total_size_to_write);
-    (write_helper(&dst_memory_to_write, absl::string_view(args)), ...);
-    inlineCommit(total_size_to_write);
+    auto* mem = inlineReserve(total_size_to_write);
+    if (mem != nullptr) {
+      (writer(&mem, absl::string_view(args)), ..., add(nullptr, 0));
+    } else {
+      (add(absl::string_view(args)), ...);
+    }
+
     return total_size_to_write;
   }
 
@@ -507,20 +511,16 @@ public:
 
 protected:
   /**
-   * Reserve contiguous memory segment with specific size. The first address of this memory segment
-   * will be returned.
+   * Reserve contiguous memory segment with specific size from the back slice. The first address of
+   * this memory segment will be returned. If there is no enough continuous memory in the back slice
+   * then this method will return nullptr. The reserved memory will be regarded as used and directly
+   * increase the length of the buffer.
+   *
    * @param expected contiguous memory segment size.
-   * @return the first address of this memory segment.
+   * @return the first address of this memory segment or nullptr if there is no enough continuous
+   * memory in the back slice.
    */
   virtual uint8_t* inlineReserve(uint64_t size) PURE;
-
-  /**
-   * Increase the length of buffer directly. This method can only be used after calling
-   * `inlineReserve`. And there should not be any other Buffer API calls between `inlineReserve` and
-   * this method.
-   * @param size the increased size of buffer length.
-   */
-  virtual void inlineCommit(uint64_t size) PURE;
 
 private:
   friend Reservation;

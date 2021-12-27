@@ -425,14 +425,6 @@ protected:
 
 private:
   friend OwnedImpl;
-
-  uint8_t* inlineReserve(uint64_t size) {
-    ASSERT(size > 0);
-    if (reservableSize() < size) {
-      return nullptr;
-    }
-    return base_ + reservable_;
-  }
 };
 
 class SliceDataImpl : public SliceData {
@@ -764,24 +756,20 @@ protected:
   uint8_t* inlineReserve(uint64_t size) override {
     if (slices_.empty()) {
       slices_.emplace_back(Slice(size, account_));
-      return slices_.back().inlineReserve(size);
+      length_ += size;
+      slices_.back().reservable_ += size;
+      return slices_.back().base_;
     }
 
-    auto* mem = slices_.back().inlineReserve(size);
-    if (mem != nullptr) {
+    auto& back = slices_.back();
+    if (slices_.back().reservableSize() >= size) {
+      uint8_t* mem = back.base_ + back.reservable_;
+      length_ += size;
+      back.reservable_ += size;
       return mem;
     }
 
-    slices_.emplace_back(Slice(size, account_));
-    return slices_.back().inlineReserve(size);
-  }
-
-  void inlineCommit(uint64_t size) override {
-    ASSERT(!slices_.empty());
-    slices_.back().reservable_ += size;
-    ASSERT(slices_.back().reservable_ <= slices_.back().capacity_);
-
-    length_ += size;
+    return nullptr;
   }
 
 private:
