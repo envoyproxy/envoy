@@ -207,6 +207,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.upstreamInfo()->upstreamConnectionId().has_value());
     EXPECT_EQ(12345, stream_info.upstreamInfo()->upstreamConnectionId().value());
 
+    EXPECT_FALSE(stream_info.upstreamInfo()->upstreamInterfaceName().has_value());
+    stream_info.upstreamInfo()->setUpstreamInterfaceName("lo");
+    ASSERT_TRUE(stream_info.upstreamInfo()->upstreamInterfaceName().has_value());
+    EXPECT_EQ("lo", stream_info.upstreamInfo()->upstreamInterfaceName().value());
+
     std::shared_ptr<UpstreamInfo> new_info = std::make_shared<UpstreamInfoImpl>();
     EXPECT_NE(stream_info.upstreamInfo(), new_info);
     stream_info.setUpstreamInfo(new_info);
