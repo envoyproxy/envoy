@@ -125,9 +125,26 @@ The configuration is expected as a JSON list.
   This API is only available for Kotlin.
 
 Add a list of IP addresses to use as fallback DNS name servers.
+See `the Envoy docs <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto#extensions-network-dns-resolver-cares-v3-caresdnsresolverconfig>`__
+for further information.
 
   // Kotlin
   builder.addDNSFallbackNameservers(listOf<String>("8.8.8.8"))
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``enableDNSFilterUnroutableFamilies``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. attention::
+
+  This API is only available for Kotlin.
+
+Specify whether to filter unroutable IP families during DNS resolution or not.
+See `the Envoy docs <https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/network/dns_resolver/cares/v3/cares_dns_resolver.proto#extensions-network-dns-resolver-cares-v3-caresdnsresolverconfig>`__
+for further information.
+
+  // Kotlin
+  builder.enableDNSFilterUnroutableFamilies(true)
 
 ~~~~~~~~~~~~~~~
 ``addLogLevel``

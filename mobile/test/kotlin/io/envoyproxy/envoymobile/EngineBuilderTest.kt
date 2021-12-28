@@ -111,6 +111,16 @@ class EngineBuilderTest {
   }
 
   @Test
+  fun `specifying dns filter unroutable families overrides default`() {
+    engineBuilder = EngineBuilder(Standard())
+    engineBuilder.addEngineType { envoyEngine }
+    engineBuilder.enableDNSFilterUnroutableFamilies(true)
+
+    val engine = engineBuilder.build() as EngineImpl
+    assertThat(engine.envoyConfiguration!!.dnsFilterUnroutableFamilies).isTrue()
+  }
+
+  @Test
   fun `specifying H2 Ping idle interval overrides default`() {
     engineBuilder = EngineBuilder(Standard())
     engineBuilder.addEngineType { envoyEngine }
