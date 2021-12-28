@@ -344,7 +344,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
     EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_total")->value());
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
 
   // Rate limiter fails open

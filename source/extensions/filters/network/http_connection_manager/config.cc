@@ -34,6 +34,7 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_manager_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 
@@ -495,7 +496,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     Tracing::CustomTagMap custom_tags;
     for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+      custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
     }
 
     envoy::type::v3::FractionalPercent client_sampling;

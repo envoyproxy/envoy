@@ -31,8 +31,8 @@ public:
   }
 
   void getTrailers(LookupTrailersCallback&&) override {
+    ENVOY_BUG(false, "trailers not supported");
     // TODO(toddmgreer): Support trailers.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   const LookupRequest& request() const { return request_; }
@@ -78,7 +78,7 @@ public:
   }
 
   void insertTrailers(const Http::ResponseTrailerMap&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(toddmgreer): support trailers
+    ENVOY_BUG(false, "trailers not supported");
   }
 
   void onDestroy() override {}
