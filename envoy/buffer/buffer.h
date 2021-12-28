@@ -467,7 +467,7 @@ public:
    * to be safely convertible to `absl::string_view`.
    * @return The total size of the data copied to the buffer.
    */
-  template <class... Args> size_t addFragments(Args&&... args) {
+  template <bool ActionAfterAdd = true, class... Args> size_t addFragments(Args&&... args) {
     size_t total_size_to_write = 0;
 
     static_assert(sizeof...(args) >= 2, "At least two arguments");
@@ -478,10 +478,16 @@ public:
     };
 
     total_size_to_write = (absl::string_view(args).size() + ...);
+
     auto* mem = inlineReserve(total_size_to_write);
     if (mem != nullptr) {
-      (writer(&mem, absl::string_view(args)), ..., add(nullptr, 0));
+      (writer(&mem, absl::string_view(args)), ...);
+      // Call the `add` method to trigger action after writing such as watermark checking.
+      if constexpr (ActionAfterAdd) {
+        add(nullptr, 0);
+      }
     } else {
+      // No enough continuous memory in the back slice and downgrade to using `add` method.
       (add(absl::string_view(args)), ...);
     }
 
