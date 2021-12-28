@@ -33,6 +33,12 @@ message CaresDnsResolverConfig {
   // resolvers. Defaults to false.
   bool use_resolvers_as_fallback = 3;
 
+  // The resolver will query available network interfaces and determine if there are no available
+  // interfaces for a given IP family. It will then filter these addresses from the results it
+  // presents. e.g., if there are no available IPv4 network interfaces, the resolver will not
+  // provide IPv4 addresses.
+  bool filter_unroutable_families = 4;
+
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
   config.core.v3.DnsResolverOptions dns_resolver_options = 2;
 }
