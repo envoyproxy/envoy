@@ -11,6 +11,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -21,10 +22,12 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -654,6 +657,9 @@ public:
         cares.add_resolvers()->MergeFrom(dns_resolvers);
       }
     }
+
+    cares.set_filter_unroutable_families(filterUnroutableFamilies());
+
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
@@ -674,7 +680,6 @@ public:
     // Create a resolver options on stack here to emulate what actually happens in envoy bootstrap.
     envoy::config::core::v3::DnsResolverOptions dns_resolver_options = dns_resolver_options_;
     envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
-
     if (setResolverInConstructor()) {
       typed_dns_resolver_config = getTypedDnsResolverConfig(
           {socket_->connectionInfoProvider().localAddress()}, dns_resolver_options);
@@ -685,7 +690,6 @@ public:
         createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     resolver_ =
         dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config);
-
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
     if (tcpOnly()) {
@@ -782,12 +786,60 @@ public:
                               });
   }
 
+  void testFilterAddresses(const std::vector<std::string>& ifaddrs,
+                           const DnsLookupFamily lookup_family,
+                           const std::list<std::string>& expected_addresses,
+                           const DnsResolver::ResolutionStatus resolution_status =
+                               DnsResolver::ResolutionStatus::Success) {
+    server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+    server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+    auto& real_syscall = Api::OsSysCallsSingleton::get();
+    Api::MockOsSysCalls os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+    EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillOnce(Return(true));
+    EXPECT_CALL(os_sys_calls, getifaddrs(_))
+        .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+          for (uint32_t i = 0; i < ifaddrs.size(); i++) {
+            auto addr = Network::Utility::parseInternetAddressAndPort(ifaddrs[i]);
+            vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
+          }
+          return {0, 0};
+        }));
+
+    // These passthrough calls are needed to let the resolver communicate with the DNS server
+    EXPECT_CALL(os_sys_calls, accept(_, _, _))
+        .WillRepeatedly(Invoke(
+            [&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
+              return real_syscall.accept(sockfd, addr, addrlen);
+            }));
+    EXPECT_CALL(os_sys_calls, readv(_, _, _))
+        .WillRepeatedly(
+            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+              return real_syscall.readv(fd, iov, num_iov);
+            }));
+    EXPECT_CALL(os_sys_calls, writev(_, _, _))
+        .WillRepeatedly(
+            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+              return real_syscall.writev(fd, iov, num_iov);
+            }));
+    EXPECT_CALL(os_sys_calls, close(_))
+        .WillRepeatedly(Invoke(
+            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
+
+    resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
+                            expected_addresses, {}, absl::nullopt);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zeroTimeout() const { return false; }
   virtual bool tcpOnly() const { return true; }
   virtual void updateDnsResolverOptions(){};
   virtual bool setResolverInConstructor() const { return false; }
+  virtual bool filterUnroutableFamilies() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   std::shared_ptr<Network::TcpListenSocket> socket_;
@@ -1193,17 +1245,125 @@ TEST_P(DnsImplTest, RecordTtlLookup) {
 // immediately.
 TEST_P(DnsImplTest, PendingTimerEnable) {
   InSequence s;
+  const envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig config;
   std::vector<Network::Address::InstanceConstSharedPtr> vec{};
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  resolver_ = std::make_shared<DnsResolverImpl>(dispatcher, false /* use_resolvers_as_fallback */,
-                                                vec, dns_resolver_options_);
+  resolver_ = std::make_shared<DnsResolverImpl>(config, dispatcher, vec);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
   EXPECT_NE(nullptr, resolveWithUnreferencedParameters("some.bad.domain.invalid",
                                                        DnsLookupFamily::V4Only, true));
+}
+
+class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
+protected:
+  bool filterUnroutableFamilies() const override { return true; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplFilterUnroutableFamiliesTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutable) {
+  testFilterAddresses({}, DnsLookupFamily::Auto, {}, DnsResolver::ResolutionStatus::Failure);
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutableV6) {
+  // Auto would have preferred V6, but because there is no v6 interface we will get v4.
+  testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::Auto, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutableV6LoopbackDoesntCount) {
+  testFilterAddresses({"1.2.3.4:80", "[::1]:80"}, DnsLookupFamily::Auto, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterV6) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::Auto, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutableV4) {
+  // V4Preferred would have preferred v4, but because there is no v6 interface we will get v4.
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::V4Preferred, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterUnroutableV4LoopbackDoesntCount) {
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54", "127.0.0.1:80"},
+                      DnsLookupFamily::V4Preferred, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterV4) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::V4Preferred, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, DontFilterAll) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::All, {"201.134.56.7", "1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV4) {
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"}, DnsLookupFamily::All,
+                      {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesTest, FilterAllV6) {
+  testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7"});
+}
+
+class DnsImplFilterUnroutableFamiliesDontFilterTest : public DnsImplTest {
+protected:
+  bool filterUnroutableFamilies() const override { return false; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplFilterUnroutableFamiliesDontFilterTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterUnroutableV6) {
+  testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::Auto, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterUnroutableV6LoopbackDoesntCount) {
+  testFilterAddresses({"1.2.3.4:80", "[::1]:80"}, DnsLookupFamily::Auto, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterV6) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::Auto, {"1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterUnroutableV4) {
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::V4Preferred, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterUnroutableV4LoopbackDoesntCount) {
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54", "127.0.0.1:80"},
+                      DnsLookupFamily::V4Preferred, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterV4) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::V4Preferred, {"201.134.56.7"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, DontFilterAll) {
+  testFilterAddresses({"1.2.3.4:80", "[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"},
+                      DnsLookupFamily::All, {"201.134.56.7", "1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV4) {
+  testFilterAddresses({"[2001:0000:3238:DFE1:0063:0000:0000:FEFB]:54"}, DnsLookupFamily::All,
+                      {"201.134.56.7", "1::2"});
+}
+
+TEST_P(DnsImplFilterUnroutableFamiliesDontFilterTest, FilterAllV6) {
+  testFilterAddresses({"1.2.3.4:80"}, DnsLookupFamily::All, {"201.134.56.7", "1::2"});
 }
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
