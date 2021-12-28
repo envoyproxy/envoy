@@ -30,9 +30,6 @@ CompiledHyperscanMatcher::CompiledHyperscanMatcher(
       flags = flags | HS_FLAG_UCP;
     }
   }
-  if (config.combination()) {
-    flags = flags | HS_FLAG_COMBINATION;
-  }
 
   hs_compile_error_t* compile_err;
   if (hs_compile(pattern, flags, HS_MODE_BLOCK, nullptr, &database_, &compile_err) != HS_SUCCESS) {

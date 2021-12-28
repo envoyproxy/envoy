@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The engine follows PCRE pattern syntax, and the regex string must adhere to the documented
 // `pattern support <http://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message Hyperscan {
   // Matching will be performed case-insensitively.
   //
@@ -49,11 +49,4 @@ message Hyperscan {
   // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
   // classes. It is only meaningful in conjunction with `utf8`.
   bool ucp = 6;
-
-  // Parse the expression in logical combination syntax.
-  //
-  // This option instructs Hyperscan to parse this expression as logical combination syntax.
-  // Logical constraints consist of operands, operators and parentheses. The operands are
-  // expression indices, and operators can be `!`, `&` or `|`.
-  bool combination = 7;
 }
