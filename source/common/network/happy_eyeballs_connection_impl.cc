@@ -16,6 +16,7 @@ HappyEyeballsConnectionImpl::HappyEyeballsConnectionImpl(
           {source_address, socket_factory, transport_socket_options, options}),
       next_attempt_timer_(dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })) {
   ENVOY_LOG(trace, "New connection.");
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_new_cx", "[C{}]", id_);
   connections_.push_back(createNextConnection());
 }
 
@@ -425,6 +426,7 @@ ClientConnectionPtr HappyEyeballsConnectionImpl::createNextConnection() {
       connection_construction_state_.socket_factory_.createTransportSocket(
           connection_construction_state_.transport_socket_options_),
       connection_construction_state_.options_);
+  ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt", "[C{}] {}", id_, next_address_);
   callbacks_wrappers_.push_back(std::make_unique<ConnectionCallbacksWrapper>(*this, *connection));
   connection->addConnectionCallbacks(*callbacks_wrappers_.back());
 
@@ -474,6 +476,7 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
                                           ConnectionCallbacksWrapper* wrapper) {
   if (event != ConnectionEvent::Connected) {
     ENVOY_LOG(trace, "Connection failed to connect");
+    ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_attempt_failed", "[C{}] {}", id_, next_address_);
     // This connection attempt has failed. If possible, start another connection attempt
     // immediately, instead of waiting for the timer.
     if (next_address_ < address_list_.size()) {
@@ -490,6 +493,9 @@ void HappyEyeballsConnectionImpl::onEvent(ConnectionEvent event,
     ASSERT(connections_.size() == 1);
     // This connection attempt failed but there are no more attempts to be made, so pass
     // the failure up by setting up this connection as the final one.
+    ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_failed", "[C{}]", id_);
+  } else {
+    ENVOY_LOG_EVENT(debug, "happy_eyeballs_cx_ok", "[C{}] {}", id_, next_address_);
   }
 
   // Close all other connections and configure the final connection.
