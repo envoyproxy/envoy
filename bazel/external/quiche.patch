@@ -1,0 +1,13 @@
+diff --git a/http2/adapter/oghttp2_session.cc b/http2/adapter/oghttp2_session.cc
+index 781c49f8..052af525 100644
+--- a/http2/adapter/oghttp2_session.cc
++++ b/http2/adapter/oghttp2_session.cc
+@@ -427,7 +427,7 @@ OgHttp2Session::ProcessBytesImpl(absl::string_view bytes) {
+     if (!remaining_preface_.empty()) {
+       QUICHE_VLOG(2) << "Preface bytes remaining: "
+                      << remaining_preface_.size();
+-      return min_size;
++      return static_cast<int64_t>(min_size);
+     }
+     preface_consumed = min_size;
+   }
