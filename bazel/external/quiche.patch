@@ -1,5 +1,4 @@
-diff --git a/http2/adapter/oghttp2_session.cc b/http2/adapter/oghttp2_session.cc
-index 781c49f8..052af525 100644
+# This patch is needed for compilation with MacOS toolchains.
 --- a/http2/adapter/oghttp2_session.cc
 +++ b/http2/adapter/oghttp2_session.cc
 @@ -427,7 +427,7 @@ OgHttp2Session::ProcessBytesImpl(absl::string_view bytes) {

@@ -823,9 +823,7 @@ def _com_github_google_quiche():
         name = "com_github_google_quiche",
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
-        # This patch is needed for compilation with MacOS toolchains.
         patches = ["@envoy//bazel/external:quiche.patch"],
-        patch_args = ["-p1"],
     )
     native.bind(
         name = "quiche_common_platform",
