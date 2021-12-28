@@ -762,7 +762,7 @@ protected:
     }
 
     auto& back = slices_.back();
-    if (slices_.back().reservableSize() >= size) {
+    if (back.reservableSize() >= size) {
       uint8_t* mem = back.base_ + back.reservable_;
       length_ += size;
       back.reservable_ += size;

@@ -459,10 +459,8 @@ public:
   }
 
   /**
-   * Copy multiple arguments to the buffer. In order to improve performance, all the arguments in
-   * each call will be stored in contiguous memory. So this method is mainly used when a large
-   * amount of fine-grained data needs to be written to the buffer. The type of arguments must be
-   * automatically convertible (e.g. char*, char[], std::string) to `absl::string_view`.
+   * Copy multiple arguments to the buffer. The type of arguments must be automatically convertible
+   * (e.g. char*, char[], std::string) to `absl::string_view`.
    * @param args A set of arguments with variable length and type. The arguments must be guaranteed
    * to be safely convertible to `absl::string_view`.
    * @return The total size of the data copied to the buffer.
@@ -472,7 +470,7 @@ public:
 
     static_assert(sizeof...(args) >= 2, "At least two arguments");
 
-    constexpr auto writer = [](uint8_t** dst, absl::string_view v) {
+    constexpr auto write_helper = [](uint8_t** dst, absl::string_view v) {
       memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
       *dst += v.size();
     };
@@ -481,7 +479,7 @@ public:
 
     auto* mem = inlineReserve(total_size_to_write);
     if (mem != nullptr) {
-      (writer(&mem, absl::string_view(args)), ...);
+      (write_helper(&mem, absl::string_view(args)), ...);
       // Call the `add` method to trigger action after writing such as watermark checking.
       if constexpr (ActionAfterAdd) {
         add(nullptr, 0);
