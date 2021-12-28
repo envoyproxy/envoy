@@ -1,6 +1,6 @@
 # This patch is needed for compilation with MacOS toolchains.
---- a/http2/adapter/oghttp2_session.cc
-+++ b/http2/adapter/oghttp2_session.cc
+--- http2/adapter/oghttp2_session.cc
++++ http2/adapter/oghttp2_session.cc
 @@ -427,7 +427,7 @@ OgHttp2Session::ProcessBytesImpl(absl::string_view bytes) {
      if (!remaining_preface_.empty()) {
        QUICHE_VLOG(2) << "Preface bytes remaining: "
