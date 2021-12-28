@@ -36,6 +36,7 @@ open class EngineBuilder(
   private var dnsQueryTimeoutSeconds = 25
   private var dnsPreresolveHostnames = "[]"
   private var dnsFallbackNameservers = listOf<String>()
+  private var dnsFilterUnroutableFamilies = false
   private var enableHappyEyeballs = false
   private var enableInterfaceBinding = false
   private var h2ConnectionKeepaliveIdleIntervalMilliseconds = 100000000
@@ -163,6 +164,18 @@ open class EngineBuilder(
    */
   fun addDNSFallbackNameservers(dnsFallbackNameservers: List<String>): EngineBuilder {
     this.dnsFallbackNameservers = dnsFallbackNameservers
+    return this
+  }
+
+  /**
+   * Specify whether to filter unroutable IP families during DNS resolution or not.
+   *
+   * @param dnsFilterUnroutableFamilies whether to filter or not.
+   *
+   * @return this builder.
+   */
+  fun enableDNSFilterUnroutableFamilies(dnsFilterUnroutableFamilies: Boolean): EngineBuilder {
+    this.dnsFilterUnroutableFamilies = dnsFilterUnroutableFamilies
     return this
   }
 
@@ -410,6 +423,7 @@ open class EngineBuilder(
             dnsQueryTimeoutSeconds,
             dnsPreresolveHostnames,
             dnsFallbackNameservers,
+            dnsFilterUnroutableFamilies,
             enableHappyEyeballs,
             enableInterfaceBinding,
             h2ConnectionKeepaliveIdleIntervalMilliseconds,
@@ -442,6 +456,7 @@ open class EngineBuilder(
             dnsQueryTimeoutSeconds,
             dnsPreresolveHostnames,
             dnsFallbackNameservers,
+            dnsFilterUnroutableFamilies,
             enableHappyEyeballs,
             enableInterfaceBinding,
             h2ConnectionKeepaliveIdleIntervalMilliseconds,
