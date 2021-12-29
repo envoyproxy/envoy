@@ -5078,6 +5078,7 @@ TEST_F(RouterTest, UpstreamSSLConnection) {
   EXPECT_EQ(session_id,
             callbacks_.streamInfo().upstreamInfo()->upstreamSslConnection()->sessionId());
   EXPECT_FALSE(callbacks_.streamInfo().upstreamInfo()->upstreamConnectionId().has_value());
+  EXPECT_FALSE(callbacks_.streamInfo().upstreamInfo()->upstreamInterfaceName().has_value());
 }
 
 // Verify that upstream timing information is set into the StreamInfo after the upstream

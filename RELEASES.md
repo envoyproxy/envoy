@@ -63,6 +63,8 @@ In order to accommodate downstream projects, new Envoy releases are produced on 
 schedule (at the end of each quarter), with an acceptable delay of up to 2 weeks, with a hard
 deadline of 3 weeks.
 
+As of 2022, the targeted release dates are the 15th day of each quarter.
+
 | Version |  Expected  |   Actual   | Difference | End of Life |
 |:-------:|:----------:|:----------:|:----------:|:-----------:|
 | 1.12.0  | 2019/09/30 | 2019/10/31 |  +31 days  | 2020/10/31  |
@@ -74,6 +76,6 @@ deadline of 3 weeks.
 | 1.18.0  | 2021/03/31 | 2021/04/15 |  +15 days  | 2022/04/15  |
 | 1.19.0  | 2021/06/30 | 2021/07/13 |  +13 days  | 2022/07/13  |
 | 1.20.0  | 2021/09/30 | 2021/10/05 |   +5 days  | 2022/10/13  |
-| 1.21.0  | 2021/12/30 |            |            |             |
+| 1.21.0  | 2022/01/15 |            |            |             |
 
 [repokitteh]: https://github.com/repokitteh
