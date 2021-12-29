@@ -82,17 +82,23 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     listener->setRejectFraction(listener_reject_fraction_);
   }
 
+  ASSERT(!listener_map_by_tag_.contains(config.listenerTag()));
+
   listener_map_by_tag_.emplace(
       config.listenerTag(),
       std::make_pair(config.listenSocketFactory().localAddress(), std::move(details)));
-  listener_map_by_address_.emplace(config.listenSocketFactory().localAddress()->asString(),
-                                   listener_map_by_tag_[config.listenerTag()].second);
+  // This map only store the new listener.
+  listener_map_by_address_.insert_or_assign(config.listenSocketFactory().localAddress()->asString(), &listener_map_by_tag_[config.listenerTag()].second);
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   auto listener_iter = listener_map_by_tag_.find(listener_tag);
   if (listener_iter != listener_map_by_tag_.end()) {
-    listener_map_by_address_.erase(listener_iter->second.first->asString());
+    // listener_map_by_address_ may already update to the new listener. Compare it with the one which find from
+    // listener_map_by_tag_, only delete it when it is same listener.
+    if (listener_map_by_address_[listener_iter->second.first->asString()] == &listener_iter->second.second) {
+      listener_map_by_address_.erase(listener_iter->second.first->asString());
+    }
     listener_map_by_tag_.erase(listener_tag);
   }
 }
@@ -133,28 +139,28 @@ void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
 
 void ConnectionHandlerImpl::stopListeners() {
   for (auto& iter : listener_map_by_address_) {
-    iter.second.get().listener_->shutdownListener();
+    iter.second->listener_->shutdownListener();
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
   for (auto& iter : listener_map_by_address_) {
-    iter.second.get().listener_->pauseListening();
+    iter.second->listener_->pauseListening();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
   for (auto& iter : listener_map_by_address_) {
-    iter.second.get().listener_->resumeListening();
+    iter.second->listener_->resumeListening();
   }
 }
 
 void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
   for (auto& iter : listener_map_by_address_) {
-    iter.second.get().listener_->listener()->setRejectFraction(reject_fraction);
+    iter.second->listener_->listener()->setRejectFraction(reject_fraction);
   }
 }
 
@@ -164,7 +170,7 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
   auto listener_it = listener_map_by_address_.find(address->asString());
   if (listener_it != listener_map_by_address_.end()) {
     return Network::InternalListenerOptRef(
-        listener_it->second.get().internalListener().value().get());
+        listener_it->second->internalListener().value().get());
   }
   return OptRef<Network::InternalListener>();
 }
@@ -215,7 +221,7 @@ ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Insta
   // If there is exact address match, return the corresponding listener.
   if (listener_it != listener_map_by_address_.end()) {
     return Network::BalancedConnectionHandlerOptRef(
-        listener_it->second.get().tcpListener().value().get());
+        listener_it->second->tcpListener().value().get());
   }
 
   absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveListenerDetails>> details;
