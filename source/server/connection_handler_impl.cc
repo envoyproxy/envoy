@@ -88,15 +88,17 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       config.listenerTag(),
       std::make_pair(config.listenSocketFactory().localAddress(), std::move(details)));
   // This map only store the new listener.
-  listener_map_by_address_.insert_or_assign(config.listenSocketFactory().localAddress()->asString(), &listener_map_by_tag_[config.listenerTag()].second);
+  listener_map_by_address_.insert_or_assign(config.listenSocketFactory().localAddress()->asString(),
+                                            &listener_map_by_tag_[config.listenerTag()].second);
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
   auto listener_iter = listener_map_by_tag_.find(listener_tag);
   if (listener_iter != listener_map_by_tag_.end()) {
-    // listener_map_by_address_ may already update to the new listener. Compare it with the one which find from
-    // listener_map_by_tag_, only delete it when it is same listener.
-    if (listener_map_by_address_[listener_iter->second.first->asString()] == &listener_iter->second.second) {
+    // listener_map_by_address_ may already update to the new listener. Compare it with the one
+    // which find from listener_map_by_tag_, only delete it when it is same listener.
+    if (listener_map_by_address_[listener_iter->second.first->asString()] ==
+        &listener_iter->second.second) {
       listener_map_by_address_.erase(listener_iter->second.first->asString());
     }
     listener_map_by_tag_.erase(listener_tag);
@@ -169,8 +171,7 @@ ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstShared
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
   auto listener_it = listener_map_by_address_.find(address->asString());
   if (listener_it != listener_map_by_address_.end()) {
-    return Network::InternalListenerOptRef(
-        listener_it->second->internalListener().value().get());
+    return Network::InternalListenerOptRef(listener_it->second->internalListener().value().get());
   }
   return OptRef<Network::InternalListener>();
 }

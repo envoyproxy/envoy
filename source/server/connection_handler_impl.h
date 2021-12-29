@@ -96,8 +96,7 @@ private:
   absl::flat_hash_map<uint64_t,
                       std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>>
       listener_map_by_tag_;
-  absl::flat_hash_map<std::string, ActiveListenerDetails*>
-      listener_map_by_address_;
+  absl::flat_hash_map<std::string, ActiveListenerDetails*> listener_map_by_address_;
 
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
