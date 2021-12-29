@@ -52,7 +52,7 @@ SocketInterfaceImpl::socket(Network::Socket::Type socket_type, Network::Address:
   } else if (addr_type == Network::Address::Type::Pipe) {
     domain = AF_UNIX;
   } else {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   const Api::SysCallSocketResult result =

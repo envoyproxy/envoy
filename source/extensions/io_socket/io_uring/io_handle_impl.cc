@@ -56,7 +56,7 @@ bool IoUringSocketHandleImpl::isOpen() const { return SOCKET_VALID(fd_); }
 Api::IoCallUint64Result IoUringSocketHandleImpl::readv(uint64_t /* max_length */,
                                                        Buffer::RawSlice* /* slices */,
                                                        uint64_t /* num_slice */) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
@@ -90,7 +90,7 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::read(Buffer::Instance& buffer,
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::writev(const Buffer::RawSlice* /*slices */,
                                                         uint64_t /*num_slice*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::write(Buffer::Instance& buffer) {
@@ -133,30 +133,30 @@ Api::IoCallUint64Result
 IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice* /*slices*/, uint64_t /*num_slice*/,
                                  int /*flags*/, const Network::Address::Ip* /*self_ip*/,
                                  const Network::Address::Instance& /*peer_address*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice* /*slices*/,
                                                          const uint64_t /*num_slice*/,
                                                          uint32_t /*self_port*/,
                                                          RecvMsgOutput& /*output*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmmsg(RawSliceArrays& /*slices*/,
                                                           uint32_t /*self_port*/,
                                                           RecvMsgOutput& /*output*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recv(void* /*buffer*/, size_t /*length*/,
                                                       int /*flags*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
-bool IoUringSocketHandleImpl::supportsMmsg() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+bool IoUringSocketHandleImpl::supportsMmsg() const { PANIC("not implemented"); }
 
-bool IoUringSocketHandleImpl::supportsUdpGro() const { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+bool IoUringSocketHandleImpl::supportsUdpGro() const { PANIC("not implemented"); }
 
 Api::SysCallIntResult
 IoUringSocketHandleImpl::bind(Network::Address::InstanceConstSharedPtr address) {
@@ -205,11 +205,11 @@ Api::SysCallIntResult IoUringSocketHandleImpl::getOption(int level, int optname,
 
 Api::SysCallIntResult IoUringSocketHandleImpl::ioctl(unsigned long, void*, unsigned long, void*,
                                                      unsigned long, unsigned long*) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::setBlocking(bool /*blocking*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 absl::optional<int> IoUringSocketHandleImpl::domain() { return domain_; }
@@ -277,7 +277,7 @@ void IoUringSocketHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher,
   cb_ = std::move(cb);
 }
 
-Network::IoHandlePtr IoUringSocketHandleImpl::duplicate() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+Network::IoHandlePtr IoUringSocketHandleImpl::duplicate() { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::activateFileEvents(uint32_t events) {
   if (events & Event::FileReadyType::Write) {
@@ -297,9 +297,7 @@ void IoUringSocketHandleImpl::enableFileEvents(uint32_t events) {
 
 void IoUringSocketHandleImpl::resetFileEvents() { file_event_adapter_.reset(); }
 
-Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int /*how*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int /*how*/) { PANIC("not implemented"); }
 
 void IoUringSocketHandleImpl::addReadRequest() {
   if (!is_read_enabled_ || !SOCKET_VALID(fd_) || is_read_added_) {
@@ -320,6 +318,57 @@ void IoUringSocketHandleImpl::addReadRequest() {
     res = uring.prepareReadv(fd_, &iov_, 1, 0, req);
     RELEASE_ASSERT(res == Io::IoUringResult::Ok, "unable to prepare readv");
   }
+}
+
+absl::optional<std::string> IoUringSocketHandleImpl::interfaceName() {
+  // TODO(rojkov): This is a copy-paste from Network::IoSocketHandleImpl.
+  // Unification is needed.
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  if (!os_syscalls_singleton.supportsGetifaddrs()) {
+    return absl::nullopt;
+  }
+
+  Network::Address::InstanceConstSharedPtr socket_address = localAddress();
+  if (!socket_address || socket_address->type() != Network::Address::Type::Ip) {
+    return absl::nullopt;
+  }
+
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+
+  absl::optional<std::string> selected_interface_name{};
+  for (const auto& interface_address : interface_addresses) {
+    if (!interface_address.interface_addr_) {
+      continue;
+    }
+
+    if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
+      // Compare address _without port_.
+      // TODO: create common addressAsStringWithoutPort method to simplify code here.
+      absl::uint128 socket_address_value;
+      absl::uint128 interface_address_value;
+      switch (socket_address->ip()->version()) {
+      case Network::Address::IpVersion::v4:
+        socket_address_value = socket_address->ip()->ipv4()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
+        break;
+      case Network::Address::IpVersion::v6:
+        socket_address_value = socket_address->ip()->ipv6()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
+        break;
+      default:
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+      }
+
+      if (socket_address_value == interface_address_value) {
+        selected_interface_name = interface_address.interface_name_;
+        break;
+      }
+    }
+  }
+
+  return selected_interface_name;
 }
 
 Network::IoHandlePtr IoUringSocketHandleImpl::FileEventAdapter::accept(struct sockaddr* addr,
@@ -381,7 +430,7 @@ void IoUringSocketHandleImpl::FileEventAdapter::onRequestCompletion(const Reques
   case RequestType::Close:
     break;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 
