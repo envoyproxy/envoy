@@ -194,7 +194,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   EXPECT_EQ(res, IoUringResult::Ok);
 
   // Even though we haven't been notified about ops completion the buffers
-  // are filled aready.
+  // are filled already.
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[0], 'a');
   EXPECT_EQ(static_cast<char*>(iov1.iov_base)[1], 'b');
   EXPECT_EQ(static_cast<char*>(iov2.iov_base)[0], 'c');
