@@ -42,11 +42,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   ActiveListenerDetails details;
   if (config.internalListenerConfig().has_value()) {
     if (overridden_listener.has_value()) {
-      for (auto& listener : listeners_) {
-        if (listener.second.listener_->listenerTag() == overridden_listener) {
-          listener.second.internalListener()->get().updateListenerConfig(config);
-          return;
-        }
+      auto listener_it = listener_map_by_tag_.find(overridden_listener.value());
+      if (listener_it != listener_map_by_tag_.end()) {
+        listener_it->second.second.internalListener()->get().updateListenerConfig(config);
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -55,11 +53,9 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     details.listener_ = std::move(internal_listener);
   } else if (config.listenSocketFactory().socketType() == Network::Socket::Type::Stream) {
     if (!support_udp_in_place_filter_chain_update && overridden_listener.has_value()) {
-      for (auto& listener : listeners_) {
-        if (listener.second.listener_->listenerTag() == overridden_listener) {
-          listener.second.tcpListener()->get().updateListenerConfig(config);
-          return;
-        }
+      auto listener_it = listener_map_by_tag_.find(overridden_listener.value());
+      if (listener_it != listener_map_by_tag_.end()) {
+        listener_it->second.second.tcpListener()->get().updateListenerConfig(config);
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -83,16 +79,19 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
   if (auto* listener = details.listener_->listener(); listener != nullptr) {
     listener->setRejectFraction(listener_reject_fraction_);
   }
-  listeners_.emplace_back(config.listenSocketFactory().localAddress(), std::move(details));
+
+  listener_map_by_tag_.emplace(
+      config.listenerTag(),
+      std::make_pair(config.listenSocketFactory().localAddress(), std::move(details)));
+  listener_map_by_address_.emplace(config.listenSocketFactory().localAddress()->asString(),
+                                   listener_map_by_tag_[config.listenerTag()].second);
 }
 
 void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
-  for (auto listener = listeners_.begin(); listener != listeners_.end();) {
-    if (listener->second.listener_->listenerTag() == listener_tag) {
-      listener = listeners_.erase(listener);
-    } else {
-      ++listener;
-    }
+  auto listener_iter = listener_map_by_tag_.find(listener_tag);
+  if (listener_iter != listener_map_by_tag_.end()) {
+    listener_map_by_address_.erase(listener_iter->second.first->asString());
+    listener_map_by_tag_.erase(listener_tag);
   }
 }
 
@@ -112,12 +111,11 @@ ConnectionHandlerImpl::getUdpListenerCallbacks(uint64_t listener_tag) {
 void ConnectionHandlerImpl::removeFilterChains(
     uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
     std::function<void()> completion) {
-  for (auto& listener : listeners_) {
-    if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.listener_->onFilterChainDraining(filter_chains);
-      break;
-    }
+  auto listener_it = listener_map_by_tag_.find(listener_tag);
+  if (listener_it != listener_map_by_tag_.end()) {
+    listener_it->second.second.listener_->onFilterChainDraining(filter_chains);
   }
+
   // Reach here if the target listener is found or the target listener was removed by a full
   // listener update. In either case, the completion must be deferred so that any active connection
   // referencing the filter chain can finish prior to deletion.
@@ -125,55 +123,46 @@ void ConnectionHandlerImpl::removeFilterChains(
 }
 
 void ConnectionHandlerImpl::stopListeners(uint64_t listener_tag) {
-  for (auto& listener : listeners_) {
-    if (listener.second.listener_->listenerTag() == listener_tag) {
-      listener.second.listener_->shutdownListener();
-    }
+  auto iter = listener_map_by_tag_.find(listener_tag);
+  if (iter != listener_map_by_tag_.end()) {
+    iter->second.second.listener_->shutdownListener();
   }
 }
 
 void ConnectionHandlerImpl::stopListeners() {
-  for (auto& listener : listeners_) {
-    listener.second.listener_->shutdownListener();
+  for (auto& iter : listener_map_by_address_) {
+    iter.second.get().listener_->shutdownListener();
   }
 }
 
 void ConnectionHandlerImpl::disableListeners() {
   disable_listeners_ = true;
-  for (auto& listener : listeners_) {
-    listener.second.listener_->pauseListening();
+  for (auto& iter : listener_map_by_address_) {
+    iter.second.get().listener_->pauseListening();
   }
 }
 
 void ConnectionHandlerImpl::enableListeners() {
   disable_listeners_ = false;
-  for (auto& listener : listeners_) {
-    listener.second.listener_->resumeListening();
+  for (auto& iter : listener_map_by_address_) {
+    iter.second.get().listener_->resumeListening();
   }
 }
 
 void ConnectionHandlerImpl::setListenerRejectFraction(UnitFloat reject_fraction) {
   listener_reject_fraction_ = reject_fraction;
-  for (auto& listener : listeners_) {
-    listener.second.listener_->listener()->setRejectFraction(reject_fraction);
+  for (auto& iter : listener_map_by_address_) {
+    iter.second.get().listener_->listener()->setRejectFraction(reject_fraction);
   }
 }
 
 Network::InternalListenerOptRef
 ConnectionHandlerImpl::findByAddress(const Network::Address::InstanceConstSharedPtr& address) {
   ASSERT(address->type() == Network::Address::Type::EnvoyInternal);
-  auto listener_it =
-      std::find_if(listeners_.begin(), listeners_.end(),
-                   [&address](std::pair<Network::Address::InstanceConstSharedPtr,
-                                        ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                     return p.second.internalListener().has_value() &&
-                            p.second.listener_->listener() != nullptr &&
-                            p.first->type() == Network::Address::Type::EnvoyInternal &&
-                            *(p.first) == *address;
-                   });
-
-  if (listener_it != listeners_.end()) {
-    return Network::InternalListenerOptRef(listener_it->second.internalListener().value().get());
+  auto listener_it = listener_map_by_address_.find(address->asString());
+  if (listener_it != listener_map_by_address_.end()) {
+    return Network::InternalListenerOptRef(
+        listener_it->second.get().internalListener().value().get());
   }
   return OptRef<Network::InternalListener>();
 }
@@ -198,15 +187,10 @@ ConnectionHandlerImpl::ActiveListenerDetails::internalListener() {
 
 ConnectionHandlerImpl::ActiveListenerDetailsOptRef
 ConnectionHandlerImpl::findActiveListenerByTag(uint64_t listener_tag) {
-  // TODO(mattklein123): We should probably use a hash table here to lookup the tag
-  // instead of iterating through the listener list.
-  for (auto& listener : listeners_) {
-    if (listener.second.listener_->listener() != nullptr &&
-        listener.second.listener_->listenerTag() == listener_tag) {
-      return listener.second;
-    }
+  auto iter = listener_map_by_tag_.find(listener_tag);
+  if (iter != listener_map_by_tag_.end()) {
+    return iter->second.second;
   }
-
   return absl::nullopt;
 }
 
@@ -224,58 +208,47 @@ ConnectionHandlerImpl::getBalancedHandlerByTag(uint64_t listener_tag) {
 
 Network::BalancedConnectionHandlerOptRef
 ConnectionHandlerImpl::getBalancedHandlerByAddress(const Network::Address::Instance& address) {
-  // This is a linear operation, may need to add a map<address, listener> to improve performance.
-  // However, linear performance might be adequate since the number of listeners is small.
   // We do not return stopped listeners.
-  auto listener_it =
-      std::find_if(listeners_.begin(), listeners_.end(),
-                   [&address](std::pair<Network::Address::InstanceConstSharedPtr,
-                                        ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                     return p.second.tcpListener().has_value() &&
-                            p.second.listener_->listener() != nullptr &&
-                            p.first->type() == Network::Address::Type::Ip && *(p.first) == address;
-                   });
-
+  auto listener_it = listener_map_by_address_.find(address.asString());
   // If there is exact address match, return the corresponding listener.
-  if (listener_it != listeners_.end()) {
+  if (listener_it != listener_map_by_address_.end()) {
     return Network::BalancedConnectionHandlerOptRef(
-        listener_it->second.tcpListener().value().get());
+        listener_it->second.get().tcpListener().value().get());
   }
 
+  absl::optional<std::reference_wrapper<ConnectionHandlerImpl::ActiveListenerDetails>> details;
   // Otherwise, we need to look for the wild card match, i.e., 0.0.0.0:[address_port].
   // We do not return stopped listeners.
   // TODO(wattli): consolidate with previous search for more efficiency.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.listener_wildcard_match_ip_family")) {
-    listener_it =
-        std::find_if(listeners_.begin(), listeners_.end(),
-                     [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
-                                                ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                       return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                                  p.second.typed_listener_) &&
-                              p.second.listener_->listener() != nullptr &&
-                              p.first->type() == Network::Address::Type::Ip &&
-                              p.first->ip()->port() == address.ip()->port() &&
-                              p.first->ip()->isAnyAddress() &&
-                              p.first->ip()->version() == address.ip()->version();
-                     });
+    for (auto& iter : listener_map_by_tag_) {
+      if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+              iter.second.second.typed_listener_) &&
+          iter.second.second.listener_->listener() != nullptr &&
+          iter.second.first->type() == Network::Address::Type::Ip &&
+          iter.second.first->ip()->port() == address.ip()->port() &&
+          iter.second.first->ip()->isAnyAddress() &&
+          iter.second.first->ip()->version() == address.ip()->version()) {
+        details = iter.second.second;
+      }
+    }
   } else {
-    listener_it =
-        std::find_if(listeners_.begin(), listeners_.end(),
-                     [&address](const std::pair<Network::Address::InstanceConstSharedPtr,
-                                                ConnectionHandlerImpl::ActiveListenerDetails>& p) {
-                       return absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
-                                  p.second.typed_listener_) &&
-                              p.second.listener_->listener() != nullptr &&
-                              p.first->type() == Network::Address::Type::Ip &&
-                              p.first->ip()->port() == address.ip()->port() &&
-                              p.first->ip()->isAnyAddress();
-                     });
+    for (auto& iter : listener_map_by_tag_) {
+      if (absl::holds_alternative<std::reference_wrapper<ActiveTcpListener>>(
+              iter.second.second.typed_listener_) &&
+          iter.second.second.listener_->listener() != nullptr &&
+          iter.second.first->type() == Network::Address::Type::Ip &&
+          iter.second.first->ip()->port() == address.ip()->port() &&
+          iter.second.first->ip()->isAnyAddress()) {
+        details = iter.second.second;
+      }
+    }
   }
-  return (listener_it != listeners_.end())
+  return (details.has_value())
              ? Network::BalancedConnectionHandlerOptRef(
                    ActiveTcpListenerOptRef(absl::get<std::reference_wrapper<ActiveTcpListener>>(
-                                               listener_it->second.typed_listener_))
+                                               details.value().get().typed_listener_))
                        .value()
                        .get())
              : absl::nullopt;

@@ -93,7 +93,12 @@ private:
   const absl::optional<uint32_t> worker_index_;
   Event::Dispatcher& dispatcher_;
   const std::string per_handler_stat_prefix_;
-  std::list<std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>> listeners_;
+  absl::flat_hash_map<uint64_t,
+                      std::pair<Network::Address::InstanceConstSharedPtr, ActiveListenerDetails>>
+      listener_map_by_tag_;
+  absl::flat_hash_map<std::string, std::reference_wrapper<ActiveListenerDetails>>
+      listener_map_by_address_;
+
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
