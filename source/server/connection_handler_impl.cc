@@ -45,6 +45,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       auto listener_it = listener_map_by_tag_.find(overridden_listener.value());
       if (listener_it != listener_map_by_tag_.end()) {
         listener_it->second.second.internalListener()->get().updateListenerConfig(config);
+        return;
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -56,6 +57,7 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       auto listener_it = listener_map_by_tag_.find(overridden_listener.value());
       if (listener_it != listener_map_by_tag_.end()) {
         listener_it->second.second.tcpListener()->get().updateListenerConfig(config);
+        return;
       }
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
