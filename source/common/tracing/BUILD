@@ -50,7 +50,6 @@ envoy_cc_library(
         "//source/common/common:base64_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
-        "//source/common/config:metadata_lib",
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
@@ -92,5 +91,21 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "custom_tag_lib",
+    srcs = [
+        "custom_tag_impl.cc",
+    ],
+    hdrs = [
+        "custom_tag_impl.h",
+    ],
+    deps = [
+        "//envoy/router:router_interface",
+        "//envoy/tracing:custom_tag_interface",
+        "//source/common/config:metadata_lib",
+        "@envoy_api//envoy/type/tracing/v3:pkg_cc_proto",
     ],
 )

@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # HTTP L7 filter that performs compression with configurable compression libraries
-# Public docs: docs/root/configuration/http_filters/compressor_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/compressor_filter
 
 envoy_extension_package()
 

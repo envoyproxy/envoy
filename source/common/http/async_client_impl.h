@@ -134,7 +134,7 @@ private:
 
     Router::RouteConstSharedPtr route(const Router::RouteCallback&, const Http::RequestHeaderMap&,
                                       const StreamInfo::StreamInfo&, uint64_t) const override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      return nullptr;
     }
 
     const std::list<LowerCaseString>& internalOnlyHeaders() const override {
@@ -327,10 +327,8 @@ private:
   Event::Dispatcher& dispatcher() override { return parent_.dispatcher_; }
   void resetStream() override;
   Router::RouteConstSharedPtr route() override { return route_; }
-  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  void setRoute(Router::RouteConstSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Router::RouteConstSharedPtr route(const Router::RouteCallback&) override { return nullptr; }
+  void setRoute(Router::RouteConstSharedPtr) override {}
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() const override { return stream_id_; }
@@ -338,22 +336,18 @@ private:
   Buffer::BufferMemoryAccountSharedPtr account() const override { return nullptr; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
-  void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  RequestTrailerMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void continueDecoding() override {}
+  RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance&, bool) override {
     // This should only be called if the user has set up buffering. The request is already fully
     // buffered. Note that this is only called via the async client's internal use of the router
     // filter which uses this function for buffering.
     ASSERT(buffered_body_ != nullptr);
   }
-  MetadataMapVector& addDecodedMetadata() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  MetadataMapVector& addDecodedMetadata() override { PANIC("not implemented"); }
+  void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
-  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(ResponseHeaderMap& headers)> modify_headers,
                       const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
@@ -379,13 +373,13 @@ private:
   }
   // The async client won't pause if sending 1xx headers so simply swallow any.
   void encode1xxHeaders(ResponseHeaderMapPtr&&) override {}
-  ResponseHeaderMapOptRef informationalHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ResponseHeaderMapOptRef informationalHeaders() const override { return {}; }
   void encodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream,
                      absl::string_view details) override;
-  ResponseHeaderMapOptRef responseHeaders() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ResponseHeaderMapOptRef responseHeaders() const override { return {}; }
   void encodeData(Buffer::Instance& data, bool end_stream) override;
   void encodeTrailers(ResponseTrailerMapPtr&& trailers) override;
-  ResponseTrailerMapOptRef responseTrailers() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ResponseTrailerMapOptRef responseTrailers() const override { return {}; }
   void encodeMetadata(MetadataMapPtr&&) override {}
   void onDecoderFilterAboveWriteBufferHighWatermark() override { ++high_watermark_calls_; }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
@@ -403,10 +397,8 @@ private:
   }
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
-  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-  void resetIdleTimer() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {}
+  void resetIdleTimer() override {}
 
   // ScopeTrackedObject
   void dumpState(std::ostream& os, int indent_level) const override {
@@ -461,9 +453,7 @@ private:
     // internal use of the router filter which uses this function for buffering.
   }
   const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
-  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
 
   RequestMessagePtr request_;
   AsyncClient::Callbacks& callbacks_;

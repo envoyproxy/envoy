@@ -14,28 +14,26 @@ namespace quic {
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)
 std::string SpdyServerPushUtils::GetPromisedUrlFromHeaders(const SpdyHeaderBlock& /*headers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 // static
 std::string
 // NOLINTNEXTLINE(readability-identifier-naming)
 SpdyServerPushUtils::GetPromisedHostNameFromHeaders(const SpdyHeaderBlock& /*headers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)
-bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+bool SpdyServerPushUtils::PromisedUrlIsValid(const SpdyHeaderBlock& /*headers*/) { return false; }
 
 // static
 // NOLINTNEXTLINE(readability-identifier-naming)
 std::string SpdyServerPushUtils::GetPushPromiseUrl(absl::string_view /*scheme*/,
                                                    absl::string_view /*authority*/,
                                                    absl::string_view /*path*/) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 } // namespace quic
