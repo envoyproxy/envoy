@@ -7,6 +7,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -16,7 +17,7 @@ namespace ResourceMonitors {
 namespace DownstreamConnections {
 namespace {
 
-TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitor) {
+TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.downstream_connections");
@@ -25,6 +26,27 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitor) {
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
   config.set_max_active_downstream_connections(std::numeric_limits<uint64_t>::max());
+  Event::MockDispatcher dispatcher;
+  Api::ApiPtr api = Api::createApiForTest();
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+  EXPECT_THROW_WITH_REGEX(factory->createProactiveResourceMonitor(config, context),
+                          ProtoValidationException,
+                          "Proto constraint validation failed "
+                          "\\(DownstreamConnectionsConfigValidationError."
+                          "MaxActiveDownstreamConnections: value must be greater than 0");
+}
+
+TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitor) {
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.downstream_connections");
+  EXPECT_NE(factory, nullptr);
+
+  envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
+      config;
+  config.set_max_active_downstream_connections(1);
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;

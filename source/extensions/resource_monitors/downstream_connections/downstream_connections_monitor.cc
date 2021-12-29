@@ -16,7 +16,7 @@ ActiveDownstreamConnectionsResourceMonitor::ActiveDownstreamConnectionsResourceM
 
 bool ActiveDownstreamConnectionsResourceMonitor::tryAllocateResource(int64_t increment) {
   int64_t new_val = (current_ += increment);
-  if (new_val > static_cast<int64_t>(max_) || new_val < 0) {
+  if (new_val > max_ || new_val < 0) {
     current_ -= increment;
     return false;
   }

@@ -15,8 +15,7 @@ namespace {
 TEST(ActiveDownstreamConnectionsMonitorTest, CannotAllocateDeallocateResourceWithDefaultConfig) {
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
-  std::unique_ptr<ActiveDownstreamConnectionsResourceMonitor> monitor(
-      new ActiveDownstreamConnectionsResourceMonitor(config));
+  auto monitor = std::make_unique<ActiveDownstreamConnectionsResourceMonitor>(config);
   EXPECT_FALSE(monitor->tryAllocateResource(1));
   EXPECT_DEATH(monitor->tryDeallocateResource(1),
                ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
@@ -27,8 +26,7 @@ TEST(ActiveDownstreamConnectionsMonitorTest, ComputesCorrectUsage) {
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
   config.set_max_active_downstream_connections(10);
-  std::unique_ptr<ActiveDownstreamConnectionsResourceMonitor> monitor(
-      new ActiveDownstreamConnectionsResourceMonitor(config));
+  auto monitor = std::make_unique<ActiveDownstreamConnectionsResourceMonitor>(config);
   EXPECT_EQ(0, monitor->currentResourceUsage());
   EXPECT_EQ(10, monitor->maxResourceUsage());
   EXPECT_TRUE(monitor->tryAllocateResource(3));
@@ -41,8 +39,7 @@ TEST(ActiveDownstreamConnectionsMonitorTest, FailsToAllocateDeallocateWhenMinMax
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
   config.set_max_active_downstream_connections(1);
-  std::unique_ptr<ActiveDownstreamConnectionsResourceMonitor> monitor(
-      new ActiveDownstreamConnectionsResourceMonitor(config));
+  auto monitor = std::make_unique<ActiveDownstreamConnectionsResourceMonitor>(config);
   EXPECT_EQ(0, monitor->currentResourceUsage());
   EXPECT_EQ(1, monitor->maxResourceUsage());
   EXPECT_TRUE(monitor->tryAllocateResource(1));

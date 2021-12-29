@@ -24,7 +24,7 @@ public:
   int64_t maxResourceUsage() const override;
 
 protected:
-  uint64_t max_;
+  int64_t max_;
   std::atomic<int64_t> current_;
 };
 
