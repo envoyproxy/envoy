@@ -272,7 +272,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data("1234567890123");
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _, _)).Times(0);
+  EXPECT_CALL(*router_.retry_state_, shouldRetryHeaders(_, _, _)).Times(0);
   EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _, _)).Times(0);
   // This will result in retry_state_ being deleted.
   router_.decodeData(data, false);

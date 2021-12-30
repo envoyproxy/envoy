@@ -346,7 +346,7 @@ public:
 
   using DoRetryCallback = std::function<void()>;
   using DoRetryResetCallback = std::function<void(bool disable_alt_svc)>;
-  using DoRetryHeaderCallback = std::function<void(bool as_early_data)>;
+  using DoRetryHeaderCallback = std::function<void(bool disable_early_data)>;
 
   virtual ~RetryState() = default;
 
@@ -375,7 +375,7 @@ public:
    */
   virtual RetryStatus shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                          const Http::RequestHeaderMap& original_request,
-                                         bool had_early_data, DoRetryHeaderCallback callback) PURE;
+                                         DoRetryHeaderCallback callback) PURE;
 
   /**
    * Determines whether given response headers would be retried by the retry policy, assuming

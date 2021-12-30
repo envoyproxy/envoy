@@ -1380,9 +1380,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
                         RetryState::RetryDecision::NoRetry;
     } else {
       const RetryStatus retry_status = retry_state_->shouldRetryHeaders(
-          *headers, *downstream_headers_, /*had_early_data=*/upstream_request.hasEarlyData(),
-          [this, use_alt_svc = upstream_request.useAltSvc()](bool as_early_data) -> void {
-            doRetry(as_early_data, use_alt_svc);
+          *headers, *downstream_headers_,
+          [this, use_alt_svc = upstream_request.useAltSvc(),
+           had_early_data = upstream_request.hasEarlyData()](bool disable_early_data) -> void {
+            doRetry((disable_early_data ? false : had_early_data), use_alt_svc);
           });
       if (retry_status == RetryStatus::Yes) {
         runRetryOptionsPredicates(upstream_request);

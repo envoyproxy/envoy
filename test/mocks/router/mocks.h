@@ -176,8 +176,7 @@ public:
               (const Http::ResponseHeaderMap& response_headers), (const));
   MOCK_METHOD(RetryStatus, shouldRetryHeaders,
               (const Http::ResponseHeaderMap& response_headers,
-               const Http::RequestHeaderMap& original_request, bool had_early_data,
-               DoRetryHeaderCallback callback));
+               const Http::RequestHeaderMap& original_request, DoRetryHeaderCallback callback));
   MOCK_METHOD(RetryState::RetryDecision, wouldRetryFromHeaders,
               (const Http::ResponseHeaderMap& response_headers,
                const Http::RequestHeaderMap& original_request, bool& retry_as_early_data));

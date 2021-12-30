@@ -294,12 +294,11 @@ RetryStatus RetryStateImpl::shouldRetry(RetryDecision would_retry, DoRetryCallba
 
 RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& response_headers,
                                                const Http::RequestHeaderMap& original_request,
-                                               bool had_early_data,
                                                DoRetryHeaderCallback callback) {
   // This may be overridden in wouldRetryFromHeaders().
-  bool retry_as_early_data = had_early_data;
+  bool disable_early_data = false;
   const RetryDecision retry_decision =
-      wouldRetryFromHeaders(response_headers, original_request, retry_as_early_data);
+      wouldRetryFromHeaders(response_headers, original_request, disable_early_data);
 
   // Yes, we will retry based on the headers - try to parse a rate limited reset interval from the
   // response.
@@ -312,7 +311,7 @@ RetryStatus RetryStateImpl::shouldRetryHeaders(const Http::ResponseHeaderMap& re
   }
 
   return shouldRetry(retry_decision,
-                     [retry_as_early_data, callback]() { callback(retry_as_early_data); });
+                     [disable_early_data, callback]() { callback(disable_early_data); });
 }
 
 RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reason,

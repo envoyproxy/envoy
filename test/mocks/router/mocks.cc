@@ -31,10 +31,10 @@ MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
-  EXPECT_CALL(*this, shouldRetryHeaders(_, _, _, _))
-      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&, bool,
+  EXPECT_CALL(*this, shouldRetryHeaders(_, _, _))
+      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
                               DoRetryHeaderCallback callback) {
-        callback_ = [callback]() { callback(true); };
+        callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
       }));
 }
@@ -48,7 +48,7 @@ void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool>,
                               DoRetryResetCallback callback) {
-        callback_ = [callback]() { callback(true); };
+        callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
       }));
 }
