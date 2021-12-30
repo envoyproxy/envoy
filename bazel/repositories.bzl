@@ -210,8 +210,10 @@ def envoy_dependencies(skip_targets = []):
     _com_lightstep_tracer_cpp()
     _io_hyperscan()
     _io_opentracing_cpp()
+    _net_colm_open_source_ragel()
     _net_zlib()
     _com_github_zlib_ng_zlib_ng()
+    _org_boost()
     _org_brotli()
     _upb()
     _proxy_wasm_cpp_sdk()
@@ -405,6 +407,18 @@ def _com_github_libevent_libevent():
         actual = "@envoy//bazel/foreign_cc:event",
     )
 
+def _net_colm_open_source_ragel():
+    external_http_archive(
+        name = "net_colm_open_source_ragel",
+        build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:ragel.patch"],
+    )
+    native.bind(
+        name = "ragel",
+        actual = "@envoy//bazel/foreign_cc:ragel",
+    )
+
 def _net_zlib():
     external_http_archive(
         name = "net_zlib",
@@ -430,6 +444,16 @@ def _com_github_zlib_ng_zlib_ng():
         build_file_content = BUILD_ALL_CONTENT,
         patch_args = ["-p1"],
         patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
+    )
+
+def _org_boost():
+    external_http_archive(
+        name = "org_boost",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "boost",
+        actual = "@envoy//bazel/foreign_cc:boost",
     )
 
 # If you're looking for envoy-filter-example / envoy_filter_example
@@ -503,6 +527,10 @@ def _io_hyperscan():
     external_http_archive(
         name = "io_hyperscan",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+    native.bind(
+        name = "hyperscan",
+        actual = "@envoy//bazel/foreign_cc:hyperscan",
     )
 
 def _io_opentracing_cpp():

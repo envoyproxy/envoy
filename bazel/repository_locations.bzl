@@ -443,6 +443,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2020-07-28",
         cpe = "cpe:2.3:a:libevent_project:libevent:*",
     ),
+    net_colm_open_source_ragel = dict(
+        project_name = "Ragel",
+        project_desc = "Ragel State Machine Compiler",
+        project_url = "https://www.colm.net/open-source/ragel/",
+        version = "6.10",
+        sha256 = "5f156edb65d20b856d638dd9ee2dfb43285914d9aa2b6ec779dac0270cd56c3f",
+        strip_prefix = "ragel-{version}",
+        urls = ["https://www.colm.net/files/ragel/ragel-{version}.tar.gz"],
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2017-03-24",
+        cpe = "N/A",
+    ),
     # This should be removed, see https://github.com/envoyproxy/envoy/issues/13261.
     net_zlib = dict(
         project_name = "zlib",
@@ -458,6 +470,18 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["controlplane", "dataplane_core"],
         release_date = "2019-04-14",
         cpe = "cpe:2.3:a:gnu:zlib:*",
+    ),
+    org_boost = dict(
+        project_name = "Boost",
+        project_desc = "Boost C++ source libraries",
+        project_url = "https://www.boost.org/",
+        version = "1.78.0",
+        sha256 = "94ced8b72956591c4775ae2207a9763d3600b30d9d7446562c552f0a14a63be7",
+        strip_prefix = "boost_{underscore_version}",
+        urls = ["https://boostorg.jfrog.io/artifactory/main/release/{version}/source/boost_{underscore_version}.tar.gz"],
+        use_category = ["controlplane", "dataplane_core"],
+        release_date = "2021-12-08",
+        cpe = "cpe:2.3:a:boost:boost:*",
     ),
     org_brotli = dict(
         project_name = "brotli",
