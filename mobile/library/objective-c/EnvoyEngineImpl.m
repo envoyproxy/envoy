@@ -332,6 +332,20 @@ static void ios_http_filter_set_response_callbacks(envoy_http_filter_callbacks c
   }
 }
 
+static void ios_http_filter_on_complete(envoy_stream_intel stream_intel,
+                                        envoy_final_stream_intel final_stream_intel,
+                                        const void *context) {
+  // This code block runs inside the Envoy event loop. Therefore, an explicit autoreleasepool block
+  // is necessary to act as a breaker for any Objective-C allocation that happens.
+  @autoreleasepool {
+    EnvoyHTTPFilter *filter = (__bridge EnvoyHTTPFilter *)context;
+    if (filter.onComplete == nil) {
+      return;
+    }
+    filter.onComplete(stream_intel, final_stream_intel);
+  }
+}
+
 static void ios_http_filter_on_cancel(envoy_stream_intel stream_intel,
                                       envoy_final_stream_intel final_stream_intel,
                                       const void *context) {
@@ -342,7 +356,7 @@ static void ios_http_filter_on_cancel(envoy_stream_intel stream_intel,
     if (filter.onCancel == nil) {
       return;
     }
-    filter.onCancel(stream_intel);
+    filter.onCancel(stream_intel, final_stream_intel);
   }
 }
 
@@ -363,7 +377,8 @@ static void ios_http_filter_on_error(envoy_error error, envoy_stream_intel strea
                                                     encoding:NSUTF8StringEncoding];
 
     release_envoy_error(error);
-    filter.onError(error.error_code, errorMessage, error.attempt_count, stream_intel);
+    filter.onError(error.error_code, errorMessage, error.attempt_count, stream_intel,
+                   final_stream_intel);
   }
 }
 
@@ -457,6 +472,8 @@ static void ios_track_event(envoy_map map, const void *context) {
   api->on_resume_request = ios_http_filter_on_resume_request;
   api->set_response_callbacks = ios_http_filter_set_response_callbacks;
   api->on_resume_response = ios_http_filter_on_resume_response;
+  // TODO(goaway) HTTP filter on_complete not currently implemented.
+  // api->on_complete = ios_http_filter_on_complete;
   api->on_cancel = ios_http_filter_on_cancel;
   api->on_error = ios_http_filter_on_error;
   api->release_filter = ios_http_filter_release;

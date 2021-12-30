@@ -17,6 +17,9 @@ typedef NSDictionary<NSString *, NSString *> EnvoyEvent;
 /// Contains internal HTTP stream metrics, context, and other details.
 typedef envoy_stream_intel EnvoyStreamIntel;
 
+// Contains one time HTTP stream metrics, context, and other details.
+typedef envoy_final_stream_intel EnvoyFinalStreamIntel;
+
 #pragma mark - EnvoyHTTPCallbacks
 
 /// Interface that can handle callbacks from an HTTP stream.
@@ -27,14 +30,17 @@ typedef envoy_stream_intel EnvoyStreamIntel;
  */
 @property (nonatomic, assign) dispatch_queue_t dispatchQueue;
 
+// Formatting for block properties is inconsistent and not configurable.
+// clang-format off
+
 /**
  * Called when all headers get received on the async HTTP stream.
  * @param headers the headers received.
  * @param endStream whether the response is headers-only.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onHeaders)
-    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onHeaders)(
+    EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
 
 /**
  * Called when a data frame gets received on the async HTTP stream.
@@ -43,26 +49,26 @@ typedef envoy_stream_intel EnvoyStreamIntel;
  * @param endStream whether the data is the last data frame.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onData)
-    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onData)(
+    NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
 
-// clang-format off
 /**
  * Called when all trailers get received on the async HTTP stream.
  * Note that end stream is implied when on_trailers is called.
  * @param trailers the trailers received.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onTrailers)
-    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
-// clang-format on
+@property (nonatomic, copy) void (^onTrailers)(
+    EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
 
 /**
  * Called when the async HTTP stream has an error.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
+ * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onError)
-    (uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onError)(
+    uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel,
+    EnvoyFinalStreamIntel finalStreamIntel);
 
 /**
  * Called when the async HTTP stream is canceled.
@@ -70,9 +76,22 @@ typedef envoy_stream_intel EnvoyStreamIntel;
  * response is already complete. It will fire no more than once, and no other callbacks for the
  * stream will be issued afterwards.
  * @param streamIntel internal HTTP stream metrics, context, and other details.
+ * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
  */
-@property (nonatomic, copy) void (^onCancel)(EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) void (^onCancel)(
+    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
 
+/**
+ * Final call made when an HTTP stream is closed gracefully.
+ * Note this may already be inferred from a prior callback with endStream=TRUE, and this only needs
+ * to be handled if information from finalStreamIntel is desired.
+ * @param streamIntel internal HTTP stream metrics, context, and other details.
+ * @param finalStreamIntel one time HTTP stream metrics, context, and other details.
+ */
+@property (nonatomic, copy) void (^onComplete)(
+    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
+
+// clang-format on
 @end
 
 #pragma mark - EnvoyHTTPFilter
@@ -114,79 +133,86 @@ extern const int kEnvoyFilterResumeStatusResumeIteration;
 
 @interface EnvoyHTTPFilter : NSObject
 
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - EnvoyHeaders *, forward headers
-@property (nonatomic, copy) NSArray * (^onRequestHeaders)
-    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
-
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - NSData *, forward data
-/// 2 - EnvoyHeaders *, optional pending headers
-@property (nonatomic, copy) NSArray * (^onRequestData)
-    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
-
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - EnvoyHeaders *, forward trailers
-/// 2 - EnvoyHeaders *, optional pending headers
-/// 3 - NSData *, optional pending data
-@property (nonatomic, copy) NSArray * (^onRequestTrailers)
-    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
-
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - EnvoyHeaders *, forward headers
-@property (nonatomic, copy) NSArray * (^onResponseHeaders)
-    (EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
-
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - NSData *, forward data
-/// 2 - EnvoyHeaders *, optional pending headers
-@property (nonatomic, copy) NSArray * (^onResponseData)
-    (NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
-
-/// Returns tuple of:
-/// 0 - NSNumber *,filter status
-/// 1 - EnvoyHeaders *, forward trailers
-/// 2 - EnvoyHeaders *, optional pending headers
-/// 3 - NSData *, optional pending data
-@property (nonatomic, copy) NSArray * (^onResponseTrailers)
-    (EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
-
-@property (nonatomic, copy) void (^onCancel)(EnvoyStreamIntel streamIntel);
-
-@property (nonatomic, copy) void (^onError)
-    (uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel);
-
-@property (nonatomic, copy) void (^setRequestFilterCallbacks)
-    (id<EnvoyHTTPFilterCallbacks> callbacks);
-
+// Formatting for block properties is inconsistent and not configurable.
 // clang-format off
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward headers
+@property (nonatomic, copy) NSArray * (^onRequestHeaders)(
+    EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - NSData *, forward data
+/// 2 - EnvoyHeaders *, optional pending headers
+@property (nonatomic, copy) NSArray * (^onRequestData)(
+    NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward trailers
+/// 2 - EnvoyHeaders *, optional pending headers
+/// 3 - NSData *, optional pending data
+@property (nonatomic, copy) NSArray * (^onRequestTrailers)(
+    EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward headers
+@property (nonatomic, copy) NSArray * (^onResponseHeaders)(
+    EnvoyHeaders *headers, BOOL endStream, EnvoyStreamIntel streamIntel);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - NSData *, forward data
+/// 2 - EnvoyHeaders *, optional pending headers
+@property (nonatomic, copy) NSArray * (^onResponseData)(
+    NSData *data, BOOL endStream, EnvoyStreamIntel streamIntel);
+
+/// Returns tuple of:
+/// 0 - NSNumber *,filter status
+/// 1 - EnvoyHeaders *, forward trailers
+/// 2 - EnvoyHeaders *, optional pending headers
+/// 3 - NSData *, optional pending data
+@property (nonatomic, copy)NSArray * (^onResponseTrailers)(
+    EnvoyHeaders *trailers, EnvoyStreamIntel streamIntel);
+
+@property (nonatomic, copy) void (^onCancel)(
+    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
+
+@property (nonatomic, copy) void (^onError)(
+    uint64_t errorCode, NSString *message, int32_t attemptCount, EnvoyStreamIntel streamIntel,
+    EnvoyFinalStreamIntel finalStreamIntel);
+
+@property (nonatomic, copy) void (^onComplete)(
+    EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel);
+
+@property (nonatomic, copy) void (^setRequestFilterCallbacks)(
+    id<EnvoyHTTPFilterCallbacks> callbacks);
+
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, optional pending headers
 /// 2 - NSData *, optional pending data
 /// 3 - EnvoyHeaders *, optional pending trailers
-@property (nonatomic, copy) NSArray * (^onResumeRequest)
-    (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
-     BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) NSArray * (^onResumeRequest)(
+    EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
+    BOOL endStream, EnvoyStreamIntel streamIntel);
 
-@property (nonatomic, copy) void (^setResponseFilterCallbacks)
-    (id<EnvoyHTTPFilterCallbacks> callbacks);
+@property (nonatomic, copy) void (^setResponseFilterCallbacks)(
+    id<EnvoyHTTPFilterCallbacks> callbacks);
 
 /// Returns tuple of:
 /// 0 - NSNumber *,filter status
 /// 1 - EnvoyHeaders *, optional pending headers
 /// 2 - NSData *, optional pending data
 /// 3 - EnvoyHeaders *, optional pending trailers
-@property (nonatomic, copy) NSArray * (^onResumeResponse)
-    (EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
-     BOOL endStream, EnvoyStreamIntel streamIntel);
+@property (nonatomic, copy) NSArray * (^onResumeResponse)(
+    EnvoyHeaders *_Nullable headers, NSData *_Nullable data, EnvoyHeaders *_Nullable trailers,
+    BOOL endStream, EnvoyStreamIntel streamIntel);
+
 // clang-format on
-
 @end
 
 #pragma mark - EnvoyHTTPFilterFactory

@@ -40,7 +40,9 @@ final class BufferDemoFilter: ResponseFilter {
     return .resumeIteration(headers: builder.build(), data: self.body, trailers: trailers)
   }
 
-  func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
+  func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {}
 
-  func onCancel(streamIntel: StreamIntel) {}
+  func onCancel(streamIntel: FinalStreamIntel) {}
+
+  func onComplete(streamIntel: FinalStreamIntel) {}
 }

@@ -66,15 +66,17 @@ static_resources:
         return .continue(trailers: trailers)
       }
 
-      func onError(_ error: EnvoyError, streamIntel: StreamIntel) {
+      func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {
         XCTAssertEqual(error.errorCode, 2) // 503/Connection Failure
         self.receivedError.fulfill()
       }
 
-      func onCancel(streamIntel: StreamIntel) {
+      func onCancel(streamIntel: FinalStreamIntel) {
         XCTFail("Unexpected call to onCancel filter callback")
         self.notCancelled.fulfill()
       }
+
+      func onComplete(streamIntel: FinalStreamIntel) {}
     }
 
     let callbackReceivedError = self.expectation(description: "Run called with expected error")

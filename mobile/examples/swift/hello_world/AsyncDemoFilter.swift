@@ -59,7 +59,9 @@ final class AsyncDemoFilter: AsyncResponseFilter {
     return .resumeIteration(headers: builder.build(), data: data, trailers: trailers)
   }
 
-  func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
+  func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {}
 
-  func onCancel(streamIntel: StreamIntel) {}
+  func onCancel(streamIntel: FinalStreamIntel) {}
+
+  func onComplete(streamIntel: FinalStreamIntel) {}
 }

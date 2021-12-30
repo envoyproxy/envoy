@@ -12,6 +12,7 @@ swift_library(
         "EngineBuilder.swift",
         "EngineImpl.swift",
         "EnvoyError.swift",
+        "FinalStreamIntel.swift",
         "Headers.swift",
         "HeadersBuilder.swift",
         "LogLevel.swift",

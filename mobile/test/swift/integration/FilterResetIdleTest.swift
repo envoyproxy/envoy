@@ -168,11 +168,13 @@ static_resources:
         return .stopIteration
       }
 
-      func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
+      func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {}
 
-      func onCancel(streamIntel: StreamIntel) {
+      func onCancel(streamIntel: FinalStreamIntel) {
         cancelExpectation.fulfill()
       }
+
+      func onComplete(streamIntel: FinalStreamIntel) {}
     }
 
     let resetExpectation = self.expectation(description: "Stream idle timer reset 3 times")
