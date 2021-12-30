@@ -101,7 +101,8 @@ public:
         .WillOnce(Invoke([&response](const std::string& ns,
                                      const ProtobufWkt::Struct& returned_dynamic_metadata) {
           EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-          EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+          EXPECT_TRUE(
+              returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
           (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
               returned_dynamic_metadata.fields().at("ext_authz_duration");
           EXPECT_TRUE(

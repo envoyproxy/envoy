@@ -93,7 +93,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     if (ext_authz_duration.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
       ext_authz_duration_value.set_number_value(ext_authz_duration->count());
-      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+          ext_authz_duration_value;
     }
 
     filter_callbacks_->connection().streamInfo().setDynamicMetadata(
