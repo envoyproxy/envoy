@@ -1,14 +1,37 @@
 Version history
 ---------------
 
-Next
-====================
+Pending Release
+===============
+
+Bugfixes:
 
 Features:
 
-- Adds support for using `NWPathMonitor <https://developer.apple.com/documentation/network/nwpathmonitor>`_
-  instead of `SCNetworkReachability <https://developer.apple.com/documentation/systemconfiguration/scnetworkreachability>`_
-  on supported platforms (iOS 12+) to update the preferred Envoy network cluster (e.g. WLAN vs WWAN).
+0.4.4 (December 30, 2021)
+=========================
+
+Bugfixes:
+
+- Explicit Flow Control: fix a reset-after-fin bug with explicit flow control (:issue:`#1898 <1898>`)
+- HTTP: solve a race condition when resumeData is too early (:issue:`#1926 <1926>`)
+- HTTP: fix race condition for last resumeData (:issue:`#1936 <1936>`)
+- HTTP: expand response buffer limit to 1Mb (:issue:`#1987 <1987>`)
+- JNI: fix support for non-direct byte buffers (:issue:`#1950 <1950>`)
+- Network: make SrcAddrSocketOptionImpl safely handle null addresses (:issue:`#1905 <1905>`)
+- Obj-c: fix NSString to envoy_data conversion (:issue:`#1958 <1958>`)
+- Observability: fix V6 interface binding logging (:issue:`#1959 <1959>`)
+
+Features:
+
+- Cronvoy: use Explicit Flow Control (:issue:`#1924 <1924>`)
+- DNS: add ability to use fallback nameservers. Android only (:issue:`#1953 <1953>`)
+- DNS: add EngineBuilder API to filter unroutable families (:issue:`#1984 <1984>`)
+- Interface Binding: support interface binding on Android (:issue:`#1897 <1897>`)
+- Interface Binding: filter alt interfaces for binding by well-known prefixes (:issue:`#1901 <1901>`)
+- Network: use NWPathMonitor to determine network reachability on iOS (:issue:`#1874 <1874>`)
+- Networl: add iOS/Android support for enabling Happy Eyeballs (:issue:`#1971 <1971>`)
+- Observability: instrument first active interfaces when switching socket modes (:issue:`#1889 <1889>`)
 
 0.4.3 (October 20, 2021)
 ========================
