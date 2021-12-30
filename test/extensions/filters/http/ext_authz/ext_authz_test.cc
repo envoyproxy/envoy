@@ -2134,9 +2134,9 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
-        (*response.dynamic_metadata.mutable_fields())["duration"] =
-            returned_dynamic_metadata.fields().at("duration");
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+        (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            returned_dynamic_metadata.fields().at("ext_authz_duration");
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));
@@ -2187,9 +2187,9 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
                                    const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
-        (*response.dynamic_metadata.mutable_fields())["duration"] =
-            returned_dynamic_metadata.fields().at("duration");
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+        (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            returned_dynamic_metadata.fields().at("ext_authz_duration");
 
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
       }));

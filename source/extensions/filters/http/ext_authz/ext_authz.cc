@@ -216,11 +216,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   if (!response->dynamic_metadata.fields().empty()) {
     // Add duration of call to dynamic metadata if applicable
     StreamInfo::TimingUtility timingUtility(decoder_callbacks_->streamInfo());
-    auto ext_authz_duration = timingUtility.recordDuration(start_time_);
+    auto ext_authz_duration = timingUtility.recordExtAuthzDuration(start_time_);
     if (ext_authz_duration.has_value()) {
       ProtobufWkt::Value ext_authz_duration_value;
       ext_authz_duration_value.set_number_value(ext_authz_duration->count());
-      (*response->dynamic_metadata.mutable_fields())["duration"] = ext_authz_duration_value;
+      (*response->dynamic_metadata.mutable_fields())["ext_authz_duration"] = ext_authz_duration_value;
     }
 
     decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.ext_authz",

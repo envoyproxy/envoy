@@ -101,9 +101,9 @@ public:
         .WillOnce(Invoke([&response](const std::string& ns,
                                      const ProtobufWkt::Struct& returned_dynamic_metadata) {
           EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-          EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
-          (*response.dynamic_metadata.mutable_fields())["duration"] =
-              returned_dynamic_metadata.fields().at("duration");
+          EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+          (*response.dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+              returned_dynamic_metadata.fields().at("ext_authz_duration");
           EXPECT_TRUE(
               TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
         }));
@@ -395,9 +395,9 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
-        (*dynamic_metadata.mutable_fields())["duration"] =
-            returned_dynamic_metadata.fields().at("duration");
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+        (*dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            returned_dynamic_metadata.fields().at("ext_authz_duration");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
       }));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -443,9 +443,9 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
                                            const ProtobufWkt::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-        EXPECT_TRUE(returned_dynamic_metadata.fields().at("duration").has_number_value());
-        (*dynamic_metadata.mutable_fields())["duration"] =
-            returned_dynamic_metadata.fields().at("duration");
+        EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+        (*dynamic_metadata.mutable_fields())["ext_authz_duration"] =
+            returned_dynamic_metadata.fields().at("ext_authz_duration");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
       }));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,

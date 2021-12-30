@@ -117,7 +117,7 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteRece
 }
 
 absl::optional<std::chrono::duration<double, std::milli>>
-TimingUtility::recordDuration(absl::optional<MonotonicTime> start_time) {
+TimingUtility::recordExtAuthzDuration(absl::optional<MonotonicTime> start_time) {
   if (start_time.has_value()) {
 
     auto ext_authz_duration =
