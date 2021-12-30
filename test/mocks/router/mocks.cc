@@ -34,7 +34,7 @@ void MockRetryState::expectHeadersRetry() {
   EXPECT_CALL(*this, shouldRetryHeaders(_, _, _, _))
       .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&, bool,
                               DoRetryHeaderCallback callback) {
-        callback_ = [&]() { callback(true); };
+        callback_ = [callback]() { callback(true); };
         return RetryStatus::Yes;
       }));
 }
@@ -48,7 +48,7 @@ void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool>,
                               DoRetryResetCallback callback) {
-        callback_ = [&]() { callback(true); };
+        callback_ = [callback]() { callback(true); };
         return RetryStatus::Yes;
       }));
 }

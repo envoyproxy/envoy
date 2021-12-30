@@ -191,6 +191,7 @@ public:
               (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&,
                const Upstream::RetryPriority::PriorityMappingFunc&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
+  MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
 
   DoRetryCallback callback_;
 };

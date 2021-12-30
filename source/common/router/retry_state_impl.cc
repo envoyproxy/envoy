@@ -443,7 +443,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     if (was_using_alt_svc.has_value()) {
       // Already got request encoder, so this must be a 0-RTT handshake failure. Retry immediately.
       // TODO(danzh) consider making the retry configurable.
-      ASSERT(was_using_alt_svc.value());
+      ASSERT(*was_using_alt_svc, "0-RTT was attempted on non-Quic connection and failed.");
       return RetryDecision::RetryNoBackoff;
     }
     if ((retry_on_ & RetryPolicy::RETRY_ON_CONNECT_FAILURE)) {

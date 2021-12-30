@@ -306,6 +306,7 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, Http::Utility::resetReasonToString(reason));
   }
+  clearRequestEncoder();
   awaiting_headers_ = false;
   if (!calling_encode_headers_) {
     stream_info_.setResponseFlag(Filter::streamResetReasonToResponseFlag(reason));
@@ -313,7 +314,6 @@ void UpstreamRequest::onResetStream(Http::StreamResetReason reason,
   } else {
     deferred_reset_reason_ = reason;
   }
-  clearRequestEncoder();
 }
 
 void UpstreamRequest::resetStream() {
@@ -412,8 +412,9 @@ void UpstreamRequest::onPoolReady(
     const StreamInfo::StreamInfo& info, absl::optional<Http::Protocol> protocol) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
-  ENVOY_STREAM_LOG(debug, "============ pool ready", *parent_.callbacks());
+  ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks());
   upstream_ = std::move(upstream);
+  had_upstream_ = true;
   // Have the upstream use the account of the downstream.
   upstream_->setAccount(parent_.callbacks()->account());
 

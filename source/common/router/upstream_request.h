@@ -122,7 +122,7 @@ public:
   RouterFilterInterface& parent() { return parent_; }
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
-  bool hasUpstream() const { return upstream_ != nullptr; }
+  bool hadUpstream() const { return had_upstream_; }
 
 private:
   StreamInfo::UpstreamTiming& upstreamTiming() {
@@ -187,6 +187,7 @@ private:
   Event::TimerPtr max_stream_duration_timer_;
   bool has_early_data_;
   bool use_alt_svc_ : 1;
+  bool had_upstream_{false};
 };
 
 } // namespace Router

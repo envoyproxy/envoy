@@ -1148,7 +1148,7 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     return false;
   }
   absl::optional<bool> was_using_alt_svc;
-  if (upstream_request.hasUpstream()) {
+  if (upstream_request.hadUpstream()) {
     was_using_alt_svc = upstream_request.streamInfo().protocol().has_value() &&
                         upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3;
   }
