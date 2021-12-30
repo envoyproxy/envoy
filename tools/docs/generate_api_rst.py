@@ -49,7 +49,7 @@ def main():
             continue
 
         # Skip copying empty files.
-        if (os.path.getsize(rst_file_path) == 0):
+        if os.path.getsize(rst_file_path) == 0:
             continue
 
         target = os.path.join("rst-out/api-v3", canonical)
