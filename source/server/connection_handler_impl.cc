@@ -71,8 +71,10 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
       IS_ENVOY_BUG("unexpected");
     }
     // worker_index_ doesn't have a value on the main thread for the admin server.
-    auto tcp_listener = std::make_unique<ActiveTcpListener>(
-        *this, config, runtime, worker_index_.has_value() ? *worker_index_ : 0);
+    auto tcp_listener =
+        std::make_unique<ActiveTcpListener>(*this, config, runtime,
+                                            config.listenSocketFactory().getListenSocket(
+                                                worker_index_.has_value() ? *worker_index_ : 0));
     details->typed_listener_ = *tcp_listener;
     details->listener_ = std::move(tcp_listener);
   } else {
