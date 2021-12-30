@@ -1154,11 +1154,12 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
   }
   const RetryStatus retry_status = retry_state_->shouldRetryReset(
       reset_reason, was_using_alt_svc,
-      [this, has_early_data = upstream_request.hasEarlyData()](bool use_alt_svc) -> void {
+      [this, has_early_data = upstream_request.hasEarlyData(),
+       use_alt_svc = upstream_request.useAltSvc()](bool disable_alt_svc) -> void {
         // This retry might be because of ConnectionFailure of 0-RTT handshake. In this case, though
         // the original request is retried with the same has_early_data setting, it will not be sent
         // as early data by the underlying connection pool grid.
-        doRetry(has_early_data, use_alt_svc);
+        doRetry(has_early_data, disable_alt_svc ? false : use_alt_svc);
       });
   if (retry_status == RetryStatus::Yes) {
     runRetryOptionsPredicates(upstream_request);

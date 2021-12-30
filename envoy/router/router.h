@@ -345,7 +345,7 @@ public:
   };
 
   using DoRetryCallback = std::function<void()>;
-  using DoRetryResetCallback = std::function<void(bool use_alt_svc)>;
+  using DoRetryResetCallback = std::function<void(bool disable_alt_svc)>;
   using DoRetryHeaderCallback = std::function<void(bool as_early_data)>;
 
   virtual ~RetryState() = default;

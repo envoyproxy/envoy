@@ -319,13 +319,11 @@ RetryStatus RetryStateImpl::shouldRetryReset(Http::StreamResetReason reset_reaso
                                              absl::optional<bool> was_using_alt_svc,
                                              DoRetryResetCallback callback) {
 
-  // By default retry with the same protocl if the original request already had an encoder of
-  // certain protocol. Following wouldRetryFromReset() may override it.
-  bool retry_with_alt_svc = was_using_alt_svc.has_value() ? was_using_alt_svc.value() : true;
+  // Following wouldRetryFromReset() may override the value.
+  bool disable_alt_svc = false;
   const RetryDecision retry_decision =
-      wouldRetryFromReset(reset_reason, was_using_alt_svc, retry_with_alt_svc);
-  return shouldRetry(retry_decision,
-                     [retry_with_alt_svc, callback]() { callback(retry_with_alt_svc); });
+      wouldRetryFromReset(reset_reason, was_using_alt_svc, disable_alt_svc);
+  return shouldRetry(retry_decision, [disable_alt_svc, callback]() { callback(disable_alt_svc); });
 }
 
 RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callback) {
@@ -422,8 +420,8 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
 
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
-                                    absl::optional<bool> was_using_alt_svc,
-                                    bool& retry_with_alt_svc) {
+                                    absl::optional<bool> was_using_alt_svc, bool& disable_alt_svc) {
+  ASSERT(!disable_alt_svc);
   // First check "never retry" conditions so we can short circuit (we never
   // retry if the reset reason is overflow).
   if (reset_reason == Http::StreamResetReason::Overflow) {
@@ -435,7 +433,7 @@ RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_reason,
     if (*was_using_alt_svc) {
       // Retry any post-handshake failure immediately with no alt_svc if the request was sent over
       // Http/3.
-      retry_with_alt_svc = false;
+      disable_alt_svc = true;
       // TODO(danzh) consider making the retry configurable.
       return RetryDecision::RetryNoBackoff;
     }

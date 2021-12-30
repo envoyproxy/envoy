@@ -3078,7 +3078,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
       .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool> was_using_alt_svc,
                               RetryState::DoRetryResetCallback callback) {
         EXPECT_TRUE(was_using_alt_svc.has_value() && !was_using_alt_svc.value());
-        router_.retry_state_->callback_ = [callback]() { callback(/*use_alt_svc=*/false); };
+        router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/false); };
         return RetryStatus::Yes;
       }));
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
@@ -3087,7 +3087,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
 
   // We expect this reset to kick off a new request.
   NiceMock<Http::MockRequestEncoder> encoder2;
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, _))
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _, /*use_alt_svc=*/true))
       .WillOnce(
           Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
                      bool, bool) -> Http::ConnectionPool::Cancellable* {
@@ -3136,7 +3136,7 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
       .WillOnce(Invoke([this](const Http::StreamResetReason, absl::optional<bool> was_using_alt_svc,
                               RetryState::DoRetryResetCallback callback) {
         EXPECT_TRUE(was_using_alt_svc.has_value() && was_using_alt_svc.value());
-        router_.retry_state_->callback_ = [callback]() { callback(/*use_alt_svc=*/false); };
+        router_.retry_state_->callback_ = [callback]() { callback(/*disable_alt_svc=*/true); };
         return RetryStatus::Yes;
       }));
 
