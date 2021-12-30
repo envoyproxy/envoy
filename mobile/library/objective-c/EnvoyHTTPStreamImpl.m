@@ -68,7 +68,10 @@ static void *ios_on_complete(envoy_stream_intel stream_intel,
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    // TODO: If the callback queue is not serial, clean up is not currently thread-safe.
+    if (callbacks.onComplete) {
+      callbacks.onComplete(stream_intel, final_stream_intel);
+    }
+
     assert(stream);
     [stream cleanUp];
   });
@@ -90,7 +93,7 @@ static void *ios_on_cancel(envoy_stream_intel stream_intel,
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
     if (callbacks.onCancel) {
-      callbacks.onCancel(stream_intel);
+      callbacks.onCancel(stream_intel, final_stream_intel);
     }
 
     // TODO: If the callback queue is not serial, clean up is not currently thread-safe.
@@ -111,7 +114,8 @@ static void *ios_on_error(envoy_error error, envoy_stream_intel stream_intel,
                                                         length:error.message.length
                                                       encoding:NSUTF8StringEncoding];
       release_envoy_error(error);
-      callbacks.onError(error.error_code, errorMessage, error.attempt_count, stream_intel);
+      callbacks.onError(error.error_code, errorMessage, error.attempt_count, stream_intel,
+                        final_stream_intel);
     }
 
     // TODO: If the callback queue is not serial, clean up is not currently thread-safe.

@@ -3,7 +3,7 @@ import Foundation
 
 /// Exposes internal HTTP stream metrics, context, and other details.
 @objcMembers
-public final class StreamIntel: NSObject, Error {
+public class StreamIntel: NSObject, Error {
   // An internal identifier for the stream. -1 if not set.
   public let streamId: Int64
   // An internal identifier for the connection carrying the stream. -1 if not set.

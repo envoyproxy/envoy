@@ -77,11 +77,13 @@ static_resources:
         return .continue(trailers: trailers)
       }
 
-      func onError(_ error: EnvoyError, streamIntel: StreamIntel) {}
+      func onError(_ error: EnvoyError, streamIntel: FinalStreamIntel) {}
 
-      func onCancel(streamIntel: StreamIntel) {
+      func onCancel(streamIntel: FinalStreamIntel) {
         self.expectation.fulfill()
       }
+
+      func onComplete(streamIntel: FinalStreamIntel) {}
     }
 
     let runExpectation = self.expectation(description: "Run called with expected cancellation")

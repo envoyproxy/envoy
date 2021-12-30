@@ -59,6 +59,7 @@ public class StreamPrototype: NSObject {
   }
 
   /// Specify a callback for when response headers are received by the stream.
+  /// If `endStream` is `true`, the stream is complete, pending an onComplete callback.
   ///
   /// - parameter closure: Closure which will receive the headers
   ///                      and flag indicating if the stream is headers-only.
@@ -74,7 +75,7 @@ public class StreamPrototype: NSObject {
   }
 
   /// Specify a callback for when a data frame is received by the stream.
-  /// If `endStream` is `true`, the stream is complete.
+  /// If `endStream` is `true`, the stream is complete, pending an onComplete callback.
   ///
   /// - parameter closure: Closure which will receive the data
   ///                      and flag indicating whether this is the last data frame.
@@ -89,7 +90,7 @@ public class StreamPrototype: NSObject {
   }
 
   /// Specify a callback for when trailers are received by the stream.
-  /// If the closure is called, the stream is complete.
+  /// If the closure is called, the stream is complete, pending an onComplete callback.
   ///
   /// - parameter closure: Closure which will receive the trailers.
   ///
@@ -110,7 +111,7 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnError(
-    closure: @escaping (_ error: EnvoyError, _ streamIntel: StreamIntel) -> Void
+    closure: @escaping (_ error: EnvoyError, _ streamIntel: FinalStreamIntel) -> Void
   ) -> StreamPrototype {
     self.callbacks.onError = closure
     return self
@@ -124,7 +125,21 @@ public class StreamPrototype: NSObject {
   /// - returns: This stream, for chaining syntax.
   @discardableResult
   public func setOnCancel(
-    closure: @escaping (_ streamIntel: StreamIntel) -> Void
+    closure: @escaping (_ streamIntel: FinalStreamIntel) -> Void
+  ) -> StreamPrototype {
+    self.callbacks.onCancel = closure
+    return self
+  }
+
+  /// Specify a callback for when the stream completes gracefully.
+  /// If the closure is called, the stream is complete.
+  ///
+  /// - parameter closure: Closure which will be called when the stream is canceled.
+  ///
+  /// - returns: This stream, for chaining syntax.
+  @discardableResult
+  public func setOnComplete(
+    closure: @escaping (_ streamIntel: FinalStreamIntel) -> Void
   ) -> StreamPrototype {
     self.callbacks.onCancel = closure
     return self

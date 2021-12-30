@@ -72,7 +72,7 @@ public final class MockStream: Stream {
 
   /// Simulate the stream receiving a cancellation signal from Envoy.
   public func receiveCancel() {
-    self.mockStream.callbacks.onCancel(EnvoyStreamIntel())
+    self.mockStream.callbacks.onCancel(EnvoyStreamIntel(), EnvoyFinalStreamIntel())
   }
 
   /// Simulate Envoy returning an error.
@@ -81,6 +81,6 @@ public final class MockStream: Stream {
   public func receiveError(_ error: EnvoyError) {
     self.mockStream.callbacks.onError(error.errorCode, error.message,
                                       Int32(error.attemptCount ?? 0),
-                                      EnvoyStreamIntel())
+                                      EnvoyStreamIntel(), EnvoyFinalStreamIntel())
   }
 }

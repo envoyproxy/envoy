@@ -61,6 +61,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
 
   /**
    * Specify a callback for when response headers are received by the stream.
+   * If `endStream` is `true`, the stream is complete, pending an onComplete callback.
    *
    * @param closure Closure which will receive the headers and flag indicating if the stream
    * is headers-only.
@@ -75,7 +76,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
 
   /**
    * Specify a callback for when a data frame is received by the stream.
-   * If `endStream` is `true`, the stream is complete.
+   * If `endStream` is `true`, the stream is complete, pending an onComplete callback.
    *
    * @param closure Closure which will receive the data and flag indicating whether this
    * is the last data frame.
@@ -90,7 +91,7 @@ open class StreamPrototype(private val engine: EnvoyEngine) {
 
   /**
    * Specify a callback for when trailers are received by the stream.
-   * If the closure is called, the stream is complete.
+   * If the closure is called, the stream is complete, pending an onComplete callback.
    *
    * @param closure Closure which will receive the trailers.
    * @return This stream, for chaining syntax.
