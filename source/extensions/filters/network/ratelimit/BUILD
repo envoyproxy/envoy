@@ -8,7 +8,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # Ratelimit L4 network filter
-# Public docs: docs/root/configuration/network_filters/rate_limit_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/rate_limit_filter
 
 envoy_extension_package()
 

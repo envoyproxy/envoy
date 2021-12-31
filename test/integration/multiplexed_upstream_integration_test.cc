@@ -156,8 +156,11 @@ void MultiplexedUpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) 
   ASSERT_FALSE(response->trailers()->get(Http::LowerCaseString("upstream_connect_start")).empty());
   ASSERT_FALSE(
       response->trailers()->get(Http::LowerCaseString("upstream_connect_complete")).empty());
-  ASSERT_FALSE(
-      response->trailers()->get(Http::LowerCaseString("upstream_handshake_complete")).empty());
+
+  ASSERT_FALSE(response->headers().get(Http::LowerCaseString("num_streams")).empty());
+  EXPECT_EQ(
+      "1",
+      response->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView());
 }
 
 TEST_P(MultiplexedUpstreamIntegrationTest, BidirectionalStreaming) { bidirectionalStreaming(1024); }
@@ -545,49 +548,6 @@ TEST_P(MultiplexedUpstreamIntegrationTest, LargeResponseHeadersRejected) {
   EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
-// Regression test to make sure that configuring upstream logs over gRPC will not crash Envoy.
-// TODO(asraa): Test output of the upstream logs.
-// See https://github.com/envoyproxy/envoy/issues/8828.
-TEST_P(MultiplexedUpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
-  config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) -> void {
-        // Configure just enough of an upstream access log to reference the upstream headers.
-        const std::string yaml_string = R"EOF(
-name: router
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  upstream_log:
-    name: grpc_accesslog
-    filter:
-      not_health_check_filter: {}
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
-      common_config:
-        log_name: foo
-        transport_api_version: V3
-        grpc_service:
-          envoy_grpc:
-            cluster_name: cluster_0
-  )EOF";
-        // Replace the terminal envoy.router.
-        hcm.clear_http_filters();
-        TestUtility::loadFromYaml(yaml_string, *hcm.add_http_filters());
-      });
-
-  initialize();
-
-  // Send the request.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
-
-  // Send the response headers.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933
 TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   autonomous_upstream_ = true;
@@ -605,10 +565,11 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
-                                     {AutonomousStream::NO_END_STREAM, ""}});
+                                     {AutonomousStream::NO_END_STREAM, "true"}});
   // Wait until the response is sent to ensure the SETTINGS frame has been read
   // by Envoy.
   response->waitForHeaders();
+  ASSERT_FALSE(response->complete());
 
   // Now send a second request and make sure it is processed. Previously it
   // would be queued on the original connection, as Envoy would ignore the
@@ -617,6 +578,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, MultipleRequestsLowStreamLimit) {
   FakeStreamPtr upstream_request2;
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response2->waitForEndStream());
+  cleanupUpstreamAndDownstream();
 }
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/13933

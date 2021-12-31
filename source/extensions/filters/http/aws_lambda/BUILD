@@ -9,7 +9,7 @@ load(
 licenses(["notice"])  # Apache 2
 
 # L7 HTTP AWS Lambda filter
-# Public docs: docs/root/configuration/http_filters/aws_lambda_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/aws_lambda_filter
 
 envoy_extension_package()
 

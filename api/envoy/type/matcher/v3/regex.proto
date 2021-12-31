@@ -45,6 +45,12 @@ message RegexMatcher {
     //
     // This field is deprecated; regexp validation should be performed on the management server
     // instead of being done by each individual client.
+    //
+    // .. note::
+    //
+    //  Although this field is deprecated, the program size will still be checked against the
+    //  global ``re2.max_program_size.error_level`` runtime value.
+    //
     google.protobuf.UInt32Value max_program_size = 1
         [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
   }

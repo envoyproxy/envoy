@@ -90,7 +90,7 @@ MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* met
   case ProtobufWkt::Value::kBoolValue:
     return value.bool_value() ? "true" : "false";
   case ProtobufWkt::Value::kNumberValue:
-    return absl::StrCat("", value.number_value());
+    return absl::StrCat(value.number_value());
   case ProtobufWkt::Value::kStringValue:
     return value.string_value();
   case ProtobufWkt::Value::kListValue:

@@ -310,7 +310,7 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
-        // docs/root/configuration/access_log.rst#format-rules
+        // docs/root/configuration/observability/access_log/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
 

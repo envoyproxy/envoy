@@ -121,12 +121,13 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
           absl::flat_hash_set<std::string> all_new_hosts;
           for (const auto& resp : response) {
+            const auto& addrinfo = resp.addrInfo();
             // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
             // make a new address that has port in it. We need to both support IPv6 as well as
             // potentially move port handling into the DNS interface itself, which would work better
             // for SRV.
-            ASSERT(resp.address_ != nullptr);
-            auto address = Network::Utility::getAddressWithPort(*(resp.address_), port_);
+            ASSERT(addrinfo.address_ != nullptr);
+            auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
             if (all_new_hosts.count(address->asString()) > 0) {
               continue;
             }
@@ -139,7 +140,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                 lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
                 lb_endpoint_.health_status(), parent_.time_source_));
             all_new_hosts.emplace(address->asString());
-            ttl_refresh_rate = min(ttl_refresh_rate, resp.ttl_);
+            ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
           }
 
           HostVector hosts_added;

@@ -15,7 +15,6 @@ public:
   void applySpan(Span& span, const CustomTagContext& ctx) const override;
   void applyLog(envoy::data::accesslog::v3::AccessLogCommon& entry,
                 const CustomTagContext& ctx) const override;
-
   virtual absl::string_view value(const CustomTagContext& ctx) const PURE;
 
 protected:

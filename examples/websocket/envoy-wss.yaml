@@ -35,10 +35,10 @@ static_resources:
             # $ openssl req -x509 -newkey rsa:2048 -keyout a/front-proxy-key.pem -out  a/front-proxy-crt.pem -days 3650 -nodes -subj '/CN=front-envoy'
             #
             # Instead of feeding it as an inline_string, certificate pair can also be fed to Envoy
-            # via filename. Reference: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
+            # via filename. Reference: https://envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#config-core-v3-datasource.
             #
             # Or in a dynamic configuration scenario, certificate pair can be fetched remotely via
-            # Secret Discovery Service (SDS). Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/security/secret.
+            # Secret Discovery Service (SDS). Reference: https://envoyproxy.io/docs/envoy/latest/configuration/security/secret.
             - certificate_chain:
                 inline_string: |
                   -----BEGIN CERTIFICATE-----
