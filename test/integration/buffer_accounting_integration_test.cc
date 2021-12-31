@@ -213,8 +213,8 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
   buffer_factory_->setExpectedAccountBalance(request_body_size, num_requests);
 
   // Makes us have Envoy's writes to upstream return EAGAIN
-  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -228,7 +228,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToUpstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   for (auto& response : responses) {
     ASSERT_TRUE(response->waitForEndStream());
@@ -246,12 +246,12 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
   initialize();
 
   buffer_factory_->setExpectedAccountBalance(response_body_size, num_requests);
-  writev_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Simulate TCP push back on the Envoy's downstream network socket, so that outbound frames
   // start to accumulate in the transport socket buffer.
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setWriteReturnsEgain();
 
   auto responses = sendRequests(num_requests, request_body_size, response_body_size);
 
@@ -263,7 +263,7 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToDownstream) {
         << " buffer max: " << buffer_factory_->maxBufferSize() << printAccounts();
   }
 
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   // Wait for streams to terminate.
   for (auto& response : responses) {
@@ -454,8 +454,8 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   initialize();
 
   // Makes us have Envoy's writes to upstream return EAGAIN
-  writev_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  write_matcher_->setWriteReturnsEgain();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto smallest_request_response = std::move(sendRequests(1, 4096, 4096)[0]);
@@ -500,7 +500,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
       "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to upstream, any request streams that survive can go through.
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   if (!streamBufferAccounting()) {
     // If we're not doing the accounting, we didn't end up resetting these
@@ -533,9 +533,9 @@ TEST_P(Http2OverloadManagerIntegrationTest,
   initialize();
 
   // Makes us have Envoy's writes to downstream return EAGAIN
-  writev_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setSourcePort(lookupPort("http"));
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setWriteReturnsEgain();
 
   auto smallest_response = std::move(sendRequests(1, 10, 4096)[0]);
   waitForNextUpstreamRequest();
@@ -589,7 +589,7 @@ TEST_P(Http2OverloadManagerIntegrationTest,
       "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to downstream, any responses that survive can go through.
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   if (streamBufferAccounting()) {
     EXPECT_TRUE(largest_response->waitForReset());
@@ -642,8 +642,8 @@ TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnde
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
 
   // Makes us have Envoy's writes to downstream return EAGAIN
-  writev_matcher_->setSourcePort(lookupPort("http"));
-  writev_matcher_->setWritevReturnsEgain();
+  write_matcher_->setSourcePort(lookupPort("http"));
+  write_matcher_->setWriteReturnsEgain();
 
   // Send a request
   auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
@@ -690,7 +690,7 @@ TEST_P(Http2OverloadManagerIntegrationTest, CanResetStreamIfEnvoyLevelStreamEnde
       "overload.envoy.overload_actions.reset_high_memory_stream.scale_percent", 0);
 
   // Resume writes to downstream.
-  writev_matcher_->setResumeWrites();
+  write_matcher_->setResumeWrites();
 
   if (streamBufferAccounting()) {
     EXPECT_TRUE(response->waitForReset());

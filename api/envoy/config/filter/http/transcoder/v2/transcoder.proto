@@ -9,6 +9,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 option java_outer_classname = "TranscoderProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/transcoder/v2;transcoderv2";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.grpc_json_transcoder.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
@@ -152,8 +153,8 @@ message GrpcJsonTranscoder {
   //
   //     {"code":5,"details":[{"@type":"type.googleapis.com/google.rpc.RequestInfo","requestId":"r-1"}]}
   //
-  //  In order to transcode the message, the ``google.rpc.RequestInfo`` type from
-  //  the ``google/rpc/error_details.proto`` should be included in the configured
-  //  :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
+  // In order to transcode the message, the ``google.rpc.RequestInfo`` type from
+  // the ``google/rpc/error_details.proto`` should be included in the configured
+  // :ref:`proto descriptor set <config_grpc_json_generate_proto_descriptor_set>`.
   bool convert_grpc_status = 9;
 }

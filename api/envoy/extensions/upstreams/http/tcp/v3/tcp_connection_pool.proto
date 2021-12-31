@@ -7,6 +7,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.tcp.v3";
 option java_outer_classname = "TcpConnectionPoolProtoOuterClass";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/tcp/v3;tcpv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Tcp Connection Pool]

@@ -57,7 +57,7 @@ public:
     update_async_ = new_update_async;
   }
 
-  void updateResourceUsage(ResourceMonitor::Callbacks& callbacks) override {
+  void updateResourceUsage(ResourceUpdateCallbacks& callbacks) override {
     if (update_async_) {
       callbacks_.emplace(callbacks);
     } else {
@@ -74,7 +74,7 @@ public:
   }
 
 private:
-  void publishUpdate(ResourceMonitor::Callbacks& callbacks) {
+  void publishUpdate(ResourceUpdateCallbacks& callbacks) {
     if (absl::holds_alternative<double>(response_)) {
       Server::ResourceUsage usage;
       usage.resource_pressure_ = absl::get<double>(response_);
@@ -88,7 +88,39 @@ private:
   Event::Dispatcher& dispatcher_;
   absl::variant<double, EnvoyException> response_;
   bool update_async_ = false;
-  absl::optional<std::reference_wrapper<ResourceMonitor::Callbacks>> callbacks_;
+  absl::optional<std::reference_wrapper<ResourceUpdateCallbacks>> callbacks_;
+};
+
+class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
+public:
+  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0){};
+
+  bool tryAllocateResource(int64_t increment) override {
+    int64_t new_val = (current_ += increment);
+    if (new_val > static_cast<int64_t>(max_) || new_val < 0) {
+      current_ -= increment;
+      return false;
+    }
+    return true;
+  }
+
+  bool tryDeallocateResource(int64_t decrement) override {
+    RELEASE_ASSERT(decrement <= current_,
+                   "Cannot deallocate resource, current resource usage is lower than decrement");
+    int64_t new_val = (current_ -= decrement);
+    if (new_val < 0) {
+      current_ += decrement;
+      return false;
+    }
+    return true;
+  }
+
+  int64_t currentResourceUsage() const override { return current_.load(); }
+  int64_t maxResourceUsage() const override { return max_; }
+
+private:
+  int64_t max_;
+  std::atomic<int64_t> current_;
 };
 
 template <class ConfigType>
@@ -111,6 +143,30 @@ public:
   std::string name() const override { return name_; }
 
   FakeResourceMonitor* monitor_; // not owned
+  const std::string name_;
+};
+
+template <class ConfigType>
+class FakeProactiveResourceMonitorFactory
+    : public Server::Configuration::ProactiveResourceMonitorFactory {
+public:
+  FakeProactiveResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
+
+  Server::ProactiveResourceMonitorPtr
+  createProactiveResourceMonitor(const Protobuf::Message&,
+                                 Server::Configuration::ResourceMonitorFactoryContext&) override {
+    auto monitor = std::make_unique<FakeProactiveResourceMonitor>(3);
+    monitor_ = monitor.get();
+    return monitor;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new ConfigType()};
+  }
+
+  std::string name() const override { return name_; }
+
+  FakeProactiveResourceMonitor* monitor_; // not owned
   const std::string name_;
 };
 
@@ -146,8 +202,10 @@ protected:
       : factory1_("envoy.resource_monitors.fake_resource1"),
         factory2_("envoy.resource_monitors.fake_resource2"),
         factory3_("envoy.resource_monitors.fake_resource3"),
-        factory4_("envoy.resource_monitors.fake_resource4"), register_factory1_(factory1_),
-        register_factory2_(factory2_), register_factory3_(factory3_), register_factory4_(factory4_),
+        factory4_("envoy.resource_monitors.fake_resource4"),
+        factory5_("envoy.resource_monitors.global_downstream_max_connections"),
+        register_factory1_(factory1_), register_factory2_(factory2_), register_factory3_(factory3_),
+        register_factory4_(factory4_), register_factory5_(factory5_),
         api_(Api::createApiForTest(stats_)) {}
 
   void setDispatcherExpectation() {
@@ -174,10 +232,12 @@ protected:
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory3_;
   FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory4_;
+  Registry::InjectFactory<Configuration::ProactiveResourceMonitorFactory> register_factory5_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockTimer>* timer_; // not owned
   Stats::TestUtil::TestStore stats_;
@@ -215,6 +275,20 @@ constexpr char kRegularStateConfig[] = R"YAML(
             saturation_threshold: 0.8
 )YAML";
 
+constexpr char proactiveResourceConfig[] = R"YAML(
+  refresh_interval:
+    seconds: 1
+  resource_monitors:
+    - name: envoy.resource_monitors.fake_resource1
+    - name: envoy.resource_monitors.global_downstream_max_connections
+  actions:
+    - name: envoy.overload_actions.dummy_action
+      triggers:
+        - name: envoy.resource_monitors.fake_resource1
+          threshold:
+            value: 0.9
+)YAML";
+
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   setDispatcherExpectation();
 
@@ -229,6 +303,9 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   manager->registerForAction("envoy.overload_actions.unknown_action", dispatcher_,
                              [&](OverloadActionState) { EXPECT_TRUE(false); });
   manager->start();
+
+  EXPECT_FALSE(manager->getThreadLocalOverloadState().isResourceMonitorEnabled(
+      OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
 
   Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active",
                                             Stats::Gauge::ImportMode::Accumulate);
@@ -566,6 +643,17 @@ TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
                           "Duplicate resource monitor .*");
 }
 
+TEST_F(OverloadManagerImplTest, DuplicateProactiveResourceMonitor) {
+  const std::string config = R"EOF(
+    resource_monitors:
+      - name: "envoy.resource_monitors.global_downstream_max_connections"
+      - name: "envoy.resource_monitors.global_downstream_max_connections"
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(createOverloadManager(config), EnvoyException,
+                          "Duplicate resource monitor .*");
+}
+
 TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
   const std::string config = R"EOF(
     actions:
@@ -708,6 +796,32 @@ TEST_F(OverloadManagerImplTest, Shutdown) {
   manager->start();
 
   EXPECT_CALL(*timer_, disableTimer());
+  manager->stop();
+}
+
+TEST_F(OverloadManagerImplTest, ProactiveResourceAllocateAndDeallocateResourceTest) {
+  setDispatcherExpectation();
+  auto manager(createOverloadManager(proactiveResourceConfig));
+  Stats::Counter& failed_updates =
+      stats_.counter("overload.envoy.resource_monitors.global_downstream_max_connections."
+                     "failed_updates");
+  manager->start();
+  EXPECT_TRUE(manager->getThreadLocalOverloadState().isResourceMonitorEnabled(
+      OverloadProactiveResourceName::GlobalDownstreamMaxConnections));
+  bool resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+  EXPECT_TRUE(resource_allocated);
+  resource_allocated = manager->getThreadLocalOverloadState().tryAllocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 3);
+  EXPECT_FALSE(resource_allocated);
+  EXPECT_EQ(1, failed_updates.value());
+
+  bool resource_deallocated = manager->getThreadLocalOverloadState().tryDeallocateResource(
+      Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1);
+  EXPECT_TRUE(resource_deallocated);
+  EXPECT_DEATH(manager->getThreadLocalOverloadState().tryDeallocateResource(
+                   Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections, 1),
+               ".*Cannot deallocate resource, current resource usage is lower than decrement.*");
   manager->stop();
 }
 
