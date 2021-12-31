@@ -139,10 +139,7 @@ SystemTime CacheHeadersUtils::httpTime(const Http::HeaderEntry* header_entry) {
   // Sunday, 06-Nov-94 08:49:37 GMT   ; obsolete RFC 850 format.
   // Sun Nov  6 08:49:37 1994         ; ANSI C's asctime() format.
   static constexpr absl::string_view rfc7231_date_formats[] = {
-    "%a, %d %b %Y %H:%M:%S GMT",
-    "%A, %d-%b-%y %H:%M:%S GMT",
-    "%a %b %e %H:%M:%S %Y"
-  };
+      "%a, %d %b %Y %H:%M:%S GMT", "%A, %d-%b-%y %H:%M:%S GMT", "%a %b %e %H:%M:%S %Y"};
 
   for (absl::string_view format : rfc7231_date_formats) {
     if (absl::ParseTime(format, input, &time, nullptr)) {
