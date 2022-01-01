@@ -23,6 +23,8 @@ constexpr absl::string_view CountersLabel = "Counters";
 constexpr absl::string_view GaugesLabel = "Gauges";
 constexpr absl::string_view HistogramsLabel = "Histograms";
 constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
+constexpr absl::string_view NextParam = "next";
+constexpr absl::string_view PrevParam = "prev";
 
 } // namespace
 
@@ -149,6 +151,18 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   Http::Utility::QueryParams::const_iterator start_iter = query_.find("start");
   if (start_iter != query_.end()) {
     start_ = start_iter->second;
+  }
+
+  Http::Utility::QueryParams::const_iterator direction_iter = query_.find("direction");
+  if (direction_iter != query_.end()) {
+    if (direction_iter->second == NextParam) {
+      direction_ = Stats::PageDirection::Forward;
+    } else if (direction_iter->second == "prev") {
+      direction_ = Stats::PageDirection::Backward;
+    } else {
+      response.add("invalid direction; must be 'next' or 'prev'");
+      return Http::Code::BadRequest;
+    }
   }
 
   return Http::Code::OK;
@@ -358,35 +372,59 @@ public:
   template <class StatType>
   void emit(Buffer::Instance& response, Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
-            std::function<void(Stats::PageFn<StatType> stat_fn, absl::string_view start)> page_fn) {
+            std::function<void(Stats::PageFn<StatType> stat_fn)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
-      bool written = false;
-      auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
+      std::vector<Stats::RefcountPtr<StatType>> stats;
+      //auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
+      auto stat_fn = [this, &stats](StatType& stat) -> bool {
         if (checkEndOfPage(stat)) {
           return false;
         }
         if (showMetric(stat)) {
+          stats.push_back(&stat);
+        }
+        return true;
+      };
+      page_fn(stat_fn);
+      if (params_.direction_ == Stats::PageDirection::Backward) {
+        std::reverse(stats.begin(), stats.end());
+      }
+
+      if (!stats.empty()) {
+        if (prev_start_.empty() /*  && stats[0] != */) {
+          // If this is not the first item in the set then we have found a start-point
+          // for the "Previous" button.
+          prev_start_ = stats[0]->name();
+        }
+
+        bool written = false;
+        for (const auto& stat : stats) {
           if (!written && params_.format_ == Format::Html) {
             response.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
             written = true;
           }
-          render_fn(stat);
+          render_fn(*stat);
         }
-        return true;
-      };
-      page_fn(stat_fn, params_.start_);
-      if (written) {
-        response.add("</pre>\n");
+        if (written) {
+          response.add("</pre>\n");
+        }
       }
     }
   }
 
   Render& render() { return render_; }
+  absl::string_view start() {
+    if (params_.direction_ == Stats::PageDirection::Forward) {
+      return next_start_;
+    }
+    return prev_start_;
+  }
 
   int64_t num_{-1};
   const Params& params_;
   Render& render_;
   std::string next_start_;
+  std::string prev_start_;
 };
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
@@ -407,6 +445,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       html.renderHead();
       html.renderUrlHandler(statsHandler(), params.query_);
       html.renderInput("start", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+      html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
       html.renderTail();
       response.add("<body>\n");
     } else {
@@ -419,26 +458,26 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   context.emit<Stats::TextReadout>(
       response, Type::TextReadouts, TextReadoutsLabel,
       [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
-      [&stats](Stats::PageFn<Stats::TextReadout> render, absl::string_view start) {
-        stats.textReadoutPage(render, start, Stats::PageDirection::Forward);
+      [&stats, &context](Stats::PageFn<Stats::TextReadout> render) {
+        stats.textReadoutPage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Counter>(
       response, Type::Counters, CountersLabel,
       [&context](Stats::Counter& counter) { context.render().counter(counter); },
-      [&stats](Stats::PageFn<Stats::Counter> render, absl::string_view start) {
-        stats.counterPage(render, start, Stats::PageDirection::Forward);
+      [&stats, &context](Stats::PageFn<Stats::Counter> render) {
+        stats.counterPage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Gauge>(
       response, Type::Gauges, GaugesLabel,
       [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
-      [&stats](Stats::PageFn<Stats::Gauge> render, absl::string_view start) {
-        stats.gaugePage(render, start, Stats::PageDirection::Forward);
+      [&stats, &context](Stats::PageFn<Stats::Gauge> render) {
+        stats.gaugePage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Histogram>(
       response, Type::Histograms, HistogramsLabel,
       [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
-      [&stats](Stats::PageFn<Stats::Histogram> render, absl::string_view start) {
-        stats.histogramPage(render, start, Stats::PageDirection::Forward);
+      [&stats, &context](Stats::PageFn<Stats::Histogram> render) {
+        stats.histogramPage(render, context.start(), context.params_.direction_);
       });
 
 #if 0
@@ -460,9 +499,15 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   if (params.format_ == Format::Html) {
     response.add("  </pre>\n");
+    if (!context.prev_start_.empty()) {
+      response.add(
+          absl::StrCat("  <a href='javascript:page(\"", context.prev_start_, "\", \"",
+                       PrevParam, "\")'>Previous</a>\n"));
+    }
     if (!context.next_start_.empty()) {
       response.add(
-          absl::StrCat("  <a href='javascript:next(\"", context.next_start_, "\")'>Next</a>\n"));
+          absl::StrCat("  <a href='javascript:page(\"", context.next_start_, "\", \"",
+                       NextParam, "\")'>Next</a>\n"));
     }
     response.add("</body>\n");
   }

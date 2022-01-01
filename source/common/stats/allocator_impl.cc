@@ -391,14 +391,18 @@ void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
   if (direction == PageDirection::Forward) {
+    ENVOY_LOG_MISC(error, "Forward start={}", start);
     for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {
+      ENVOY_LOG_MISC(error, " {}", (*iter)->name());
       if (!f_stat(**iter)) {
         return;
       }
     }
   } else {
-    auto iter = set->upper_bound(start_name.statName());
-    for (std::reverse_iterator<decltype(iter)> rit{iter}; rit != set->rend(); ++rit) {
+    ENVOY_LOG_MISC(error, "reverse start={}", start);
+    for (auto iter = set->upper_bound(start_name.statName()); iter != set->begin(); ) {
+      --iter;
+      ENVOY_LOG_MISC(error, " {}", (*iter)->name());
       if (!f_stat(**iter)) {
         return;
       }

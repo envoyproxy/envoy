@@ -88,6 +88,7 @@ private:
     bool pretty_{false};
     Format format_{Format::Text}; // If no `format=` param we use Text, but UI defaults to HTML.
     Type type_{Type::All};
+    Stats::PageDirection direction_{Stats::PageDirection::Forward};
     std::string start_;
     std::string filter_string_;
     absl::optional<std::regex> filter_;

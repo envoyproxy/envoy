@@ -81,8 +81,9 @@ const char AdminHtmlStart[] = R"(
     }
   </style>
   <script>
-    function next(start) {
+    function page(start, direction) {
       document.getElementById("start").value = start;
+      document.getElementById("direction").value = direction;
       document.getElementById("stats").submit();
     }
   </script>
