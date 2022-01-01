@@ -218,6 +218,7 @@ envoy_cc_test(
         ":xff_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
+        "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/access_log:access_log_mocks",

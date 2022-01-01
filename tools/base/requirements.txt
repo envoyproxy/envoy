@@ -299,8 +299,9 @@ envoy.dependency.cve-scan==0.0.1 \
     --hash=sha256:438973e6258deb271d60a9ad688c13ebf9c5360ccb9b6b0d4af3b3228235b153 \
     --hash=sha256:733fa5c6bdbe91da4afe1d46bca75279f717e410693866825d92208fa0d3418f
     # via -r requirements.in
-envoy.dependency.pip-check==0.0.4 \
-    --hash=sha256:3213d77959f65c3c97e9b5d74cb14c02bc02dae64bac2e7c3cb829a2f4e5e40e
+envoy.dependency.pip-check==0.0.5 \
+    --hash=sha256:9a4041dbc21f41191b34b92943060b015150ff837758c53f0e433c2233fb7074 \
+    --hash=sha256:b3eea3c9a9d2286271c93e477c04299ca44f4fbdbc757911399a7bfe4caacc90
     # via -r requirements.in
 envoy.distribution.distrotest==0.0.5 \
     --hash=sha256:042747ff9691fe33bfccbf7821bae5735b705b9488a9a97f702d6b5b37063245 \
@@ -752,7 +753,6 @@ typing-extensions==3.10.0.2 \
     # via
     #   aiodocker
     #   aiohttp
-    #   gitpython
 uritemplate==3.0.1 \
     --hash=sha256:07620c3f3f8eed1f12600845892b0e036a2420acf513c53f7de0abd911a5894f \
     --hash=sha256:5af8ad10cec94f215e3f48112de2022e1d5a37ed427fbd88652fa908f2ab7cae
@@ -821,9 +821,9 @@ yarl==1.6.3 \
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==59.6.0 \
-    --hash=sha256:22c7348c6d2976a52632c67f7ab0cdf40147db7789f9aed18734643fe9cf3373 \
-    --hash=sha256:4ce92f1e1f8f01233ee9952c04f6b81d1e02939d6e1b488428154974a4d0783e
+setuptools==60.1.0 \
+    --hash=sha256:a4377723c53721515f72a3dfc1bfacdcd61edfa19a4cccf82e72e4f50d9cecbd \
+    --hash=sha256:ad0ea3d172404abb14d8f7bd7f54f2ccd4ed9dd00c9da0b1398862e69eb22c03
     # via
     #   -r requirements.in
     #   sphinx
