@@ -20,17 +20,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcHttp1Bridge {
 
-void Http1BridgeFilter::updateContentLength(Http::RequestHeaderMap& headers, uint64_t delta) {
-  uint64_t length;
-  if (absl::SimpleAtoi(headers.getContentLengthValue(), &length)) {
-    if (length <= std::numeric_limits<uint64_t>::max() - delta) {
-      headers.setContentLength(length + delta);
-    } else {
-      ENVOY_LOG(debug, "Unabled to update content lenght for protobuf to gRPC upgrade (overflow)");
-    }
-  }
-}
-
 void Http1BridgeFilter::chargeStat(const Http::ResponseHeaderOrTrailerMap& headers) {
   context_.chargeStat(*cluster_, Grpc::Context::Protocol::Grpc, *request_stat_names_,
                       headers.GrpcStatus());
@@ -42,7 +31,7 @@ Http::FilterHeadersStatus Http1BridgeFilter::decodeHeaders(Http::RequestHeaderMa
     do_framing_ = true;
     headers.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
     headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
-    updateContentLength(headers, Grpc::GRPC_FRAME_HEADER_SIZE);
+    headers.removeContentLength(); // message length part of the gRPC frame
     decoder_callbacks_->clearRouteCache();
   }
 

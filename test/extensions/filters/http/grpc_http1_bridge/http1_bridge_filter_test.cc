@@ -298,15 +298,12 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufNotUpgradedToGrpc) {
 TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   initialize(true);
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
-                                                 {"content-length", "5"},
                                                  {":path", "/v1/spotify.Concat/Concat"}};
   Buffer::OwnedImpl data("hello");
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
-  EXPECT_EQ(std::to_string(5 + Grpc::GRPC_FRAME_HEADER_SIZE),
-            request_headers.getContentLengthValue());
 
   EXPECT_CALL(decoder_callbacks_,
               addDecodedData(_, true)) // todo: find a better way of testing this
@@ -324,47 +321,18 @@ TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpc) {
   EXPECT_EQ("200", response_headers.get_(":status"));
 }
 
-// Verifies that content-length is not changed by the protobuf upgrade when the value is not an
-// integer value
-TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpcBadContentLength) {
+// Verifies that the Content-Length header is removed during a protobuf upgrade
+TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedHeaderSanitized) {
   initialize(true);
   Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
-                                                 {"content-length", "five"},
+                                                 {"content-length", "5"},
                                                  {":path", "/v1/spotify.Concat/Concat"}};
   Buffer::OwnedImpl data("hello");
 
   EXPECT_CALL(decoder_callbacks_, clearRouteCache());
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
-  EXPECT_EQ("five", request_headers.getContentLengthValue());
-}
-
-// Verifies that content-length is not changed by the protobuf upgrade when the new size would
-// overflow
-TEST_F(GrpcHttp1BridgeFilterTest, ProtobufUpgradedToGrpcContentLengthOverflow) {
-  initialize(true);
-  const auto max_content_length = std::to_string(std::numeric_limits<uint64_t>::max());
-  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/x-protobuf"},
-                                                 {"content-length", max_content_length},
-                                                 {":path", "/v1/spotify.Concat/Concat"}};
-  Buffer::OwnedImpl data("hello");
-
-  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
-  EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, request_headers.getContentTypeValue());
-  EXPECT_EQ(max_content_length, request_headers.getContentLengthValue());
-
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
-  Http::TestRequestTrailerMapImpl request_trailers{{"hello", "world"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
-
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->encodeHeaders(response_headers, false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(data, false));
-  Http::TestResponseTrailerMapImpl response_trailers{{"hello", "world"}};
-  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers));
-  EXPECT_EQ("200", response_headers.get_(":status"));
+  EXPECT_EQ(nullptr, request_headers.getContentLengthValue());
 }
 
 } // namespace
