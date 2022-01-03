@@ -3109,8 +3109,7 @@ TEST(SubstitutionFormatterTest, ParserFailures) {
       "RESP(FIRST)%",
       "%REQ(valid)% %NOT_VALID%",
       "%REQ(FIRST?SECOND%",
-      "%%",
-      "%%HOSTNAME%PROTOCOL%",
+      "%HOSTNAME%PROTOCOL%",
       "%protocol%",
       "%REQ(TEST):%",
       "%REQ(TEST):3q4%",
@@ -3165,6 +3164,20 @@ TEST(SubstitutionFormatterTest, EmptyFormatParse) {
 
   EXPECT_EQ(providers.size(), 1);
   EXPECT_EQ("", providers[0]->format(request_headers, response_headers, response_trailers,
+                                     stream_info, body));
+}
+
+TEST(SubstitutionFormatterTest, EscapingFormatParse) {
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  StreamInfo::MockStreamInfo stream_info;
+  std::string body;
+
+  auto providers = SubstitutionFormatParser::parse("%%");
+
+  EXPECT_EQ(providers.size(), 1);
+  EXPECT_EQ("%", providers[0]->format(request_headers, response_headers, response_trailers,
                                      stream_info, body));
 }
 
