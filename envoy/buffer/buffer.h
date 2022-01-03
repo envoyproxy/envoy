@@ -516,12 +516,11 @@ public:
 protected:
   /**
    * Reserve contiguous memory segment with specific size from the back slice. The first address of
-   * this memory segment will be returned. If there is no enough continuous memory in the back slice
-   * then this method will return nullptr. The reserved memory will be regarded as used and directly
+   * this memory segment will be returned. The reserved memory will be regarded as used and directly
    * increase the length of the buffer.
    *
    * @param expected contiguous memory segment size.
-   * @return the first address of this memory segment or nullptr if there is no enough continuous
+   * @return the first address of this memory segment or nullptr if there is not enough continuous
    * memory in the back slice.
    */
   virtual uint8_t* inlineReserve(uint64_t size) PURE;

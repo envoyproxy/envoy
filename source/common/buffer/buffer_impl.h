@@ -754,6 +754,8 @@ protected:
               ReservationSlicesOwnerPtr slices_owner) override;
 
   uint8_t* inlineReserve(uint64_t size) override {
+    // If no any slice in the buffer then create one new slice based on the expected continuous
+    // memory size.
     if (slices_.empty()) {
       slices_.emplace_back(Slice(size, account_));
       length_ += size;
@@ -761,6 +763,8 @@ protected:
       return slices_.back().base_;
     }
 
+    // If the back slice has enough continuous memory then reserve the memory segment and mark it
+    // as already used.
     auto& back = slices_.back();
     if (back.reservableSize() >= size) {
       uint8_t* mem = back.base_ + back.reservable_;
@@ -769,6 +773,7 @@ protected:
       return mem;
     }
 
+    // No enough continuous memory in the back slice.
     return nullptr;
   }
 

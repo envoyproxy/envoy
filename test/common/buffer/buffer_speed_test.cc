@@ -474,52 +474,58 @@ BENCHMARK(bufferStartsWithMatch)
     ->Args({65536, 4096});
 
 static void bufferAddVsAddFragments(benchmark::State& state) {
+  static constexpr size_t OwnedImplBufferType = 0;
+  static constexpr size_t WatermarkBufferType = 1;
+
+  static constexpr size_t ClassicalAddApi = 0;
+  static constexpr size_t AddFragmentsApi = 1;
+
+  static constexpr size_t Write2UnitsPerCall = 2;
+  static constexpr size_t Write5UnitsPerCall = 5;
+
+  static constexpr size_t DataSizeToWrite = 32 * 1024 * 1024;
+
   size_t buffer_type = state.range(0);
   size_t api_type = state.range(1);
-  size_t data_size = state.range(2);
-  size_t data_step = state.range(3);
-  std::string data_unit(data_step, 'c');
+  size_t data_unit_size = state.range(2);
+  size_t write_cycle = state.range(3);
+
+  std::string data_unit(data_unit_size, 'c');
   absl::string_view data_unit_view(data_unit);
 
-  size_t reserve_cycle = state.range(4);
-
   for (auto _ : state) { // NOLINT
-    std::unique_ptr<Buffer::Instance> buffer_ptr;
-    if (buffer_type == 0) {
-      buffer_ptr = std::make_unique<Buffer::OwnedImpl>();
-    } else {
-      buffer_ptr = std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
-    }
+    ASSERT(buffer_type == OwnedImplBufferType || buffer_type == WatermarkBufferType);
+    Buffer::InstancePtr buffer_ptr =
+        buffer_type == OwnedImplBufferType
+            ? std::make_unique<Buffer::OwnedImpl>()
+            : std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
     Buffer::Instance& buffer = *buffer_ptr;
 
-    if (api_type == 0) {
-      if (reserve_cycle == 2) {
-        for (size_t i = 0; i < data_size;) {
-          buffer.add(data_unit_view);
-          buffer.add(data_unit_view);
-          i += 2 * data_step;
+    ASSERT(api_type == ClassicalAddApi || api_type == AddFragmentsApi);
+    ASSERT(write_cycle == Write2UnitsPerCall || write_cycle == Write5UnitsPerCall);
+    if (api_type == ClassicalAddApi) {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write2UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
         }
-      } else if (reserve_cycle == 5) {
-        for (size_t i = 0; i < data_size;) {
-          buffer.add(data_unit_view);
-          buffer.add(data_unit_view);
-          buffer.add(data_unit_view);
-          buffer.add(data_unit_view);
-          buffer.add(data_unit_view);
-          i += 5 * data_step;
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write5UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
         }
       }
     } else {
-      if (reserve_cycle == 2) {
-        for (size_t i = 0; i < data_size;) {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
           buffer.addFragments(data_unit_view, data_unit_view);
-          i += 2 * data_step;
         }
-      } else if (reserve_cycle == 5) {
-        for (size_t i = 0; i < data_size;) {
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
           buffer.addFragments(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
                               data_unit_view);
-          i += 5 * data_step;
         }
       }
     }
@@ -527,45 +533,29 @@ static void bufferAddVsAddFragments(benchmark::State& state) {
 }
 
 BENCHMARK(bufferAddVsAddFragments)
-    ->Args({0, 0, 16 * 1024 * 1024, 1, 2})
-    ->Args({0, 0, 16 * 1024 * 1024, 16, 2})
-    ->Args({0, 0, 16 * 1024 * 1024, 64, 2})
-    ->Args({0, 0, 16 * 1024 * 1024, 128, 2})
-    ->Args({0, 0, 16 * 1024 * 1024, 4096, 2})
-    ->Args({0, 0, 16 * 1024 * 1024, 1, 5})
-    ->Args({0, 0, 16 * 1024 * 1024, 16, 5})
-    ->Args({0, 0, 16 * 1024 * 1024, 64, 5})
-    ->Args({0, 0, 16 * 1024 * 1024, 128, 5})
-    ->Args({0, 0, 16 * 1024 * 1024, 4096, 5})
-    ->Args({0, 1, 16 * 1024 * 1024, 1, 2})
-    ->Args({0, 1, 16 * 1024 * 1024, 16, 2})
-    ->Args({0, 1, 16 * 1024 * 1024, 64, 2})
-    ->Args({0, 1, 16 * 1024 * 1024, 128, 2})
-    ->Args({0, 1, 16 * 1024 * 1024, 4096, 2})
-    ->Args({0, 1, 16 * 1024 * 1024, 1, 5})
-    ->Args({0, 1, 16 * 1024 * 1024, 16, 5})
-    ->Args({0, 1, 16 * 1024 * 1024, 64, 5})
-    ->Args({0, 1, 16 * 1024 * 1024, 128, 5})
-    ->Args({0, 1, 16 * 1024 * 1024, 4096, 5})
-    ->Args({1, 0, 16 * 1024 * 1024, 1, 2})
-    ->Args({1, 0, 16 * 1024 * 1024, 16, 2})
-    ->Args({1, 0, 16 * 1024 * 1024, 64, 2})
-    ->Args({1, 0, 16 * 1024 * 1024, 128, 2})
-    ->Args({1, 0, 16 * 1024 * 1024, 4096, 2})
-    ->Args({1, 0, 16 * 1024 * 1024, 1, 5})
-    ->Args({1, 0, 16 * 1024 * 1024, 16, 5})
-    ->Args({1, 0, 16 * 1024 * 1024, 64, 5})
-    ->Args({1, 0, 16 * 1024 * 1024, 128, 5})
-    ->Args({1, 0, 16 * 1024 * 1024, 4096, 5})
-    ->Args({1, 1, 16 * 1024 * 1024, 1, 2})
-    ->Args({1, 1, 16 * 1024 * 1024, 16, 2})
-    ->Args({1, 1, 16 * 1024 * 1024, 64, 2})
-    ->Args({1, 1, 16 * 1024 * 1024, 128, 2})
-    ->Args({1, 1, 16 * 1024 * 1024, 4096, 2})
-    ->Args({1, 1, 16 * 1024 * 1024, 1, 5})
-    ->Args({1, 1, 16 * 1024 * 1024, 16, 5})
-    ->Args({1, 1, 16 * 1024 * 1024, 64, 5})
-    ->Args({1, 1, 16 * 1024 * 1024, 128, 5})
-    ->Args({1, 1, 16 * 1024 * 1024, 4096, 5});
+    ->Args({0, 0, 16, 2})
+    ->Args({0, 0, 64, 2})
+    ->Args({0, 0, 4096, 2})
+    ->Args({0, 0, 16, 5})
+    ->Args({0, 0, 64, 5})
+    ->Args({0, 0, 4096, 5})
+    ->Args({0, 1, 16, 2})
+    ->Args({0, 1, 64, 2})
+    ->Args({0, 1, 4096, 2})
+    ->Args({0, 1, 16, 5})
+    ->Args({0, 1, 64, 5})
+    ->Args({0, 1, 4096, 5})
+    ->Args({1, 0, 16, 2})
+    ->Args({1, 0, 64, 2})
+    ->Args({1, 0, 4096, 2})
+    ->Args({1, 0, 16, 5})
+    ->Args({1, 0, 64, 5})
+    ->Args({1, 0, 4096, 5})
+    ->Args({1, 1, 16, 2})
+    ->Args({1, 1, 64, 2})
+    ->Args({1, 1, 4096, 2})
+    ->Args({1, 1, 16, 5})
+    ->Args({1, 1, 64, 5})
+    ->Args({1, 1, 4096, 5});
 
 } // namespace Envoy
