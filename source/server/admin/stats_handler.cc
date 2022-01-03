@@ -382,14 +382,6 @@ public:
         return;
       }
 
-      std::string& start_ref =
-          (params_.direction_ == Stats::PageDirection::Forward) ? prev_start_ : next_start_;
-      if (start_ref.empty() && !params_.start_.empty()) {
-        // If this is not the first item in the set then we have found a start-point
-        // for the "Previous" button.
-        start_ref = stats[0]->name();
-      }
-
       if (params_.direction_ == Stats::PageDirection::Forward) {
         if (!params_.start_.empty()) {
           prev_start_ = stats[0]->name();
