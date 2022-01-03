@@ -354,14 +354,6 @@ public:
   }
   */
 
-  template <class StatType> bool showMetric(const StatType& metric) {
-    if (params_.shouldShowMetric(metric)) {
-      ++num_;
-      return true;
-    }
-    return false;
-  }
-
   template <class StatType>
   void emit(Buffer::Instance& response, Type type, absl::string_view label, const Context& context,
             std::function<void(StatType& stat_type)> render_fn,
@@ -370,14 +362,13 @@ public:
       std::vector<Stats::RefcountPtr<StatType>> stats;
       // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
       auto stat_fn = [this, &stats](StatType& stat) -> bool {
-        if (checkEndOfPage()) {
-          return false;
-        }
-        if (showMetric(stat)) {
+        if (params_.shouldShowMetric(stat)) {
+          ++num_;
           stats.push_back(&stat);
         }
-        return true;
+        return !params_.page_size_.has_value() || num_ < params_.page_size_.value();
       };
+
       bool more = page_fn(stat_fn);
 
       if (stats.empty()) {
@@ -438,7 +429,7 @@ public:
     */
   }
 
-  int64_t num_{-1};
+  int64_t num_{0};
   const Params& params_;
   Render& render_;
   std::string next_start_;
