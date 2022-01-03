@@ -328,17 +328,10 @@ public:
 
   // Quick check to see if we're at the end of the page. If we are, we record the
   // name of the stat we are going to reject.
-  template <class StatType> bool checkEndOfPage(const StatType& metric) {
+  bool checkEndOfPage() {
     if (params_.page_size_.has_value()) {
       ASSERT(num_ <= params_.page_size_.value());
-      if (num_ == params_.page_size_.value() - 1) {
-        if (params_.direction_ == Stats::PageDirection::Forward) {
-          next_start_ = metric.name();
-        } else {
-          prev_start_ = metric.name();
-        }
-        return true;
-      }
+      return num_ == params_.page_size_.value() - 1;
     }
     return false;
   }
@@ -377,7 +370,7 @@ public:
       std::vector<Stats::RefcountPtr<StatType>> stats;
       // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
       auto stat_fn = [this, &stats](StatType& stat) -> bool {
-        if (checkEndOfPage(stat)) {
+        if (checkEndOfPage()) {
           return false;
         }
         if (showMetric(stat)) {
@@ -388,7 +381,9 @@ public:
       bool more = page_fn(stat_fn);
 
       if (stats.empty()) {
-        // response.add("<i>No stats found</i>\n");
+        if (params_.format_ == Format::Html) {
+          response.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
+        }
         return;
       }
 

@@ -51,6 +51,16 @@ protected:
     return counters;
   }
 
+  std::vector<GaugeSharedPtr> makeGauges() {
+    std::vector<GaugeSharedPtr> gauges;
+    for (size_t idx = 0; idx < num_stats; ++idx) {
+      auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+      gauges.emplace_back(
+          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    }
+    return gauges;
+  }
+
   template <class Metrics> StatNameHashSet collectStatNames(const Metrics& metrics) {
     StatNameHashSet stat_names;
     for (auto& metric : metrics) {
@@ -228,14 +238,8 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachGauge) {
-  StatNameHashSet stat_names;
-  std::vector<GaugeSharedPtr> gauges;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    stat_names.insert(stat_name);
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-  }
+  std::vector<GaugeSharedPtr> gauges = makeGauges();
+  StatNameHashSet stat_names = collectStatNames(gauges);
 
   size_t num_gauges = 0;
   size_t num_iterations = 0;
@@ -415,11 +419,8 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   EXPECT_EQ(deleted_counter->value(), 0);
   EXPECT_EQ(rejected_counter.value(), 2);
 
-  std::vector<GaugeSharedPtr> gauges;
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-  }
+  std::vector<GaugeSharedPtr> gauges = makeGauges();
+
   // Reject a stat and remove it from "scope".
   StatName const rejected_gauge_name = gauges[4]->statName();
   alloc_.markGaugeForDeletion(gauges[4]);

@@ -391,11 +391,11 @@ bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
                                PageDirection direction) const {
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
-  if (set->empty()) {
-    return false;
-  }
   if (direction == PageDirection::Forward) {
     auto iter = set->lower_bound(start_name.statName());
+    if (iter == set->end()) {
+      return false;
+    }
     if ((*iter)->statName() == start_name.statName()) {
       ++iter;
     }
