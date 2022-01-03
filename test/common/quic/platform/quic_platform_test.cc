@@ -498,6 +498,7 @@ TEST_F(QuicPlatformTest, MonotonicityWithFakeEpollClock) {
 
 TEST_F(QuicPlatformTest, QuicFlags) {
   auto& flag_registry = quiche::FlagRegistry::getInstance();
+  EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr));
   flag_registry.resetFlags();
 
   EXPECT_FALSE(GetQuicReloadableFlag(quic_testonly_default_false));
@@ -510,7 +511,6 @@ TEST_F(QuicPlatformTest, QuicFlags) {
   SetQuicRestartFlag(quic_testonly_default_false, true);
   EXPECT_TRUE(GetQuicRestartFlag(quic_testonly_default_false));
 
-  EXPECT_TRUE(GetQuicReloadableFlag(quic_default_to_bbr), true);
   EXPECT_EQ(200, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
   SetQuicFlag(FLAGS_quic_time_wait_list_seconds, 100);
   EXPECT_EQ(100, GetQuicFlag(FLAGS_quic_time_wait_list_seconds));
