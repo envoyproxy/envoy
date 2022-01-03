@@ -68,10 +68,11 @@ private:
     Text,
   };
 
+  // The order is used to linearize the ordering of stats of all types.
   enum class Type {
     TextReadouts,
-    Gauges,
     Counters,
+    Gauges,
     Histograms,
     All,
   };
@@ -90,6 +91,7 @@ private:
     Type type_{Type::All};
     Stats::PageDirection direction_{Stats::PageDirection::Forward};
     std::string start_;
+    Type start_type_{Type::TextReadouts};
     std::string filter_string_;
     absl::optional<std::regex> filter_;
     absl::optional<std::string> scope_;

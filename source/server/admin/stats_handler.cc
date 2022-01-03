@@ -25,6 +25,7 @@ constexpr absl::string_view CountersLabel = "Counters";
 constexpr absl::string_view GaugesLabel = "Gauges";
 constexpr absl::string_view HistogramsLabel = "Histograms";
 constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
+constexpr absl::string_view StartSeparator = ":";
 
 } // namespace
 
@@ -108,19 +109,27 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     page_size_ = page_size;
   }
 
-  auto type_iter = query_.find("type");
-  if (type_iter != query_.end()) {
-    if (type_iter->second == GaugesLabel) {
-      type_ = Type::Gauges;
-    } else if (type_iter->second == CountersLabel) {
-      type_ = Type::Counters;
-    } else if (type_iter->second == HistogramsLabel) {
-      type_ = Type::Histograms;
-    } else if (type_iter->second == TextReadoutsLabel) {
-      type_ = Type::TextReadouts;
-    } else if (type_iter->second == AllLabel) {
-      type_ = Type::All;
+  auto parse_type = [](absl::string_view str, Type& type) {
+    if (str == GaugesLabel) {
+      type = Type::Gauges;
+    } else if (str == CountersLabel) {
+      type = Type::Counters;
+    } else if (str == HistogramsLabel) {
+      type = Type::Histograms;
+    } else if (str == TextReadoutsLabel) {
+      type = Type::TextReadouts;
+    } else if (str == AllLabel) {
+      type = Type::All;
+    } else {
+      return false;
     }
+    return true;
+  };
+
+  auto type_iter = query_.find("type");
+  if (type_iter != query_.end() && !parse_type(type_iter->second, type_)) {
+    response.add("invalid &type= param");
+    return Http::Code::BadRequest;
   }
 
   const absl::optional<std::string> format_value = Utility::formatParam(query_);
@@ -135,7 +144,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
       format_ = Format::Html;
     } else {
       response.add("usage: /stats?format=json  or /stats?format=prometheus \n\n");
-      return Http::Code::NotFound;
+      return Http::Code::BadRequest;
     }
   }
 
@@ -143,6 +152,15 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   if (scope_iter != query_.end()) {
     scope_ = scope_iter->second;
   }
+
+  auto parse_start = [this, parse_type](absl::string_view val) -> bool {
+    std::vector<absl::string_view> split = absl::StrSplit(val, absl::MaxSplits(StartSeparator, 1));
+    if ((split.size() != 2) || !parse_type(split[0], start_type_)) {
+      return false;
+    }
+    start_ = std::string(split[1]);
+    return true;
+  };
 
   // For clarity and brevirty of command-line options, we parse &after=xxx to
   // mean display the first page of stats alphabetically after "xxx", and
@@ -156,14 +174,18 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   if (before_iter != query_.end()) {
     if (after_iter != query_.end()) {
       response.add("Only one of &before= and &after= is allowed");
-      return Http::Code::NotFound;
+      return Http::Code::BadRequest;
+    }
+    if (!parse_start(before_iter->second)) {
+      response.add("bad before= param");
+      return Http::Code::BadRequest;
     }
     direction_ = Stats::PageDirection::Backward;
-    start_ = before_iter->second;
   } else {
     direction_ = Stats::PageDirection::Forward;
-    if (after_iter != query_.end()) {
-      start_ = after_iter->second;
+    if (after_iter != query_.end() && !parse_start(after_iter->second)) {
+      response.add("bad after= param");
+      return Http::Code::BadRequest;
     }
   }
 
@@ -383,8 +405,8 @@ public:
         return;
       }
 
-      std::string first = /*absl::StrCat(label, ":", */ (stats[0]->name());
-      std::string last = /*absl::StrCat(label, ":", */ (stats[stats.size() - 1]->name());
+      std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
+      std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
 
       if (params_.direction_ == Stats::PageDirection::Forward) {
         if (!params_.start_.empty() && prev_start_.empty()) {
@@ -503,10 +525,34 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   Context context(params, *render, response, stats);
 
-  context.textReadouts();
-  context.counters();
-  context.gauges();
-  context.histograms();
+  if (params.direction_ == Stats::PageDirection::Forward) {
+    if (params.start_type_ <= Type::TextReadouts) {
+      context.textReadouts();
+    }
+    if (params.start_type_ <= Type::Counters) {
+      context.counters();
+    }
+    if (params.start_type_ <= Type::Gauges) {
+      context.gauges();
+    }
+    if (params.start_type_ <= Type::Histograms) {
+      context.histograms();
+    }
+  } else {
+    if (params.start_type_ <= Type::Histograms) {
+      context.histograms();
+    }
+    if (params.start_type_ <= Type::Gauges) {
+      context.gauges();
+    }
+    if (params.start_type_ <= Type::Counters) {
+      context.counters();
+    }
+    if (params.start_type_ <= Type::TextReadouts) {
+      context.textReadouts();
+    }
+  }
+
 
 #if 0
   if (params.scope_.has_value()) {

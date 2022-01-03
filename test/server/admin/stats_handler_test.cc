@@ -91,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
 TEST_P(AdminStatsTest, HandlerStatsInvalidFormat) {
   Buffer::OwnedImpl data;
   Http::Code code = handlerStats("/stats?format=blergh", data);
-  EXPECT_EQ(Http::Code::NotFound, code);
+  EXPECT_EQ(Http::Code::BadRequest, code);
   EXPECT_EQ("usage: /stats?format=json  or /stats?format=prometheus \n\n", data.toString());
 }
 
@@ -154,9 +154,9 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     Buffer::OwnedImpl data;
     std::string url = "/stats?format=html&pagesize=4&type=All&";
     if (direction == "prev") {
-      absl::StrAppend(&url, "before=", start);
+      absl::StrAppend(&url, "before=Counters:", start);
     } else {
-      absl::StrAppend(&url, "after=", start);
+      absl::StrAppend(&url, "after=Counters:", start);
     }
 
     Http::Code code = handlerStats(url, data);
@@ -172,7 +172,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     auto nav = [](absl::string_view direction, absl::string_view start = "") -> std::string {
       std::string out = absl::StrCat("javascript:", direction);
       if (!start.empty()) {
-        absl::StrAppend(&out, "(\"", start, "\")");
+        absl::StrAppend(&out, "(\"Counters:", start, "\")");
       }
       return out;
     };
