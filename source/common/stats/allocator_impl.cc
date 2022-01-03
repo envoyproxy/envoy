@@ -387,7 +387,8 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
 }
 
 template <class Set, class Fn>
-bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start, PageDirection direction) const {
+bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start,
+                               PageDirection direction) const {
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
   if (set->empty()) {
@@ -417,11 +418,13 @@ bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
   return iter != set->begin();
 }
 
-bool AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const {
+bool AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
+                                PageDirection direction) const {
   return pageHelper(&counters_, f_stat, start, direction);
 }
 
-bool AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+bool AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
+                              PageDirection direction) const {
   return pageHelper(&gauges_, f_stat, start, direction);
 }
 

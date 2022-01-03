@@ -985,12 +985,13 @@ bool ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view
   return alloc_.counterPage(f_stat, start, direction);
 }
 
-bool ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+bool ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
+                                     PageDirection direction) const {
   return alloc_.gaugePage(f_stat, start, direction);
 }
 
-bool ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat,
-                                           absl::string_view start, PageDirection direction) const {
+bool ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+                                           PageDirection direction) const {
   return alloc_.textReadoutPage(f_stat, start, direction);
 }
 

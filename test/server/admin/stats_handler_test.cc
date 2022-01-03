@@ -158,7 +158,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     EXPECT_EQ(Http::Code::OK, code);
     std::string expected = "<pre>\n";
     for (uint32_t i = first; i <= last; ++i) {
-      absl::StrAppend(&expected, "c", i, ": ", 10*i, "\n");
+      absl::StrAppend(&expected, "c", i, ": ", 10 * i, "\n");
     }
     absl::StrAppend(&expected, "</pre>");
     std::string out = data.toString();
@@ -175,13 +175,15 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     }
   };
 
-  // Forwared walk to end.
+  // Forward walk to end.
   test_page("next", "", 0, 3, "", R"(javascript:page("c3", "next"))");
-  test_page("next", "c3", 4, 7, R"(javascript:page("c4", "prev"))", R"(javascript:page("c7", "next"))");
+  test_page("next", "c3", 4, 7, R"(javascript:page("c4", "prev"))",
+            R"(javascript:page("c7", "next"))");
   test_page("next", "c7", 8, 9, R"(javascript:page("c8", "prev"))", "");
 
   // Reverse walk to beginning.
-  test_page("prev", "c8", 4, 7, R"(javascript:page("c4", "prev"))", R"(javascript:page("c7", "next"))");
+  test_page("prev", "c8", 4, 7, R"(javascript:page("c4", "prev"))",
+            R"(javascript:page("c7", "next"))");
   test_page("prev", "c4", 0, 3, "", R"(javascript:page("c3", "next"))");
 
   shutdownThreading();

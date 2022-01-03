@@ -297,28 +297,34 @@ public:
     Thread::LockGuard lock(lock_);
     store_.forEachTextReadout(f_size, f_stat);
   }
-  void forEachScope(std::function<void(std::size_t)> f_size, StatFn<const Scope> f_scope) const override {
+  void forEachScope(std::function<void(std::size_t)> f_size,
+                    StatFn<const Scope> f_scope) const override {
     Thread::LockGuard lock(lock_);
     store_.forEachScope(f_size, f_scope);
   }
 
-  bool counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
+                   PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
     return store_.counterPage(f_stat, start, direction);
   }
-  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
+                 PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
     return store_.gaugePage(f_stat, start, direction);
   }
-  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+                       PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
     return store_.textReadoutPage(f_stat, start, direction);
   }
-  bool  histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool histogramPage(PageFn<Histogram> f_stat, absl::string_view start,
+                     PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
     return store_.histogramPage(f_stat, start, direction);
   }
-  bool scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/, PageDirection) const override {
+  bool scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/,
+                 PageDirection) const override {
     ASSERT(false);
     return false;
     /*Thread::LockGuard lock(lock_);

@@ -51,7 +51,7 @@ protected:
     return counters;
   }
 
-  template<class Metrics> StatNameHashSet collectStatNames(const Metrics& metrics) {
+  template <class Metrics> StatNameHashSet collectStatNames(const Metrics& metrics) {
     StatNameHashSet stat_names;
     for (auto& metric : metrics) {
       stat_names.insert(metric->statName());
@@ -606,14 +606,16 @@ TEST_F(AllocatorImplTest, CounterPageForward) {
   constexpr size_t page_size = 5;
   uint32_t page_index = 0;
 
-  auto test_page = [this, &page_index](
-      absl::string_view start, std::vector<uint32_t> suffixes) -> bool {
+  auto test_page = [this, &page_index](absl::string_view start,
+                                       std::vector<uint32_t> suffixes) -> bool {
     ++page_index;
     std::vector<Counter*> page;
-    bool ret = alloc_.counterPage([&page](Counter& counter) {
-      page.push_back(&counter);
-      return page.size() < page_size;
-    }, start, PageDirection::Forward);
+    bool ret = alloc_.counterPage(
+        [&page](Counter& counter) {
+          page.push_back(&counter);
+          return page.size() < page_size;
+        },
+        start, PageDirection::Forward);
     EXPECT_EQ(suffixes.size(), page.size());
     uint32_t i = 0;
     for (uint32_t suffix : suffixes) {
@@ -638,14 +640,16 @@ TEST_F(AllocatorImplTest, CounterPageBackward) {
   constexpr size_t page_size = 5;
   uint32_t page_index = 0;
 
-  auto test_page = [this, &page_index](
-      absl::string_view start, std::vector<uint32_t> suffixes) -> bool {
+  auto test_page = [this, &page_index](absl::string_view start,
+                                       std::vector<uint32_t> suffixes) -> bool {
     ++page_index;
     std::vector<Counter*> page;
-    bool ret = alloc_.counterPage([&page](Counter& counter) {
-      page.push_back(&counter);
-      return page.size() < page_size;
-    }, start, PageDirection::Backward);
+    bool ret = alloc_.counterPage(
+        [&page](Counter& counter) {
+          page.push_back(&counter);
+          return page.size() < page_size;
+        },
+        start, PageDirection::Backward);
     EXPECT_EQ(suffixes.size(), page.size());
     uint32_t i = 0;
     for (uint32_t suffix : suffixes) {

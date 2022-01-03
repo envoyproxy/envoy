@@ -103,8 +103,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     uint32_t page_size = 0;
     if (pagesize_iter->second == "unlimited") {
       page_size_ = absl::nullopt;
-    } else if (!absl::SimpleAtoi(pagesize_iter->second, &page_size) ||
-               page_size > 1000) {
+    } else if (!absl::SimpleAtoi(pagesize_iter->second, &page_size) || page_size > 1000) {
       response.add("pagesize invalid -- must be <= 1000 or unlimited");
       return Http::Code::BadRequest;
     }
@@ -376,7 +375,7 @@ public:
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
       std::vector<Stats::RefcountPtr<StatType>> stats;
-      //auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
+      // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
       auto stat_fn = [this, &stats](StatType& stat) -> bool {
         if (checkEndOfPage(stat)) {
           return false;
@@ -389,12 +388,12 @@ public:
       bool more = page_fn(stat_fn);
 
       if (stats.empty()) {
-        //response.add("<i>No stats found</i>\n");
+        // response.add("<i>No stats found</i>\n");
         return;
       }
 
-      std::string& start_ref = (context.params_.direction_ == Stats::PageDirection::Forward)
-                               ? prev_start_ : next_start_;
+      std::string& start_ref =
+          (context.params_.direction_ == Stats::PageDirection::Forward) ? prev_start_ : next_start_;
       if (start_ref.empty() && !context.params_.start_.empty()) {
         // If this is not the first item in the set then we have found a start-point
         // for the "Previous" button.
@@ -469,7 +468,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       html.renderHead();
       html.renderUrlHandler(statsHandler(), params.query_);
       html.renderInput("start", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-      html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+      html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_,
+                       {});
       html.renderTail();
       response.add("<body>\n");
     } else {
@@ -523,14 +523,12 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
-      response.add(
-          absl::StrCat("  <a href='javascript:page(\"", context.prev_start_, "\", \"",
-                       PrevParam, "\")'>Previous</a>\n"));
+      response.add(absl::StrCat("  <a href='javascript:page(\"", context.prev_start_, "\", \"",
+                                PrevParam, "\")'>Previous</a>\n"));
     }
     if (!context.next_start_.empty()) {
-      response.add(
-          absl::StrCat("  <a href='javascript:page(\"", context.next_start_, "\", \"",
-                       NextParam, "\")'>Next</a>\n"));
+      response.add(absl::StrCat("  <a href='javascript:page(\"", context.next_start_, "\", \"",
+                                NextParam, "\")'>Next</a>\n"));
     }
     response.add("</body>\n");
   }
@@ -570,7 +568,8 @@ Http::Code StatsHandler::handlerStatsScopes(absl::string_view,
 
   Stats::StatNameHashSet prefixes;
   Stats::StatFn<const Stats::Scope> add_scope = [&prefixes](const Stats::Scope& scope) {
-    prefixes.insert(scope.prefix()); };
+    prefixes.insert(scope.prefix());
+  };
   server_.stats().forEachScope([](size_t) {}, add_scope);
   std::vector<std::string> lines, names;
   names.reserve(prefixes.size());

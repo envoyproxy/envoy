@@ -301,7 +301,8 @@ public:
   MOCK_METHOD(void, forEachScope, (SizeFn, StatFn<const Scope>), (const));
   MOCK_METHOD(bool, counterPage, (PageFn<Counter>, absl::string_view, PageDirection), (const));
   MOCK_METHOD(bool, gaugePage, (PageFn<Gauge>, absl::string_view, PageDirection), (const));
-  MOCK_METHOD(bool, textreadoutPage, (PageFn<TextReadout>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(bool, textreadoutPage, (PageFn<TextReadout>, absl::string_view, PageDirection),
+              (const));
   MOCK_METHOD(bool, scopePage, (PageFn<const Scope&>, absl::string_view, PageDirection), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
