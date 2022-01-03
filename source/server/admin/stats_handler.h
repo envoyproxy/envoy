@@ -84,7 +84,7 @@ private:
     }
 
     bool used_only_{false};
-    bool text_readouts_{false};
+    bool prometheus_text_readouts_{false};
     bool pretty_{false};
     Format format_{Format::Text}; // If no `format=` param we use Text, but UI defaults to HTML.
     Type type_{Type::All};

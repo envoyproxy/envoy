@@ -89,7 +89,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   query_ = Http::Utility::parseAndDecodeQueryString(url);
   used_only_ = query_.find("usedonly") != query_.end();
   pretty_ = query_.find("pretty") != query_.end();
-  text_readouts_ = query_.find("text_readouts") != query_.end();
+  prometheus_text_readouts_ = query_.find("text_readouts") != query_.end();
   if (!Utility::filterParam(query_, response, filter_)) {
     return Http::Code::BadRequest;
   }
@@ -180,7 +180,7 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   Stats::Store& store = server_.stats();
   if (params.format_ == Format::Prometheus) {
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.text_readouts_ ? store.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+        params.prometheus_text_readouts_ ? store.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
     PrometheusStatsFormatter::statsAsPrometheus(
         store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
         params.used_only_, params.filter_, server_.api().customStatNamespaces());
@@ -588,7 +588,7 @@ Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query
   }
   Stats::Store& stats = server_.stats();
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.text_readouts_ ? stats.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+      params.prometheus_text_readouts_ ? stats.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
                                               text_readouts_vec, response, params.used_only_,
                                               params.filter_, server_.api().customStatNamespaces());
