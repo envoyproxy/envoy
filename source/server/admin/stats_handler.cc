@@ -435,6 +435,24 @@ public:
         });
   }
 
+  void gauges() {
+    emit<Stats::Gauge>(
+        Type::Gauges, GaugesLabel,
+        [this](Stats::Gauge& gauge) { render().gauge(gauge); },
+        [this](Stats::PageFn<Stats::Gauge> render) -> bool {
+          return stats_.gaugePage(render, start(), params_.direction_);
+        });
+  }
+
+  void histograms() {
+    emit<Stats::Histogram>(
+        Type::Histograms, HistogramsLabel,
+        [this](Stats::Histogram& histogram) { render().histogram(histogram); },
+        [this](Stats::PageFn<Stats::Histogram> render) -> bool {
+          return stats_.histogramPage(render, start(), params_.direction_);
+        });
+  }
+
   Render& render() { return render_; }
 
   absl::string_view start() const {
@@ -487,20 +505,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   context.textReadouts();
   context.counters();
-  context.emit<Stats::Gauge>(
-      Type::Gauges, GaugesLabel,
-      [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
-      [context](Stats::PageFn<Stats::Gauge> render) -> bool {
-        return context.stats_.gaugePage(render, context.start(), context.params_.direction_);
-      });
-  context.emit<Stats::Histogram>(
-      Type::Histograms, HistogramsLabel,
-      [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
-      [&context](Stats::PageFn<Stats::Histogram> render) -> bool {
-        return context.stats_.histogramPage(render, context.start(), context.params_.direction_);
-      });
-
-
+  context.gauges();
+  context.histograms();
 
 #if 0
   if (params.scope_.has_value()) {
