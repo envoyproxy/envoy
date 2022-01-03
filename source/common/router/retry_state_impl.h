@@ -62,7 +62,7 @@ public:
   // take into account circuit breaking or remaining tries.
   RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const Http::RequestHeaderMap& original_request,
-                                      bool& retry_as_early_data) override;
+                                      bool& disable_early_data) override;
   bool wouldRetryFromRetriableStatusCode(Http::Code code) const override;
   RetryStatus shouldRetryReset(Http::StreamResetReason reset_reason,
                                absl::optional<bool> was_using_alt_svc,

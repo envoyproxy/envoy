@@ -339,7 +339,7 @@ RetryStatus RetryStateImpl::shouldHedgeRetryPerTryTimeout(DoRetryCallback callba
 RetryState::RetryDecision
 RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                       const Http::RequestHeaderMap& original_request,
-                                      bool& retry_as_early_data) {
+                                      bool& disable_early_data) {
   // A response that contains the x-envoy-ratelimited header comes from an upstream envoy.
   // We retry these only when the envoy-ratelimited policy is in effect.
   if (response_headers.EnvoyRateLimited() != nullptr) {
@@ -374,11 +374,10 @@ RetryStateImpl::wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_he
           return RetryDecision::RetryWithBackoff;
         }
         if (original_request.get(Http::Headers::get().EarlyData).empty()) {
-          ASSERT(retry_as_early_data);
           // Retry iff the downstream request wasn't sent as early data. Otherwise, regardless if
           // the request was sent as early date in upstream or not, don't retry. Instead, forwarding
           // the response to downstream.
-          retry_as_early_data = false;
+          disable_early_data = true;
           return RetryDecision::RetryNoBackoff;
         }
       }
