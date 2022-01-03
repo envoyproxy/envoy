@@ -695,21 +695,20 @@ TEST_F(HttpGrpcAccessLogTest, MarshallingAdditionalHeaders) {
         {":method", "POST"},
         {"x-envoy-max-retries", "3"}, // test inline header not otherwise logged
         {"x-custom-request", "custom_value"},
-	{"x-custom-request", "custome_value_second"},
+        {"x-custom-request", "custome_value_second"},
         {"x-custom-empty", ""},
     };
     Http::TestResponseHeaderMapImpl response_headers{
         {":status", "200"},
         {"x-envoy-immediate-health-check-fail", "true"}, // test inline header not otherwise logged
         {"x-custom-response", "custom_value"},
-	{"x-custom-response", "custome_response_value"},
+        {"x-custom-response", "custome_response_value"},
         {"x-custom-empty", ""},
     };
 
-    std::cout << "Tarun" << std::endl ;
     Http::TestResponseTrailerMapImpl response_trailers{
         {"x-logged-trailer", "value"},
-	{"x-logged-trailer", "response_trailer_value"},
+        {"x-logged-trailer", "response_trailer_value"},
         {"x-empty-trailer", ""},
         {"x-unlogged-trailer", "2"},
     };
