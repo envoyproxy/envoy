@@ -152,8 +152,13 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
   auto test_page = [this](absl::string_view direction, absl::string_view start, uint32_t first,
                           uint32_t last, absl::string_view prev, absl::string_view next) {
     Buffer::OwnedImpl data;
-    const std::string url = absl::StrCat("/stats?format=html&pagesize=4&type=All&start=", start,
-                                         "&direction=", direction);
+    std::string url = "/stats?format=html&pagesize=4&type=All&";
+    if (direction == "prev") {
+      absl::StrAppend(&url, "before=", start);
+    } else {
+      absl::StrAppend(&url, "after=", start);
+    }
+
     Http::Code code = handlerStats(url, data);
     EXPECT_EQ(Http::Code::OK, code);
     std::string expected = "<pre>\n";
@@ -163,28 +168,35 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     absl::StrAppend(&expected, "</pre>");
     std::string out = data.toString();
     EXPECT_THAT(out, HasSubstr(expected)) << "url=" << url;
+
+    auto nav = [](absl::string_view direction, absl::string_view start = "") -> std::string {
+      std::string out = absl::StrCat("javascript:", direction);
+      if (!start.empty()) {
+        absl::StrAppend(&out, "(\"", start, "\")");
+      }
+      return out;
+    };
+
     if (prev.empty()) {
-      EXPECT_THAT(out, Not(HasSubstr(R"("prev")"))) << "url=" << url;
+      EXPECT_THAT(out, Not(HasSubstr(nav("prev")))) << "url=" << url;
     } else {
-      EXPECT_THAT(out, HasSubstr(prev)) << "url=" << url;
+      EXPECT_THAT(out, HasSubstr(nav("prev", prev))) << "url=" << url;
     }
     if (next.empty()) {
-      EXPECT_THAT(out, Not(HasSubstr(R"("next"))"))) << "url=" << url;
+      EXPECT_THAT(out, Not(HasSubstr(nav("next")))) << "url=" << url;
     } else {
-      EXPECT_THAT(out, HasSubstr(next)) << "url=" << url;
+      EXPECT_THAT(out, HasSubstr(nav("next", next))) << "url=" << url;
     }
   };
 
   // Forward walk to end.
-  test_page("next", "", 0, 3, "", R"(javascript:page("c3", "next"))");
-  test_page("next", "c3", 4, 7, R"(javascript:page("c4", "prev"))",
-            R"(javascript:page("c7", "next"))");
-  test_page("next", "c7", 8, 9, R"(javascript:page("c8", "prev"))", "");
+  test_page("next", "", 0, 3, "", "c3");
+  test_page("next", "c3", 4, 7, "c4", "c7");
+  test_page("next", "c7", 8, 9, "c8", "");
 
   // Reverse walk to beginning.
-  test_page("prev", "c8", 4, 7, R"(javascript:page("c4", "prev"))",
-            R"(javascript:page("c7", "next"))");
-  test_page("prev", "c4", 0, 3, "", R"(javascript:page("c3", "next"))");
+  test_page("prev", "c8", 4, 7, "c4", "c7");
+  test_page("prev", "c4", 0, 3, "", "c3");
 
   shutdownThreading();
 }

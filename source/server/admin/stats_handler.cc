@@ -25,8 +25,6 @@ constexpr absl::string_view CountersLabel = "Counters";
 constexpr absl::string_view GaugesLabel = "Gauges";
 constexpr absl::string_view HistogramsLabel = "Histograms";
 constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
-constexpr absl::string_view NextParam = "next";
-constexpr absl::string_view PrevParam = "prev";
 
 } // namespace
 
@@ -146,20 +144,26 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     scope_ = scope_iter->second;
   }
 
-  Http::Utility::QueryParams::const_iterator start_iter = query_.find("start");
-  if (start_iter != query_.end()) {
-    start_ = start_iter->second;
-  }
-
-  Http::Utility::QueryParams::const_iterator direction_iter = query_.find("direction");
-  if (direction_iter != query_.end()) {
-    if (direction_iter->second == NextParam) {
-      direction_ = Stats::PageDirection::Forward;
-    } else if (direction_iter->second == PrevParam) {
-      direction_ = Stats::PageDirection::Backward;
-    } else {
-      response.add("invalid direction; must be 'next' or 'prev'");
-      return Http::Code::BadRequest;
+  // For clarity and brevirty of command-line options, we parse &after=xxx to
+  // mean display the first page of stats alphabetically after "xxx", and
+  // &&before=yyy to mena display the last page of stats alphabetically before
+  // "yyy". It is not valid to specify both &before=... and after, though that
+  // could make sense in principle. It's just not that useful for paging, so
+  // it is not implemented. If nothing is specified, that implies "&after=",
+  // which gives you the first page.
+  Http::Utility::QueryParams::const_iterator after_iter = query_.find("after");
+  Http::Utility::QueryParams::const_iterator before_iter = query_.find("before");
+  if (before_iter != query_.end()) {
+    if (after_iter != query_.end()) {
+      response.add("Only one of &before= and &after= is allowed");
+      return Http::Code::NotFound;
+    }
+    direction_ = Stats::PageDirection::Backward;
+    start_ = before_iter->second;
+  } else {
+    direction_ = Stats::PageDirection::Forward;
+    if (after_iter != query_.end()) {
+      start_ = after_iter->second;
     }
   }
 
@@ -509,12 +513,12 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
 
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:page(\"", context.prev_start_, "\", \"",
-                                PrevParam, "\")'>Previous</a>\n"));
+      response.add(absl::StrCat("  <a href='javascript:prev(\"", context.prev_start_,
+                                "\")>Previous</a>\n"));
     }
     if (!context.next_start_.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:page(\"", context.next_start_, "\", \"",
-                                NextParam, "\")'>Next</a>\n"));
+      response.add(absl::StrCat("  <a href='javascript:next(\"", context.next_start_,
+                                "\")'>Next</a>\n"));
     }
     response.add("</body>\n");
   }
