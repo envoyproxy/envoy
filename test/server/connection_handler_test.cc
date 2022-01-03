@@ -496,26 +496,19 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
   listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
 
-  ENVOY_LOG(debug, "######1111");
   // Test stop/remove of not existent listener.
   handler_->stopListeners(0);
-  ENVOY_LOG(debug, "######222");
   handler_->removeListeners(0);
-  ENVOY_LOG(debug, "######33333");
 
   EXPECT_CALL(*listener, onDestroy());
-  ENVOY_LOG(debug, "######33333.1111");
   handler_->stopListeners(1);
-  ENVOY_LOG(debug, "######4444");
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
   handler_->removeListeners(1);
-  ENVOY_LOG(debug, "######555");
   EXPECT_EQ(0UL, handler_->numConnections());
 
   // Test stop/remove of not existent listener.
   handler_->stopListeners(0);
   handler_->removeListeners(0);
-  ENVOY_LOG(debug, "######6666");
 }
 
 TEST_F(ConnectionHandlerTest, DisableListener) {
