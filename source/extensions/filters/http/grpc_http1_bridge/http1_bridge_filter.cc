@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/grpc_http1_bridge/http1_bridge_filter.h"
 
 #include <cstdint>
-#include <limits>
 #include <string>
 #include <vector>
 
