@@ -328,7 +328,8 @@ private:
 
 class StatsHandler::Context {
 public:
-  Context(const Params& params, Render& render) : params_(params), render_(render) {}
+  Context(const Params& params, Render& render, Buffer::Instance& response, Stats::Store& stats)
+      : params_(params), render_(render), response_(response), stats_(stats) {}
 
   // Quick check to see if we're at the end of the page. If we are, we record the
   // name of the stat we are going to reject.
@@ -359,7 +360,7 @@ public:
   */
 
   template <class StatType>
-  void emit(Buffer::Instance& response, Type type, absl::string_view label,
+  void emit(Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
@@ -377,40 +378,61 @@ public:
 
       if (stats.empty()) {
         if (params_.format_ == Format::Html) {
-          response.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
+          response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
         }
         return;
       }
 
+      std::string first = /*absl::StrCat(label, ":", */ (stats[0]->name());
+      std::string last = /*absl::StrCat(label, ":", */ (stats[stats.size() - 1]->name());
+
       if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (!params_.start_.empty()) {
-          prev_start_ = stats[0]->name();
+        if (!params_.start_.empty() && prev_start_.empty()) {
+          prev_start_ = first;
         }
         if (more) {
-          next_start_ = stats[stats.size() - 1]->name();
+          next_start_ = last;
         }
       } else {
-        std::reverse(stats.begin(), stats.end());
         if (more) {
-          prev_start_ = stats[0]->name();
+          prev_start_ = last;
         }
-        if (!params_.start_.empty()) {
-          next_start_ = stats[stats.size() - 1]->name();
+        if (!params_.start_.empty() && next_start_.empty()) {
+          next_start_ = first;
         }
+        std::reverse(stats.begin(), stats.end());
       }
 
       bool written = false;
       for (const auto& stat : stats) {
         if (!written && params_.format_ == Format::Html) {
-          response.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
+          response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
           written = true;
         }
         render_fn(*stat);
       }
       if (written) {
-        response.add("</pre>\n");
+        response_.add("</pre>\n");
       }
     }
+  }
+
+  void textReadouts() {
+    emit<Stats::TextReadout>(
+        Type::TextReadouts, TextReadoutsLabel,
+        [this](Stats::TextReadout& text_readout) { render().textReadout(text_readout); },
+        [this](Stats::PageFn<Stats::TextReadout> render) -> bool {
+          return stats_.textReadoutPage(render, start(), params_.direction_);
+        });
+  }
+
+  void counters() {
+    emit<Stats::Counter>(
+        Type::Counters, CountersLabel,
+        [this](Stats::Counter& counter) { render().counter(counter); },
+        [this](Stats::PageFn<Stats::Counter> render) -> bool {
+          return stats_.counterPage(render, start(), params_.direction_);
+        });
   }
 
   Render& render() { return render_; }
@@ -428,6 +450,8 @@ public:
   int64_t num_{0};
   const Params& params_;
   Render& render_;
+  Buffer::Instance& response_;
+  Stats::Store& stats_;
   std::string next_start_;
   std::string prev_start_;
 };
@@ -459,32 +483,24 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     }
   }
 
-  Context context(params, *render);
+  Context context(params, *render, response, stats);
 
-  context.emit<Stats::TextReadout>(
-      response, Type::TextReadouts, TextReadoutsLabel,
-      [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
-      [&stats, &context](Stats::PageFn<Stats::TextReadout> render) -> bool {
-        return stats.textReadoutPage(render, context.start(), context.params_.direction_);
-      });
-  context.emit<Stats::Counter>(
-      response, Type::Counters, CountersLabel,
-      [&context](Stats::Counter& counter) { context.render().counter(counter); },
-      [&stats, &context](Stats::PageFn<Stats::Counter> render) -> bool {
-        return stats.counterPage(render, context.start(), context.params_.direction_);
-      });
+  context.textReadouts();
+  context.counters();
   context.emit<Stats::Gauge>(
-      response, Type::Gauges, GaugesLabel,
+      Type::Gauges, GaugesLabel,
       [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
-      [&stats, &context](Stats::PageFn<Stats::Gauge> render) -> bool {
-        return stats.gaugePage(render, context.start(), context.params_.direction_);
+      [context](Stats::PageFn<Stats::Gauge> render) -> bool {
+        return context.stats_.gaugePage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Histogram>(
-      response, Type::Histograms, HistogramsLabel,
+      Type::Histograms, HistogramsLabel,
       [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
-      [&stats, &context](Stats::PageFn<Stats::Histogram> render) -> bool {
-        return stats.histogramPage(render, context.start(), context.params_.direction_);
+      [&context](Stats::PageFn<Stats::Histogram> render) -> bool {
+        return context.stats_.histogramPage(render, context.start(), context.params_.direction_);
       });
+
+
 
 #if 0
   if (params.scope_.has_value()) {
