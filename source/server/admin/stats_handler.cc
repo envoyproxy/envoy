@@ -355,7 +355,7 @@ public:
   */
 
   template <class StatType>
-  void emit(Buffer::Instance& response, Type type, absl::string_view label, const Context& context,
+  void emit(Buffer::Instance& response, Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
     if (params_.type_ == Type::All || params_.type_ == type) {
@@ -379,15 +379,15 @@ public:
       }
 
       std::string& start_ref =
-          (context.params_.direction_ == Stats::PageDirection::Forward) ? prev_start_ : next_start_;
-      if (start_ref.empty() && !context.params_.start_.empty()) {
+          (params_.direction_ == Stats::PageDirection::Forward) ? prev_start_ : next_start_;
+      if (start_ref.empty() && !params_.start_.empty()) {
         // If this is not the first item in the set then we have found a start-point
         // for the "Previous" button.
         start_ref = stats[0]->name();
       }
 
-      if (context.params_.direction_ == Stats::PageDirection::Forward) {
-        if (!context.params_.start_.empty()) {
+      if (params_.direction_ == Stats::PageDirection::Forward) {
+        if (!params_.start_.empty()) {
           prev_start_ = stats[0]->name();
         }
         if (more) {
@@ -398,7 +398,7 @@ public:
         if (more) {
           prev_start_ = stats[0]->name();
         }
-        if (!context.params_.start_.empty()) {
+        if (!params_.start_.empty()) {
           next_start_ = stats[stats.size() - 1]->name();
         }
       }
@@ -466,25 +466,25 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   Context context(params, *render);
 
   context.emit<Stats::TextReadout>(
-      response, Type::TextReadouts, TextReadoutsLabel, context,
+      response, Type::TextReadouts, TextReadoutsLabel,
       [&context](Stats::TextReadout& text_readout) { context.render().textReadout(text_readout); },
       [&stats, &context](Stats::PageFn<Stats::TextReadout> render) -> bool {
         return stats.textReadoutPage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Counter>(
-      response, Type::Counters, CountersLabel, context,
+      response, Type::Counters, CountersLabel,
       [&context](Stats::Counter& counter) { context.render().counter(counter); },
       [&stats, &context](Stats::PageFn<Stats::Counter> render) -> bool {
         return stats.counterPage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Gauge>(
-      response, Type::Gauges, GaugesLabel, context,
+      response, Type::Gauges, GaugesLabel,
       [&context](Stats::Gauge& gauge) { context.render().gauge(gauge); },
       [&stats, &context](Stats::PageFn<Stats::Gauge> render) -> bool {
         return stats.gaugePage(render, context.start(), context.params_.direction_);
       });
   context.emit<Stats::Histogram>(
-      response, Type::Histograms, HistogramsLabel, context,
+      response, Type::Histograms, HistogramsLabel,
       [&context](Stats::Histogram& histogram) { context.render().histogram(histogram); },
       [&stats, &context](Stats::PageFn<Stats::Histogram> render) -> bool {
         return stats.histogramPage(render, context.start(), context.params_.direction_);
