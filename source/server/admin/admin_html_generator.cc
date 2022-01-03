@@ -81,12 +81,14 @@ const char AdminHtmlStart[] = R"(
     }
   </style>
   <script>
-    function next(start) {(
+    function next(start) {
       document.getElementById("after").value = start;
+      document.getElementById("before").value = "";
       document.getElementById("stats").submit();
     }
-    function prev(start) {(
+    function prev(start) {
       document.getElementById("before").value = start;
+      document.getElementById("after").value = "";
       document.getElementById("stats").submit();
     }
   </script>

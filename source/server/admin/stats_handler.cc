@@ -171,8 +171,8 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
   // which gives you the first page.
   Http::Utility::QueryParams::const_iterator after_iter = query_.find("after");
   Http::Utility::QueryParams::const_iterator before_iter = query_.find("before");
-  if (before_iter != query_.end()) {
-    if (after_iter != query_.end()) {
+  if (before_iter != query_.end() && !before_iter->second.empty()) {
+    if (after_iter != query_.end() && !after_iter->second.empty()) {
       response.add("Only one of &before= and &after= is allowed");
       return Http::Code::BadRequest;
     }
@@ -358,7 +358,7 @@ public:
   bool checkEndOfPage() {
     if (params_.page_size_.has_value()) {
       ASSERT(num_ <= params_.page_size_.value());
-      return num_ == params_.page_size_.value() - 1;
+      return num_ >= params_.page_size_.value() - 1;
     }
     return false;
   }
@@ -385,57 +385,65 @@ public:
   void emit(Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
-    if (params_.type_ == Type::All || params_.type_ == type) {
-      std::vector<Stats::RefcountPtr<StatType>> stats;
-      // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
-      auto stat_fn = [this, &stats](StatType& stat) -> bool {
-        if (params_.shouldShowMetric(stat)) {
-          ++num_;
-          stats.push_back(&stat);
-        }
-        return !params_.page_size_.has_value() || num_ < params_.page_size_.value();
-      };
+    // Check if the page is already full.
+    if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
+      return;
+    }
 
-      bool more = page_fn(stat_fn);
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
+      return;
+    }
 
-      if (stats.empty()) {
-        if (params_.format_ == Format::Html) {
-          response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
-        }
-        return;
+    std::vector<Stats::RefcountPtr<StatType>> stats;
+    // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
+    auto stat_fn = [this, &stats](StatType& stat) -> bool {
+      if (params_.shouldShowMetric(stat)) {
+        ++num_;
+        stats.push_back(&stat);
       }
+      return !params_.page_size_.has_value() || num_ < params_.page_size_.value();
+    };
 
-      std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
-      std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
+    bool more = page_fn(stat_fn);
 
-      if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (!params_.start_.empty() && prev_start_.empty()) {
-          prev_start_ = first;
-        }
-        if (more) {
-          next_start_ = last;
-        }
-      } else {
-        if (more) {
-          prev_start_ = last;
-        }
-        if (!params_.start_.empty() && next_start_.empty()) {
-          next_start_ = first;
-        }
-        std::reverse(stats.begin(), stats.end());
+    if (stats.empty()) {
+      if (params_.format_ == Format::Html) {
+        response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
       }
+      return;
+    }
 
-      bool written = false;
-      for (const auto& stat : stats) {
-        if (!written && params_.format_ == Format::Html) {
-          response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
-          written = true;
-        }
-        render_fn(*stat);
+    std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
+    std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
+
+    if (params_.direction_ == Stats::PageDirection::Forward) {
+      if (!params_.start_.empty() && prev_start_.empty()) {
+        prev_start_ = first;
       }
-      if (written) {
-        response_.add("</pre>\n");
+      if (more) {
+        next_start_ = last;
       }
+    } else {
+      if (more) {
+        prev_start_ = last;
+      }
+      if (!params_.start_.empty() && next_start_.empty()) {
+        next_start_ = first;
+      }
+      std::reverse(stats.begin(), stats.end());
+    }
+
+    bool written = false;
+    for (const auto& stat : stats) {
+      if (!written && params_.format_ == Format::Html) {
+        response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
+        written = true;
+      }
+      render_fn(*stat);
+    }
+    if (written) {
+      response_.add("</pre>\n");
     }
   }
 
@@ -444,7 +452,7 @@ public:
         Type::TextReadouts, TextReadoutsLabel,
         [this](Stats::TextReadout& text_readout) { render().textReadout(text_readout); },
         [this](Stats::PageFn<Stats::TextReadout> render) -> bool {
-          return stats_.textReadoutPage(render, start(), params_.direction_);
+          return stats_.textReadoutPage(render, start(Type::TextReadouts), params_.direction_);
         });
   }
 
@@ -453,7 +461,7 @@ public:
         Type::Counters, CountersLabel,
         [this](Stats::Counter& counter) { render().counter(counter); },
         [this](Stats::PageFn<Stats::Counter> render) -> bool {
-          return stats_.counterPage(render, start(), params_.direction_);
+          return stats_.counterPage(render, start(Type::Counters), params_.direction_);
         });
   }
 
@@ -462,7 +470,7 @@ public:
         Type::Gauges, GaugesLabel,
         [this](Stats::Gauge& gauge) { render().gauge(gauge); },
         [this](Stats::PageFn<Stats::Gauge> render) -> bool {
-          return stats_.gaugePage(render, start(), params_.direction_);
+          return stats_.gaugePage(render, start(Type::Gauges), params_.direction_);
         });
   }
 
@@ -471,20 +479,17 @@ public:
         Type::Histograms, HistogramsLabel,
         [this](Stats::Histogram& histogram) { render().histogram(histogram); },
         [this](Stats::PageFn<Stats::Histogram> render) -> bool {
-          return stats_.histogramPage(render, start(), params_.direction_);
+          return stats_.histogramPage(render, start(Type::Histograms), params_.direction_);
         });
   }
 
   Render& render() { return render_; }
 
-  absl::string_view start() const {
-    return params_.start_;
-    /*
-    if (params_.direction_ == Stats::PageDirection::Forward) {
-      return next_start_;
+  absl::string_view start(Type type) const {
+    if (type == params_.start_type_) {
+      return params_.start_;
     }
-    return prev_start_;
-    */
+    return absl::string_view();
   }
 
   int64_t num_{0};
@@ -513,7 +518,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       html.setSubmitOnChange(true);
       html.renderHead();
       html.renderUrlHandler(statsHandler(), params.query_);
-      html.renderInput("start", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+      html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+      html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
       html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_,
                        {});
       html.renderTail();
@@ -539,16 +545,16 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       context.histograms();
     }
   } else {
-    if (params.start_type_ <= Type::Histograms) {
+    if (params.start_type_ >= Type::Histograms) {
       context.histograms();
     }
-    if (params.start_type_ <= Type::Gauges) {
+    if (params.start_type_ >= Type::Gauges) {
       context.gauges();
     }
-    if (params.start_type_ <= Type::Counters) {
+    if (params.start_type_ >= Type::Counters) {
       context.counters();
     }
-    if (params.start_type_ <= Type::TextReadouts) {
+    if (params.start_type_ >= Type::TextReadouts) {
       context.textReadouts();
     }
   }
@@ -574,7 +580,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
       response.add(absl::StrCat("  <a href='javascript:prev(\"", context.prev_start_,
-                                "\")>Previous</a>\n"));
+                                "\")'>Previous</a>\n"));
     }
     if (!context.next_start_.empty()) {
       response.add(absl::StrCat("  <a href='javascript:next(\"", context.next_start_,
