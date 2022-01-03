@@ -460,6 +460,15 @@ SubstitutionFormatParser::parse(const std::string& format,
       continue;
     }
 
+    // escape '%%'
+    if (format.length() > pos+1) {
+      if (format[pos+1] == '%') {
+        current_token += '%';
+        pos++;
+        continue;
+      }
+    }
+
     if (!current_token.empty()) {
       formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
       current_token = "";
