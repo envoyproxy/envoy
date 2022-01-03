@@ -83,9 +83,9 @@ public:
   virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
-  virtual void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const PURE;
-  virtual void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const PURE;
-  virtual void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction)
+  virtual bool counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction)
       const PURE;
 
   /**

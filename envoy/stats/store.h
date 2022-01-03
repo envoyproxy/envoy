@@ -63,12 +63,12 @@ public:
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
-  virtual void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const PURE;
-  virtual void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const PURE;
-  virtual void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction)
+  virtual bool counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction)
       const PURE;
-  virtual void histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const PURE;
-  virtual void scopePage(PageFn<const Scope> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const PURE;
+  virtual bool scopePage(PageFn<const Scope> f_stat, absl::string_view start, PageDirection direction) const PURE;
 
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can

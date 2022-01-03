@@ -980,21 +980,21 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   }
 }
 
-void ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
+bool ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
                                        PageDirection direction) const {
-  alloc_.counterPage(f_stat, start, direction);
+  return alloc_.counterPage(f_stat, start, direction);
 }
 
-void ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
-  alloc_.gaugePage(f_stat, start, direction);
+bool ThreadLocalStoreImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+  return alloc_.gaugePage(f_stat, start, direction);
 }
 
-void ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat,
+bool ThreadLocalStoreImpl::textReadoutPage(PageFn<TextReadout> f_stat,
                                            absl::string_view start, PageDirection direction) const {
-  alloc_.textReadoutPage(f_stat, start, direction);
+  return alloc_.textReadoutPage(f_stat, start, direction);
 }
 
-void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_view start,
+bool ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_view start,
                                          PageDirection direction) const {
   std::vector<ParentHistogramSharedPtr> histograms;
   {
@@ -1015,13 +1015,13 @@ void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_
   std::sort(histograms.begin(), histograms.end(), cmp);
   StatNameManagedStorage start_name(start, const_cast<SymbolTable&>(constSymbolTable()));
   if (direction == PageDirection::Forward) {
-    for (auto iter =
-             std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
-         iter != histograms.end(); ++iter) {
+    auto iter = std::lower_bound(histograms.begin(), histograms.end(), start_name.statName(), cmp);
+    for (bool cont = true; cont && iter != histograms.end(); ++iter) {
       if (!f_stat(**iter)) {
-        break;
+        cont = false;
       }
     }
+    return iter != histograms.end();
   } else {
     // FIX THIS
     for (auto iter =
@@ -1031,21 +1031,19 @@ void ThreadLocalStoreImpl::histogramPage(PageFn<Histogram> f_stat, absl::string_
         break;
       }
     }
+    return false; // fix this
   }
 }
 
-void ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_view,
+bool ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_view,
                                      PageDirection /*direction*/) const {
   // FIX THIS
   Thread::LockGuard lock(lock_);
-  if (!f_scope(*default_scope_)) {
-    return;
+  auto iter = scopes_.begin();
+  for (bool cont = f_scope(*default_scope_); cont && iter != scopes_.end(); ++iter) {
+    cont = f_scope(**iter);
   }
-  for (ScopeImpl* scope : scopes_) {
-    if (!f_scope(*scope)) {
-      return;
-    }
-  }
+  return iter != scopes_.end();
 }
 
 void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {

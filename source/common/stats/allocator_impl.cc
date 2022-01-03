@@ -387,40 +387,47 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
 }
 
 template <class Set, class Fn>
-void AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start, PageDirection direction) const {
+bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start, PageDirection direction) const {
   StatNameManagedStorage start_name(start, symbol_table_);
   Thread::LockGuard lock(mutex_);
+  if (set->empty()) {
+    return false;
+  }
   if (direction == PageDirection::Forward) {
-    ENVOY_LOG_MISC(error, "Forward start={}", start);
-    for (auto iter = set->lower_bound(start_name.statName()); iter != set->end(); ++iter) {
+    auto iter = set->lower_bound(start_name.statName());
+    if ((*iter)->statName() == start_name.statName()) {
+      ++iter;
+    }
+    for (bool cont = true; cont && iter != set->end(); ++iter) {
       ENVOY_LOG_MISC(error, " {}", (*iter)->name());
       if (!f_stat(**iter)) {
-        return;
+        cont = false;
       }
     }
-  } else {
-    ENVOY_LOG_MISC(error, "reverse start={}", start);
-    for (auto iter = set->upper_bound(start_name.statName()); iter != set->begin(); ) {
-      --iter;
-      ENVOY_LOG_MISC(error, " {}", (*iter)->name());
-      if (!f_stat(**iter)) {
-        return;
-      }
+    return iter != set->end();
+  }
+  auto iter = start.empty() ? set->end() : set->lower_bound(start_name.statName());
+  while (iter != set->begin()) {
+    --iter;
+    ENVOY_LOG_MISC(error, " {}", (*iter)->name());
+    if (!f_stat(**iter)) {
+      break;
     }
   }
+  return iter != set->begin();
 }
 
-void AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const {
-  pageHelper(&counters_, f_stat, start, direction);
+bool AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const {
+  return pageHelper(&counters_, f_stat, start, direction);
 }
 
-void AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
-  pageHelper(&gauges_, f_stat, start, direction);
+bool AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const {
+  return pageHelper(&gauges_, f_stat, start, direction);
 }
 
-void AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+bool AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
                                     PageDirection direction) const {
-  pageHelper(&text_readouts_, f_stat, start, direction);
+  return pageHelper(&text_readouts_, f_stat, start, direction);
 }
 
 void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {

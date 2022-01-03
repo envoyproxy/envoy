@@ -302,24 +302,25 @@ public:
     store_.forEachScope(f_size, f_scope);
   }
 
-  void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.counterPage(f_stat, start, direction);
+    return store_.counterPage(f_stat, start, direction);
   }
-  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.gaugePage(f_stat, start, direction);
+    return store_.gaugePage(f_stat, start, direction);
   }
-  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.textReadoutPage(f_stat, start, direction);
+    return store_.textReadoutPage(f_stat, start, direction);
   }
-  void histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const override {
+  bool  histogramPage(PageFn<Histogram> f_stat, absl::string_view start, PageDirection direction) const override {
     Thread::LockGuard lock(lock_);
-    store_.histogramPage(f_stat, start, direction);
+    return store_.histogramPage(f_stat, start, direction);
   }
-  void scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/, PageDirection) const override {
+  bool scopePage(PageFn<const Scope> /*f_scope*/, absl::string_view /*start*/, PageDirection) const override {
     ASSERT(false);
+    return false;
     /*Thread::LockGuard lock(lock_);
       store_.scopePage(f_size, f_scope);*/
   }

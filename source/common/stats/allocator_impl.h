@@ -39,9 +39,9 @@ public:
   void forEachGauge(SizeFn, StatFn<Gauge>) const override;
   void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
 
-  void counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override;
-  void gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override;
-  void textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override;
+  bool counterPage(PageFn<Counter> f_stat, absl::string_view start, PageDirection direction) const override;
+  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start, PageDirection direction) const override;
+  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start, PageDirection direction) const override;
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
@@ -83,8 +83,12 @@ private:
   // protected by locks.
   mutable Thread::MutexBasicLockable mutex_;
 
+  /**
+   * Iterates from a start-point until stat_fn returns false or we exhaust entries.
+   * @return whether there are more entries remaining
+   */
   template <class Set, class Fn>
-  void pageHelper(const Set* set, Fn stat_fn, absl::string_view start, PageDirection direction) const;
+  bool pageHelper(const Set* set, Fn stat_fn, absl::string_view start, PageDirection direction) const;
 
   template <class StatType>
   using StatOrderedSet = absl::btree_set<StatType*, MetricHelper::LessThan>;

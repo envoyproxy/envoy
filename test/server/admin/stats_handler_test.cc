@@ -14,6 +14,7 @@
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::InSequence;
+using testing::Not;
 using testing::Ref;
 using testing::StartsWith;
 
@@ -133,6 +134,55 @@ TEST_P(AdminStatsTest, HandlerStatsPlainText) {
             "P90(109.0,109.0) P95(109.5,109.5) P99(109.9,109.9) P99.5(109.95,109.95) "
             "P99.9(109.99,109.99) P100(110.0,110.0)\n",
             data.toString());
+
+  shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, HandlerStatsPage) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  std::vector<Stats::Counter*> counters;
+  for (uint32_t i = 0; i < 10; ++i) {
+    Stats::Counter& c = store_->counterFromString(absl::StrCat("c", i));
+    counters.push_back(&c);
+    c.add(10 * i);
+  }
+
+  auto test_page = [this](absl::string_view direction, absl::string_view start, uint32_t first,
+                          uint32_t last, absl::string_view prev, absl::string_view next) {
+    Buffer::OwnedImpl data;
+    const std::string url = absl::StrCat("/stats?format=html&pagesize=4&type=All&start=", start,
+                                         "&direction=", direction);
+    Http::Code code = handlerStats(url, data);
+    EXPECT_EQ(Http::Code::OK, code);
+    std::string expected = "<pre>\n";
+    for (uint32_t i = first; i <= last; ++i) {
+      absl::StrAppend(&expected, "c", i, ": ", 10*i, "\n");
+    }
+    absl::StrAppend(&expected, "</pre>");
+    std::string out = data.toString();
+    EXPECT_THAT(out, HasSubstr(expected)) << "url=" << url;
+    if (prev.empty()) {
+      EXPECT_THAT(out, Not(HasSubstr(R"("prev")"))) << "url=" << url;
+    } else {
+      EXPECT_THAT(out, HasSubstr(prev)) << "url=" << url;
+    }
+    if (next.empty()) {
+      EXPECT_THAT(out, Not(HasSubstr(R"("next"))"))) << "url=" << url;
+    } else {
+      EXPECT_THAT(out, HasSubstr(next)) << "url=" << url;
+    }
+  };
+
+  // Forwared walk to end.
+  test_page("next", "", 0, 3, "", R"(javascript:page("c3", "next"))");
+  test_page("next", "c3", 4, 7, R"(javascript:page("c4", "prev"))", R"(javascript:page("c7", "next"))");
+  test_page("next", "c7", 8, 9, R"(javascript:page("c8", "prev"))", "");
+
+  // Reverse walk to beginning.
+  test_page("prev", "c8", 4, 7, R"(javascript:page("c4", "prev"))", R"(javascript:page("c7", "next"))");
+  test_page("prev", "c4", 0, 3, "", R"(javascript:page("c3", "next"))");
 
   shutdownThreading();
 }
