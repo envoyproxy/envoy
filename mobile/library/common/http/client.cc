@@ -46,14 +46,22 @@ void Client::DirectStreamCallbacks::encodeHeaders(const ResponseHeaderMap& heade
     closeStream();
   }
 
+  absl::string_view alpn = "";
   uint64_t response_status = Utility::getResponseStatus(headers);
+  if (direct_stream_.request_decoder_->streamInfo().upstreamInfo() &&
+      direct_stream_.request_decoder_->streamInfo().upstreamInfo()->upstreamSslConnection()) {
+    alpn = direct_stream_.request_decoder_->streamInfo()
+               .upstreamInfo()
+               ->upstreamSslConnection()
+               ->alpn();
+  }
 
   // Track success for later bookkeeping (stream could still be reset).
   success_ = CodeUtility::is2xx(response_status);
 
   ENVOY_LOG(debug, "[S{}] dispatching to platform response headers for stream (end_stream={}):\n{}",
             direct_stream_.stream_handle_, end_stream, headers);
-  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers), end_stream, streamIntel(),
+  bridge_callbacks_.on_headers(Utility::toBridgeHeaders(headers, alpn), end_stream, streamIntel(),
                                bridge_callbacks_.context);
   response_headers_forwarded_ = true;
   if (end_stream) {

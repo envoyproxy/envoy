@@ -42,9 +42,10 @@ RequestTrailerMapPtr toRequestTrailers(envoy_headers trailers);
  * This function copies the content.
  * Caller owns the allocated bytes for the return value, and needs to free after use.
  * @param headers, the HeaderMap to transform.
+ * @param alpn, the optional alpn to add to the headers.
  * @return envoy_headers, the HeaderMap 1:1 transformation of the headers param.
  */
-envoy_headers toBridgeHeaders(const HeaderMap& headers);
+envoy_headers toBridgeHeaders(const HeaderMap& headers, absl::string_view alpn = "");
 
 } // namespace Utility
 } // namespace Http
