@@ -183,7 +183,8 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     direction_ = Stats::PageDirection::Backward;
   } else {
     direction_ = Stats::PageDirection::Forward;
-    if (after_iter != query_.end() && !parse_start(after_iter->second)) {
+    if (after_iter != query_.end() && !after_iter->second.empty() &&
+        !parse_start(after_iter->second)) {
       response.add("bad after= param");
       return Http::Code::BadRequest;
     }
@@ -206,7 +207,8 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   Stats::Store& store = server_.stats();
   if (params.format_ == Format::Prometheus) {
     const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-        params.prometheus_text_readouts_ ? store.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+        params.prometheus_text_readouts_ ? store.textReadouts()
+                                         : std::vector<Stats::TextReadoutSharedPtr>();
     PrometheusStatsFormatter::statsAsPrometheus(
         store.counters(), store.gauges(), store.histograms(), text_readouts_vec, response,
         params.used_only_, params.filter_, server_.api().customStatNamespaces());
@@ -354,9 +356,22 @@ public:
       : params_(params), render_(render), response_(response), stats_(stats) {}
 
   template <class StatType>
-  void emit(Type type, absl::string_view label,
-            std::function<void(StatType& stat_type)> render_fn,
+  void emit(Type type, absl::string_view label, std::function<void(StatType& stat_type)> render_fn,
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
+    ENVOY_LOG_MISC(error, "emit {}", label);
+
+    // Determine if the starting filter begins after this type. For example,
+    // counters come before gauges, so if we are forward-iterating with a
+    // start_type==Type::Gauge, and type==Type::Counter then we should not
+    // include the counters.
+    if (params_.direction_ == Stats::PageDirection::Forward) {
+      if (type < params_.start_type_) {
+        return;
+      }
+    } else if (type > params_.start_type_) {
+      return;
+    }
+
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
@@ -365,10 +380,13 @@ public:
     // If page is already full, we may need to enable navigation to this type prior to bailing.
     if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
       // Make sure we expose a next/prev link to reveal the types we are not hitting.
-      std::string& start_ref = (params_.direction_ == Stats::PageDirection::Forward)
-                               ? next_start_ : prev_start_;
-      if (start_ref.empty()) {
-        start_ref = absl::StrCat(label, StartSeparator, "");
+      if (params_.direction_ == Stats::PageDirection::Forward) {
+        if (next_start_.empty()) {
+          next_start_ = absl::StrCat(label, StartSeparator, "");
+          ENVOY_LOG_MISC(error, "AAA: setting next_start_={}", next_start_);
+        }
+      } else if (prev_start_.empty()) {
+        prev_start_ = absl::StrCat(label, StartSeparator, "");
       }
       return;
     }
@@ -389,11 +407,21 @@ public:
       if (params_.format_ == Format::Html) {
         response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
       }
+      if (params_.direction_ == Stats::PageDirection::Forward) {
+        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) + 1);
+        if (next_type != Type::All && next_start_.empty()) {
+          next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
+          ENVOY_LOG_MISC(error, "BBB: setting next_start_={}", next_start_);
+        }
+      } else if (static_cast<uint32_t>(type) > 0) {
+        Type prev_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
+        prev_start_ = absl::StrCat(typeToString(prev_type), StartSeparator);
+      }
       return;
     }
 
-    std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
-    std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
+    const std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
+    const std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
 
     if (params_.direction_ == Stats::PageDirection::Forward) {
       if (!params_.start_.empty() && prev_start_.empty()) {
@@ -401,21 +429,24 @@ public:
       }
       if (more) {
         next_start_ = last;
-      } else {
+        ENVOY_LOG_MISC(error, "CCC: setting next_start_={}", next_start_);
+      } else if (next_start_.empty()) {
         Type next_type = static_cast<Type>(static_cast<uint32_t>(type) + 1);
         if (next_type != Type::All) {
           next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
+          ENVOY_LOG_MISC(error, "DDD: setting next_start_={}", next_start_);
         }
       }
     } else {
       if (more) {
         prev_start_ = last;
-      } else if (static_cast<uint32_t>(type) > 0) {
-        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
-        next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
+      } else if (prev_start_.empty() && static_cast<uint32_t>(type) > 0) {
+        Type prev_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
+        prev_start_ = absl::StrCat(typeToString(prev_type), StartSeparator);
       }
       if (!params_.start_.empty() && next_start_.empty()) {
         next_start_ = first;
+        ENVOY_LOG_MISC(error, "EEE: setting next_start_={}", next_start_);
       }
       std::reverse(stats.begin(), stats.end());
     }
@@ -451,8 +482,7 @@ public:
 
   void gauges() {
     emit<Stats::Gauge>(
-        Type::Gauges, GaugesLabel,
-        [this](Stats::Gauge& gauge) { render().gauge(gauge); },
+        Type::Gauges, GaugesLabel, [this](Stats::Gauge& gauge) { render().gauge(gauge); },
         [this](Stats::PageFn<Stats::Gauge> render) -> bool {
           return stats_.gaugePage(render, start(Type::Gauges), params_.direction_);
         });
@@ -516,33 +546,16 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
   Context context(params, *render, response, stats);
 
   if (params.direction_ == Stats::PageDirection::Forward) {
-    if (params.start_type_ <= Type::TextReadouts) {
-      context.textReadouts();
-    }
-    if (params.start_type_ <= Type::Counters) {
-      context.counters();
-    }
-    if (params.start_type_ <= Type::Gauges) {
-      context.gauges();
-    }
-    if (params.start_type_ <= Type::Histograms) {
-      context.histograms();
-    }
+    context.textReadouts();
+    context.counters();
+    context.gauges();
+    context.histograms();
   } else {
-    if (params.start_type_ >= Type::Histograms) {
-      context.histograms();
-    }
-    if (params.start_type_ >= Type::Gauges) {
-      context.gauges();
-    }
-    if (params.start_type_ >= Type::Counters) {
-      context.counters();
-    }
-    if (params.start_type_ >= Type::TextReadouts) {
-      context.textReadouts();
-    }
+    context.histograms();
+    context.gauges();
+    context.counters();
+    context.textReadouts();
   }
-
 
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
@@ -550,8 +563,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                 "\")'>Previous</a>\n"));
     }
     if (!context.next_start_.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:next(\"", context.next_start_,
-                                "\")'>Next</a>\n"));
+      response.add(
+          absl::StrCat("  <a href='javascript:next(\"", context.next_start_, "\")'>Next</a>\n"));
     }
     response.add("</body>\n");
   }
@@ -625,7 +638,8 @@ Http::Code StatsHandler::handlerStatsPrometheus(absl::string_view path_and_query
   }
   Stats::Store& stats = server_.stats();
   const std::vector<Stats::TextReadoutSharedPtr>& text_readouts_vec =
-      params.prometheus_text_readouts_ ? stats.textReadouts() : std::vector<Stats::TextReadoutSharedPtr>();
+      params.prometheus_text_readouts_ ? stats.textReadouts()
+                                       : std::vector<Stats::TextReadoutSharedPtr>();
   PrometheusStatsFormatter::statsAsPrometheus(stats.counters(), stats.gauges(), stats.histograms(),
                                               text_readouts_vec, response, params.used_only_,
                                               params.filter_, server_.api().customStatNamespaces());
@@ -777,11 +791,16 @@ Admin::UrlHandler StatsHandler::statsHandler() {
 
 std::string StatsHandler::typeToString(StatsHandler::Type type) {
   switch (type) {
-    case Type::TextReadouts: return "TextReadouts";
-    case Type::Counters: return "Counters";
-    case Type::Gauges: return "Gauges";
-    case Type::Histograms: return "Histograms";
-    case Type::All: return "All";
+  case Type::TextReadouts:
+    return "TextReadouts";
+  case Type::Counters:
+    return "Counters";
+  case Type::Gauges:
+    return "Gauges";
+  case Type::Histograms:
+    return "Histograms";
+  case Type::All:
+    return "All";
   }
 }
 

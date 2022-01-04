@@ -154,9 +154,9 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     Buffer::OwnedImpl data;
     std::string url = "/stats?format=html&pagesize=4&type=All&";
     if (direction == "prev") {
-      absl::StrAppend(&url, "before=Counters:", start);
+      absl::StrAppend(&url, "before=", start);
     } else {
-      absl::StrAppend(&url, "after=Counters:", start);
+      absl::StrAppend(&url, "after=", start);
     }
 
     Http::Code code = handlerStats(url, data);
@@ -172,7 +172,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     auto nav = [](absl::string_view direction, absl::string_view start = "") -> std::string {
       std::string out = absl::StrCat("javascript:", direction);
       if (!start.empty()) {
-        absl::StrAppend(&out, "(\"Counters:", start, "\")");
+        absl::StrAppend(&out, "(\"", start, "\")");
       }
       return out;
     };
@@ -190,13 +190,13 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
   };
 
   // Forward walk to end.
-  test_page("next", "", 0, 3, "", "c3");
-  test_page("next", "c3", 4, 7, "c4", "c7");
-  test_page("next", "c7", 8, 9, "c8", "");
+  test_page("next", "", 0, 3, "", "Counters:c3");
+  test_page("next", "Counters:c3", 4, 7, "Counters:c4", "Counters:c7");
+  test_page("next", "Counters:c7", 8, 9, "Counters:c8", "Gauges:");
 
   // Reverse walk to beginning.
-  test_page("prev", "c8", 4, 7, "c4", "c7");
-  test_page("prev", "c4", 0, 3, "", "c3");
+  test_page("prev", "Counters:c8", 4, 7, "Counters:c4", "Counters:c7");
+  test_page("prev", "Counters:c4", 0, 3, "TextReadouts:", "Counters:c3");
 
   shutdownThreading();
 }

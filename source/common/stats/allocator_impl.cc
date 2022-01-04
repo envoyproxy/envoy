@@ -400,7 +400,6 @@ bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
       ++iter;
     }
     for (bool cont = true; cont && iter != set->end(); ++iter) {
-      ENVOY_LOG_MISC(error, " {}", (*iter)->name());
       if (!f_stat(**iter)) {
         cont = false;
       }
@@ -410,7 +409,6 @@ bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view star
   auto iter = start.empty() ? set->end() : set->lower_bound(start_name.statName());
   while (iter != set->begin()) {
     --iter;
-    ENVOY_LOG_MISC(error, " {}", (*iter)->name());
     if (!f_stat(**iter)) {
       break;
     }
