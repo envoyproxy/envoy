@@ -48,6 +48,10 @@ def main():
         if canonical is None:
             continue
 
+        # Skip copying empty files.
+        if os.path.getsize(rst_file_path) == 0:
+            continue
+
         target = os.path.join("rst-out/api-v3", canonical)
         if not os.path.exists(os.path.dirname(target)):
             os.makedirs(os.path.dirname(target))

@@ -848,6 +848,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
 
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
@@ -887,11 +888,11 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->connectionInfoProvider().remoteAddress()->asString());
+  ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
+                       socket_->connectionInfoProvider().remoteAddress()->asString());
   const Api::SysCallIntResult result =
       socket_->connect(socket_->connectionInfoProvider().remoteAddress());
-  stream_info_.upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -921,7 +922,17 @@ void ClientConnectionImpl::connect() {
 }
 
 void ClientConnectionImpl::onConnected() {
-  stream_info_.upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  // There are no meaningful socket source address semantics for non-IP sockets, so skip.
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
+    // interfaceName makes a syscall. Call once to minimize perf hit.
+    const auto maybe_interface_name = ioHandle().interfaceName();
+    if (maybe_interface_name.has_value()) {
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+                           maybe_interface_name.value());
+      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
+    }
+  }
   ConnectionImpl::onConnected();
 }
 

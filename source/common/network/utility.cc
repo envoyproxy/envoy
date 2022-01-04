@@ -248,7 +248,8 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
-      if (!isLoopbackAddress(*interface_address.interface_addr_)) {
+      if (!isLoopbackAddress(*interface_address.interface_addr_) &&
+          interface_address.interface_addr_->ip()->version() == version) {
         ret = interface_address.interface_addr_;
         break;
       }

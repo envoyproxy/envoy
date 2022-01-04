@@ -190,11 +190,11 @@ private:
       };
     }
     case MatcherType::MatcherTree::kPrefixMatchMap:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("unsupported");
     case MatcherType::MatcherTree::kCustomMatch:
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("unsupported");
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("unsupported");
     }
   }
 

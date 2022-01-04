@@ -72,7 +72,7 @@ protected:
       IS_ENVOY_BUG("Unexpected call to upstreamHost");
     }
     Network::Connection& connection() override { return connection_; }
-    const Network::Socket& socket() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    const Network::Socket& socket() override { PANIC("not implemented"); }
 
     // Synthetic class that acts as a stub for the connection backing the
     // Network::ReadFilterCallbacks.

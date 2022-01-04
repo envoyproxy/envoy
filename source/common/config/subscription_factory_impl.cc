@@ -191,7 +191,7 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
   }
   default:
     // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Unsupported code path");
   }
 }
 
