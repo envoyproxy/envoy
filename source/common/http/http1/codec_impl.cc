@@ -107,7 +107,8 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   ASSERT(!key.empty());
 
-  const uint64_t header_size = connection_.buffer().addFragments(key, COLON_SPACE, value, CRLF);
+  const uint64_t header_size =
+      connection_.buffer().addFragments<false>(key, COLON_SPACE, value, CRLF);
 
   bytes_meter_->addHeaderBytesSent(header_size);
 }
