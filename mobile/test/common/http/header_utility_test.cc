@@ -149,5 +149,30 @@ TEST(HeaderDataConstructorTest, FromCppToC) {
   release_envoy_headers(c_headers);
 }
 
+TEST(HeaderDataConstructorTest, FromCppToCWithAlpn) {
+  RequestHeaderMapPtr cpp_headers = RequestHeaderMapImpl::create();
+  cpp_headers->addCopy(LowerCaseString(std::string(":method")), std::string("GET"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":scheme")), std::string("https"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":authority")), std::string("api.lyft.com"));
+  cpp_headers->addCopy(LowerCaseString(std::string(":path")), std::string("/ping"));
+
+  envoy_headers c_headers = Utility::toBridgeHeaders(*cpp_headers, "h2");
+
+  cpp_headers->addCopy(LowerCaseString(std::string("x-envoy-upstream-alpn")), std::string("h2"));
+  ASSERT_EQ(c_headers.length, static_cast<envoy_map_size_t>(cpp_headers->size()));
+
+  for (envoy_map_size_t i = 0; i < c_headers.length; i++) {
+    auto actual_key = LowerCaseString(Data::Utility::copyToString(c_headers.entries[i].key));
+    auto actual_value = Data::Utility::copyToString(c_headers.entries[i].value);
+
+    // Key is present.
+    EXPECT_FALSE(cpp_headers->get(actual_key).empty());
+    // Value for the key is the same.
+    EXPECT_EQ(actual_value, cpp_headers->get(actual_key)[0]->value().getStringView());
+  }
+
+  release_envoy_headers(c_headers);
+}
+
 } // namespace Http
 } // namespace Envoy
