@@ -23,6 +23,6 @@ using QuicTestImpl = ::testing::Test;
 
 template <class T> using QuicTestWithParamImpl = ::testing::TestWithParam<T>;
 
-inline std::string QuicGetTestMemoryCachePathImpl() {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // TODO(mpwarres): implement
+inline std::string QuicGetTestMemoryCachePathImpl() { // NOLINT(readability-identifier-naming)
+  PANIC("not implemented");                           // TODO(mpwarres): implement
 }

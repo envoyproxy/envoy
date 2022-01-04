@@ -1,0 +1,19 @@
+# Remote-pdb can be used inside build jobs, or parallelized aspects
+remote-pdb
+
+# Add temporary dev requirements with `-e` here
+#
+# Note: This should always be empty on `main`.
+#
+# Examples:
+#
+# Github pull request:
+#
+#   -e git+https://github.com/envoyproxy/pytooling@f862768556e747ce5a1d309850f9ba8ad72b0afa#egg=envoy.dependency.check&subdirectory=envoy.dependency.check
+#
+# Local filesystem (path must be available to bazel, eg inside container)
+#
+#   -e file:///src/workspace/pytooling/envoy.dependency.check#egg=envoy.dependency.check&cachebust=011
+#
+# `cachebust` can be used to signify change to bazel.
+#

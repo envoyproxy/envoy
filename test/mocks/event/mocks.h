@@ -117,6 +117,9 @@ public:
     if (to_delete) {
       to_delete_.push_back(std::move(to_delete));
     }
+    if (delete_immediately_) {
+      to_delete_.clear();
+    }
   }
 
   SignalEventPtr listenForSignal(signal_t signal_num, SignalCb cb) override {
@@ -167,6 +170,7 @@ public:
   std::list<DeferredDeletablePtr> to_delete_;
   testing::NiceMock<MockBufferFactory> buffer_factory_;
   bool allow_null_callback_{};
+  bool delete_immediately_{};
 
 private:
   const std::string name_;
@@ -225,7 +229,8 @@ public:
 
 class MockSchedulableCallback : public SchedulableCallback {
 public:
-  MockSchedulableCallback(MockDispatcher* dispatcher);
+  MockSchedulableCallback(MockDispatcher* dispatcher,
+                          testing::MockFunction<void()>* destroy_cb = nullptr);
   ~MockSchedulableCallback() override;
 
   void invokeCallback() {
@@ -245,6 +250,7 @@ public:
 
 private:
   std::function<void()> callback_;
+  testing::MockFunction<void()>* destroy_cb_{nullptr};
 };
 
 class MockSignalEvent : public SignalEvent {

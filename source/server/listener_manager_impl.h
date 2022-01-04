@@ -299,6 +299,8 @@ private:
   createListenSocketFactory(const envoy::config::core::v3::Address& proto_address,
                             ListenerImpl& listener);
 
+  void maybeCloseSocketsForListener(ListenerImpl& listener);
+
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
