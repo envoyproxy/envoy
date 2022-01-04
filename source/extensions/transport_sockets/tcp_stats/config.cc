@@ -16,7 +16,7 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
     Server::Configuration::TransportSocketFactoryContext& context,
     const envoy::extensions::transport_sockets::tcp_stats::v3::Config& config,
     Network::TransportSocketFactoryPtr&& inner_factory)
-    : inner_factory_(std::move(inner_factory)) {
+    : PassthroughFactory(std::move(inner_factory)) {
 #if defined(__linux__)
   config_ = std::make_shared<Config>(config, context.scope());
 #else
@@ -29,7 +29,7 @@ TcpStatsSocketFactory::TcpStatsSocketFactory(
 Network::TransportSocketPtr TcpStatsSocketFactory::createTransportSocket(
     Network::TransportSocketOptionsConstSharedPtr options) const {
 #if defined(__linux__)
-  auto inner_socket = inner_factory_->createTransportSocket(options);
+  auto inner_socket = transport_socket_factory_->createTransportSocket(options);
   if (inner_socket == nullptr) {
     return nullptr;
   }
@@ -38,14 +38,6 @@ Network::TransportSocketPtr TcpStatsSocketFactory::createTransportSocket(
   UNREFERENCED_PARAMETER(options);
   return nullptr;
 #endif
-}
-
-bool TcpStatsSocketFactory::implementsSecureTransport() const {
-  return inner_factory_->implementsSecureTransport();
-}
-
-bool TcpStatsSocketFactory::usesProxyProtocolOptions() const {
-  return inner_factory_->usesProxyProtocolOptions();
 }
 
 class TcpStatsConfigFactory : public virtual Server::Configuration::TransportSocketConfigFactory {

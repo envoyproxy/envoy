@@ -10,7 +10,7 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 # MySQL proxy L7 network filter.
-# Public docs: docs/root/configuration/network_filters/mysql_proxy_filter.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/mysql_proxy_filter
 
 envoy_cc_library(
     name = "filter_lib",

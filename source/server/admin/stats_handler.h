@@ -55,7 +55,7 @@ private:
             (!regex.has_value() || std::regex_search(metric.name(), regex.value())));
   }
 
-  friend class AdminStatsTest;
+  friend class StatsHandlerTest;
 
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::map<std::string, std::string>& text_readouts,
