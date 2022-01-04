@@ -45,7 +45,7 @@ public:
   // This is intentionally left as an implicit conversion from string_view to
   // make call-sites easier to read, e.g.
   //    Utility::counterFromElements(*scope, {DynamicName("a"), DynamicName("b")});
-  explicit DynamicSavedName(const std::string &str) : std::string(str) {}
+  explicit DynamicSavedName(const std::string& str) : std::string(str) {}
   explicit DynamicSavedName(absl::string_view str) : std::string(str.begin(), str.end()) {}
 };
 

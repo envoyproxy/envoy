@@ -6,8 +6,8 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/stats/symbol_table_impl.h"
-
 #include "source/common/stats/utility.h"
+
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/global.h"
 #include "test/test_common/utility.h"
