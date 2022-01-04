@@ -531,6 +531,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   EXPECT_CALL(stream_callbacks_, onComplete());
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, MultipleStreams) {
@@ -865,6 +866,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream->reset();
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
@@ -979,6 +981,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
@@ -1016,6 +1019,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
