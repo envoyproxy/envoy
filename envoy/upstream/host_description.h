@@ -78,7 +78,7 @@ public:
   // total_metric_value fields. Otherwise, the stat is added with the provided value to the map,
   // which retains all entries until the next call to latch(). This allows metrics to be added
   // whose keys may not necessarily be known at startup time.
-  virtual void add(const std::string& key, double value) PURE;
+  virtual void add(const absl::string_view key, double value) PURE;
 
   // Returns an owning pointer to the current load metrics and clears the map.
   virtual StatsMapPtr latch() PURE;
