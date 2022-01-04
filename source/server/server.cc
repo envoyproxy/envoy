@@ -170,38 +170,38 @@ void InstanceImpl::failHealthcheck(bool fail) {
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store, TimeSource& time_source) {
   store.forEachSinkedCounter(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
       },
-      [this](Stats::Counter& counter) mutable {
+      [this](Stats::Counter& counter) {
         snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
         counters_.push_back({counter.latch(), counter});
       });
 
   store.forEachSinkedGauge(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
       },
-      [this](Stats::Gauge& gauge) mutable {
+      [this](Stats::Gauge& gauge) {
         ASSERT(gauge.importMode() != Stats::Gauge::ImportMode::Uninitialized);
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
       });
 
   store.forEachSinkedHistogram(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);
       },
-      [this](Stats::ParentHistogram& histogram) mutable {
+      [this](Stats::ParentHistogram& histogram) {
         snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
         histograms_.push_back(histogram);
       });
 
   store.forEachSinkedTextReadout(
-      [this](std::size_t size) mutable {
+      [this](std::size_t size) {
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
       },

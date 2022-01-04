@@ -1,7 +1,9 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <random>
 #include <string>
+#include <fstream>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/stats/histogram.h"
@@ -1567,21 +1569,6 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             parent_histogram->bucketSummary());
 }
 
-class SinkPredicatesTest : public SinkPredicates {
-public:
-  ~SinkPredicatesTest() override = default;
-  absl::flat_hash_set<std::string>& sinkedStatNames() { return sinked_stat_names_; }
-  bool includeCounter(const Counter&) override { return false; }
-  bool includeGauge(const Gauge&) override { return false; }
-  bool includeTextReadout(const TextReadout&) override { return false; }
-  bool includeHistogram(const Histogram& histogram) override {
-    return sinked_stat_names_.find(histogram.tagExtractedName()) != sinked_stat_names_.end();
-  }
-
-private:
-  absl::flat_hash_set<std::string> sinked_stat_names_;
-};
-
 TEST_F(HistogramTest, ForEachHistogram) {
   std::vector<std::reference_wrapper<Stats::Histogram>> histograms;
 
@@ -1614,28 +1601,31 @@ TEST_F(HistogramTest, ForEachHistogram) {
   EXPECT_EQ(num_iterations, 0);
 
   // Verify that we can access the local reference without a crash.
-  (void)deleted_histogram.unit();
+  EXPECT_EQ(deleted_histogram.unit(), Stats::Histogram::Unit::Unspecified);
 }
 
 TEST_F(HistogramTest, ForEachSinkedHistogram) {
-  std::unique_ptr<Stats::SinkPredicatesTest> moved_sink_predicates =
-      std::make_unique<SinkPredicatesTest>();
-  SinkPredicatesTest* sink_predicates = moved_sink_predicates.get();
+  StatNamePool pool(store_->symbolTable());
+
+  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
+  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
   std::vector<std::reference_wrapper<Stats::Histogram>> sinked_histograms;
   std::vector<std::reference_wrapper<Stats::Histogram>> unsinked_histograms;
 
   const size_t num_stats = 11;
   // Create some histograms before setting the predicates.
   for (size_t idx = 0; idx < num_stats / 2; ++idx) {
-    auto stat_name = absl::StrCat("histogram.", idx);
-    // sink every 3rd stat
+    auto name = absl::StrCat("histogram.", idx);
+    Stats::StatName stat_name = pool.add(name);
+    //  sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
       sink_predicates->sinkedStatNames().insert(stat_name);
       sinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+          store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
     } else {
       unsinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+          store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
     }
   }
 
@@ -1643,15 +1633,16 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
 
   // Create some histograms after setting the predicates.
   for (size_t idx = num_stats / 2; idx < num_stats; ++idx) {
-    auto stat_name = absl::StrCat("histogram.", idx);
+    auto name = absl::StrCat("histogram.", idx);
+    Stats::StatName stat_name = pool.add(name);
     // sink every 3rd stat
     if ((idx + 1) % 3 == 0) {
       sink_predicates->sinkedStatNames().insert(stat_name);
       sinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+          store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
     } else {
       unsinked_histograms.emplace_back(
-          store_->histogramFromString(stat_name, Stats::Histogram::Unit::Unspecified));
+          store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified));
     }
   }
 
@@ -1663,7 +1654,7 @@ TEST_F(HistogramTest, ForEachSinkedHistogram) {
   store_->forEachSinkedHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
       [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
-        EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.tagExtractedName()),
+        EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
                   sink_predicates->sinkedStatNames().end());
         ++num_iterations;
       });
@@ -1930,6 +1921,84 @@ TEST_F(HistogramThreadTest, ScopeOverlap) {
 
   shutdownThreading();
   store_->histogramFromString("histogram_after_shutdown", Histogram::Unit::Unspecified);
+}
+
+size_t getMemoryUsage() {
+#ifndef WIN32
+  std::ifstream status("/proc/self/status", std::ios_base::in);
+  std::string line;
+  const std::string key("VmSize:");
+  while (status.good() && !status.eof()) {
+    std::getline(status, line);
+    const auto pos = line.find(key);
+    if (pos != std::string::npos) {
+      return std::stoull(line.substr(pos + key.size()));
+    }
+  }
+#endif
+  return 0;
+}
+
+// Verify that recording values for histograms that are not sinked does not
+// cause them to grow in memory over time.
+TEST_F(HistogramTest, SinkedHistogramMemoryTest) {
+  StatNamePool pool(store_->symbolTable());
+  std::unique_ptr<Stats::TestUtil::TestSinkPredicates> moved_sink_predicates =
+      std::make_unique<Stats::TestUtil::TestSinkPredicates>();
+  Stats::TestUtil::TestSinkPredicates* sink_predicates = moved_sink_predicates.get();
+  Stats::StatName stat_name = pool.add("h1");
+  sink_predicates->sinkedStatNames().insert(stat_name);
+  store_->setSinkPredicates(std::move(moved_sink_predicates));
+
+  Histogram& h1 = store_->histogramFromStatName(stat_name, Stats::Histogram::Unit::Unspecified);
+  Histogram& h2 = store_->histogramFromString("h2", Stats::Histogram::Unit::Unspecified);
+
+  EXPECT_EQ("h1", h1.name());
+  EXPECT_EQ("h2", h2.name());
+
+  // Create a random number generator to populate histogram values
+  std::random_device random_d;
+  std::mt19937_64 generator(random_d());
+  std::uniform_int_distribution<uint64_t> distribution(0, 1000);
+
+  const size_t num_flushes = 512;
+  const size_t num_updates = 20;
+  size_t memoryUsageOld = 0;
+  // Outer loop for flushes.
+  for (size_t idx = 0; idx < num_flushes; ++idx) {
+    // Inner loop to record histogram values.
+    for (size_t idx2 = 0; idx2 < num_updates; ++idx2) {
+      const uint64_t h1_val = distribution(generator);
+      EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), h1_val));
+      h1.recordValue(h1_val);
+      const uint64_t h2_val = distribution(generator);
+      EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), h2_val));
+      h2.recordValue(h2_val);
+    }
+
+    store_->mergeHistograms([this, sink_predicates]() -> void {
+      size_t num_iterations = 0;
+      size_t num_sinked_histograms = 0;
+      store_->forEachSinkedHistogram(
+          [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
+          [&num_iterations, sink_predicates](Stats::ParentHistogram& histogram) {
+            EXPECT_NE(sink_predicates->sinkedStatNames().find(histogram.statName()),
+                      sink_predicates->sinkedStatNames().end());
+            ++num_iterations;
+          });
+      EXPECT_EQ(num_sinked_histograms, 1);
+      EXPECT_EQ(num_iterations, 1);
+    });
+    size_t memoryUsageNew = getMemoryUsage();
+#ifndef WIN32
+    EXPECT_NE(memoryUsageNew, 0);
+#endif
+    if (memoryUsageOld == 0) {
+      memoryUsageOld = memoryUsageNew;
+    } else {
+      EXPECT_EQ(memoryUsageNew, memoryUsageOld);
+    }
+  }
 }
 
 } // namespace Stats

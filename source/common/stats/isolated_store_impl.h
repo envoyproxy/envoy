@@ -245,8 +245,8 @@ public:
   }
 
   void forEachSinkedHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override {
-    (void)f_size;
-    (void)f_stat;
+    UNREFERENCED_PARAMETER(f_size);
+    UNREFERENCED_PARAMETER(f_stat);
   }
 
 private:
