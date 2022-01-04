@@ -100,8 +100,12 @@ template <class DataType> class OnMatchFactory {
 public:
   virtual ~OnMatchFactory() = default;
 
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
   virtual absl::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch&) PURE;
+  // Instantiates a nested matcher sub-tree or an action.
+  // Returns absl::nullopt if neither sub-tree or action is specified.
   virtual absl::optional<OnMatchFactoryCb<DataType>>
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
