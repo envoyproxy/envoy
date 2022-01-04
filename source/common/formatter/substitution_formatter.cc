@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <regex>
 #include <string>
@@ -454,15 +455,15 @@ SubstitutionFormatParser::parse(const std::string& format,
   std::vector<FormatterProviderPtr> formatters;
   const std::regex command_w_args_regex(R"EOF(^%([A-Z]|[0-9]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
-  for (size_t pos = 0; pos < format.length(); ++pos) {
+  for (size_t pos = 0; pos < format.size(); ++pos) {
     if (format[pos] != '%') {
       current_token += format[pos];
       continue;
     }
 
     // escape '%%'
-    if (format.length() > pos+1) {
-      if (format[pos+1] == '%') {
+    if (format.size() > pos + 1) {
+      if (format[pos + 1] == '%') {
         current_token += '%';
         pos++;
         continue;

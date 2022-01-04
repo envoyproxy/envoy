@@ -3176,9 +3176,9 @@ TEST(SubstitutionFormatterTest, EscapingFormatParse) {
 
   auto providers = SubstitutionFormatParser::parse("%%");
 
-  EXPECT_EQ(providers.size(), 1);
+  ASSERT_EQ(providers.size(), 1);
   EXPECT_EQ("%", providers[0]->format(request_headers, response_headers, response_trailers,
-                                     stream_info, body));
+                                      stream_info, body));
 }
 
 TEST(SubstitutionFormatterTest, FormatterExtension) {
