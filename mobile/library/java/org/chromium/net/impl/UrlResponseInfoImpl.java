@@ -17,14 +17,14 @@ import org.chromium.net.UrlResponseInfo;
  * redirect response.
  */
 public final class UrlResponseInfoImpl extends UrlResponseInfo {
-  private final List<String> mResponseInfoUrlChain;
-  private final int mHttpStatusCode;
-  private final String mHttpStatusText;
-  private final boolean mWasCached;
-  private final String mNegotiatedProtocol;
-  private final String mProxyServer;
-  private final AtomicLong mReceivedByteCount;
-  private final HeaderBlockImpl mHeaders;
+  private List<String> mResponseInfoUrlChain;
+  private int mHttpStatusCode;
+  private String mHttpStatusText;
+  private boolean mWasCached;
+  private String mNegotiatedProtocol;
+  private String mProxyServer;
+  private final AtomicLong mReceivedByteCount = new AtomicLong();
+  private HeaderBlockImpl mHeaders;
 
   /**
    * Unmodifiable container of response headers or trailers.
@@ -88,18 +88,37 @@ public final class UrlResponseInfoImpl extends UrlResponseInfo {
     mWasCached = wasCached;
     mNegotiatedProtocol = negotiatedProtocol;
     mProxyServer = proxyServer;
-    mReceivedByteCount = new AtomicLong(receivedByteCount);
+    mReceivedByteCount.set(receivedByteCount);
   }
 
   /**
-   * Constructor for backwards compatibility. See main constructor above for more info.
+   * Creates an empty implementation of {@link UrlResponseInfo}.
    */
-  @Deprecated
-  public UrlResponseInfoImpl(List<String> urlChain, int httpStatusCode, String httpStatusText,
-                             List<Map.Entry<String, String>> allHeadersList, boolean wasCached,
-                             String negotiatedProtocol, String proxyServer) {
-    this(urlChain, httpStatusCode, httpStatusText, allHeadersList, wasCached, negotiatedProtocol,
-         proxyServer, 0);
+  public UrlResponseInfoImpl() {}
+
+  /**
+   * Sets response values.
+   *
+   * @param urlChain the URL chain. The first entry is the originally requested URL;
+   *         the following entries are redirects followed.
+   * @param httpStatusCode the HTTP status code.
+   * @param httpStatusText the HTTP status text of the status line.
+   * @param allHeadersList list of response header field and value pairs.
+   * @param wasCached {@code true} if the response came from the cache, {@code false}
+   *         otherwise.
+   * @param negotiatedProtocol the protocol negotiated with the server.
+   * @param proxyServer the proxy server that was used for the request.
+   */
+  public void setResponseValues(List<String> urlChain, int httpStatusCode, String httpStatusText,
+                                List<Map.Entry<String, String>> allHeadersList, boolean wasCached,
+                                String negotiatedProtocol, String proxyServer) {
+    mResponseInfoUrlChain = Collections.unmodifiableList(urlChain);
+    mHttpStatusCode = httpStatusCode;
+    mHttpStatusText = httpStatusText;
+    mHeaders = new HeaderBlockImpl(Collections.unmodifiableList(allHeadersList));
+    mWasCached = wasCached;
+    mNegotiatedProtocol = negotiatedProtocol;
+    mProxyServer = proxyServer;
   }
 
   @Override
