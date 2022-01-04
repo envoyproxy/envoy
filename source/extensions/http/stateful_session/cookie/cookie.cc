@@ -24,7 +24,7 @@ CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
     : name_(config.cookie().name()), ttl_(config.cookie().ttl().seconds()),
       path_(config.cookie().path()) {
   if (name_.empty()) {
-    throw EnvoyException("Cookie key cannot be empty for cookie based stateful session sticky");
+    throw EnvoyException("Cookie key cannot be empty for cookie based stateful sessions");
   }
 }
 

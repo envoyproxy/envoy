@@ -57,7 +57,10 @@ class StatefulSession : public Http::PassThroughFilter,
 public:
   StatefulSession(const StatefulSessionConfig* config) : config_(config) {}
 
+  // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+
+  // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
   Http::SessionStatePtr& sessionStateForTest() { return session_state_; }

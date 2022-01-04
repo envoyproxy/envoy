@@ -3,9 +3,9 @@
 Stateful session
 ================
 
-Stateful session is an HTTP filter which sets an override host based on the extensible session state
+Stateful session is an HTTP filter which overrides the upstream host based on extensible session state
 and updates the session state based on the final selected upstream host. The override host will
-eventually overwrites the load balancing result. This filter can implement session sticky without using
+eventually overwrites the load balancing result. This filter implements session stickiness without using
 a hash-based load balancer.
 
 And by extending the session state, this filter also allows more flexible control over the results of
@@ -14,22 +14,23 @@ the load balancing.
 Overview
 --------
 
-Sticky-session is an important feature of LB. Requests belonging to the same session should be guaranteed
-to be routed to the same backend host.
+Session stickiness allows requests belonging to the same session to be consistently routed to a specific
+upstream host.
 
-HTTP session sticky of Envoy is generally achieved through hash-based load balancer. The hash-based session
-sticky can be regarded as 'soft' sticky and the result of the route may change when the upstream host set
-changes. This filter implements 'hard' sticky as an enhancement to Envoy HTTP session sticky. We should
-use the filter in the following cases:
+HTTP session stickiness in Envoy is generally achieved through hash-based load balancing.
+The stickiness of hash-based sessions can be regarded as 'weak' since the upstream host may change when the
+host set changes. This filter implements 'strong' stickiness. It is intended to handle the following cases:
 
-* The case where more stable session sticky is required. For example, when a host is marked as degrade and
-  it is hoped that the requests for existing sessions will not be affected. At this time, stateful session
-  filter is needed.
-* The case where a non hash-based load balancer (Random, Round Robin, etc.) is used and session sticky
-  is still required. If stateful session is enabled in this case, new requests will be routed to the
-  corresponding upstream host based on the result of load balancing. The requests belonging to specific
-  session will be routed to specific host.
+* The case where more stable session stickiness is required. For example, when a host is marked as degraded
+  but it is desirable to continue routing requests for existing sessions to that host.
+* The case where a non hash-based load balancer (Random, Round Robin, etc.) is used and session stickiness
+  is still required. If stateful sessions are enabled in this case, requests for new sessions will be routed
+  to the corresponding upstream host based on the result of load balancing. Requests belonging to existing
+  sessions will be routed to the session's upstream host.
 
+.. note::
+  This filter would affect the result of the upstream load balancer depending on the state of the downstream.
+  So please check the necessity before using this filter.
 
 Configuration
 -------------
@@ -43,13 +44,13 @@ How it works
 The most important configuration for this filter is an :ref:`extensible session state
 <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.session_state>`.
 
-In the process of processing the request, the session state will search for the corresponding session and
-host according to the request. The results of the searching will be used to influence the final load balancing
+While processing the request, the stateful session filter will search for the corresponding session and
+host based on the request. The results of the search will be used to influence the final load balancing
 results.
 
-If it is a complete new request, the session state will create a session and save the corresponding
-host when responding. Please note that the session here is an abstract concept. In different session state
-implementations, the session may be completely different.
+If no existing session is found, the filter will create a session to store the selected upstream host.
+Please note that the session here is an abstract concept. The details of the storage are based on the
+session state implementation.
 
 One example
 ___________
@@ -72,9 +73,9 @@ So let's take this as an example.
         ttl: 120s
 
 
-In the above configuration, the cookie-based session state obtains the override host of the current session
-from the cookie by the key `global-session-cookie` and if the corresponding host exists, the corresponding
-request will be routed to the specified override host.
+In the above configuration, the cookie-based session state obtains the overridden host of the current session
+from the cookie named `global-session-cookie` and if the corresponding host exists in the upstream cluster, the
+request will be routed to that host.
 
-If there is no valid cookie, the load balancer will choose a new upstream host. When responding, The address
-of the selected upstream host will be set into the cookie with `global-session-cookie` as the key.
+If there is no valid cookie, the load balancer will choose a new upstream host. When responding, the address
+of the selected upstream host will be stored in the cookie named `global-session-cookie`.

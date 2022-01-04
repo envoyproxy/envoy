@@ -166,9 +166,6 @@ public:
   static HostConstSharedPtr selectOverrideHost(const HostMap* host_map,
                                                LoadBalancerContext* context);
 
-  static LoadBalancerContext::OverrideHostStatus
-  createOverrideHostStatus(const std::vector<envoy::config::core::v3::HealthStatus>& statuses);
-
   absl::optional<uint64_t> computeHashKey() override { return {}; }
 
   const Network::Connection* downstreamConnection() const override { return nullptr; }
