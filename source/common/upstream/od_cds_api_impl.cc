@@ -104,7 +104,7 @@ void OdCdsApiImpl::updateOnDemand(std::string cluster_name) {
     subscription_->requestOnDemandUpdate({std::move(cluster_name)});
     return;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC("corrupt enum");
 }
 
 } // namespace Upstream
