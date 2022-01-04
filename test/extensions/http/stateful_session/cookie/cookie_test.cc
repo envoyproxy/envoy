@@ -18,7 +18,7 @@ TEST(CookieBasedSessionStateFactoryTest, EmptyCookieName) {
 
   EXPECT_THROW_WITH_MESSAGE(std::make_shared<CookieBasedSessionStateFactory>(config),
                             EnvoyException,
-                            "Cookie key cannot be empty for cookie based stateful session sticky");
+                            "Cookie key cannot be empty for cookie based stateful sessions");
   config.mutable_cookie()->set_name("override_host");
 
   EXPECT_NO_THROW(std::make_shared<CookieBasedSessionStateFactory>(config));
