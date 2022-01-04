@@ -118,6 +118,8 @@ private:
                           const std::map<std::string, std::string>& text_readouts,
                           const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                           Buffer::Instance& response);
+
+  static std::string typeToString(Type type);
 };
 
 } // namespace Server

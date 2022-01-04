@@ -353,45 +353,23 @@ public:
   Context(const Params& params, Render& render, Buffer::Instance& response, Stats::Store& stats)
       : params_(params), render_(render), response_(response), stats_(stats) {}
 
-  // Quick check to see if we're at the end of the page. If we are, we record the
-  // name of the stat we are going to reject.
-  bool checkEndOfPage() {
-    if (params_.page_size_.has_value()) {
-      ASSERT(num_ <= params_.page_size_.value());
-      return num_ >= params_.page_size_.value() - 1;
-    }
-    return false;
-  }
-
-  /*
-  template <class StatType> bool checkMetricAndEndOfPage(const StatType& metric) {
-    // Do a relatively fast check to see whether we have hit the end of the page,
-    //
-
-    ++num_;
-    if (params_.page_size_.has_value()) {
-      if (num_ == params_.page_size_.value()) {
-        next_start_ = "";//metric->name();
-        return true;
-      } else if (num_ > params_.page_size_.value()) {
-        return true;
-      }
-    }
-    return false;
-  }
-  */
-
   template <class StatType>
   void emit(Type type, absl::string_view label,
             std::function<void(StatType& stat_type)> render_fn,
             std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
-    // Check if the page is already full.
-    if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
       return;
     }
 
-    // Bail early if the  requested type does not match the current type.
-    if (params_.type_ != Type::All && params_.type_ != type) {
+    // If page is already full, we may need to enable navigation to this type prior to bailing.
+    if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
+      // Make sure we expose a next/prev link to reveal the types we are not hitting.
+      std::string& start_ref = (params_.direction_ == Stats::PageDirection::Forward)
+                               ? next_start_ : prev_start_;
+      if (start_ref.empty()) {
+        start_ref = absl::StrCat(label, StartSeparator, "");
+      }
       return;
     }
 
@@ -423,10 +401,18 @@ public:
       }
       if (more) {
         next_start_ = last;
+      } else {
+        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) + 1);
+        if (next_type != Type::All) {
+          next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
+        }
       }
     } else {
       if (more) {
         prev_start_ = last;
+      } else if (static_cast<uint32_t>(type) > 0) {
+        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
+        next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
       }
       if (!params_.start_.empty() && next_start_.empty()) {
         next_start_ = first;
@@ -434,15 +420,13 @@ public:
       std::reverse(stats.begin(), stats.end());
     }
 
-    bool written = false;
+    if (params_.format_ == Format::Html) {
+      response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
+    }
     for (const auto& stat : stats) {
-      if (!written && params_.format_ == Format::Html) {
-        response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
-        written = true;
-      }
       render_fn(*stat);
     }
-    if (written) {
+    if (params_.format_ == Format::Html) {
       response_.add("</pre>\n");
     }
   }
@@ -559,23 +543,6 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     }
   }
 
-
-#if 0
-  if (params.scope_.has_value()) {
-    Stats::StatNameManagedStorage scope_name(params.scope_.value(), stats.symbolTable());
-    stats.forEachScope([](size_t) {},
-                       [&scope_name, &append_stats_from_scope, &context](
-                           const Stats::Scope& scope) -> bool {
-                         if (context.checkEndOfPage(scope)) {
-                           return false;
-                         }
-                         if (scope.prefix() == scope_name.statName()) {
-                           append_stats_from_scope(scope);
-                         }
-                         return true;
-                       });
-  }
-#endif
 
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
@@ -806,6 +773,16 @@ Admin::UrlHandler StatsHandler::statsHandler() {
             "type",
             "Stat types to include.",
             {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
+}
+
+std::string StatsHandler::typeToString(StatsHandler::Type type) {
+  switch (type) {
+    case Type::TextReadouts: return "TextReadouts";
+    case Type::Counters: return "Counters";
+    case Type::Gauges: return "Gauges";
+    case Type::Histograms: return "Histograms";
+    case Type::All: return "All";
+  }
 }
 
 } // namespace Server
