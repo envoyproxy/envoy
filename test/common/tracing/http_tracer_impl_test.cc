@@ -11,6 +11,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
@@ -109,7 +110,7 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      config.custom_tags_.emplace(custom_tag.tag(), HttpTracerUtility::createCustomTag(custom_tag));
+      config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {

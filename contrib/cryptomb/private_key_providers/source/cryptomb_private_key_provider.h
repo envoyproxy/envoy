@@ -9,6 +9,7 @@
 #include "source/common/common/c_smart_ptr.h"
 #include "source/common/common/logger.h"
 
+#include "contrib/cryptomb/private_key_providers/source/cryptomb_stats.h"
 #include "contrib/cryptomb/private_key_providers/source/ipp_crypto.h"
 #include "contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha/cryptomb.pb.h"
 
@@ -93,7 +94,7 @@ public:
   static constexpr uint32_t MULTIBUFF_BATCH = 8;
 
   CryptoMbQueue(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                IppCryptoSharedPtr ipp, Event::Dispatcher& d);
+                IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats);
   void addAndProcessEightRequests(CryptoMbContextSharedPtr mb_ctx);
 
 private:
@@ -120,6 +121,8 @@ private:
 
   // Timer to trigger queue processing if eight requests are not received in time.
   Event::TimerPtr timer_{};
+
+  CryptoMbStats& stats_;
 };
 
 // CryptoMbPrivateKeyConnection maintains the data needed by a given SSL
@@ -170,8 +173,8 @@ private:
   // Thread local data containing a single queue per worker thread.
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
     ThreadLocalData(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
-                    IppCryptoSharedPtr ipp, Event::Dispatcher& d)
-        : queue_(poll_delay, type, keysize, ipp, d){};
+                    IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
+        : queue_(poll_delay, type, keysize, ipp, d, stats){};
     CryptoMbQueue queue_;
   };
 
@@ -181,6 +184,8 @@ private:
   enum KeyType key_type_;
 
   ThreadLocal::TypedSlotPtr<ThreadLocalData> tls_;
+
+  CryptoMbStats stats_;
 };
 
 } // namespace CryptoMb

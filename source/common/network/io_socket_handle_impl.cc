@@ -576,5 +576,54 @@ absl::optional<std::chrono::milliseconds> IoSocketHandleImpl::lastRoundTripTime(
   return std::chrono::duration_cast<std::chrono::milliseconds>(info.tcpi_rtt);
 }
 
+absl::optional<std::string> IoSocketHandleImpl::interfaceName() {
+  auto& os_syscalls_singleton = Api::OsSysCallsSingleton::get();
+  if (!os_syscalls_singleton.supportsGetifaddrs()) {
+    return absl::nullopt;
+  }
+
+  Address::InstanceConstSharedPtr socket_address = localAddress();
+  if (!socket_address || socket_address->type() != Address::Type::Ip) {
+    return absl::nullopt;
+  }
+
+  Api::InterfaceAddressVector interface_addresses{};
+  const Api::SysCallIntResult rc = os_syscalls_singleton.getifaddrs(interface_addresses);
+  RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
+
+  absl::optional<std::string> selected_interface_name{};
+  for (const auto& interface_address : interface_addresses) {
+    if (!interface_address.interface_addr_) {
+      continue;
+    }
+
+    if (socket_address->ip()->version() == interface_address.interface_addr_->ip()->version()) {
+      // Compare address _without port_.
+      // TODO: create common addressAsStringWithoutPort method to simplify code here.
+      absl::uint128 socket_address_value;
+      absl::uint128 interface_address_value;
+      switch (socket_address->ip()->version()) {
+      case Address::IpVersion::v4:
+        socket_address_value = socket_address->ip()->ipv4()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv4()->address();
+        break;
+      case Address::IpVersion::v6:
+        socket_address_value = socket_address->ip()->ipv6()->address();
+        interface_address_value = interface_address.interface_addr_->ip()->ipv6()->address();
+        break;
+      default:
+        ENVOY_BUG(false, fmt::format("unexpected IP family {}", socket_address->ip()->version()));
+      }
+
+      if (socket_address_value == interface_address_value) {
+        selected_interface_name = interface_address.interface_name_;
+        break;
+      }
+    }
+  }
+
+  return selected_interface_name;
+}
+
 } // namespace Network
 } // namespace Envoy

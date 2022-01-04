@@ -243,17 +243,18 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
-  uint64_t idle_network_timeout_ms =
+  const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
-  quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
-  int32_t max_time_before_crypto_handshake_ms =
+  const int64_t minimal_idle_network_timeout_ms = 1;
+  quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(minimal_idle_network_timeout_ms, idle_network_timeout_ms)));
+  const int64_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()
           ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
           : 20000;
-  quic_config_.set_max_time_before_crypto_handshake(
-      quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
+  quic_config_.set_max_time_before_crypto_handshake(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(quic::kInitialIdleTimeoutSecs * 1000, max_time_before_crypto_handshake_ms)));
   convertQuicConfig(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.

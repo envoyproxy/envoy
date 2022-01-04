@@ -347,6 +347,17 @@ public:
   virtual absl::optional<uint64_t> upstreamConnectionId() const PURE;
 
   /**
+   * @param interface name of the upstream connection's local socket.
+   */
+  virtual void setUpstreamInterfaceName(absl::string_view interface_name) PURE;
+
+  /**
+   * @return interface name of the upstream connection's local socket, or absl::nullopt if not
+   * available.
+   */
+  virtual absl::optional<absl::string_view> upstreamInterfaceName() const PURE;
+
+  /**
    * @param connection_info sets the upstream ssl connection.
    */
   virtual void
