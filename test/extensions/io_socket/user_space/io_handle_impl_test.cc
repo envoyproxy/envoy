@@ -57,6 +57,8 @@ public:
   absl::FixedArray<char> buf_;
 };
 
+TEST_F(IoHandleImplTest, InterfaceName) { ASSERT_FALSE(io_handle_->interfaceName().has_value()); }
+
 // Test recv side effects.
 TEST_F(IoHandleImplTest, BasicRecv) {
   Buffer::OwnedImpl buf_to_write("0123456789");
@@ -1056,6 +1058,32 @@ TEST_F(IoHandleImplTest, ActivateEvent) {
   ASSERT_TRUE(schedulable_cb_->enabled());
 }
 
+// This is a compatibility test for Envoy Connection. When a connection is destroyed, the Envoy
+// connection may close the underlying handle but not destroy that io handle. Meanwhile, the
+// Connection object does not expect any further event be invoked because the connection in destroy
+// pending state can not support read/write.
+TEST_F(IoHandleImplTest, EventCallbackIsNotInvokedIfHandleIsClosed) {
+  testing::MockFunction<void()> check_event_cb;
+  testing::MockFunction<void()> check_schedulable_cb_destroyed;
+
+  schedulable_cb_ =
+      new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, &check_schedulable_cb_destroyed);
+  io_handle_->initializeFileEvent(
+      dispatcher_, [&, handle = io_handle_.get()](uint32_t) { check_event_cb.Call(); },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  EXPECT_FALSE(schedulable_cb_->enabled());
+  io_handle_->activateFileEvents(Event::FileReadyType::Read);
+  EXPECT_TRUE(schedulable_cb_->enabled());
+
+  {
+    EXPECT_CALL(check_event_cb, Call()).Times(0);
+    EXPECT_CALL(check_schedulable_cb_destroyed, Call());
+    io_handle_->close();
+    // Verify that the schedulable_cb is destroyed along with close(), not later.
+    testing::Mock::VerifyAndClearExpectations(&check_schedulable_cb_destroyed);
+  }
+}
+
 TEST_F(IoHandleImplTest, DeathOnActivatingDestroyedEvents) {
   io_handle_->resetFileEvents();
   ASSERT_DEBUG_DEATH(io_handle_->activateFileEvents(Event::FileReadyType::Read),
@@ -1068,10 +1096,10 @@ TEST_F(IoHandleImplTest, DeathOnEnablingDestroyedEvents) {
                      "Null user_file_event_");
 }
 
-TEST_F(IoHandleImplTest, NotImplementDuplicate) { ASSERT_DEATH(io_handle_->duplicate(), ""); }
+TEST_F(IoHandleImplTest, NotImplementDuplicate) { EXPECT_ENVOY_BUG(io_handle_->duplicate(), ""); }
 
 TEST_F(IoHandleImplTest, NotImplementAccept) {
-  ASSERT_DEATH(io_handle_->accept(nullptr, nullptr), "");
+  EXPECT_ENVOY_BUG(io_handle_->accept(nullptr, nullptr), "");
 }
 
 TEST_F(IoHandleImplTest, LastRoundtripTimeNullOpt) {

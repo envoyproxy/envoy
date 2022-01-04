@@ -51,7 +51,11 @@ public:
           auto status = conn_impl->onUrl(at, length);
           return conn_impl->setAndCheckCallbackStatus(std::move(status));
         },
-        nullptr, // on_status
+        [](http_parser* parser, const char* at, size_t length) -> int {
+          auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
+          auto status = conn_impl->onStatus(at, length);
+          return conn_impl->setAndCheckCallbackStatus(std::move(status));
+        },
         [](http_parser* parser, const char* at, size_t length) -> int {
           auto* conn_impl = static_cast<ParserCallbacks*>(parser->data);
           auto status = conn_impl->onHeaderField(at, length);
@@ -142,7 +146,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
     parser_type = HTTP_RESPONSE;
     break;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   impl_ = std::make_unique<Impl>(parser_type, data);

@@ -414,7 +414,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got a bad request"))
+                                                 Eq(absl::nullopt), "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -486,7 +486,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyOnResponse) {
 
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::BadRequest, "Bad request", _,
-                                                 Eq(absl::nullopt), "Got a bad request"))
+                                                 Eq(absl::nullopt), "Got_a_bad_request"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -559,7 +559,7 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBuffered) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "3");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
@@ -755,7 +755,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedOneChunk) {
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
   response_headers_.addCopy(LowerCaseString("content-length"), "100");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Buffer::OwnedImpl resp_data;
@@ -831,7 +831,7 @@ TEST_F(HttpFilterTest, PostAndChangeBothBodiesBufferedMultiChunk) {
   response_headers_.addCopy(LowerCaseString(":status"), "200");
   response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
 
-  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encode1xxHeaders(response_headers_));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   Buffer::OwnedImpl resp_data_1;
@@ -1540,9 +1540,8 @@ TEST_F(HttpFilterTest, PostAndFail) {
 
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
-                             "ext_proc error: gRPC error 13"))
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
+                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
@@ -1598,9 +1597,8 @@ TEST_F(HttpFilterTest, PostAndFailOnResponse) {
 
   // Oh no! The remote server had a failure!
   Http::TestResponseHeaderMapImpl immediate_response_headers;
-  EXPECT_CALL(encoder_callbacks_,
-              sendLocalReply(Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
-                             "ext_proc error: gRPC error 13"))
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, "", _,
+                                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13"))
       .WillOnce(Invoke([&immediate_response_headers](
                            Unused, Unused,
                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
