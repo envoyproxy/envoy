@@ -132,9 +132,12 @@ versioning guidelines:
   for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
-* Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
-  are new commits and/or merges. We squash rebase the final merged commit so the number of commits
-  you have in the PR don't matter.
+* Once you submit a PR, *please do not rebase it*. If you rebase, you will need to force push to
+  github, and github's user interface will force your reviewer to review the PR
+  from stratch rather than simply look at your latest changes.  It's much easier for folks to review
+  new commits and/or merges. We squash rebase the final merged commit so the number of commits
+  you have in the PR don't matter. Again unless you need to fix DCO, *please do
+  not force push*.
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
