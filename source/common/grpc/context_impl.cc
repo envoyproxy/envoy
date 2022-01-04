@@ -85,12 +85,13 @@ void ContextImpl::chargeUpstreamStat(const Upstream::ClusterInfo& cluster,
 absl::optional<ContextImpl::RequestStatNames>
 ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
   absl::optional<Common::RequestNames> request_names = Common::resolveServiceAndMethod(path);
+
   if (!request_names) {
     return {};
   }
 
-  Stats::Element service = Stats::DynamicName(request_names->service_);
-  Stats::Element method = Stats::DynamicName(request_names->method_);
+  Stats::Element service = Stats::DynamicSavedName(request_names->service_);
+  Stats::Element method = Stats::DynamicSavedName(request_names->method_);
   return RequestStatNames{service, method};
 }
 
