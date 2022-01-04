@@ -4,9 +4,9 @@ import android.os.ConditionVariable;
 import android.util.Log;
 import androidx.annotation.IntDef;
 import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream;
+import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel;
-import io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.net.MalformedURLException;
@@ -30,7 +30,6 @@ import org.chromium.net.CallbackException;
 import org.chromium.net.CronetException;
 import org.chromium.net.InlineExecutionProhibitedException;
 import org.chromium.net.UploadDataProvider;
-import org.chromium.net.UrlResponseInfo;
 
 /** UrlRequest, backed by Envoy-Mobile. */
 public final class CronetUrlRequest extends UrlRequestBase {
@@ -67,6 +66,16 @@ public final class CronetUrlRequest extends UrlRequestBase {
     int READY = 0;
     int BUSY = 1;
     int CANCELLED = 2;
+  }
+
+  @IntDef({SucceededState.UNDETERMINED, SucceededState.FINAL_READ_DONE,
+           SucceededState.ON_COMPLETE_RECEIVED, SucceededState.SUCCESS_READY})
+  @Retention(RetentionPolicy.SOURCE)
+  @interface SucceededState {
+    int UNDETERMINED = 0;
+    int FINAL_READ_DONE = 1;
+    int ON_COMPLETE_RECEIVED = 2;
+    int SUCCESS_READY = 3;
   }
 
   private static final String X_ENVOY = "x-envoy";
@@ -246,7 +255,9 @@ public final class CronetUrlRequest extends UrlRequestBase {
     }
     if (mState.compareAndSet(State.AWAITING_READ, streamEnded() ? State.COMPLETE : State.READING)) {
       if (streamEnded()) {
-        onSucceeded(mUrlResponseInfo);
+        if (mCronvoyCallbacks.successReady(SucceededState.FINAL_READ_DONE)) {
+          onSucceeded();
+        }
         return;
       }
       mUserCurrentReadBuffer = buffer;
@@ -463,6 +474,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       mInitialMethod = "GET";
     }
     mAdditionalStatusDetails = Status.CONNECTING;
+    mUrlResponseInfo = new UrlResponseInfoImpl();
     mUrlChain.add(mCurrentUrl);
     Map<String, List<String>> envoyRequestHeaders =
         buildEnvoyRequestHeaders(mInitialMethod, mRequestHeaders, mUploadDataStream, mUserAgent,
@@ -563,12 +575,12 @@ public final class CronetUrlRequest extends UrlRequestBase {
     execute(task);
   }
 
-  void onSucceeded(final UrlResponseInfo info) {
+  void onSucceeded() {
     Runnable task = new Runnable() {
       @Override
       public void run() {
         try {
-          mCallback.onSucceeded(CronetUrlRequest.this, info);
+          mCallback.onSucceeded(CronetUrlRequest.this, mUrlResponseInfo);
         } catch (Exception exception) {
           Log.e(TAG, "Exception in onSucceeded method", exception);
         }
@@ -643,6 +655,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
   private class CronvoyHttpCallbacks implements EnvoyHTTPCallbacks {
 
     private final AtomicInteger mCancelState = new AtomicInteger(CancelState.READY);
+    private final AtomicInteger mSucceededState = new AtomicInteger(SucceededState.UNDETERMINED);
     private volatile boolean mEndStream = false; // Accessed by different Threads
 
     @Override
@@ -662,7 +675,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
           statuses != null && !statuses.isEmpty() ? Integer.valueOf(statuses.get(0)) : -1;
       final String locationField;
       if (responseCode >= 300 && responseCode < 400) {
-        mUrlResponseInfo = createUrlResponseInfoImpl(headers, responseCode);
+        setUrlResponseInfo(headers, responseCode);
         List<String> locationFields = mUrlResponseInfo.getAllHeaders().get("location");
         locationField = locationFields == null ? null : locationFields.get(0);
       } else {
@@ -702,7 +715,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
                                            mPendingRedirectUrl);
             } else {
               if (responseCode < 300 || responseCode >= 400) {
-                mUrlResponseInfo = createUrlResponseInfoImpl(headers, responseCode);
+                setUrlResponseInfo(headers, responseCode);
               }
               fireCloseUploadDataProvider(); // Idempotent
               mWaitingOnRead.set(true);
@@ -835,7 +848,15 @@ public final class CronetUrlRequest extends UrlRequestBase {
     }
 
     @Override
-    public void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel) {}
+    public void onComplete(EnvoyStreamIntel streamIntel, EnvoyFinalStreamIntel finalStreamIntel) {
+      if (isAbandoned()) {
+        return;
+      }
+      mUrlResponseInfo.setReceivedByteCount(finalStreamIntel.getSentByteCount());
+      if (successReady(SucceededState.ON_COMPLETE_RECEIVED)) {
+        onSucceeded();
+      }
+    }
 
     /**
      * Sends one chunk of the request body if the state permits. This method is not re-entrant, but
@@ -888,8 +909,7 @@ public final class CronetUrlRequest extends UrlRequestBase {
       }
     }
 
-    private UrlResponseInfoImpl createUrlResponseInfoImpl(Map<String, List<String>> responseHeaders,
-                                                          int responseCode) {
+    private void setUrlResponseInfo(Map<String, List<String>> responseHeaders, int responseCode) {
       mAdditionalStatusDetails = Status.WAITING_FOR_RESPONSE;
       List<Map.Entry<String, String>> headerList = new ArrayList<>();
       String selectedTransport = "unknown";
@@ -916,9 +936,20 @@ public final class CronetUrlRequest extends UrlRequestBase {
       // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1426) set receivedByteCount
       // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1622) support proxy
       // TODO(https://github.com/envoyproxy/envoy-mobile/issues/1546) negotiated protocol
-      return new UrlResponseInfoImpl(
+      mUrlResponseInfo.setResponseValues(
           new ArrayList<>(mUrlChain), responseCode, HttpReason.getReason(responseCode),
-          Collections.unmodifiableList(headerList), false, selectedTransport, ":0", 0);
+          Collections.unmodifiableList(headerList), false, selectedTransport, ":0");
+    }
+
+    private boolean successReady(@SucceededState int activityDone) {
+      @SucceededState int originalState;
+      @SucceededState int updatedState;
+      do {
+        originalState = mSucceededState.get();
+        updatedState = originalState | activityDone;
+      } while (!mSucceededState.compareAndSet(originalState, updatedState));
+      return originalState != SucceededState.SUCCESS_READY &&
+          updatedState == SucceededState.SUCCESS_READY;
     }
 
     private boolean completeAbandonIfAny(@State int originalState, @State int updatedState) {
