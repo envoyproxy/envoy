@@ -53,6 +53,16 @@ AlternateProtocolsCacheSharedPtr AlternateProtocolsCacheManagerImpl::getCache(
 
   AlternateProtocolsCacheSharedPtr new_cache = std::make_shared<AlternateProtocolsCacheImpl>(
       dispatcher.timeSource(), std::move(store), options.max_entries().value());
+
+  if (const AlternateProtocolsCacheEntry& entry : options.prepopulated_entries()) {
+    AlternateProtocolsCacheEntries&
+    const AlternateProtocolsCacheImpl::Origin origin2_ = {https_, hostname2_, port2_};
+
+    AlternateProtocolsCacheImpl::AlternateProtocol protocol1_ = {alpn1_, hostname1_, port1_,
+      expiration1_};
+
+  }
+
   (*slot_).caches_.emplace(options.name(), CacheWithOptions{options, new_cache});
   return new_cache;
 }

@@ -123,6 +123,18 @@ message UpstreamHttpProtocolOptions {
       [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 }
 
+// Allows pre-populating the cache with HTTP/3 alternate protocols entries.
+// This will cause Enovy to attempt HTTP/3 to those upstreams, even if the upstreams have not
+// advertised HTTP/3 support.
+// As with regular cached entries, if the origin response would result in clearing an existing
+// alternate protocol cache entry, pre-populated entries will also be cleared.
+message AlternateProtocolsCacheEntry {
+  // FIXME comment.
+  string host_name = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+  uint32 port = 2 [(validate.rules).uint32 = {lte: 65535}, (validate.rules).message = {required: true}];
+  uint32 alternate_port = 3 [(validate.rules).uint32 = {lte: 65535}, (validate.rules).message = {required: true}];
+}
+
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
 // make an HTTP connection to an origin server. See https://tools.ietf.org/html/rfc7838 for
 // HTTP Alternative Services and https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-04
@@ -149,6 +161,8 @@ message AlternateProtocolsCacheOptions {
   // alternate protocols entries to disk.
   // This function is currently only supported if concurrency is 1
   TypedExtensionConfig key_value_store_config = 3;
+
+  repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 }
 
 // [#next-free-field: 7]
