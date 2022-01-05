@@ -122,7 +122,10 @@ public:
   bool trackStreamCapacity() override { return false; }
 
 protected:
-  bool usesAltSvc() const override { return true; }
+  bool onlySupportsAltSvc() const override {
+    // This will fail newStream(..., /*should_use_alt_svc=*/false) call.
+    return true;
+  }
 
 private:
   // Store quic helpers which can be shared between connections and must live

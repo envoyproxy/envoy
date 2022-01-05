@@ -23,7 +23,9 @@ ConnectivityGrid::WrapperCallbacks::WrapperCallbacks(ConnectivityGrid& grid,
       next_attempt_timer_(
           grid_.dispatcher_.createTimer([this]() -> void { tryAnotherConnection(); })),
       current_(pool_it), has_early_data_(has_early_data), should_use_alt_svc_(should_use_alt_svc) {
-  if (!should_use_alt_svc) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+      !should_use_alt_svc) {
     // If alt_svc is explicitly disabled, there must have been a failed request over Http3 and the
     // failure must be post-handshake.
     http3_attempt_failed_ = true;
@@ -282,7 +284,10 @@ ConnectionPool::Cancellable* ConnectivityGrid::newStream(Http::ResponseDecoder& 
     createNextPool();
   }
   PoolIterator pool = pools_.begin();
-  if (!shouldAttemptHttp3() || !should_use_alt_svc) {
+  if (!shouldAttemptHttp3() ||
+      (Runtime::runtimeFeatureEnabled(
+           "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+       !should_use_alt_svc)) {
     // Before skipping to the next pool, make sure it has been created.
     createNextPool();
     ++pool;

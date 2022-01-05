@@ -383,17 +383,21 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Make sure all connections use the same PersistentQuicInfoImpl.
   concurrency_ = 1;
-  // Config retry on 425.
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        auto* route_config = hcm.mutable_route_config();
-        auto* virtual_host = route_config->mutable_virtual_hosts(0);
-        auto* route = virtual_host->mutable_routes(0)->mutable_route();
-        auto* retry_policy = route->mutable_retry_policy();
-        retry_policy->set_retry_on("retriable-status-codes");
-        retry_policy->add_retriable_status_codes(425);
-      });
+  const Http::TestResponseHeaderMapImpl too_early_response_headers{{":status", "425"}};
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    // Config retry on 425.
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          auto* route = virtual_host->mutable_routes(0)->mutable_route();
+          auto* retry_policy = route->mutable_retry_policy();
+          retry_policy->set_retry_on("retriable-status-codes");
+          retry_policy->add_retriable_status_codes(425);
+        });
+  }
 
   initialize();
   // Start the first connection.
@@ -403,13 +407,15 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Send a complete request on the first connection.
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  const Http::TestResponseHeaderMapImpl response_headers{{":status", "425"}};
-  // 425 response will be retried by Envoy without Early-Data header.
-  upstream_request_->encodeHeaders(response_headers, true);
-  upstream_request_.reset();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    // 425 response will be retried by Envoy without Early-Data header.
+    upstream_request_->encodeHeaders(too_early_response_headers, true);
+    upstream_request_.reset();
 
-  waitForNextUpstreamRequest(0);
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+    waitForNextUpstreamRequest(0);
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response1->waitForEndStream());
   // Close the first connection.
@@ -453,7 +459,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
   // This is downstream sending early data, so the 425 response should be forwarded back to the
   // client.
@@ -473,13 +479,15 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
   EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
-  upstream_request_->encodeHeaders(response_headers, true);
+  upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
   // 425 response should be forwarded back to the client.
   EXPECT_EQ("425", response3->headers().getStatusValue());
   codec_client_->close();
-
-  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  }
 }
 
 // Ensure multiple quic connections work, regardless of platform BPF support

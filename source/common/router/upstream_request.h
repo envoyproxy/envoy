@@ -68,7 +68,7 @@ public:
   // UpstreamToDownstream
   const RouteEntry& routeEntry() const override;
   const Network::Connection& connection() const override;
-  bool hasEarlyData() const override;
+  bool hasEarlyData() const override { return has_early_data_; }
   bool useAltSvc() const override { return use_alt_svc_; }
 
   void disableDataFromDownstreamForFlowControl();

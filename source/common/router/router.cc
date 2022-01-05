@@ -703,27 +703,32 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // Hang onto the modify_headers function for later use in handling upstream responses.
   modify_headers_ = modify_headers;
-  absl::string_view method = downstream_headers_->getMethodValue();
-  const bool is_safe_method = (method == Http::Headers::get().MethodValues.Get ||
-                               method == Http::Headers::get().MethodValues.Head ||
-                               method == Http::Headers::get().MethodValues.Options ||
-                               method == Http::Headers::get().MethodValues.Trace);
 
-  if (retry_state_ == nullptr) {
-    ENVOY_LOG(
-        warn,
-        "No retry policy is configured. There won't be any fallback for alt_svc protocol failure.");
+  bool as_early_data{false};
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    absl::string_view method = downstream_headers_->getMethodValue();
+    const bool is_safe_method = (method == Http::Headers::get().MethodValues.Get ||
+                                 method == Http::Headers::get().MethodValues.Head ||
+                                 method == Http::Headers::get().MethodValues.Options ||
+                                 method == Http::Headers::get().MethodValues.Trace);
+
+    if (retry_state_ == nullptr) {
+      ENVOY_LOG(warn, "No retry policy is configured. There won't be any fallback for alt_svc "
+                      "protocol failure.");
+    }
+    // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on
+    // 425 response. In addition to this, the decisions should also depend on reset retry policies.
+    const bool can_handle_too_early_response =
+        retry_state_ != nullptr &&
+        retry_state_->wouldRetryFromRetriableStatusCode(Http::Code::TooEarly);
+    // The request should only be sent as early data iff the policy will retry on 425 and it has
+    // safe method.
+    as_early_data = is_safe_method && can_handle_too_early_response;
   }
-  // TODO(danzh) Right now whether to try early data or not depends on retry policy on retry on 425
-  // response. In addition to this, the decisions should also depend on reset retry policies.
-  const bool can_handle_too_early_response =
-      retry_state_ != nullptr &&
-      retry_state_->wouldRetryFromRetriableStatusCode(Http::Code::TooEarly);
-  // The request should only be sent as early data iff the policy will retry on 425 and it has safe
-  // method.
+
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
-      *this, std::move(generic_conn_pool),
-      /*has_early_data=*/is_safe_method && can_handle_too_early_response, /*use_alt_svc=*/true);
+      *this, std::move(generic_conn_pool), as_early_data, /*use_alt_svc=*/true);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->encodeHeaders(end_stream);
   if (end_stream) {
@@ -876,7 +881,6 @@ void Filter::cleanup() {
   // list as appropriate.
   ASSERT(upstream_requests_.empty());
 
-  std::cerr << "============= cleanup\n";
   retry_state_.reset();
   if (response_timeout_) {
     response_timeout_->disableTimer();
@@ -1140,7 +1144,6 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
 
 bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
                              UpstreamRequest& upstream_request) {
-
   // We don't retry if we already started the response, don't have a retry policy defined,
   // or if we've already retried this upstream request (currently only possible if a per
   // try timeout occurred and hedge_on_per_try_timeout is enabled).
@@ -1148,7 +1151,9 @@ bool Filter::maybeRetryReset(Http::StreamResetReason reset_reason,
     return false;
   }
   absl::optional<bool> was_using_alt_svc;
-  if (upstream_request.hadUpstream()) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+      upstream_request.hadUpstream()) {
     was_using_alt_svc = upstream_request.streamInfo().protocol().has_value() &&
                         upstream_request.streamInfo().protocol().value() == Http::Protocol::Http3;
   }

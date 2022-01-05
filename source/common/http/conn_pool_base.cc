@@ -61,7 +61,9 @@ HttpConnPoolImplBase::newStream(Http::ResponseDecoder& response_decoder,
                                 Http::ConnectionPool::Callbacks& callbacks, bool has_early_data,
                                 bool should_use_alt_svc) {
   HttpAttachContext context({&response_decoder, &callbacks});
-  if (!should_use_alt_svc && usesAltSvc()) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+      !should_use_alt_svc && onlySupportsAltSvc()) {
     ENVOY_LOG(debug, "Couldn't disable alt-svc. Stop retrying.");
     onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::NotQualified,
                   context);

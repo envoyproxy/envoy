@@ -18,7 +18,6 @@ namespace Http {
 struct HttpAttachContext : public Envoy::ConnectionPool::AttachContext {
   HttpAttachContext(Http::ResponseDecoder* d, Http::ConnectionPool::Callbacks* c)
       : decoder_(d), callbacks_(c) {}
-
   Http::ResponseDecoder* decoder_;
   Http::ConnectionPool::Callbacks* callbacks_;
 };
@@ -91,7 +90,8 @@ public:
 protected:
   friend class ActiveClient;
 
-  virtual bool usesAltSvc() const { return false; }
+  // Interface for derived classes to indicate it only supports HTTP/3.
+  virtual bool onlySupportsAltSvc() const { return false; }
 
   Random::RandomGenerator& random_generator_;
 };

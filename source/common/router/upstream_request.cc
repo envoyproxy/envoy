@@ -629,7 +629,5 @@ void UpstreamRequest::enableDataFromDownstreamForFlowControl() {
   }
 }
 
-bool UpstreamRequest::hasEarlyData() const { return has_early_data_; }
-
 } // namespace Router
 } // namespace Envoy

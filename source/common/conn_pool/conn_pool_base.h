@@ -17,7 +17,7 @@ namespace ConnectionPool {
 class ConnPoolImplBase;
 
 // A placeholder struct for whatever data a given connection pool needs to
-// successfully attach a upstream connection to a downstream connection.
+// successfully attach an upstream connection to a downstream connection.
 struct AttachContext {
   // Add a virtual destructor to allow for the dynamic_cast ASSERT in typedContext.
   virtual ~AttachContext() = default;
@@ -134,8 +134,6 @@ public:
   // The context here returns a pointer to whatever context is provided with newStream(),
   // which will be passed back to the parent in onPoolReady or onPoolFailure.
   virtual AttachContext& context() PURE;
-
-  bool hasEarlyData() const { return has_early_data_; }
 
   ConnPoolImplBase& parent_;
   bool has_early_data_;

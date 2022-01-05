@@ -58,6 +58,7 @@ constexpr const char* runtime_features[] = {
     // Begin alphabetically sorted section.
     "envoy.reloadable_features.allow_response_for_timeout",
     "envoy.reloadable_features.conn_pool_delete_when_idle",
+    "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc",
     "envoy.reloadable_features.correct_scheme_and_xfp",
     "envoy.reloadable_features.disable_tls_inspector_injection",
     "envoy.reloadable_features.fix_added_trailers",

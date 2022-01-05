@@ -143,6 +143,11 @@ TEST_F(Http3ConnPoolImplTest, CreationWithConfig) {
 }
 
 TEST_F(Http3ConnPoolImplTest, NewStreamFail) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    return;
+  }
+
   initialize();
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;

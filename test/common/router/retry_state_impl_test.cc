@@ -128,7 +128,9 @@ public:
         (response_status == "425" &&
          state_->wouldRetryFromRetriableStatusCode(Http::Code::TooEarly));
 
-    if (expect_disable_early_data) {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc") &&
+        expect_disable_early_data) {
       expectSchedulableCallback();
     } else {
       expectTimerCreateAndEnable();
@@ -210,6 +212,11 @@ TEST_F(RouterRetryStateImplTest, PolicyRefusedStream) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyRefusedStreamUsingAltSvc) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    return;
+  }
+
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "refused-stream"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -452,6 +459,11 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesUpstreamTooEarly) {
 }
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodesDownstreamEarlyDataUpstreamTooEarly) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    return;
+  }
+
   policy_.retriable_status_codes_.push_back(425);
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"},
                                                  {"early-data", "1"}};
@@ -944,9 +956,12 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
   expectSchedulableCallback();
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryReset(connect_failure_, /*was_using_alt_svc=*/true,
                                                        reset_callback_));
-  EXPECT_CALL(callback_ready_, ready());
-  retry_schedulable_callback_->invokeCallback();
-  EXPECT_FALSE(retry_disable_alt_svc_);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_new_stream_with_early_data_and_alt_svc")) {
+    EXPECT_CALL(callback_ready_, ready());
+    retry_schedulable_callback_->invokeCallback();
+    EXPECT_FALSE(retry_disable_alt_svc_);
+  }
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No,

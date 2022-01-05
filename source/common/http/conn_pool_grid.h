@@ -126,7 +126,10 @@ public:
     bool http3_attempt_failed_{};
     // True if the TCP attempt succeeded.
     bool tcp_attempt_succeeded_{};
+    // True if the request can be sent as early data.
     bool has_early_data_{};
+    // True if the request can be sent via alternative service. If this is
+    // false, http3_attempt_failed_ must be true.
     bool should_use_alt_svc_{};
   };
   using WrapperCallbacksPtr = std::unique_ptr<WrapperCallbacks>;

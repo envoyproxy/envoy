@@ -339,7 +339,9 @@ public:
 class RetryState {
 public:
   enum class RetryDecision {
+    // Retry the request immediately.
     RetryNoBackoff,
+    // Retry the request with timed backoff delay.
     RetryWithBackoff,
     NoRetry,
   };
@@ -366,6 +368,7 @@ public:
   /**
    * Determine whether a request should be retried based on the response headers.
    * @param response_headers supplies the response headers.
+   * @param original_request supplies the orignal request headers.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -383,17 +386,26 @@ public:
    * the information about whether a response is "good" or not is useful, but a retry should
    * not be attempted for other reasons.
    * @param response_headers supplies the response headers.
+   * @param original_request supplies the orignal request headers.
    * @return bool true if a retry would be warranted based on the retry policy.
    */
   virtual RetryDecision wouldRetryFromHeaders(const Http::ResponseHeaderMap& response_headers,
                                               const Http::RequestHeaderMap& original_request,
                                               bool& retry_as_early_data) PURE;
 
+  /**
+   * Determines whether given response status code would be retried by the retry policy, assuming
+   * sufficient retry budget and circuit breaker headroom.
+   * @param code the received response status code.
+   * @return bool true if the given status code can be retried according to the current config.
+   */
   virtual bool wouldRetryFromRetriableStatusCode(Http::Code code) const PURE;
 
   /**
    * Determine whether a request should be retried after a reset based on the reason for the reset.
    * @param reset_reason supplies the reset reason.
+   * @param was_using_alt_svc whether the reset request was sent over alternative service or not.
+   * nullopt means it wasn't sent at all before getting reset.
    * @param callback supplies the callback that will be invoked when the retry should take place.
    *                 This is used to add timed backoff, etc. The callback will never be called
    *                 inline.
@@ -1238,12 +1250,11 @@ public:
    */
   virtual const Network::Connection& connection() const PURE;
   /**
-   * @return return true if the downstream request has early data and the early hasn't been
-   * rejected.
+   * @return returns true if the downstream request could be sent as early data.
    */
   virtual bool hasEarlyData() const PURE;
   /**
-   * @return return true if the downstream request can be sent to upstream using
+   * @return returns true if the downstream request can be sent to upstream using
    * protocols advertised in Alt-Svc by the upstream.
    */
   virtual bool useAltSvc() const PURE;
