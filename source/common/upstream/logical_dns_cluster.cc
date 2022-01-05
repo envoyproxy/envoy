@@ -122,11 +122,12 @@ void LogicalDnsCluster::startResolve() {
         // not stabilize back to 0 hosts.
         if (status == Network::DnsResolver::ResolutionStatus::Success && !response.empty()) {
           info_->stats().update_success_.inc();
+          const auto addrinfo = response.front().addrInfo();
           // TODO(mattklein123): Move port handling into the DNS interface.
           uint32_t port = Network::Utility::portFromTcpUrl(dns_url_);
-          ASSERT(response.front().address_ != nullptr);
+          ASSERT(addrinfo.address_ != nullptr);
           Network::Address::InstanceConstSharedPtr new_address =
-              Network::Utility::getAddressWithPort(*(response.front().address_), port);
+              Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_), port);
           auto address_list = DnsUtils::generateAddressList(response, port);
 
           if (!logical_host_) {
@@ -159,8 +160,8 @@ void LogicalDnsCluster::startResolve() {
           // reset failure backoff strategy because there was a success.
           failure_backoff_strategy_->reset();
 
-          if (respect_dns_ttl_ && response.front().ttl_ != std::chrono::seconds(0)) {
-            final_refresh_rate = response.front().ttl_;
+          if (respect_dns_ttl_ && addrinfo.ttl_ != std::chrono::seconds(0)) {
+            final_refresh_rate = addrinfo.ttl_;
           }
           ENVOY_LOG(debug, "DNS refresh rate reset for {}, refresh rate {} ms", dns_address,
                     final_refresh_rate.count());

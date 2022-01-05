@@ -248,7 +248,8 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
 
     // man getifaddrs(3)
     for (const auto& interface_address : interface_addresses) {
-      if (!isLoopbackAddress(*interface_address.interface_addr_)) {
+      if (!isLoopbackAddress(*interface_address.interface_addr_) &&
+          interface_address.interface_addr_->ip()->version() == version) {
         ret = interface_address.interface_addr_;
         break;
       }
@@ -331,7 +332,8 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected address type");
+  return false;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {

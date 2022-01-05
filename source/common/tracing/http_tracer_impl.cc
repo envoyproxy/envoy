@@ -48,7 +48,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EgressOperation;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING; // Make the compiler happy.
 }
 
 Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
@@ -66,8 +66,6 @@ Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& str
   default:
     return {trace_reason, false};
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
@@ -95,39 +93,40 @@ template <class T> static void addGrpcResponseTags(Span& span, const T& headers)
 
 static void annotateVerbose(Span& span, const StreamInfo::StreamInfo& stream_info) {
   const auto start_time = stream_info.startTime();
-  if (stream_info.lastDownstreamRxByteReceived()) {
+  StreamInfo::TimingUtility timing(stream_info);
+  if (timing.lastDownstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastDownstreamRxByteReceived()),
+                              *timing.lastDownstreamRxByteReceived()),
              Tracing::Logs::get().LastDownstreamRxByteReceived);
   }
-  if (stream_info.firstUpstreamTxByteSent()) {
+  if (timing.firstUpstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstUpstreamTxByteSent()),
+                              *timing.firstUpstreamTxByteSent()),
              Tracing::Logs::get().FirstUpstreamTxByteSent);
   }
-  if (stream_info.lastUpstreamTxByteSent()) {
-    span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastUpstreamTxByteSent()),
+  if (timing.lastUpstreamTxByteSent()) {
+    span.log(start_time +
+                 std::chrono::duration_cast<SystemTime::duration>(*timing.lastUpstreamTxByteSent()),
              Tracing::Logs::get().LastUpstreamTxByteSent);
   }
-  if (stream_info.firstUpstreamRxByteReceived()) {
+  if (timing.firstUpstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstUpstreamRxByteReceived()),
+                              *timing.firstUpstreamRxByteReceived()),
              Tracing::Logs::get().FirstUpstreamRxByteReceived);
   }
-  if (stream_info.lastUpstreamRxByteReceived()) {
+  if (timing.lastUpstreamRxByteReceived()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastUpstreamRxByteReceived()),
+                              *timing.lastUpstreamRxByteReceived()),
              Tracing::Logs::get().LastUpstreamRxByteReceived);
   }
-  if (stream_info.firstDownstreamTxByteSent()) {
+  if (timing.firstDownstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.firstDownstreamTxByteSent()),
+                              *timing.firstDownstreamTxByteSent()),
              Tracing::Logs::get().FirstDownstreamTxByteSent);
   }
-  if (stream_info.lastDownstreamTxByteSent()) {
+  if (timing.lastDownstreamTxByteSent()) {
     span.log(start_time + std::chrono::duration_cast<SystemTime::duration>(
-                              *stream_info.lastDownstreamTxByteSent()),
+                              *timing.lastDownstreamTxByteSent()),
              Tracing::Logs::get().LastDownstreamTxByteSent);
   }
 }
@@ -177,7 +176,7 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span,
   const CustomTagMap* custom_tag_map = tracing_config.customTags();
   if (custom_tag_map) {
     for (const auto& it : *custom_tag_map) {
-      it.second->apply(span, ctx);
+      it.second->applySpan(span, ctx);
     }
   }
   span.setTag(Tracing::Tags::get().RequestSize, std::to_string(stream_info.bytesReceived()));
@@ -197,9 +196,9 @@ void HttpTracerUtility::finalizeUpstreamSpan(Span& span,
       Tracing::Tags::get().HttpProtocol,
       Formatter::SubstitutionFormatUtils::protocolToStringOrDefault(stream_info.protocol()));
 
-  if (stream_info.upstreamHost()) {
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
     span.setTag(Tracing::Tags::get().UpstreamAddress,
-                stream_info.upstreamHost()->address()->asStringView());
+                stream_info.upstreamInfo()->upstreamHost()->address()->asStringView());
   }
 
   setCommonTags(span, response_headers, response_trailers, stream_info, tracing_config);
@@ -214,10 +213,11 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
 
   span.setTag(Tracing::Tags::get().Component, Tracing::Tags::get().Proxy);
 
-  if (nullptr != stream_info.upstreamHost()) {
-    span.setTag(Tracing::Tags::get().UpstreamCluster, stream_info.upstreamHost()->cluster().name());
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+    span.setTag(Tracing::Tags::get().UpstreamCluster,
+                stream_info.upstreamInfo()->upstreamHost()->cluster().name());
     span.setTag(Tracing::Tags::get().UpstreamClusterName,
-                stream_info.upstreamHost()->cluster().observabilityName());
+                stream_info.upstreamInfo()->upstreamHost()->cluster().observabilityName());
   }
 
   // Post response data.
@@ -239,23 +239,6 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::ResponseHeaderMap*
   if (!stream_info.responseCode() || Http::CodeUtility::is5xx(stream_info.responseCode().value())) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
-}
-
-CustomTagConstSharedPtr
-HttpTracerUtility::createCustomTag(const envoy::type::tracing::v3::CustomTag& tag) {
-  switch (tag.type_case()) {
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kLiteral:
-    return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kEnvironment:
-    return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kRequestHeader:
-    return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::kMetadata:
-    return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
-  case envoy::type::tracing::v3::CustomTag::TypeCase::TYPE_NOT_SET:
-    PANIC_DUE_TO_PROTO_UNSET;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 HttpTracerImpl::HttpTracerImpl(DriverSharedPtr driver, const LocalInfo::LocalInfo& local_info)
@@ -281,96 +264,6 @@ SpanPtr HttpTracerImpl::startSpan(const Config& config, Http::RequestHeaderMap& 
   }
 
   return active_span;
-}
-
-void CustomTagBase::apply(Span& span, const CustomTagContext& ctx) const {
-  absl::string_view tag_value = value(ctx);
-  if (!tag_value.empty()) {
-    span.setTag(tag(), tag_value);
-  }
-}
-
-EnvironmentCustomTag::EnvironmentCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Environment& environment)
-    : CustomTagBase(tag), name_(environment.name()), default_value_(environment.default_value()) {
-  const char* env = std::getenv(name_.data());
-  final_value_ = env ? env : default_value_;
-}
-
-RequestHeaderCustomTag::RequestHeaderCustomTag(
-    const std::string& tag, const envoy::type::tracing::v3::CustomTag::Header& request_header)
-    : CustomTagBase(tag), name_(Http::LowerCaseString(request_header.name())),
-      default_value_(request_header.default_value()) {}
-
-absl::string_view RequestHeaderCustomTag::value(const CustomTagContext& ctx) const {
-  if (ctx.trace_context == nullptr) {
-    return default_value_;
-  }
-  // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially populate all header values.
-  const auto entry = ctx.trace_context->getByKey(name_);
-  return entry.value_or(default_value_);
-}
-
-MetadataCustomTag::MetadataCustomTag(const std::string& tag,
-                                     const envoy::type::tracing::v3::CustomTag::Metadata& metadata)
-    : CustomTagBase(tag), kind_(metadata.kind().kind_case()),
-      metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
-
-void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
-  const envoy::config::core::v3::Metadata* meta = metadata(ctx);
-  if (!meta) {
-    if (!default_value_.empty()) {
-      span.setTag(tag(), default_value_);
-    }
-    return;
-  }
-  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(meta, metadata_key_);
-  switch (value.kind_case()) {
-  case ProtobufWkt::Value::kBoolValue:
-    span.setTag(tag(), value.bool_value() ? "true" : "false");
-    return;
-  case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), absl::StrCat("", value.number_value()));
-    return;
-  case ProtobufWkt::Value::kStringValue:
-    span.setTag(tag(), value.string_value());
-    return;
-  case ProtobufWkt::Value::kListValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.list_value()));
-    return;
-  case ProtobufWkt::Value::kStructValue:
-    span.setTag(tag(), MessageUtil::getJsonStringFromMessageOrDie(value.struct_value()));
-    return;
-  default:
-    break;
-  }
-  if (!default_value_.empty()) {
-    span.setTag(tag(), default_value_);
-  }
-}
-
-const envoy::config::core::v3::Metadata*
-MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
-  const StreamInfo::StreamInfo& info = ctx.stream_info;
-  switch (kind_) {
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kRequest:
-    return &info.dynamicMetadata();
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kRoute: {
-    Router::RouteConstSharedPtr route = info.route();
-    return route ? &route->metadata() : nullptr;
-  }
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kCluster: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
-  }
-  case envoy::type::metadata::v3::MetadataKind::KindCase::kHost: {
-    const auto& hostPtr = info.upstreamHost();
-    return hostPtr ? hostPtr->metadata().get() : nullptr;
-  }
-  case envoy::type::metadata::v3::MetadataKind::KindCase::KIND_NOT_SET:
-    PANIC_DUE_TO_PROTO_UNSET;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 } // namespace Tracing

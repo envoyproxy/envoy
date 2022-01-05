@@ -11,6 +11,9 @@ envoy_package()
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
+    deps = [
+        ":router_interface",
+    ],
 )
 
 envoy_cc_library(

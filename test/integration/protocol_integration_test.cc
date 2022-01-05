@@ -614,7 +614,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
@@ -682,7 +682,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
@@ -3540,7 +3540,7 @@ public:
   bool supportsUdpGso() const override { return false; }
 };
 
-TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
+TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
   // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
   NoUdpGso reject_gso_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
@@ -3556,8 +3556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
   socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
   socket_swap.write_matcher_->setWriteOverride(ebadf);
-  // TODO(danzh) set to true.
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   if (downstreamProtocol() == Http::CodecType::HTTP3) {
     // For HTTP/3 since the packets are black holed, there is no client side
@@ -3567,6 +3566,39 @@ TEST_P(DownstreamProtocolIntegrationTest, HandleSocketFail) {
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
+}
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
+  SocketInterfaceSwap socket_swap;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Make sure the headers made it through.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Makes us have Envoy's writes to upstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+
+  Buffer::OwnedImpl data("HTTP body content goes here");
+  codec_client_->sendData(*downstream_request, data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
   socket_swap.write_matcher_->setWriteOverride(nullptr);
   // Shut down the server before os_calls goes out of scope to avoid syscalls
   // during its removal.

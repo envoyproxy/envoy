@@ -1426,6 +1426,11 @@ void HttpIntegrationTest::testAdminDrain(Http::CodecType admin_request_type) {
 
 void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t request2_bytes,
                                               uint32_t response1_bytes, uint32_t response2_bytes) {
+  config_helper_.prependFilter(fmt::format(R"EOF(
+  name: stream-info-to-headers-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty)EOF"));
+
   FakeStreamPtr upstream_request1;
   FakeStreamPtr upstream_request2;
   initialize();
@@ -1479,6 +1484,15 @@ void HttpIntegrationTest::simultaneousRequest(uint32_t request1_bytes, uint32_t 
   EXPECT_TRUE(response1->complete());
   EXPECT_EQ("200", response1->headers().getStatusValue());
   EXPECT_EQ(response1_bytes, response1->body().size());
+
+  ASSERT_FALSE(response1->headers().get(Http::LowerCaseString("num_streams")).empty());
+  ASSERT_FALSE(response2->headers().get(Http::LowerCaseString("num_streams")).empty());
+  EXPECT_EQ(
+      response1->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView(),
+      "1");
+  EXPECT_EQ(
+      response2->headers().get(Http::LowerCaseString("num_streams"))[0]->value().getStringView(),
+      upstreamProtocol() == Http::CodecType::HTTP1 ? "1" : "2");
 }
 
 std::string HttpIntegrationTest::downstreamProtocolStatsRoot() const {

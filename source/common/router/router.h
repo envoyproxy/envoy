@@ -148,6 +148,21 @@ public:
                                   bool respect_expected_rq_timeout);
 
   /**
+   * Set the x-envoy-expected-request-timeout-ms and grpc-timeout headers if needed.
+   * @param elapsed_time time elapsed since completion of the downstream request
+   * @param timeout final TimeoutData to use for the request
+   * @param request_headers the request headers to modify
+   * @param insert_envoy_expected_request_timeout_ms insert
+   *        x-envoy-expected-request-timeout-ms?
+   * @param grpc_request tells if the request is a gRPC request.
+   * @param per_try_timeout_headging_enabled is request hedging enabled?
+   */
+  static void setTimeoutHeaders(uint64_t elapsed_time, const FilterUtility::TimeoutData& timeout,
+                                const RouteEntry& route, Http::RequestHeaderMap& request_headers,
+                                bool insert_envoy_expected_request_timeout_ms, bool grpc_request,
+                                bool per_try_timeout_hedging_enabled);
+
+  /**
    * Try to parse a header entry that may have a timeout field
    *
    * @param header_timeout_entry header entry which may contain a timeout value.
@@ -188,8 +203,8 @@ public:
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
-      : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime), random_(random),
-        stats_(router_context.statNames(), scope, stat_prefix),
+      : router_context_(router_context), scope_(scope), local_info_(local_info), cm_(cm),
+        runtime_(runtime), random_(random), stats_(router_context_.statNames(), scope, stat_prefix),
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -224,6 +239,7 @@ public:
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
   TimeSource& timeSource() { return time_source_; }
 
+  Router::Context& router_context_;
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;

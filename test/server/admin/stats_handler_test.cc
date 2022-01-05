@@ -1,5 +1,7 @@
 #include <regex>
+#include <string>
 
+#include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/server/admin/stats_handler.h"
 
@@ -18,9 +20,9 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Server {
 
-class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
+class StatsHandlerTest {
 public:
-  AdminStatsTest() : alloc_(symbol_table_) {
+  StatsHandlerTest() : alloc_(symbol_table_), pool_(symbol_table_) {
     store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(alloc_);
     store_->addSink(sink_);
   }
@@ -34,6 +36,9 @@ public:
                                      true /*pretty_print*/);
   }
 
+  Stats::StatName makeStat(absl::string_view name) { return pool_.add(name); }
+  Stats::CustomStatNamespaces& customNamespaces() { return custom_namespaces_; }
+
   void shutdownThreading() {
     tls_.shutdownGlobalThreading();
     store_->shutdownThreading();
@@ -43,10 +48,16 @@ public:
   Stats::SymbolTableImpl symbol_table_;
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
   Stats::AllocatorImpl alloc_;
   Stats::MockSink sink_;
   Stats::ThreadLocalStoreImplPtr store_;
+  Stats::StatNamePool pool_;
+  Stats::CustomStatNamespacesImpl custom_namespaces_;
 };
+
+class AdminStatsTest : public StatsHandlerTest,
+                       public testing::TestWithParam<Network::Address::IpVersion> {};
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminStatsTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -755,6 +766,120 @@ TEST_P(AdminInstanceTest, RecentLookups) {
 
   // We can't test RecentLookups in admin unit tests as it doesn't work with a
   // fake symbol table. However we cover this solidly in integration tests.
+}
+
+class StatsHandlerPrometheusTest : public StatsHandlerTest {
+public:
+  Http::TestResponseHeaderMapImpl response_headers;
+  Buffer::OwnedImpl data;
+  MockAdminStream admin_stream;
+  Configuration::MockStatsConfig stats_config;
+  Api::MockApi api;
+
+  std::shared_ptr<MockInstance> setupMockedInstance() {
+    auto instance = std::make_shared<MockInstance>();
+    EXPECT_CALL(stats_config, flushOnAdmin()).WillRepeatedly(testing::Return(false));
+    store_->initializeThreading(main_thread_dispatcher_, tls_);
+    EXPECT_CALL(*instance, stats()).WillRepeatedly(testing::ReturnRef(*store_));
+    EXPECT_CALL(*instance, statsConfig()).WillRepeatedly(testing::ReturnRef(stats_config));
+    EXPECT_CALL(api, customStatNamespaces()).WillRepeatedly(testing::ReturnRef(customNamespaces()));
+    EXPECT_CALL(*instance, api()).WillRepeatedly(testing::ReturnRef(api));
+    return instance;
+  }
+
+  void createTestStats() {
+    Stats::StatNameTagVector c1Tags{{makeStat("cluster"), makeStat("c1")}};
+    Stats::StatNameTagVector c2Tags{{makeStat("cluster"), makeStat("c2")}};
+
+    Stats::Counter& c1 =
+        store_->counterFromStatNameWithTags(makeStat("cluster.upstream.cx.total"), c1Tags);
+    c1.add(10);
+    Stats::Counter& c2 =
+        store_->counterFromStatNameWithTags(makeStat("cluster.upstream.cx.total"), c2Tags);
+    c2.add(20);
+
+    Stats::Gauge& g1 = store_->gaugeFromStatNameWithTags(
+        makeStat("cluster.upstream.cx.active"), c1Tags, Stats::Gauge::ImportMode::Accumulate);
+    g1.set(11);
+    Stats::Gauge& g2 = store_->gaugeFromStatNameWithTags(
+        makeStat("cluster.upstream.cx.active"), c2Tags, Stats::Gauge::ImportMode::Accumulate);
+    g2.set(12);
+
+    Stats::TextReadout& t1 =
+        store_->textReadoutFromStatNameWithTags(makeStat("control_plane.identifier"), c1Tags);
+    t1.set("cp-1");
+  }
+};
+
+class StatsHandlerPrometheusDefaultTest
+    : public StatsHandlerPrometheusTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, StatsHandlerPrometheusDefaultTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(StatsHandlerPrometheusDefaultTest, StatsHandlerPrometheusDefaultTest) {
+  std::string url = "/stats?format=prometheus";
+
+  createTestStats();
+  std::shared_ptr<MockInstance> instance = setupMockedInstance();
+  StatsHandler handler(*instance);
+
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+
+)EOF";
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_THAT(expected_response, data.toString());
+
+  shutdownThreading();
+}
+
+class StatsHandlerPrometheusWithTextReadoutsTest
+    : public StatsHandlerPrometheusTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndUrls, StatsHandlerPrometheusWithTextReadoutsTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values("/stats?format=prometheus&text_readouts",
+                                     "/stats?format=prometheus&text_readouts=true",
+                                     "/stats?format=prometheus&text_readouts=false",
+                                     "/stats?format=prometheus&text_readouts=abc")));
+
+TEST_P(StatsHandlerPrometheusWithTextReadoutsTest, StatsHandlerPrometheusWithTextReadoutsTest) {
+  std::string url = std::get<1>(GetParam());
+
+  createTestStats();
+  std::shared_ptr<MockInstance> instance = setupMockedInstance();
+  StatsHandler handler(*instance);
+
+  const std::string expected_response = R"EOF(# TYPE envoy_cluster_upstream_cx_total counter
+envoy_cluster_upstream_cx_total{cluster="c1"} 10
+envoy_cluster_upstream_cx_total{cluster="c2"} 20
+
+# TYPE envoy_cluster_upstream_cx_active gauge
+envoy_cluster_upstream_cx_active{cluster="c1"} 11
+envoy_cluster_upstream_cx_active{cluster="c2"} 12
+
+# TYPE envoy_control_plane_identifier gauge
+envoy_control_plane_identifier{cluster="c1",text_value="cp-1"} 0
+
+)EOF";
+
+  Http::Code code = handler.handlerStats(url, response_headers, data, admin_stream);
+  EXPECT_EQ(Http::Code::OK, code);
+  EXPECT_THAT(expected_response, data.toString());
+
+  shutdownThreading();
 }
 
 } // namespace Server

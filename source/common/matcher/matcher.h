@@ -86,6 +86,7 @@ public:
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     case MatcherType::MATCHER_TYPE_NOT_SET:
+      IS_ENVOY_BUG("match fail");
       return nullptr;
     }
     return nullptr;

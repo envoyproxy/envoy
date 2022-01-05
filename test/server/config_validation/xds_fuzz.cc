@@ -347,7 +347,7 @@ void XdsFuzzTest::verifyListeners() {
       FUZZ_ASSERT(listener_dump->has_active_state());
       break;
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      PANIC("reached unexpected code");
     }
   }
 }

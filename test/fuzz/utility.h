@@ -157,7 +157,8 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   auto upstream_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       replaceInvalidStringValues(stream_info.upstream_metadata()));
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
-  test_stream_info->onUpstreamHostSelected(upstream_host);
+  test_stream_info->setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  test_stream_info->upstreamInfo()->setUpstreamHost(upstream_host);
   auto address = stream_info.has_address()
                      ? Envoy::Network::Address::resolveProtoAddress(stream_info.address())
                      : Network::Utility::resolveUrl("tcp://10.0.0.1:443");
@@ -165,7 +166,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
       stream_info.has_upstream_local_address()
           ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
           : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
-  test_stream_info->setUpstreamLocalAddress(upstream_local_address);
+  test_stream_info->upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
   test_stream_info->downstream_connection_info_provider_ =
       std::make_shared<Network::ConnectionInfoSetterImpl>(address, address);
   test_stream_info->downstream_connection_info_provider_->setRequestedServerName(

@@ -97,11 +97,6 @@ envoy_cc_extension(
     name = "http_config",
     srcs = ["http_config.cc"],
     hdrs = ["http_config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":config_utils",
         "//envoy/server:access_log_config_interface",
@@ -118,11 +113,6 @@ envoy_cc_extension(
     name = "tcp_config",
     srcs = ["tcp_config.cc"],
     hdrs = ["tcp_config.h"],
-    # TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":config_utils",
         "//envoy/server:access_log_config_interface",

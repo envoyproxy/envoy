@@ -27,6 +27,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/perf_tracing.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
@@ -274,6 +275,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
 RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encoder,
                                                  bool is_internally_created) {
+  TRACE_EVENT("core", "ConnectionManagerImpl::newStream");
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
@@ -325,7 +327,7 @@ void ConnectionManagerImpl::handleCodecError(absl::string_view error) {
   // GOAWAY.
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay,
                     StreamInfo::ResponseFlag::DownstreamProtocolError,
-                    absl::StrCat("codec error:", error));
+                    absl::StrCat("codec_error:", StringUtil::replaceAllEmptySpace(error)));
 }
 
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
@@ -1537,6 +1539,10 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
     filter_manager_.streamInfo().setResponseFlag(StreamInfo::ResponseFlag::OverloadManager);
     filter_manager_.streamInfo().setResponseCodeDetails(
         StreamInfo::ResponseCodeDetails::get().Overload);
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.handle_stream_reset_during_hcm_encoding")) {
+    filter_manager_.onDownstreamReset();
   }
 
   connection_manager_.doDeferredStreamDestroy(*this);

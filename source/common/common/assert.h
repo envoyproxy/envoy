@@ -247,10 +247,8 @@ void resetEnvoyBugCountersForTest();
  */
 #define ENVOY_BUG(...) PASS_ON(PASS_ON(_ENVOY_BUG_VERBOSE)(__VA_ARGS__))
 
-// NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
-// The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage
-// reports.
-#define NOT_IMPLEMENTED_GCOVR_EXCL_LINE PANIC("not implemented")
+// Always triggers ENVOY_BUG. This is intended for paths that are not expected to be reached.
+#define IS_ENVOY_BUG(...) ENVOY_BUG(false, __VA_ARGS__);
 
 // NOT_REACHED_GCOVR_EXCL_LINE is for spots the compiler insists on having a return, but where we
 // know that it shouldn't be possible to arrive there, assuming no horrendous bugs. For example,
