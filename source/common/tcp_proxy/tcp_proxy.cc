@@ -444,13 +444,13 @@ void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
   case ConnectionPool::PoolFailureReason::Overflow:
   case ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
-    return;
+    break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-    return;
+    break;
   case ConnectionPool::PoolFailureReason::Timeout:
     onConnectTimeout();
-    return;
+    break;
   }
 }
 
