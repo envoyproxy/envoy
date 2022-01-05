@@ -11,6 +11,12 @@ a hash-based load balancer.
 And by extending the session state, this filter also allows more flexible control over the results of
 the load balancing.
 
+.. note::
+
+  Stateful sessions can result in imbalanced load across upstreams and allow external actors to direct
+  requests to specific upstream hosts. Operators should carefully consider the security and reliability
+  implications of stateful sessions before enabling this feature.
+
 Overview
 --------
 
@@ -27,10 +33,6 @@ host set changes. This filter implements 'strong' stickiness. It is intended to 
   is still required. If stateful sessions are enabled in this case, requests for new sessions will be routed
   to the corresponding upstream host based on the result of load balancing. Requests belonging to existing
   sessions will be routed to the session's upstream host.
-
-.. note::
-  This filter would affect the result of the upstream load balancer depending on the state of the downstream.
-  So please check the necessity before using this filter.
 
 Configuration
 -------------

@@ -198,7 +198,7 @@ extensions/filters/http/oauth2 @rgs1 @derekargueta @snowp
 # Key Value store
 /*/extensions/key_value @alyssawilk @ryantheoptimist
 # Stateful session
-/*/extensions/http/stateful_session/cookie @wbpcode @dio @zuercher
+/*/extensions/http/stateful_session/cookie @wbpcode @dio
 # DNS Resolver
 /*/extensions/network/dns_resolver/cares @junr03 @yanavlasov
 /*/extensions/network/dns_resolver/apple @junr03 @yanavlasov
