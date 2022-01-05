@@ -788,7 +788,8 @@ message Cluster {
 
   // Optional maximum requests for a single upstream connection. This parameter
   // is respected by both the HTTP/1.1 and HTTP/2 connection pool
-  // implementations. If not specified, there is no limit. Setting this
+  // implementations. If not specified, there is no limit for downstream connections.
+  // For upstream connections, the default limit is 1 << 29. Setting this
   // parameter to 1 will effectively disable keep alive.
   //
   // .. attention::
