@@ -42,7 +42,7 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
                                   const std::string& version_info) {
   UNREFERENCED_PARAMETER(resources);
   UNREFERENCED_PARAMETER(version_info);
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
