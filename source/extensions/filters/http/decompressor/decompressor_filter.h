@@ -167,7 +167,8 @@ private:
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
                       Http::StreamFilterCallbacks& callbacks, HeaderType& headers) {
-    bool should_decompress = direction_config.decompressionEnabled() &&
+    bool should_decompress =
+        direction_config.decompressionEnabled() &&
         (!hasCacheControlNoTransform(headers) || direction_config.ignoreNoTransformHeader()) &&
         contentEncodingMatches(headers);
     if (should_decompress) {

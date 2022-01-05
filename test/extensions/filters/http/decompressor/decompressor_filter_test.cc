@@ -413,7 +413,8 @@ TEST_P(DecompressorFilterTest, DecompressionDisabledWhenNoTransformIsSet) {
   expectNoDecompression();
 }
 
-TEST_P(DecompressorFilterTest, DecompressionEnabledWhenNoTransformAndIgnoreNoTransformHeaderAreSet) {
+TEST_P(DecompressorFilterTest,
+       DecompressionEnabledWhenNoTransformAndIgnoreNoTransformHeaderAreSet) {
   setUpFilter(R"EOF(
 decompressor_library:
   typed_config:
@@ -423,9 +424,8 @@ response_direction_config:
     ignore_no_transform_header: true
 )EOF");
 
-  Http::TestRequestHeaderMapImpl headers_before_filter{{"content-encoding", "mock"},
-                                                       {"content-length", "256"},
-                                                       {"cache-control", "no-transform"}};
+  Http::TestRequestHeaderMapImpl headers_before_filter{
+      {"content-encoding", "mock"}, {"content-length", "256"}, {"cache-control", "no-transform"}};
   if (isRequestDirection()) {
     EXPECT_CALL(*decompressor_factory_, createDecompressor(_)).Times(0);
     std::unique_ptr<Http::RequestOrResponseHeaderMap> headers_after_filter =
