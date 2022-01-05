@@ -146,7 +146,7 @@ LegacyHttpParserImpl::LegacyHttpParserImpl(MessageType type, ParserCallbacks* da
     parser_type = HTTP_RESPONSE;
     break;
   default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   impl_ = std::make_unique<Impl>(parser_type, data);

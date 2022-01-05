@@ -748,7 +748,7 @@ void FilterManager::addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
@@ -1229,7 +1229,7 @@ void FilterManager::addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::In
   } else {
     // TODO(mattklein123): Formalize error handling for filters and add tests. Should probably
     // throw an exception here.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("fatal error adding decoded data");
   }
 }
 
