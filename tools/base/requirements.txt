@@ -44,6 +44,7 @@ aiodocker==0.21.0 \
     --hash=sha256:6fe00135bb7dc40a407669d3157ecdfd856f3737d939df54f40a479d40cf7bdc
     # via
     #   envoy.distribution.distrotest
+    #   envoy.distribution.verify
     #   envoy.docker.utils
 aiofiles==0.7.0 \
     --hash=sha256:a1c4fc9b2ff81568c83e21392a82f344ea9d23da906e4f6a52662764545e19d4 \
@@ -278,15 +279,16 @@ envoy.base.runner==0.0.4 \
     #   envoy.docs.sphinx-runner
     #   envoy.github.abstract
     #   envoy.gpg.sign
-envoy.base.utils==0.0.10 \
-    --hash=sha256:252f47a17c6346b2496c24c239e7ff7b1312a62f0605877c5315176d3387aa61 \
-    --hash=sha256:a3e9fe045c2f117e4b5754c0f412a46ff1e058796e42aabda416f52029c7cd53
+envoy.base.utils==0.0.12 \
+    --hash=sha256:0c365ad4eb38752866dcfed0c1a09fc4343eb1efc3507e67eee461f580d734ae \
+    --hash=sha256:e23c5c7931bfd1ca93e9538d69534d616980bf0f7bf29c32da3ee1e05ba4793d
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
     #   envoy.dependency.cve-scan
     #   envoy.dependency.pip-check
     #   envoy.distribution.distrotest
+    #   envoy.distribution.verify
     #   envoy.docs.sphinx-runner
     #   envoy.github.release
     #   envoy.gpg.sign
@@ -297,17 +299,20 @@ envoy.dependency.cve-scan==0.0.1 \
     --hash=sha256:438973e6258deb271d60a9ad688c13ebf9c5360ccb9b6b0d4af3b3228235b153 \
     --hash=sha256:733fa5c6bdbe91da4afe1d46bca75279f717e410693866825d92208fa0d3418f
     # via -r requirements.in
-envoy.dependency.pip-check==0.0.4 \
-    --hash=sha256:3213d77959f65c3c97e9b5d74cb14c02bc02dae64bac2e7c3cb829a2f4e5e40e
+envoy.dependency.pip-check==0.0.5 \
+    --hash=sha256:9a4041dbc21f41191b34b92943060b015150ff837758c53f0e433c2233fb7074 \
+    --hash=sha256:b3eea3c9a9d2286271c93e477c04299ca44f4fbdbc757911399a7bfe4caacc90
     # via -r requirements.in
-envoy.distribution.distrotest==0.0.3 \
-    --hash=sha256:c094adbd959eb1336f93afc00aedb7ee4e68e8252e2365be816a6f9ede8a3de7
+envoy.distribution.distrotest==0.0.5 \
+    --hash=sha256:042747ff9691fe33bfccbf7821bae5735b705b9488a9a97f702d6b5b37063245 \
+    --hash=sha256:ea9d7cd819c0dbc34bc412c8c6608cb2898b002517ff32c3baa2a1b5275e93fb
     # via envoy.distribution.verify
 envoy.distribution.release==0.0.4 \
     --hash=sha256:41037e0488f0593ce5173739fe0cd1b45a4775f5a47738b85d9d04024ca241a2
     # via -r requirements.in
-envoy.distribution.verify==0.0.2 \
-    --hash=sha256:ae59134085de50203edf51c243dbf3301cbe5550db29f0ec6f9ea1c3b82fee1c
+envoy.distribution.verify==0.0.6 \
+    --hash=sha256:7b5022ca18189089f24dd31f0486a470e1a6636a8cc352a0507ca6305421f932 \
+    --hash=sha256:dbb7e535a5c18e0845b6d66017e3ca816254f40b2bc025951d92c5059ba9d518
     # via -r requirements.in
 envoy.docker.utils==0.0.2 \
     --hash=sha256:a12cb57f0b6e204d646cbf94f927b3a8f5a27ed15f60d0576176584ec16a4b76
@@ -324,11 +329,15 @@ envoy.github.abstract==0.0.16 \
 envoy.github.release==0.0.8 \
     --hash=sha256:fbc4354030137eb565b8c4d679965e4ef60b01de0c09310441836e592ca0cd19
     # via envoy.distribution.release
-envoy.gpg.identity==0.0.2 \
-    --hash=sha256:7d32ff9133e00b9974b4dabd2512b4872b091b8c5069d0112240dcc1a56bc406
-    # via envoy.gpg.sign
-envoy.gpg.sign==0.0.3 \
-    --hash=sha256:31667931f5d7ff05fd809b89748f277511486311c777652af4cb8889bd641049
+envoy.gpg.identity==0.0.6 \
+    --hash=sha256:2195e09aaacbaa8d6588378ad96d206708ffaf863aead38445eb3e54e4223c34 \
+    --hash=sha256:93032dd82c9c422c2145dbf426fd93c3673c53ba03cca2eab13f5fb8cf24f47c
+    # via
+    #   -r requirements.in
+    #   envoy.gpg.sign
+envoy.gpg.sign==0.0.7 \
+    --hash=sha256:898907dc76627802ab248576d2fb7d12ed4cce75148b5b070382bb51d25e6504 \
+    --hash=sha256:d61165d631d92c9726129ae72ddbb409d2514de3540a829d9ed9a090c165459e
     # via -r requirements.in
 flake8==4.0.1 \
     --hash=sha256:479b1304f72536a55948cb40a32dce8bb0ffe3501e26eaf292c7e60eb5e0428d \
@@ -342,9 +351,9 @@ flake8-polyfill==1.0.2 \
     --hash=sha256:12be6a34ee3ab795b19ca73505e7b55826d5f6ad7230d31b18e106400169b9e9 \
     --hash=sha256:e44b087597f6da52ec6393a709e7108b2905317d0c0b744cdca6208e670d8eda
     # via pep8-naming
-frozendict==2.1.1 \
-    --hash=sha256:655b879217dd445a2023e16154cc231febef802b5c812d5c2e822280ad69e1dc \
-    --hash=sha256:bbad8ef1a428f5e6f7e195742fd739f56a5a602f9cf9bbe86f55a4848b1fabd6
+frozendict==2.1.3 \
+    --hash=sha256:7a12336ba271066e1261a70d8ba97d5178392f3b317b31c6686e401423e70670 \
+    --hash=sha256:cfa47860932d549947157d68f246898f60b05da392f67219a913b85d8c36b1b2
     # via
     #   -r requirements.in
     #   envoy.base.runner
@@ -758,8 +767,10 @@ verboselogs==1.7 \
     # via
     #   -r requirements.in
     #   envoy.base.runner
+    #   envoy.distribution.distrotest
     #   envoy.github.abstract
     #   envoy.github.release
+    #   envoy.gpg.sign
 wrapt==1.12.1 \
     --hash=sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7
     # via deprecated
@@ -810,9 +821,9 @@ yarl==1.6.3 \
     # via aiohttp
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==59.6.0 \
-    --hash=sha256:22c7348c6d2976a52632c67f7ab0cdf40147db7789f9aed18734643fe9cf3373 \
-    --hash=sha256:4ce92f1e1f8f01233ee9952c04f6b81d1e02939d6e1b488428154974a4d0783e
+setuptools==60.2.0 \
+    --hash=sha256:5c89b1a14a67ac5f0956f1cb0aeb7d1d3f4c8ba4e4e1ab7bf1af4933f9a2f0fe \
+    --hash=sha256:675fcebecb43c32eb930481abf907619137547f4336206e4d673180242e1a278
     # via
     #   -r requirements.in
     #   sphinx

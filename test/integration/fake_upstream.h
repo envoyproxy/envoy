@@ -733,7 +733,7 @@ private:
       return parent_.onRecvDatagram(data);
     }
     Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
 
   private:

@@ -628,6 +628,9 @@ public:
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
   }
+  absl::optional<absl::string_view> interfaceName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().interfaceName();
+  }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
     return StreamInfoImpl::downstreamAddressProvider().sslConnection();
   }

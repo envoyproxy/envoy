@@ -1,3 +1,4 @@
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -31,10 +32,15 @@ class FakeTransportSocketFactory : public Network::TransportSocketFactory {
 public:
   MOCK_METHOD(bool, implementsSecureTransport, (), (const));
   MOCK_METHOD(bool, usesProxyProtocolOptions, (), (const));
+  MOCK_METHOD(bool, supportsAlpn, (), (const));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsConstSharedPtr), (const));
-  FakeTransportSocketFactory(std::string id) : id_(std::move(id)) {}
+  FakeTransportSocketFactory(std::string id, bool alpn) : supports_alpn_(alpn), id_(std::move(id)) {
+    ON_CALL(*this, supportsAlpn).WillByDefault(Invoke([this]() { return supports_alpn_; }));
+  }
   std::string id() const { return id_; }
+
+  bool supports_alpn_;
 
 private:
   const std::string id_;
@@ -58,7 +64,7 @@ public:
     if (!node.id().empty()) {
       id = node.id();
     }
-    return std::make_unique<FakeTransportSocketFactory>(id);
+    return std::make_unique<NiceMock<FakeTransportSocketFactory>>(id, supports_alpn_);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -66,12 +72,14 @@ public:
   }
 
   std::string name() const override { return "foo"; }
+  bool supports_alpn_{};
 };
 
 class TransportSocketMatcherTest : public testing::Test {
 public:
   TransportSocketMatcherTest()
-      : registration_(factory_), mock_default_factory_(new FakeTransportSocketFactory("default")),
+      : registration_(factory_),
+        mock_default_factory_(new NiceMock<FakeTransportSocketFactory>("default", false)),
         stats_scope_(stats_store_.createScope("transport_socket_match.test")) {}
 
   void init(const std::vector<std::string>& match_yaml) {
@@ -116,6 +124,61 @@ transport_socket:
 
   envoy::config::core::v3::Metadata metadata;
   validate(metadata, "default");
+
+  // Neither the defaults nor matcher support ALPN.
+  EXPECT_FALSE(matcher_->allMatchesSupportAlpn());
+}
+
+TEST_F(TransportSocketMatcherTest, AlpnSupport) {
+  mock_default_factory_ = std::make_unique<NiceMock<FakeTransportSocketFactory>>("default", true);
+  factory_.supports_alpn_ = true;
+  init({R"EOF(
+name: "enableFooSocket"
+match:
+  hasSidecar: "true"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "abc"
+ )EOF"});
+
+  // Both default and matcher support ALPN
+  EXPECT_TRUE(matcher_->allMatchesSupportAlpn());
+}
+
+TEST_F(TransportSocketMatcherTest, NoDefaultAlpnSupport) {
+  factory_.supports_alpn_ = true;
+  init({R"EOF(
+name: "enableFooSocket"
+match:
+  hasSidecar: "true"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "abc"
+ )EOF"});
+
+  // The default doesn't support ALPN, matchers do.
+  EXPECT_FALSE(matcher_->allMatchesSupportAlpn());
+}
+
+TEST_F(TransportSocketMatcherTest, NoMatcherAlpnSupport) {
+  mock_default_factory_ = std::make_unique<NiceMock<FakeTransportSocketFactory>>("default", true);
+  init({R"EOF(
+name: "enableFooSocket"
+match:
+  hasSidecar: "true"
+transport_socket:
+  name: "foo"
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.core.v3.Node
+    id: "abc"
+ )EOF"});
+
+  // The default doesn't support ALPN, matchers do.
+  EXPECT_FALSE(matcher_->allMatchesSupportAlpn());
 }
 
 TEST_F(TransportSocketMatcherTest, BasicMatch) {

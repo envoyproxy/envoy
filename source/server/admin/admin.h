@@ -235,9 +235,7 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -297,7 +295,6 @@ private:
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
-      NOT_REACHED_GCOVR_EXCL_LINE;
       return false;
     }
 

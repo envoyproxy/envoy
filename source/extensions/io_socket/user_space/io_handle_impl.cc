@@ -275,7 +275,8 @@ Api::SysCallIntResult IoHandleImpl::bind(Network::Address::InstanceConstSharedPt
 Api::SysCallIntResult IoHandleImpl::listen(int) { return makeInvalidSyscallResult(); }
 
 Network::IoHandlePtr IoHandleImpl::accept(struct sockaddr*, socklen_t*) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ENVOY_BUG(false, "unsupported call to accept");
+  return nullptr;
 }
 
 Api::SysCallIntResult IoHandleImpl::connect(Network::Address::InstanceConstSharedPtr address) {
@@ -341,7 +342,8 @@ void IoHandleImpl::initializeFileEvent(Event::Dispatcher& dispatcher, Event::Fil
 Network::IoHandlePtr IoHandleImpl::duplicate() {
   // duplicate() is supposed to be used on listener io handle while this implementation doesn't
   // support listen.
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  ENVOY_BUG(false, "unsupported call to duplicate");
+  return nullptr;
 }
 
 void IoHandleImpl::activateFileEvents(uint32_t events) {

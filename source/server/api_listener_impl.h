@@ -44,10 +44,7 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-    return nullptr;
-  }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override { return nullptr; }
 
 protected:
   ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
@@ -63,16 +60,12 @@ protected:
         : parent_(parent), connection_(SyntheticConnection(*this)) {}
 
     // Network::ReadFilterCallbacks
-    void continueReading() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-    void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+    void continueReading() override {}
+    void injectReadDataToFilterChain(Buffer::Instance&, bool) override {}
     Upstream::HostDescriptionConstSharedPtr upstreamHost() override { return nullptr; }
-    void upstreamHost(Upstream::HostDescriptionConstSharedPtr) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+    void upstreamHost(Upstream::HostDescriptionConstSharedPtr) override {}
     Network::Connection& connection() override { return connection_; }
-    const Network::Socket& socket() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+    const Network::Socket& socket() override { PANIC("not implemented"); }
 
     // Synthetic class that acts as a stub for the connection backing the
     // Network::ReadFilterCallbacks.
@@ -88,14 +81,10 @@ protected:
       void raiseConnectionEvent(Network::ConnectionEvent event);
 
       // Network::FilterManager
-      void addWriteFilter(Network::WriteFilterSharedPtr) override {
-        NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-      }
-      void addFilter(Network::FilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-      void addReadFilter(Network::ReadFilterSharedPtr) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-      void removeReadFilter(Network::ReadFilterSharedPtr) override {
-        NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-      }
+      void addWriteFilter(Network::WriteFilterSharedPtr) override {}
+      void addFilter(Network::FilterSharedPtr) override {}
+      void addReadFilter(Network::ReadFilterSharedPtr) override {}
+      void removeReadFilter(Network::ReadFilterSharedPtr) override {}
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
@@ -105,11 +94,9 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
-      void addBytesSentCallback(Network::Connection::BytesSentCb) override {
-        NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-      }
-      void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-      bool isHalfCloseEnabled() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void addBytesSentCallback(Network::Connection::BytesSentCb) override {}
+      void enableHalfClose(bool) override {}
+      bool isHalfCloseEnabled() override { return false; }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.mainThreadDispatcher();
@@ -117,9 +104,9 @@ protected:
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
-      void noDelay(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void noDelay(bool) override {}
       void readDisable(bool) override {}
-      void detectEarlyCloseWhenReadDisabled(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void detectEarlyCloseWhenReadDisabled(bool) override {}
       bool readEnabled() const override { return true; }
       const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
         return *connection_info_provider_;
@@ -136,8 +123,8 @@ protected:
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
       bool connecting() const override { return false; }
-      void write(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-      void setBufferLimits(uint32_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      void write(Buffer::Instance&, bool) override {}
+      void setBufferLimits(uint32_t) override {}
       uint32_t bufferLimit() const override { return 65000; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
@@ -147,7 +134,7 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
-      bool startSecureTransport() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+      bool startSecureTransport() override { return false; }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
