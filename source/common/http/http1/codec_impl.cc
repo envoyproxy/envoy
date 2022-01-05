@@ -227,6 +227,8 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
     }
   }
 
+  // Watermark checks are skipped while encoding headers and this `CRLF` will trigger once watermark
+  // check for entire encoded header map.
   connection_.buffer().add(CRLF);
 
   if (end_stream) {
@@ -410,8 +412,8 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     reason_phrase = {status_string, status_string_len};
   }
 
-  connection_.buffer().addFragments(response_prefix, absl::StrCat(numeric_status), SPACE,
-                                    reason_phrase, CRLF);
+  connection_.buffer().addFragments<false>(response_prefix, absl::StrCat(numeric_status), SPACE,
+                                           reason_phrase, CRLF);
 
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
@@ -452,8 +454,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     host_or_path_view = path->value().getStringView();
   }
 
-  connection_.buffer().addFragments(method->value().getStringView(), SPACE, host_or_path_view,
-                                    REQUEST_POSTFIX);
+  connection_.buffer().addFragments<false>(method->value().getStringView(), SPACE,
+                                           host_or_path_view, REQUEST_POSTFIX);
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));
