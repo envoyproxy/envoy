@@ -10,7 +10,6 @@
 10. Fix build on Linux/aarch64 (https://crrev.com/c/3337367).
 11. Link statically (https://crrev.com/c/3295460).
 12. Fix build with GCC (https://crrev.com/c/3333635).
-13. Enable snapshot compression.
 --- BUILD.bazel
 +++ BUILD.bazel
 @@ -17,6 +17,7 @@
@@ -57,15 +56,7 @@
          ":is_v8_enable_backtrace",
      ],
  )
-@@ -291,6 +292,7 @@
-         "ENABLE_DEBUGGER_SUPPORT",
-         "V8_ADVANCED_BIGINT_ALGORITHMS",
-         "V8_CONCURRENT_MARKING",
-+        "V8_SNAPSHOT_COMPRESSION",
-     ] + select({
-         ":is_debug": [
-             "DEBUG",
-@@ -299,26 +301,26 @@
+@@ -299,26 +300,26 @@
          "//conditions:default": [],
      }) + select(
          {
@@ -99,7 +90,7 @@
              "V8_HAVE_TARGET_OS",
              "V8_TARGET_OS_MACOSX",
          ],
-@@ -595,7 +597,7 @@
+@@ -595,7 +596,7 @@
          "src/base/vlq-base64.cc",
          "src/base/vlq-base64.h",
      ] + select({
@@ -108,7 +99,7 @@
              "src/base/platform/platform-posix.cc",
              "src/base/platform/platform-posix.h",
              "src/base/platform/platform-posix-time.cc",
-@@ -603,15 +605,15 @@
+@@ -603,15 +604,15 @@
          ],
          "//conditions:default": [],
      }) + select({
@@ -127,7 +118,7 @@
              "src/base/debug/stack_trace_posix.cc",
              "src/base/platform/platform-macos.cc",
          ],
-@@ -2027,7 +2029,7 @@
+@@ -2027,7 +2028,7 @@
          "src/heap/third-party/heap-api.h",
          "src/heap/third-party/heap-api-stub.cc",
      ] + select({
@@ -136,7 +127,7 @@
              "src/baseline/ia32/baseline-assembler-ia32-inl.h",
              "src/baseline/ia32/baseline-compiler-ia32-inl.h",
              "src/codegen/shared-ia32-x64/macro-assembler-shared-ia32-x64.h",
-@@ -2055,7 +2057,7 @@
+@@ -2055,7 +2056,7 @@
              "src/regexp/ia32/regexp-macro-assembler-ia32.h",
              "src/wasm/baseline/ia32/liftoff-assembler-ia32.h",
          ],
@@ -145,7 +136,7 @@
              "src/baseline/x64/baseline-assembler-x64-inl.h",
              "src/baseline/x64/baseline-compiler-x64-inl.h",
              "src/codegen/shared-ia32-x64/macro-assembler-shared-ia32-x64.h",
-@@ -2087,7 +2089,7 @@
+@@ -2087,7 +2088,7 @@
              "src/regexp/x64/regexp-macro-assembler-x64.h",
              "src/wasm/baseline/x64/liftoff-assembler-x64.h",
          ],
@@ -154,7 +145,7 @@
              "src/baseline/arm/baseline-assembler-arm-inl.h",
              "src/baseline/arm/baseline-compiler-arm-inl.h",
              "src/codegen/arm/assembler-arm-inl.h",
-@@ -2118,7 +2120,7 @@
+@@ -2118,7 +2119,7 @@
              "src/regexp/arm/regexp-macro-assembler-arm.h",
              "src/wasm/baseline/arm/liftoff-assembler-arm.h",
          ],
@@ -163,7 +154,7 @@
              "src/baseline/arm64/baseline-assembler-arm64-inl.h",
              "src/baseline/arm64/baseline-compiler-arm64-inl.h",
              "src/codegen/arm64/assembler-arm64-inl.h",
-@@ -2163,13 +2165,13 @@
+@@ -2163,13 +2164,13 @@
          ],
      }) + select({
          # Only for x64 builds and for arm64 with x64 host simulator.
@@ -179,7 +170,7 @@
              "src/trap-handler/trap-handler-simulator.h",
              "src/trap-handler/handler-outside-simulator.cc",
          ],
-@@ -2651,10 +2653,10 @@
+@@ -2651,10 +2652,10 @@
          "src/interpreter/interpreter-intrinsics-generator.cc",
          "src/interpreter/interpreter-intrinsics-generator.h",
      ] + select({
@@ -194,7 +185,7 @@
      }) + select({
          ":is_v8_enable_webassembly": [
              "src/builtins/builtins-wasm-gen.cc",
-@@ -2717,6 +2719,7 @@
+@@ -2717,6 +2718,7 @@
          "src/heap/cppgc/marking-visitor.h",
          "src/heap/cppgc/marking-worklists.cc",
          "src/heap/cppgc/marking-worklists.h",
@@ -202,7 +193,7 @@
          "src/heap/cppgc/memory.h",
          "src/heap/cppgc/metric-recorder.h",
          "src/heap/cppgc/name-trait.cc",
-@@ -2770,10 +2773,10 @@
+@@ -2770,10 +2772,10 @@
          # Note these cannot be v8_target_is_* selects because these contain
          # inline assembly that runs inside the executable. Since these are
          # linked directly into mksnapshot, they must use the actual target cpu.
@@ -217,7 +208,7 @@
      }),
  )
  
-@@ -2927,16 +2930,16 @@
+@@ -2927,16 +2929,16 @@
      srcs = [
          "src/init/setup-isolate-deserialize.cc",
      ] + select({
@@ -238,7 +229,7 @@
      }),
  )
  
-@@ -2945,16 +2948,16 @@
+@@ -2945,16 +2947,16 @@
      srcs = [
          "src/init/setup-isolate-deserialize.cc",
      ] + select({
@@ -259,7 +250,7 @@
      }),
  )
  
-@@ -2980,7 +2983,7 @@
+@@ -2980,7 +2982,7 @@
          ":is_v8_annotate_torque_ir": ["-annotate-ir"],
          "//conditions:default": [],
      }) + select({
@@ -268,7 +259,7 @@
          "//conditions:default": [],
      }),
      extras = [
-@@ -3032,7 +3035,7 @@
+@@ -3032,7 +3034,7 @@
          "src/inspector/protocol/Schema.cpp",
          "src/inspector/protocol/Schema.h",
      ],
@@ -277,7 +268,7 @@
      local = 1,
      message = "Generating inspector files",
  )
-@@ -3177,7 +3180,7 @@
+@@ -3177,7 +3179,7 @@
      ],
      deps = [
          ":v8_libbase",
@@ -286,7 +277,7 @@
      ],
  )
  
-@@ -3194,7 +3197,27 @@
+@@ -3194,7 +3196,27 @@
  v8_library(
      name = "wee8",
      srcs = [":wee8_files"],
@@ -315,7 +306,7 @@
  )
  
  alias(
-@@ -3253,7 +3276,7 @@
+@@ -3253,7 +3275,7 @@
      copts = ["-fexceptions"],
      features = ["-use_header_modules"],
      linkopts = select({
@@ -324,7 +315,7 @@
          "//conditions:default": [],
      }),
      deps = ["v8_libbase"],
-@@ -3264,7 +3287,7 @@
+@@ -3264,7 +3286,7 @@
      srcs = [":mksnapshot_files"],
      icu_deps = [":icu/v8_libshared"],
      linkopts = select({
