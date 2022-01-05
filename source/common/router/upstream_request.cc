@@ -50,7 +50,8 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
       create_per_try_timeout_on_request_complete_(false), paused_for_connect_(false),
-      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()) {
+      record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
+      cleaned_up_(false) {
   if (parent_.config().start_child_span_) {
     span_ = parent_.callbacks()->activeSpan().spawnChild(
         parent_.callbacks()->tracingConfig(), "router " + parent.cluster()->name() + " egress",
@@ -71,7 +72,13 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
   }
 }
 
-UpstreamRequest::~UpstreamRequest() {
+UpstreamRequest::~UpstreamRequest() { cleanUp(); }
+
+void UpstreamRequest::cleanUp() {
+  if (cleaned_up_) {
+    return;
+  }
+  cleaned_up_ = true;
   if (span_ != nullptr) {
     Tracing::HttpTracerUtility::finalizeUpstreamSpan(*span_, upstream_headers_.get(),
                                                      upstream_trailers_.get(), stream_info_,
@@ -445,6 +452,11 @@ void UpstreamRequest::onPoolReady(
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
     upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
+  }
+
+  if (info.downstreamAddressProvider().interfaceName().has_value()) {
+    upstream_info.setUpstreamInterfaceName(
+        info.downstreamAddressProvider().interfaceName().value());
   }
 
   stream_info_.setUpstreamBytesMeter(upstream_->bytesMeter());
