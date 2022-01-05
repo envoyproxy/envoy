@@ -15,6 +15,4 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.listener.connect_handler]
 
 message ConnectHandler {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.listener.http_inspector.v2.ConnectHandler";
 }

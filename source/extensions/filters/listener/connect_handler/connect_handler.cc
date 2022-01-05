@@ -30,7 +30,10 @@ http_parser_settings Filter::settings_{
 };
 
 thread_local uint8_t Filter::buf_[Config::MAX_INSPECT_SIZE];
-static absl::string_view response_body = " 200 Connection Established\r\n\r\n";
+
+namespace {
+  constexpr absl::string_view response_body = " 200 Connection Established\r\n\r\n";
+}
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   ENVOY_LOG(debug, "connect handler: new connection accepted");
@@ -60,6 +63,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
     cb.socket().ioHandle().initializeFileEvent(
         cb.dispatcher(),
         [this](uint32_t events) {
+          ASSERT(events == Event::FileReadyType::Read);
           ENVOY_LOG(trace, "connect handler event: {}", events);
 
           const ParseState parse_state = onRead();
@@ -81,7 +85,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  ENVOY_BUG(false, "Unexpected ParseState value for connect handler");
 }
 
 ParseState Filter::onRead() {
@@ -99,7 +103,7 @@ ParseState Filter::onRead() {
   if (result.return_value_ == 0) {
     return ParseState::Error;
   }
-  return parseConnect(absl::string_view(reinterpret_cast<const char*>(buf_)));
+  return parseConnect(reinterpret_cast<const char*>(buf_));
 }
 
 ParseState Filter::parseConnect(absl::string_view data) {
