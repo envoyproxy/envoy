@@ -56,9 +56,6 @@ ResetHeaderParserImpl::parseInterval(TimeSource& time_source,
       return absl::optional<std::chrono::milliseconds>(interval * 1000UL);
     }
     break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return absl::nullopt;
