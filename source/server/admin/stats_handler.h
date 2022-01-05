@@ -120,7 +120,7 @@ private:
                           const std::vector<Stats::HistogramSharedPtr>& all_histograms,
                           Buffer::Instance& response);
 
-  static std::string typeToString(Type type);
+  static absl::string_view typeToString(Type type);
 };
 
 } // namespace Server

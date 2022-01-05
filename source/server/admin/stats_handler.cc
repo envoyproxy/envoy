@@ -285,7 +285,7 @@ public:
 
   void render(Buffer::Instance& response) override {
     for (const auto& iter : groups_) {
-      std::string label = StatsHandler::typeToString(iter.first);
+      absl::string_view label = StatsHandler::typeToString(iter.first);
       ENVOY_LOG_MISC(error, "Rendering {}", label);
       const Group& group = iter.second;
       if (group.empty()) {
@@ -412,22 +412,21 @@ public:
       return;
     }
 
-    bool has_next_type = params_.type_ == Type::All &&
-                         static_cast<uint32_t>(type) < static_cast<uint32_t>(Type::All);
-    bool has_prev_type = params_.type_ == Type::All && static_cast<uint32_t>(type) > 0;
-    auto prev_type_label = [type]() -> std::string {
-      return typeToString(static_cast<Type>(static_cast<uint32_t>(type) - 1));
-    };
-    auto next_type_label = [type]() -> std::string {
-      return typeToString(static_cast<Type>(static_cast<uint32_t>(type) + 1));
-    };
+    absl::string_view prev_type_label, next_type_label;
+    if (params_.type_ == Type::All && static_cast<uint32_t>(type) > 0) {
+      prev_type_label = typeToString(static_cast<Type>(static_cast<uint32_t>(type) - 1));
+    }
+    if (params_.type_ == Type::All &&
+        static_cast<uint32_t>(type) + 1 < static_cast<uint32_t>(Type::All)) {
+      next_type_label = typeToString(static_cast<Type>(static_cast<uint32_t>(type) + 1));
+    }
 
     // If page is already full, we may need to enable navigation to this type prior to bailing.
     if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
       // Make sure we expose a next/prev link to reveal the types we are not hitting.
       if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (has_next_type && next_start_.empty()) {
-          next_start_ = absl::StrCat(next_type_label(), StartSeparator, "");
+        if (!next_type_label.empty() && next_start_.empty()) {
+          next_start_ = absl::StrCat(next_type_label, StartSeparator, "");
           ENVOY_LOG_MISC(error, "AAA: setting next_start_={}", next_start_);
         }
       } else if (prev_start_.empty()) {
@@ -455,12 +454,12 @@ public:
 
     if (stats.empty()) {
       if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (page_full && has_next_type && next_start_.empty()) {
-          next_start_ = absl::StrCat(next_type_label(), StartSeparator);
+        if (page_full && !next_type_label.empty() && next_start_.empty()) {
+          next_start_ = absl::StrCat(next_type_label, StartSeparator);
           ENVOY_LOG_MISC(error, "BBB: setting next_start_={}", next_start_);
         }
-      } else if (has_prev_type) {
-        prev_start_ = absl::StrCat(prev_type_label(), StartSeparator);
+      } else if (!prev_type_label.empty()) {
+        prev_start_ = absl::StrCat(prev_type_label, StartSeparator);
       }
       return;
     }
@@ -475,15 +474,15 @@ public:
       if (more_data) {
         next_start_ = last;
         ENVOY_LOG_MISC(error, "CCC: setting next_start_={}", next_start_);
-      } else if (next_start_.empty() && page_full && has_next_type) {
-        next_start_ = absl::StrCat(next_type_label(), StartSeparator);
+      } else if (next_start_.empty() && page_full && !next_type_label.empty()) {
+        next_start_ = absl::StrCat(next_type_label, StartSeparator);
         ENVOY_LOG_MISC(error, "DDD: setting next_start_={}", next_start_);
       }
     } else {
       if (more_data) {
         prev_start_ = last;
-      } else if (prev_start_.empty() && has_prev_type) {
-        prev_start_ = absl::StrCat(prev_type_label(), StartSeparator);
+      } else if (prev_start_.empty() && !prev_type_label.empty()) {
+        prev_start_ = absl::StrCat(prev_type_label, StartSeparator);
       }
       if (!params_.start_.empty() && next_start_.empty()) {
         next_start_ = first;
@@ -832,19 +831,32 @@ Admin::UrlHandler StatsHandler::statsHandler() {
             {AllLabel, CountersLabel, HistogramsLabel, GaugesLabel, TextReadoutsLabel}}}};
 }
 
-std::string StatsHandler::typeToString(StatsHandler::Type type) {
+absl::string_view StatsHandler::typeToString(StatsHandler::Type type) {
+  static constexpr absl::string_view TextReadouts = "TextReadouts";
+  static constexpr absl::string_view Counters = "Counters";
+  static constexpr absl::string_view Gauges = "Gauges";
+  static constexpr absl::string_view Histograms = "Histograms";
+  static constexpr absl::string_view All = "All";
+
+  absl::string_view ret;
   switch (type) {
   case Type::TextReadouts:
-    return "TextReadouts";
+    ret = TextReadouts;
+    break;
   case Type::Counters:
-    return "Counters";
+    ret = Counters;
+    break;
   case Type::Gauges:
-    return "Gauges";
+    ret = Gauges;
+    break;
   case Type::Histograms:
-    return "Histograms";
+    ret = Histograms;
+    break;
   case Type::All:
-    return "All";
+    ret = All;
+    break;
   }
+  return ret;
 }
 
 } // namespace Server
