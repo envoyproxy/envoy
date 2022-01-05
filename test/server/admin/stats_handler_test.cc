@@ -142,15 +142,17 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  std::vector<Stats::Counter*> counters;
+  // no text readouts for now.
   for (uint32_t i = 0; i < 10; ++i) {
-    Stats::Counter& c = store_->counterFromString(absl::StrCat("c", i));
-    counters.push_back(&c);
-    c.add(10 * i);
+    store_->counterFromString(absl::StrCat("c", i)).add(10 * i);
   }
+  store_->gaugeFromString("g1", Stats::Gauge::ImportMode::Accumulate).set(100);
+  store_->gaugeFromString("g2", Stats::Gauge::ImportMode::Accumulate).set(200);
+  store_->histogramFromString("h1", Stats::Histogram::Unit::Unspecified);
 
-  auto test_page = [this](absl::string_view direction, absl::string_view start, uint32_t first,
-                          uint32_t last, absl::string_view prev, absl::string_view next) {
+  auto test_page = [this](absl::string_view direction, absl::string_view start,
+                          absl::string_view expected_items, absl::string_view prev,
+                          absl::string_view next) {
     Buffer::OwnedImpl data;
     std::string url = "/stats?format=html&pagesize=4&type=All&";
     if (direction == "prev") {
@@ -161,13 +163,26 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
 
     Http::Code code = handlerStats(url, data);
     EXPECT_EQ(Http::Code::OK, code);
-    std::string expected = "<pre>\n";
-    for (uint32_t i = first; i <= last; ++i) {
-      absl::StrAppend(&expected, "c", i, ": ", 10 * i, "\n");
-    }
-    absl::StrAppend(&expected, "</pre>");
+
+    // Find all the line between "<pre>" and "</pre>", and collect
+    // the first token of each line, up to the ":".
+    bool in_pre = false;
     std::string out = data.toString();
-    EXPECT_THAT(out, HasSubstr(expected)) << "url=" << url;
+    std::vector<absl::string_view> item_vector;
+    for (absl::string_view line : absl::StrSplit(out, "\n")) {
+      if (line == "<pre>") {
+        in_pre = true;
+      } else if (line == "</pre>") {
+        in_pre = false;
+      } else if (in_pre) {
+        absl::string_view::size_type colon = line.find(':');
+        if (colon != absl::string_view::npos) {
+          item_vector.push_back(line.substr(0, colon));
+        }
+      }
+    }
+    std::string actual_items = absl::StrJoin(item_vector, ",");
+    EXPECT_EQ(expected_items, actual_items) << "url=" << url;
 
     auto nav = [](absl::string_view direction, absl::string_view start = "") -> std::string {
       std::string out = absl::StrCat("javascript:", direction);
@@ -190,13 +205,16 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
   };
 
   // Forward walk to end.
-  test_page("next", "", 0, 3, "", "Counters:c3");
-  test_page("next", "Counters:c3", 4, 7, "Counters:c4", "Counters:c7");
-  test_page("next", "Counters:c7", 8, 9, "Counters:c8", "Gauges:");
+  test_page("next", "", "c0,c1,c2,c3", "", "Counters:c3");
+  test_page("next", "Counters:c3", "c4,c5,c6,c7", "Counters:c4", "Counters:c7");
+  test_page("next", "Counters:c7", "c8,c9,g1,g2", "Counters:c8", "Histograms:");
+  test_page("next", "Gauges:g2", "h1", "Histograms:h1", "");
 
   // Reverse walk to beginning.
-  test_page("prev", "Counters:c8", 4, 7, "Counters:c4", "Counters:c7");
-  test_page("prev", "Counters:c4", 0, 3, "TextReadouts:", "Counters:c3");
+  test_page("prev", "Histograms:h1", "c9,g1,g2,h1", "Counters:c9", "Histograms:h1");
+  test_page("prev", "Counters:c9", "c5,c6,c7,c8", "Counters:c5", "Counters:c8");
+  test_page("prev", "Counters:c5", "c1,c2,c3,c4", "Counters:c1", "Counters:c4");
+  test_page("prev", "Counters:c1", "c0", "TextReadouts:", "Counters:c0");
 
   shutdownThreading();
 }

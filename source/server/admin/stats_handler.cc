@@ -162,10 +162,10 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     return true;
   };
 
-  // For clarity and brevirty of command-line options, we parse &after=xxx to
-  // mean display the first page of stats alphabetically after "xxx", and
-  // &&before=yyy to mena display the last page of stats alphabetically before
-  // "yyy". It is not valid to specify both &before=... and after, though that
+  // For clarity and brevity of command-line options, we parse &after=foo to
+  // mean display the first page of stats alphabetically after "foo", and
+  // &&before=bar to mean display the last page of stats alphabetically before
+  // "bar". It is not valid to specify both &before=... and after, though that
   // could make sense in principle. It's just not that useful for paging, so
   // it is not implemented. If nothing is specified, that implies "&after=",
   // which gives you the first page.
@@ -237,37 +237,73 @@ public:
   virtual void gauge(Stats::Gauge&) PURE;
   virtual void textReadout(Stats::TextReadout&) PURE;
   virtual void histogram(Stats::Histogram&) PURE;
+  virtual void noStats(Type type) { UNREFERENCED_PARAMETER(type); }
+  virtual void render(Buffer::Instance& response) PURE;
 };
 
 class StatsHandler::TextRender : public StatsHandler::Render {
+protected:
+  using Group = std::vector<std::string>;
+
 public:
-  explicit TextRender(Buffer::Instance& response) : response_(response) {}
+  void textReadout(Stats::TextReadout& text_readout) override {
+    groups_[Type::TextReadouts].emplace_back(absl::StrCat(
+        text_readout.name(), ": \"", Html::Utility::sanitize(text_readout.value()), "\"\n"));
+  }
   void counter(Stats::Counter& counter) override {
-    response_.add(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
+    groups_[Type::Counters].emplace_back(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
   }
   void gauge(Stats::Gauge& gauge) override {
-    response_.add(absl::StrCat(gauge.name(), ": ", gauge.value(), "\n"));
-  }
-  void textReadout(Stats::TextReadout& text_readout) override {
-    response_.add(absl::StrCat(text_readout.name(), ": \"",
-                               Html::Utility::sanitize(text_readout.value()), "\"\n"));
+    groups_[Type::Gauges].emplace_back(absl::StrCat(gauge.name(), ": ", gauge.value(), "\n"));
   }
   void histogram(Stats::Histogram& histogram) override {
     Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
     if (phist != nullptr) {
-      response_.add(absl::StrCat(phist->name(), ": ", phist->quantileSummary(), "\n"));
+      groups_[Type::Histograms].emplace_back(
+          absl::StrCat(phist->name(), ": ", phist->quantileSummary(), "\n"));
     }
   }
 
-private:
-  Buffer::Instance& response_;
+  void render(Buffer::Instance& response) override {
+    for (const auto& iter : groups_) {
+      const Group& group = iter.second;
+      for (const std::string& str : group) {
+        response.add(str);
+      }
+    }
+  }
+
+protected:
+  std::map<Type, Group> groups_; // Ordered by Type's numeric value.
+};
+
+class StatsHandler::HtmlRender : public StatsHandler::TextRender {
+public:
+  void noStats(Type type) override {
+    groups_[type]; // Make an empty group for this type.
+  }
+
+  void render(Buffer::Instance& response) override {
+    for (const auto& iter : groups_) {
+      std::string label = StatsHandler::typeToString(iter.first);
+      ENVOY_LOG_MISC(error, "Rendering {}", label);
+      const Group& group = iter.second;
+      if (group.empty()) {
+        response.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
+      } else {
+        response.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
+        for (const std::string& str : group) {
+          response.add(str);
+        }
+        response.add("</pre>\n");
+      }
+    }
+  }
 };
 
 class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
-  JsonRender(Buffer::Instance& response, const Params& params)
-      : params_(params), response_(response) {}
-  ~JsonRender() override { render(); }
+  explicit JsonRender(const Params& params) : params_(params) {}
 
   void counter(Stats::Counter& counter) override {
     add(counter, ValueUtil::numberValue(counter.value()));
@@ -316,8 +352,7 @@ public:
     }
   }
 
-private:
-  void render() {
+  void render(Buffer::Instance& response) override {
     if (found_used_histogram_) {
       auto* histograms_obj_fields = histograms_obj_.mutable_fields();
       (*histograms_obj_fields)["computed_quantiles"] =
@@ -329,9 +364,10 @@ private:
 
     auto* document_fields = document_.mutable_fields();
     (*document_fields)["stats"] = ValueUtil::listValue(stats_array_);
-    response_.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
+    response.add(MessageUtil::getJsonStringFromMessageOrDie(document_, params_.pretty_, true));
   }
 
+private:
   template <class StatType, class Value> void add(StatType& stat, const Value& value) {
     ProtobufWkt::Struct stat_obj;
     auto* stat_obj_fields = stat_obj.mutable_fields();
@@ -347,7 +383,6 @@ private:
   ProtobufWkt::Struct histograms_obj_container_;
   std::vector<ProtobufWkt::Value> computed_quantile_array_;
   bool found_used_histogram_{false};
-  Buffer::Instance& response_;
 };
 
 class StatsHandler::Context {
@@ -377,12 +412,22 @@ public:
       return;
     }
 
+    bool has_next_type = params_.type_ == Type::All &&
+                         static_cast<uint32_t>(type) < static_cast<uint32_t>(Type::All);
+    bool has_prev_type = params_.type_ == Type::All && static_cast<uint32_t>(type) > 0;
+    auto prev_type_label = [type]() -> std::string {
+      return typeToString(static_cast<Type>(static_cast<uint32_t>(type) - 1));
+    };
+    auto next_type_label = [type]() -> std::string {
+      return typeToString(static_cast<Type>(static_cast<uint32_t>(type) + 1));
+    };
+
     // If page is already full, we may need to enable navigation to this type prior to bailing.
     if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
       // Make sure we expose a next/prev link to reveal the types we are not hitting.
       if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (next_start_.empty()) {
-          next_start_ = absl::StrCat(label, StartSeparator, "");
+        if (has_next_type && next_start_.empty()) {
+          next_start_ = absl::StrCat(next_type_label(), StartSeparator, "");
           ENVOY_LOG_MISC(error, "AAA: setting next_start_={}", next_start_);
         }
       } else if (prev_start_.empty()) {
@@ -401,21 +446,21 @@ public:
       return !params_.page_size_.has_value() || num_ < params_.page_size_.value();
     };
 
-    bool more = page_fn(stat_fn);
+    if (stats.empty()) {
+      render_.noStats(type);
+    }
+
+    bool more_data = page_fn(stat_fn);
+    bool page_full = params_.page_size_.has_value() && num_ == params_.page_size_.value();
 
     if (stats.empty()) {
-      if (params_.format_ == Format::Html) {
-        response_.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
-      }
       if (params_.direction_ == Stats::PageDirection::Forward) {
-        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) + 1);
-        if (next_type != Type::All && next_start_.empty()) {
-          next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
+        if (page_full && has_next_type && next_start_.empty()) {
+          next_start_ = absl::StrCat(next_type_label(), StartSeparator);
           ENVOY_LOG_MISC(error, "BBB: setting next_start_={}", next_start_);
         }
-      } else if (static_cast<uint32_t>(type) > 0) {
-        Type prev_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
-        prev_start_ = absl::StrCat(typeToString(prev_type), StartSeparator);
+      } else if (has_prev_type) {
+        prev_start_ = absl::StrCat(prev_type_label(), StartSeparator);
       }
       return;
     }
@@ -427,22 +472,18 @@ public:
       if (!params_.start_.empty() && prev_start_.empty()) {
         prev_start_ = first;
       }
-      if (more) {
+      if (more_data) {
         next_start_ = last;
         ENVOY_LOG_MISC(error, "CCC: setting next_start_={}", next_start_);
-      } else if (next_start_.empty()) {
-        Type next_type = static_cast<Type>(static_cast<uint32_t>(type) + 1);
-        if (next_type != Type::All) {
-          next_start_ = absl::StrCat(typeToString(next_type), StartSeparator);
-          ENVOY_LOG_MISC(error, "DDD: setting next_start_={}", next_start_);
-        }
+      } else if (next_start_.empty() && page_full && has_next_type) {
+        next_start_ = absl::StrCat(next_type_label(), StartSeparator);
+        ENVOY_LOG_MISC(error, "DDD: setting next_start_={}", next_start_);
       }
     } else {
-      if (more) {
+      if (more_data) {
         prev_start_ = last;
-      } else if (prev_start_.empty() && static_cast<uint32_t>(type) > 0) {
-        Type prev_type = static_cast<Type>(static_cast<uint32_t>(type) - 1);
-        prev_start_ = absl::StrCat(typeToString(prev_type), StartSeparator);
+      } else if (prev_start_.empty() && has_prev_type) {
+        prev_start_ = absl::StrCat(prev_type_label(), StartSeparator);
       }
       if (!params_.start_.empty() && next_start_.empty()) {
         next_start_ = first;
@@ -451,14 +492,8 @@ public:
       std::reverse(stats.begin(), stats.end());
     }
 
-    if (params_.format_ == Format::Html) {
-      response_.add(absl::StrCat("<h1>", label, "</h1>\n<pre>\n"));
-    }
     for (const auto& stat : stats) {
       render_fn(*stat);
-    }
-    if (params_.format_ == Format::Html) {
-      response_.add("</pre>\n");
     }
   }
 
@@ -520,27 +555,32 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
                                Buffer::Instance& response) {
   std::unique_ptr<Render> render;
 
-  if (params.format_ == Format::Json) {
-    render = std::make_unique<JsonRender>(response, params);
+  switch (params.format_) {
+  case Format::Html: {
+    render = std::make_unique<HtmlRender>();
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
+    AdminHtmlGenerator html(response);
+    html.setVisibleSubmit(false);
+    html.setSubmitOnChange(true);
+    html.renderHead();
+    html.renderUrlHandler(statsHandler(), params.query_);
+    html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    html.renderTail();
+    response.add("<body>\n");
+    break;
+  }
+  case Format::Json:
+    render = std::make_unique<JsonRender>(params);
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  } else {
-    render = std::make_unique<TextRender>(response);
-    if (params.format_ == Format::Html) {
-      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-      AdminHtmlGenerator html(response);
-      html.setVisibleSubmit(false);
-      html.setSubmitOnChange(true);
-      html.renderHead();
-      html.renderUrlHandler(statsHandler(), params.query_);
-      html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-      html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-      html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_,
-                       {});
-      html.renderTail();
-      response.add("<body>\n");
-    } else {
-      ASSERT(params.format_ == Format::Text);
-    }
+    break;
+  case Format::Prometheus:
+    ASSERT(false);
+    // fall through
+  case Format::Text:
+    render = std::make_unique<TextRender>();
+    break;
   }
 
   Context context(params, *render, response, stats);
@@ -557,6 +597,8 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     context.textReadouts();
   }
 
+  render->render(response);
+
   if (params.format_ == Format::Html) {
     if (!context.prev_start_.empty()) {
       response.add(absl::StrCat("  <a href='javascript:prev(\"", context.prev_start_,
@@ -566,6 +608,7 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
       response.add(
           absl::StrCat("  <a href='javascript:next(\"", context.next_start_, "\")'>Next</a>\n"));
     }
+
     response.add("</body>\n");
   }
 

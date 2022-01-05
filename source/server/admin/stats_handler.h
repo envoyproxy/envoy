@@ -57,6 +57,7 @@ public:
 
 private:
   class Context;
+  class HtmlRender;
   class JsonRender;
   class Render;
   class TextRender;
