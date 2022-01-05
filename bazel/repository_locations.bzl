@@ -827,10 +827,10 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "V8",
         project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
-        version = "9.7.106.17",
+        version = "9.9.62",
         # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
         # and contains complete checkout of V8 with all dependencies necessary to build wee8.
-        sha256 = "ad7d61662e7f3486544a57c1d963e8dac2a64c4f0e91689d5cbe8d5fb468b3cc",
+        sha256 = "bca06342b955e8acdfa200266b4b956bd54a5bee9bf7be9d0a16802dc3a47521",
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-{version}.tar.gz"],
         strip_prefix = "wee8",
         use_category = ["dataplane_ext"],
