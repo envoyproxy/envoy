@@ -42,7 +42,8 @@ void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&
                                   const std::string& version_info) {
   UNREFERENCED_PARAMETER(resources);
   UNREFERENCED_PARAMETER(version_info);
-  PANIC("not implemented");
+  // On-demand cluster updates are only supported for delta, not sotw.
+  PANIC("not supported");
 }
 
 void OdCdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
