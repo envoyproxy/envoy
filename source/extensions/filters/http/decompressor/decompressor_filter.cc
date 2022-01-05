@@ -51,8 +51,7 @@ DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", scope, runtime),
-      advertise_accept_encoding_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
+      advertise_accept_encoding_(proto_config.advertise_accept_encoding()) {}
 
 DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&

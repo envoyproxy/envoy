@@ -28,7 +28,7 @@ message Decompressor {
 
     // If set to true, will decompress response even if a 'no-transform' cache control header is set.
     // Defaults to false.
-    google.protobuf.BoolValue ignore_no_transform_header = 2;
+    bool ignore_no_transform_header = 2;
   }
 
   // Configuration for filter behavior on the request direction.
