@@ -3707,7 +3707,7 @@ public:
     }
     return sendResponseHeaders(ResponseHeaderMapPtr{response_headers}, response_flag, details);
   }
-  void teardown() { doRemoteClose(); }
+  void TearDown() override { doRemoteClose(); }
 
 protected:
   const std::string servername_{"custom_server_name"};
@@ -3723,8 +3723,6 @@ TEST_F(ProxyStatusTest, NoPopulateProxyStatus) {
   ASSERT_TRUE(altered_headers);
   ASSERT_FALSE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getStatusValue(), "403"); // unchanged from request.
-
-  teardown();
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerName) {
@@ -3745,8 +3743,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCodeAndServerNa
   // Changed from request, since set_recommended_response_code is true. Here,
   // 503 is the recommended response code for FailedLocalHealthCheck.
   EXPECT_EQ(altered_headers->getStatusValue(), "503");
-
-  teardown();
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
@@ -3768,8 +3764,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
   // Changed from request, since set_recommended_response_code is true. Here,
   // 504 is the recommended response code for UpstreamRequestTimeout.
   EXPECT_EQ(altered_headers->getStatusValue(), "504");
-
-  teardown();
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
@@ -3794,8 +3788,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetails) {
   // 504 would be the recommended response code for UpstreamRequestTimeout,
   EXPECT_NE(altered_headers->getStatusValue(), "504");
   EXPECT_EQ(altered_headers->getStatusValue(), "403");
-
-  teardown();
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
@@ -3818,8 +3810,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithoutDetails) {
   // Since remove_details=true, we should not have "baz", the value of
   // response_code_details, in the Proxy-Status header.
   EXPECT_THAT(altered_headers->getProxyStatusValue(), Not(HasSubstr("baz")));
-
-  teardown();
 }
 
 TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
@@ -3839,8 +3829,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusAppendToPreviousValue) {
   // Expect to see the appended previous value: "SomeCDN; envoy; ...".
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
             "SomeCDN, envoy; error=connection_timeout; details=\"baz; UT\"");
-
-  teardown();
 }
 
 } // namespace Http
