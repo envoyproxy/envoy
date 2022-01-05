@@ -86,7 +86,7 @@ public:
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("match fail");
       return nullptr;
     }
   }

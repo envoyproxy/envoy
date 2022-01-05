@@ -32,7 +32,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Uncaught default");
   }
 }
 
