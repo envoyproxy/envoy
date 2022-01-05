@@ -40,7 +40,7 @@ By *default* decompression will be *skipped* when:
 - A request/response includes *content-encoding* header, but it does not contain the configured
   decompressor's content-encoding.
 - A request/response contains a *cache-control* header whose value includes "no-transform",
-  unless :ref:`ignore_no_transform_header <envoy_v3_api_msg_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig.ignore_no_transform_header>`
+  unless :ref:`ignore_no_transform_header <envoy_v3_api_field_extensions.filters.http.decompressor.v3.Decompressor.CommonDirectionConfig.ignore_no_transform_header>`
   is set to *true*.
 
 When decompression is *applied*:
