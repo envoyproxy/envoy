@@ -167,7 +167,6 @@ private:
   maybeInitDecompress(const DecompressorFilterConfig::DirectionConfig& direction_config,
                       Compression::Decompressor::DecompressorPtr& decompressor,
                       Http::StreamFilterCallbacks& callbacks, HeaderType& headers) {
-    // TODO(jpsim): Add unit tests for ignoreNoTransformHeader.
     bool should_decompress = direction_config.decompressionEnabled() &&
         (!hasCacheControlNoTransform(headers) || direction_config.ignoreNoTransformHeader()) &&
         contentEncodingMatches(headers);
