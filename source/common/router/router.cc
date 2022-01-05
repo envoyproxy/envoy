@@ -998,7 +998,7 @@ void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
         retry_state_->shouldHedgeRetryPerTryTimeout([this, &upstream_request]() -> void {
           // Without any knowledge about what's going on in the connection pool, retry the request
           // with the safest settings which is no early data but keep using or not using alt-svc as
-          // before. In this way, QUIC won't be fasely marked as broken.
+          // before. In this way, QUIC won't be falsely marked as broken.
           doRetry(/*has_early_data*/ false, upstream_request.useAltSvc());
         });
 
