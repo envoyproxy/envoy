@@ -43,15 +43,15 @@ DecompressorFilterConfig::DirectionConfig::DirectionConfig(
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)),
       decompression_enabled_(proto_config.enabled(), runtime),
-      ignore_no_transform_header_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, ignore_no_transform_header, false)) {}
+      ignore_no_transform_header_(proto_config.ignore_no_transform_header()) {}
 
 DecompressorFilterConfig::RequestDirectionConfig::RequestDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::RequestDirectionConfig&
         proto_config,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : DirectionConfig(proto_config.common_config(), stats_prefix + "request.", scope, runtime),
-      advertise_accept_encoding_(proto_config.advertise_accept_encoding()) {}
+      advertise_accept_encoding_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, advertise_accept_encoding, true)) {}
 
 DecompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor::ResponseDirectionConfig&
