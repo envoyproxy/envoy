@@ -65,14 +65,14 @@ TEST(BasicFilterConfigTest, CreatingRouteMatcher) {
                   input:
                     name: envoy.matching.meta_protocol.input.service
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.ServiceMatchInput
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.ServiceMatchInput
                   value_match:
                     exact: "service_0"
           on_match:
             action:
               name: envoy.matching.action.meta_protocol.route
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.RouteAction
+                "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.RouteAction
                 cluster: "cluster_0"
                 metadata:
                   filter_metadata:

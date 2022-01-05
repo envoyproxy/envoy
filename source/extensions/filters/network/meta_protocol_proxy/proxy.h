@@ -45,7 +45,8 @@ public:
 
   FilterConfig(const ProxyConfig& config, Server::Configuration::FactoryContext& context)
       : FilterConfig(
-            config.stat_prefix(), codecFactoryFromProto(config.codec(), context),
+            config.stat_prefix(),
+            codecFactoryFromProto(config.application_protocol().codec(), context),
             routeMatcherFromProto(config.route_config(), context),
             filtersFactoryFromProto(config.meta_protocol_filters(), config.stat_prefix(), context),
             context) {}

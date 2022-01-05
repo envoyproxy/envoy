@@ -55,18 +55,6 @@ TEST_F(RouteEntryImplTest, SimpleClusterName) {
 };
 
 /**
- * Test the method that get request timeout from the route entry.
- */
-TEST_F(RouteEntryImplTest, DefaultTimeout) {
-  const std::string yaml_config = R"EOF(
-    cluster: cluster_0
-  )EOF";
-  initialize(yaml_config);
-
-  EXPECT_EQ(route_->timeout().count(), 15000);
-};
-
-/**
  * Test the method that get filter metadata from the route entry.
  */
 TEST_F(RouteEntryImplTest, RouteMetadata) {
@@ -189,14 +177,14 @@ routes:
               input:
                 name: envoy.matching.meta_protocol.input.service
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.ServiceMatchInput
+                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.ServiceMatchInput
               value_match:
                 exact: "service_0"
           - single_predicate:
               input:
                 name: envoy.matching.meta_protocol.input.method
                 typed_config:
-                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.MethodMatchInput
+                  "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.MethodMatchInput
               value_match:
                 exact: "method_0"
           - or_matcher:
@@ -205,7 +193,7 @@ routes:
                   input:
                     name: envoy.matching.meta_protocol.input.property
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.PropertyMatchInput
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.PropertyMatchInput
                       property_name: "key_0"
                   value_match:
                     exact: "value_0"
@@ -213,7 +201,7 @@ routes:
                   input:
                     name: envoy.matching.meta_protocol.input.property
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.PropertyMatchInput
+                      "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.v3.PropertyMatchInput
                       property_name: "key_1"
                   value_match:
                     exact: "value_1"
@@ -221,7 +209,7 @@ routes:
         action:
           name: envoy.matching.action.meta_protocol.route
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.v3.RouteAction
+            "@type": type.googleapis.com/envoy.extensions.filters.network.meta_protocol_proxy.matcher.action.v3.RouteAction
             cluster: "cluster_0"
             metadata:
               filter_metadata:

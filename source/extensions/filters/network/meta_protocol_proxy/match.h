@@ -3,8 +3,8 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3/matcher.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/v3/matcher.pb.validate.h"
 
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/network/meta_protocol_proxy/interface/stream.h"
@@ -15,11 +15,11 @@ namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
 using ServiceDataInputProto =
-    envoy::extensions::filters::network::meta_protocol_proxy::v3::ServiceMatchInput;
+    envoy::extensions::filters::network::meta_protocol_proxy::matcher::v3::ServiceMatchInput;
 using MethodDataInputProto =
-    envoy::extensions::filters::network::meta_protocol_proxy::v3::MethodMatchInput;
+    envoy::extensions::filters::network::meta_protocol_proxy::matcher::v3::MethodMatchInput;
 using PropertyDataInputProto =
-    envoy::extensions::filters::network::meta_protocol_proxy::v3::PropertyMatchInput;
+    envoy::extensions::filters::network::meta_protocol_proxy::matcher::v3::PropertyMatchInput;
 
 class ServiceMatchDataInput : public Matcher::DataInput<Request> {
 public:

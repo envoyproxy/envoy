@@ -5,7 +5,10 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3/action.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/matcher/action/v3/action.pb.validate.h"
 #include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.validate.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/matchers.h"
@@ -20,7 +23,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MetaProtocolProxy {
 
-using ProtoRouteAction = envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteAction;
+using ProtoRouteAction =
+    envoy::extensions::filters::network::meta_protocol_proxy::matcher::action::v3::RouteAction;
 using ProtoRouteConfiguration =
     envoy::extensions::filters::network::meta_protocol_proxy::v3::RouteConfiguration;
 
@@ -36,16 +40,13 @@ public:
     return iter != per_filter_configs_.end() ? iter->second.get() : nullptr;
   }
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
-  std::chrono::milliseconds timeout() const override { return timeout_; };
 
 private:
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
   std::string cluster_name_;
 
-  const std::chrono::milliseconds timeout_;
-
-  envoy::config::core::v3::Metadata metadata_;
+  const envoy::config::core::v3::Metadata metadata_;
 
   absl::flat_hash_map<std::string, RouteSpecificFilterConfigConstSharedPtr> per_filter_configs_;
 };

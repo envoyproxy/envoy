@@ -3,8 +3,6 @@
 #include <memory>
 
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/meta_protocol_proxy/v3/route.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/matchers.h"
@@ -22,7 +20,6 @@ namespace MetaProtocolProxy {
 RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
                                Envoy::Server::Configuration::ServerFactoryContext& context)
     : cluster_name_(route_action.cluster()),
-      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route_action, timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       metadata_(route_action.metadata()) {
 
   for (const auto& proto_filter_config : route_action.per_filter_config()) {

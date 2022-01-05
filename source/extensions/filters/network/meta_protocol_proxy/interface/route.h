@@ -25,30 +25,6 @@ using RouteSpecificFilterConfigConstSharedPtr = std::shared_ptr<const RouteSpeci
  */
 class RouteTypedMetadataFactory : public Envoy::Config::TypedMetadataFactory {};
 
-/**
- * Interface of retry policy.
- */
-class RetryPolicy {
-public:
-  virtual ~RetryPolicy() = default;
-
-  /**
-   * When upstream returns a response or when a specific event occurs, whether it should retry.
-   *
-   * @param count The number of requests that have been made upstream.
-   * @param response The optional upstream response.
-   * @param event The optional upstream request or connection event.
-   * @return bool should kick off a new retry request or not.
-   */
-  virtual bool shouldRetry(uint32_t count, const Response* response,
-                           absl::optional<Event> event = absl::nullopt) const PURE;
-
-  /**
-   * @return std::chrono::milliseconds per upstream request timeout.
-   */
-  virtual std::chrono::milliseconds timeout() const PURE;
-};
-
 class RouteEntry {
 public:
   virtual ~RouteEntry() = default;
@@ -68,11 +44,6 @@ public:
    * this route.
    */
   virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
-
-  /**
-   * @return std::chrono::milliseconds the route's timeout.
-   */
-  virtual std::chrono::milliseconds timeout() const PURE;
 };
 using RouteEntryConstSharedPtr = std::shared_ptr<const RouteEntry>;
 
