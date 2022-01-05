@@ -306,7 +306,7 @@ message HttpConnectionManager {
   // populated.
   //
   // See the [Proxy-Status
-  // RFC](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-05).
+  // RFC](https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-proxy-status-08).
   // [#comment:TODO: Update this with the non-draft URL when finalized.]
   //
   // The Proxy-Status header is a string of the form:
