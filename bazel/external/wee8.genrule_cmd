@@ -28,6 +28,7 @@ pushd $$ROOT
 rm -rf out/wee8
 
 # Export compiler configuration.
+export CFLAGS="$${CFLAGS-} -Wno-unknown-warning-option"
 export CXXFLAGS="$${CXXFLAGS-} -Wno-sign-compare -Wno-deprecated-copy -Wno-unknown-warning-option -Wno-range-loop-analysis -Wno-shorten-64-to-32"
 if [[ ( $${SYSTEM} == "Darwin" && $${CXX-} == "" ) || $${CXX-} == *clang* ]]; then
   export CC=$${CC:-clang}
@@ -79,9 +80,9 @@ fi
 
 # Clang or not Clang, that is the question.
 WEE8_BUILD_ARGS+=" is_clang=$$IS_CLANG"
-WEE8_BUILD_ARGS+=" use_lld=$$IS_CLANG"
-# Hack to disable bleeding-edge compiler flags.
-WEE8_BUILD_ARGS+=" use_xcode_clang=$$IS_CLANG"
+if [[ $${SYSTEM} != Darwin ]]; then
+  WEE8_BUILD_ARGS+=" use_lld=$$IS_CLANG"
+fi
 # Use local toolchain.
 WEE8_BUILD_ARGS+=" custom_toolchain=\"//build/toolchain/linux/unbundle:default\""
 # Use local stdlibc++ / libc++.
@@ -100,11 +101,6 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 # Disable read-only heap, since it's leaky and HEAPCHECK complains about it.
 # TODO(PiotrSikora): remove when fixed upstream.
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
-
-# Disable lld on Darwin since it's not vendored with Xcode
-if [[ $${SYSTEM} == Darwin ]]; then
-  WEE8_BUILD_ARGS+=" use_lld=false"
-fi
 
 # Set target architecture.
 if [[ $${ARCH} == "x86_64" ]]; then
