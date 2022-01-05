@@ -1,29 +1,27 @@
 #include <utility>
 #include <vector>
 
-#include "source/common/common/regex.h"
+#include "test/mocks/server/factory_context.h"
 
-#include "test/test_common/utility.h"
-
-#include "contrib/hyperscan/source/config.h"
+#include "contrib/hyperscan/matching/input_matchers/source/config.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Regex {
+namespace Matching {
+namespace InputMatchers {
 namespace Hyperscan {
 
 static const std::string yaml_string = R"EOF(
-engine:
-  name: google-re2
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.hyperscan.v3alpha.Hyperscan{}
-regex: {}
+name: hyperscan
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.matching.input_matchers.hyperscan.v3alpha.Hyperscan{}
+  regex: {}
 )EOF";
 
 static const std::string option_string = R"EOF(
 
-    {}: {}
+  {}: {}
 )EOF";
 
 class ConfigTest : public ::testing::Test {
@@ -31,10 +29,13 @@ public:
   ConfigTest() = default;
 
   void setup(const absl::string_view regex) {
-    envoy::type::matcher::v3::RegexMatcher matcher;
-    TestUtility::loadFromYaml(fmt::format(yaml_string, "", regex), matcher);
-    matcher_ =
-        Envoy::Regex::Utility::parseRegex(matcher, ProtobufMessage::getStrictValidationVisitor());
+    envoy::config::core::v3::TypedExtensionConfig config;
+    TestUtility::loadFromYaml(fmt::format(yaml_string, "", regex), config);
+
+    Config factory;
+    auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
+    matcher_ = factory.createInputMatcherFactoryCb(*message, context_)();
   }
 
   void setupWithOptions(
@@ -44,14 +45,17 @@ public:
     for (auto& option : options) {
       option_strs += fmt::format(option_string, option.first, option.second);
     }
+    envoy::config::core::v3::TypedExtensionConfig config;
+    TestUtility::loadFromYaml(fmt::format(yaml_string, option_strs, regex), config);
 
-    envoy::type::matcher::v3::RegexMatcher matcher;
-    TestUtility::loadFromYaml(fmt::format(yaml_string, option_strs, regex), matcher);
-    matcher_ =
-        Envoy::Regex::Utility::parseRegex(matcher, ProtobufMessage::getStrictValidationVisitor());
+    Config factory;
+    auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        config.typed_config(), ProtobufMessage::getStrictValidationVisitor(), factory);
+    matcher_ = factory.createInputMatcherFactoryCb(*message, context_)();
   }
 
-  Envoy::Regex::CompiledMatcherPtr matcher_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  Envoy::Matcher::InputMatcherPtr matcher_;
 };
 
 // Verify that default matching will be performed successfully.
@@ -137,6 +141,7 @@ TEST_F(ConfigTest, RegexWithUCP) {
 }
 
 } // namespace Hyperscan
-} // namespace Regex
+} // namespace InputMatchers
+} // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

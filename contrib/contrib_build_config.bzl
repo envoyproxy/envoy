@@ -37,8 +37,8 @@ CONTRIB_EXTENSIONS = {
     "envoy.bootstrap.vcl":                                      "//contrib/vcl/source:config",
 
     #
-    # Regex
+    # Input matchers
     #
 
-    "envoy.regex.hyperscan":                                    "//contrib/hyperscan/source:config",
+    "envoy.matching.input_matchers.hyperscan":                  "//contrib/hyperscan/matching/input_matchers/source:config",
 }

@@ -1,52 +1,57 @@
 syntax = "proto3";
 
-package envoy.extensions.hyperscan.v3alpha;
+package envoy.extensions.matching.input_matchers.hyperscan.v3alpha;
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.hyperscan.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.hyperscan.v3alpha";
 option java_outer_classname = "HyperscanProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/input_matchers/hyperscan/v3alpha";
 option (udpa.annotations.file_status).work_in_progress = true;
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Hyperscan]
-// [#extension: envoy.regex.hyperscan]
+// [#protodoc-title: Hyperscan matcher]
+// [#extension: envoy.matching.input_matchers.hyperscan]
 
-// `Hyperscan <https://github.com/intel/hyperscan>`_ regex engine. The engine uses hybrid automata
+// `Hyperscan <https://github.com/intel/hyperscan>`_ regex matcher. The matcher uses hybrid automata
 // techniques to allow simultaneous matching of large numbers of regular expressions across streams
 // of data.
 //
-// The engine follows PCRE pattern syntax, and the regex string must adhere to the documented
-// `pattern support <http://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
-// [#next-free-field: 7]
+// The matcher follows PCRE pattern syntax, and the regex string must adhere to the documented
+// `pattern support <https://intel.github.io/hyperscan/dev-reference/compilation.html#pattern-support>`_.
+// [#next-free-field: 8]
 message Hyperscan {
+  // The regex match string.
+  string regex = 1 [(validate.rules).string = {min_len: 1}];
+
   // Matching will be performed case-insensitively.
   //
   // The expression may still use PCRE tokens (notably `(?i)` and `(?-i)`) to switch
   // case-insensitive matching on and off.
-  bool caseless = 1;
+  bool caseless = 2;
 
   // Matching a `.` will not exclude newlines.
-  bool dot_all = 2;
+  bool dot_all = 3;
 
   // `^` and `$` anchors match any newlines in data.
-  bool multiline = 3;
+  bool multiline = 4;
 
   // Allow expressions which can match against an empty string.
   //
   // This option instructs the compiler to allow expressions that can match against empty buffers,
   // such as `.?`, `.*`, `(a|)`. Since Hyperscan can return every possible match for an expression,
   // such expressions generally execute very slowly.
-  bool allow_empty = 4;
+  bool allow_empty = 5;
 
   // Treat the pattern as a sequence of UTF-8 characters.
-  bool utf8 = 5;
+  bool utf8 = 6;
 
   // Use Unicode properties for character classes.
   //
   // This option instructs Hyperscan to use Unicode properties, rather than the default ASCII
   // interpretations, for character mnemonics like `\w` and `\s` as well as the POSIX character
   // classes. It is only meaningful in conjunction with `utf8`.
-  bool ucp = 6;
+  bool ucp = 7;
 }

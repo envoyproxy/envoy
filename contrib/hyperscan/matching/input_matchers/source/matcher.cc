@@ -1,16 +1,13 @@
-#include "contrib/hyperscan/source/config.h"
-
-#include <hs/hs_common.h>
-
-#include "envoy/registry/registry.h"
+#include "contrib/hyperscan/matching/input_matchers/source/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Regex {
+namespace Matching {
+namespace InputMatchers {
 namespace Hyperscan {
-CompiledHyperscanMatcher::CompiledHyperscanMatcher(
-    const std::string& regex, const envoy::extensions::hyperscan::v3alpha::Hyperscan& config) {
-  const char* pattern = regex.c_str();
+Matcher::Matcher(
+    const envoy::extensions::matching::input_matchers::hyperscan::v3alpha::Hyperscan& config) {
+  const char* pattern = config.regex().c_str();
   unsigned int flags = 0;
   if (config.caseless()) {
     flags = flags | HS_FLAG_CASELESS;
@@ -46,10 +43,15 @@ CompiledHyperscanMatcher::CompiledHyperscanMatcher(
   }
 }
 
-bool CompiledHyperscanMatcher::match(absl::string_view value) const {
+bool Matcher::match(absl::optional<absl::string_view> input) {
+  if (!input) {
+    return false;
+  }
+
   bool matched = false;
-  hs_error_t err = hs_scan(database_, value.data(), value.size(), 0, scratch_,
-                           CompiledHyperscanMatcher::eventHandler, &matched);
+  const absl::string_view input_str = *input;
+  hs_error_t err = hs_scan(database_, input_str.data(), input_str.size(), 0, scratch_,
+                           Matcher::eventHandler, &matched);
   if (err != HS_SUCCESS && err != HS_SCAN_TERMINATED) {
     hs_free_scratch(scratch_);
     hs_free_database(database_);
@@ -60,16 +62,16 @@ bool CompiledHyperscanMatcher::match(absl::string_view value) const {
   return matched;
 }
 
-int CompiledHyperscanMatcher::eventHandler(unsigned int, unsigned long long, unsigned long long,
-                                           unsigned int, void* context) {
+int Matcher::eventHandler(unsigned int, unsigned long long, unsigned long long, unsigned int,
+                          void* context) {
   bool* matched = static_cast<bool*>(context);
   *matched = true;
 
   return 1;
 }
 
-REGISTER_FACTORY(CompiledHyperscanMatcherFactory, Envoy::Regex::CompiledMatcherFactory);
 } // namespace Hyperscan
-} // namespace Regex
+} // namespace InputMatchers
+} // namespace Matching
 } // namespace Extensions
 } // namespace Envoy

@@ -14,8 +14,7 @@ envoy_cc_test(
         "config_test.cc",
     ],
     deps = [
-        "//contrib/hyperscan/source:config",
-        "//source/common/common:regex_lib",
-        "//test/test_common:utility_lib",
+        "//contrib/hyperscan/matching/input_matchers/source:config",
+        "//test/mocks/server:factory_context_mocks",
     ],
 )
