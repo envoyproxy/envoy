@@ -21,12 +21,14 @@ public:
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   Upstream::ClusterManager& clusterManager() { return cluster_manager_; }
   bool saveUpstreamAddress() const { return save_upstream_address_; };
+  std::chrono::milliseconds& resolveTimeout() { return resolution_timeout_; }
 
 private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
   Upstream::ClusterManager& cluster_manager_;
   const bool save_upstream_address_;
+  std::chrono::milliseconds resolution_timeout_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -62,6 +64,9 @@ public:
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
   void onLoadDnsCacheComplete(
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
+  void onResolutionTimeout() override;
+  std::chrono::milliseconds resolutionTimeout() const override { return config_->resolveTimeout(); }
+  Event::Dispatcher& dispatcher() override { return decoder_callbacks_->dispatcher(); }
 
 private:
   void addHostAddressToFilterState(const Network::Address::InstanceConstSharedPtr& address);

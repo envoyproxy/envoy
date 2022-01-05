@@ -5,6 +5,7 @@
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -24,11 +25,13 @@ void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, absl::stri
 struct ResponseStringValues {
   const std::string DnsCacheOverflow = "DNS cache overflow";
   const std::string PendingRequestOverflow = "Dynamic forward proxy pending request overflow";
+  const std::string DnsResolutionTimeout = "DNS resolution timeout";
 };
 
 struct RcDetailsValues {
   const std::string DnsCacheOverflow = "dns_cache_overflow";
   const std::string PendingRequestOverflow = "dynamic_forward_proxy_pending_request_overflow";
+  const std::string DnsResolutionTimeout = "dns_resolution_timeout";
 };
 
 using CustomClusterType = envoy::config::cluster::v3::Cluster::CustomClusterType;
@@ -45,7 +48,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     : dns_cache_manager_(cache_manager_factory.get()),
       dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
       cluster_manager_(cluster_manager),
-      save_upstream_address_(proto_config.save_upstream_address()) {}
+      save_upstream_address_(proto_config.save_upstream_address()),
+      resolution_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, resolution_timeout, 5000)) {}
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
     const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
@@ -167,7 +171,6 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
 void ProxyFilter::addHostAddressToFilterState(
     const Network::Address::InstanceConstSharedPtr& address) {
-
   if (!config_->saveUpstreamAddress()) {
     return;
   }
@@ -193,6 +196,12 @@ void ProxyFilter::addHostAddressToFilterState(
   filter_state->setData(StreamInfo::UpstreamAddress::key(), std::move(address_obj),
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::Request);
+}
+
+void ProxyFilter::onResolutionTimeout() {
+  decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
+                                     ResponseStrings::get().DnsResolutionTimeout, nullptr,
+                                     absl::nullopt, RcDetails::get().DnsResolutionTimeout);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(

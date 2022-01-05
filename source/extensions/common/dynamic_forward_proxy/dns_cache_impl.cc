@@ -213,7 +213,7 @@ void DnsCacheImpl::onResolveTimeout(const std::string& host) {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
 
   auto& primary_host = getPrimaryHost(host);
-  ENVOY_LOG_EVENT(debug, "dns_cache_resolve_timeout", "host='{}' resolution timeout", host);
+  ENVOY_LOG_EVENT(debug, "dns_cache_resolution_timeout", "host='{}' resolution timeout", host);
   stats_.dns_query_timeout_.inc();
   primary_host.active_query_->cancel(Network::ActiveDnsQuery::CancelReason::Timeout);
   finishResolve(host, Network::DnsResolver::ResolutionStatus::Failure, {});
@@ -372,7 +372,9 @@ void DnsCacheImpl::finishResolve(const std::string& host,
   if (first_resolve) {
     primary_host_info->host_info_->setFirstResolveComplete();
   }
-  if (first_resolve || (address_changed && !primary_host_info->host_info_->isStale())) {
+  if ((new_address ||
+       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_empty_resolutions")) &&
+      (first_resolve || (address_changed && !primary_host_info->host_info_->isStale()))) {
     notifyThreads(host, primary_host_info->host_info_);
   }
 
@@ -412,6 +414,24 @@ void DnsCacheImpl::notifyThreads(const std::string& host,
   });
 }
 
+DnsCacheImpl::LoadDnsCacheEntryHandleImpl::LoadDnsCacheEntryHandleImpl(
+    absl::flat_hash_map<std::string, std::list<LoadDnsCacheEntryHandleImpl*>>& parent,
+    absl::string_view host, LoadDnsCacheEntryCallbacks& callbacks)
+    : RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*>(parent, host, this),
+      callbacks_(callbacks) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_empty_resolutions")) {
+    resolution_timer_ =
+        callbacks_.dispatcher().createTimer([this]() -> void { callbacks_.onResolutionTimeout(); });
+    resolution_timer_->enableTimer(callbacks_.resolutionTimeout());
+  }
+}
+
+DnsCacheImpl::LoadDnsCacheEntryHandleImpl::~LoadDnsCacheEntryHandleImpl() {
+  if (resolution_timer_ && resolution_timer_->enabled()) {
+    resolution_timer_->disableTimer();
+  }
+}
+
 DnsCacheImpl::ThreadLocalHostInfo::~ThreadLocalHostInfo() {
   // Make sure we cancel any handles that still exist.
   for (const auto& per_host_list : pending_resolutions_) {
@@ -427,6 +447,9 @@ void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
   if (host_it != pending_resolutions_.end()) {
     for (auto* resolution : host_it->second) {
       auto& callbacks = resolution->callbacks_;
+      if (resolution->resolution_timer_) {
+        resolution->resolution_timer_->disableTimer();
+      }
       resolution->cancel();
       callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }

@@ -24,11 +24,13 @@ public:
 
   Extensions::Common::DynamicForwardProxy::DnsCache& cache() { return *dns_cache_; }
   uint32_t port() { return port_; }
+  std::chrono::milliseconds resolutionTimeout() { return resolution_timeout_; }
 
 private:
   const uint32_t port_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr dns_cache_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_;
+  const std::chrono::milliseconds resolution_timeout_;
 };
 
 using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
@@ -52,6 +54,11 @@ public:
   // Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks
   void onLoadDnsCacheComplete(
       const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override;
+  void onResolutionTimeout() override;
+  std::chrono::milliseconds resolutionTimeout() const override {
+    return config_->resolutionTimeout();
+  }
+  Event::Dispatcher& dispatcher() override { return read_callbacks_->connection().dispatcher(); }
 
 private:
   const ProxyFilterConfigSharedPtr config_;

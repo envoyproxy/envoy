@@ -26,6 +26,7 @@ public:
 name: dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
+  resolution_timeout: 1s
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -192,9 +193,27 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBody) {
   ASSERT_FALSE(response->headers().get(Http::LowerCaseString("dns_end")).empty());
 }
 
+// Previously if the first DNS resolution fails, the filter would continue with
+// a null address. Make sure this mode fails gracefully.
+TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainOld) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.disallow_empty_resolutions",
+                                    "false");
+  initializeWithArgs();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                       {":path", "/test/long/url"},
+                                                       {":scheme", "http"},
+                                                       {":authority", "doesnotexist.example.com"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomain) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.disallow_empty_resolutions", "true");
   initializeWithArgs();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},

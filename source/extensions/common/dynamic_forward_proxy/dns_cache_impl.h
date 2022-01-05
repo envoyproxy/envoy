@@ -70,11 +70,11 @@ private:
         RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*> {
     LoadDnsCacheEntryHandleImpl(
         absl::flat_hash_map<std::string, std::list<LoadDnsCacheEntryHandleImpl*>>& parent,
-        absl::string_view host, LoadDnsCacheEntryCallbacks& callbacks)
-        : RaiiMapOfListElement<std::string, LoadDnsCacheEntryHandleImpl*>(parent, host, this),
-          callbacks_(callbacks) {}
+        absl::string_view host, LoadDnsCacheEntryCallbacks& callbacks);
+    ~LoadDnsCacheEntryHandleImpl() override;
 
     LoadDnsCacheEntryCallbacks& callbacks_;
+    Event::TimerPtr resolution_timer_;
   };
 
   class DnsHostInfoImpl;

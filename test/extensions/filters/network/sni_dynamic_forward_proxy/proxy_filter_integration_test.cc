@@ -40,6 +40,7 @@ public:
 name: envoy.filters.http.dynamic_forward_proxy
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+  resolution_timeout: 1s
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
@@ -133,13 +134,22 @@ TEST_P(SniDynamicProxyFilterIntegrationTest, UpstreamTls) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
-TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBreakerInvokedUpstreamTls) {
+TEST_P(SniDynamicProxyFilterIntegrationTest, UnknownHost) {
   setup(1024, 0);
 
   codec_client_ = makeRawHttpConnection(
       makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("localhost")), absl::nullopt);
   ASSERT_FALSE(codec_client_->connected());
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_rq_pending_overflow")->value());
+}
+
+TEST_P(SniDynamicProxyFilterIntegrationTest, CircuitBreakerInvokedUpstreamTls) {
+  setup(1024, 0);
+
+  codec_client_ = makeRawHttpConnection(
+      makeSslClientConnection(Ssl::ClientSslTransportOptions().setSni("doesnotexist.example.com")),
+      absl::nullopt);
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
 }
 
 } // namespace

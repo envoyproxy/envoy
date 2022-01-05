@@ -18,7 +18,8 @@ ProxyFilterConfig::ProxyFilterConfig(
     Upstream::ClusterManager&)
     : port_(static_cast<uint16_t>(proto_config.port_value())),
       dns_cache_manager_(cache_manager_factory.get()),
-      dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())) {}
+      dns_cache_(dns_cache_manager_->getCache(proto_config.dns_cache_config())),
+      resolution_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, resolution_timeout, 5000)) {}
 
 ProxyFilter::ProxyFilter(ProxyFilterConfigSharedPtr config) : config_(std::move(config)) {}
 
@@ -68,6 +69,11 @@ Network::FilterStatus ProxyFilter::onNewConnection() {
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+void ProxyFilter::onResolutionTimeout() {
+  ENVOY_CONN_LOG(debug, "DNS resolution timeout", read_callbacks_->connection());
+  read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 void ProxyFilter::onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {

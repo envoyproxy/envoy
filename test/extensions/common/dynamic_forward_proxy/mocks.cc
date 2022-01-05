@@ -38,7 +38,10 @@ MockDnsHostInfo::~MockDnsHostInfo() = default;
 MockUpdateCallbacks::MockUpdateCallbacks() = default;
 MockUpdateCallbacks::~MockUpdateCallbacks() = default;
 
-MockLoadDnsCacheEntryCallbacks::MockLoadDnsCacheEntryCallbacks() = default;
+MockLoadDnsCacheEntryCallbacks::MockLoadDnsCacheEntryCallbacks() {
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
+}
+
 MockLoadDnsCacheEntryCallbacks::~MockLoadDnsCacheEntryCallbacks() = default;
 
 } // namespace DynamicForwardProxy

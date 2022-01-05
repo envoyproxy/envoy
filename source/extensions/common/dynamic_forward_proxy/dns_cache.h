@@ -96,6 +96,21 @@ public:
      * @param host_info the DnsHostInfo for the resolved host.
      */
     virtual void onLoadDnsCacheComplete(const DnsHostInfoSharedPtr& host_info) PURE;
+
+    /**
+     * Called if as asychronous DNS lookup times out.
+     */
+    virtual void onResolutionTimeout() PURE;
+
+    /**
+     * Returns the resolution time out for this lookup.
+     */
+    virtual std::chrono::milliseconds resolutionTimeout() const PURE;
+
+    /**
+     * Returns the worker thread dispatcher this look up is for.
+     */
+    virtual Event::Dispatcher& dispatcher() PURE;
   };
 
   /**

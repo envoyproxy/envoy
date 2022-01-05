@@ -4,6 +4,7 @@
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/upstream/basic_resource_limit.h"
 
 #include "gmock/gmock.h"
@@ -114,6 +115,11 @@ public:
   ~MockLoadDnsCacheEntryCallbacks() override;
 
   MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
+  MOCK_METHOD(void, onResolutionTimeout, ());
+  MOCK_METHOD(std::chrono::milliseconds, resolutionTimeout, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 } // namespace DynamicForwardProxy

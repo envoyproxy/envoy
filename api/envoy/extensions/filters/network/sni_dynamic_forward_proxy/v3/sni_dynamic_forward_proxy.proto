@@ -4,6 +4,8 @@ package envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3;
 
 import "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.proto";
 
+import "google/protobuf/duration.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -33,4 +35,8 @@ message FilterConfig {
     // The port number to connect to the upstream.
     uint32 port_value = 2 [(validate.rules).uint32 = {lte: 65535 gt: 0}];
   }
+
+  // The duration to wait for a DNS resolution before failing with a downstream disconnect.
+  // If this is not set it defaults to 5s.
+  google.protobuf.Duration resolution_timeout = 3;
 }
