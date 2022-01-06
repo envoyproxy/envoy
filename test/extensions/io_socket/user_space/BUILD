@@ -69,5 +69,6 @@ envoy_extension_cc_test(
         "//source/extensions/io_socket/user_space:client_connection_factory",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
     ],
 )

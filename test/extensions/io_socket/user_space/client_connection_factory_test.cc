@@ -8,6 +8,7 @@
 #include "source/extensions/io_socket/user_space/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
+#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/network_utility.h"
 
@@ -24,6 +25,12 @@ namespace UserSpace {
 
 namespace {
 
+class MockInternalListenerManger : public Network::InternalListenerManager {
+public:
+  MOCK_METHOD(Network::InternalListenerOptRef, findByAddress,
+              (const Network::Address::InstanceConstSharedPtr&));
+};
+
 // The internal connection factory is linked in this test suite. This test suite verifies the
 // connection can be created.
 class ClientConnectionFactoryTest : public testing::Test {
@@ -32,10 +39,24 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")),
         buf_(1024) {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
+    EXPECT_CALL(tls_allocator_, allocateSlot());
+    tls_slot_ =
+        ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
+            tls_allocator_);
+    tls_slot_->set([r = registry_](Event::Dispatcher&) { return r; });
+    // TODO: restore the original value via RAII.
+    Extensions::IoSocket::UserSpace::InternalClientConnectionFactory::registry_tls_slot_ =
+        tls_slot_.get();
   }
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  MockInternalListenerManger internal_listener_manager_;
+  std::shared_ptr<Extensions::InternalListener::ThreadLocalRegistryImpl> registry_{
+      std::make_shared<Extensions::InternalListener::ThreadLocalRegistryImpl>()};
+  ThreadLocal::MockInstance tls_allocator_;
+  std::unique_ptr<ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>>
+      tls_slot_;
 
   // Owned by IoHandleImpl.
   NiceMock<Event::MockSchedulableCallback>* schedulable_cb_;
@@ -51,11 +72,7 @@ public:
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 
-class MockInternalListenerManger : public Network::InternalListenerManager {
-public:
-  MOCK_METHOD(Network::InternalListenerOptRef, findByAddress,
-              (const Network::Address::InstanceConstSharedPtr&));
-};
+
 
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotExist) {
   auto client_conn = dispatcher_->createClientConnection(
@@ -70,11 +87,9 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotEx
 }
 
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
-  MockInternalListenerManger internal_listener_manager;
-  // TODO(lambdai): fix attach the dispatcher to the thread local registry.
-  // dispatcher_->registerInternalListenerManager(internal_listener_manager);
+  registry_->setInternalListenerManager(internal_listener_manager_);
 
-  EXPECT_CALL(internal_listener_manager, findByAddress(_))
+  EXPECT_CALL(internal_listener_manager_, findByAddress(_))
       .WillOnce(testing::Return(Network::InternalListenerOptRef()));
 
   auto client_conn = dispatcher_->createClientConnection(
@@ -92,13 +107,11 @@ TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalListenerNotExist) {
 // Verify that the client connection to envoy internal address can be established. This test case
 // does not instantiate a server connection. The server connection is tested in internal listener.
 TEST_F(ClientConnectionFactoryTest, ConnectSucceeds) {
-  MockInternalListenerManger internal_listener_manager;
-  // TODO(lambdai): fix attach the dispatcher to the thread local registry.
-  // dispatcher_->registerInternalListenerManager(internal_listener_manager);
+  registry_->setInternalListenerManager(internal_listener_manager_);
   MockInternalListener internal_listener;
   Network::InternalListenerOptRef internal_listener_opt{internal_listener};
 
-  EXPECT_CALL(internal_listener_manager, findByAddress(_))
+  EXPECT_CALL(internal_listener_manager_, findByAddress(_))
       .WillOnce(testing::Return(internal_listener_opt));
   Network::ConnectionSocketPtr server_socket;
   EXPECT_CALL(internal_listener, onAccept(_)).WillOnce([&](auto&& socket) {
