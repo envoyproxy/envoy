@@ -805,10 +805,10 @@ void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view messag
     ENVOY_LOG(critical, "script log: {}", message);
     return;
   case spdlog::level::off:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
     return;
   case spdlog::level::n_levels:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unsupported");
   }
 }
 

@@ -42,6 +42,7 @@
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
 #include "source/extensions/filters/http/common/utility.h"
@@ -367,7 +368,7 @@ RouteTracingImpl::RouteTracingImpl(const envoy::config::route::v3::Tracing& trac
     overall_sampling_ = tracing.overall_sampling();
   }
   for (const auto& tag : tracing.custom_tags()) {
-    custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+    custom_tags_.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
   }
 }
 

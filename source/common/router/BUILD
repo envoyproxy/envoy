@@ -64,6 +64,7 @@ envoy_cc_library(
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/tracing:custom_tag_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/filters/http/common:utility_lib",

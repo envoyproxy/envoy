@@ -101,9 +101,7 @@ public:
   }
   int size() const override { return value_ == nullptr ? 0 : value_->size(); }
   bool empty() const override { return value_ == nullptr ? true : value_->empty(); }
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  const google::api::expr::runtime::CelList* ListKeys() const override { return nullptr; }
 
 private:
   friend class RequestWrapper;
@@ -120,9 +118,7 @@ class BaseWrapper : public google::api::expr::runtime::CelMap,
 public:
   int size() const override { return 0; }
   bool empty() const override { return false; }
-  const google::api::expr::runtime::CelList* ListKeys() const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
+  const google::api::expr::runtime::CelList* ListKeys() const override { return nullptr; }
   CelValue Produce(ProtobufWkt::Arena* arena) override {
     // Producer is unique per evaluation arena since activation is re-created.
     arena_ = arena;

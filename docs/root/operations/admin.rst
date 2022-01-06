@@ -509,11 +509,25 @@ modify different aspects of the server:
   Outputs /stats in `Prometheus <https://prometheus.io/docs/instrumenting/exposition_formats/>`_
   v0.0.4 format. This can be used to integrate with a Prometheus server.
 
-  You can optionally pass the ``usedonly`` URL query argument to only get statistics that
-  Envoy has updated (counters incremented at least once, gauges changed at least once,
-  and histograms added to at least once)
+  .. http:get:: /stats?format=prometheus&usedonly
 
-  .. http:get:: /stats/recentlookups
+  You can optionally pass the ``usedonly`` URL query parameter to only get statistics that
+  Envoy has updated (counters incremented at least once, gauges changed at least once,
+  and histograms added to at least once).
+
+  .. http:get:: /stats?format=prometheus&text_readouts
+
+  Optional ``text_readouts`` query parameter is used to get all stats including text readouts.
+  Text readout stats are returned in gauge format. These gauges always have value 0. Each
+  gauge record has additional label named ``text_value`` that contains value of a text readout.
+
+  .. warning::
+    Every unique combination of key-value label pair represents a new time series
+    in Prometheus, which can dramatically increase the amount of data stored.
+    Text readout stats create a new label value every time the value
+    of the text readout stat changes, which could create an unbounded number of time series.
+
+.. http:get:: /stats/recentlookups
 
   This endpoint helps Envoy developers debug potential contention
   issues in the stats system. Initially, only the count of StatName

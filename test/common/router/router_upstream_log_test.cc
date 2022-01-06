@@ -89,6 +89,8 @@ public:
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
+    EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
+    callbacks_.dispatcher_.delete_immediately_ = true;
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
