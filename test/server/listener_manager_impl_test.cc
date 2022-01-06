@@ -48,6 +48,9 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
 
+// For test only.
+SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
+
 class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
 protected:
   ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }

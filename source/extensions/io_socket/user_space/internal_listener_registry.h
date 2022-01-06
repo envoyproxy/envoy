@@ -5,7 +5,6 @@
 #include "envoy/server/bootstrap_extension_config.h"
 
 #include "source/extensions/io_socket/user_space/thread_local_registry.h"
-#include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -17,6 +16,10 @@ namespace InternalListener {
 class TlsInternalListenerRegistry : public Singleton::Instance,
                                     public Network::InternalListenerRegistry {
 public:
+  ~TlsInternalListenerRegistry() override {
+    ENVOY_LOG_MISC(debug, "lambdai: destroying TlsInternalListenerRegistry");
+  }
+
   Network::LocalInternalListenerRegistry* getLocalRegistry() override {
     if (auto opt = tls_slot_->get(); opt.has_value()) {
       return &opt.value().get();
@@ -30,13 +33,15 @@ public:
 class InternalListenerExtension : public Server::BootstrapExtension {
 public:
   explicit InternalListenerExtension(Server::Configuration::ServerFactoryContext& server_context)
-      : server_context_(server_context) {}
+      : server_context_(server_context),
+        tls_registry_(std::make_shared<TlsInternalListenerRegistry>()) {}
   ~InternalListenerExtension() override = default;
 
   // Server::Configuration::BootstrapExtension
   void onServerInitialized() override;
 
   Server::Configuration::ServerFactoryContext& server_context_;
+  std::shared_ptr<TlsInternalListenerRegistry> tls_registry_;
 };
 
 class InternalListenerRegistryFactory : public Server::Configuration::BootstrapExtensionFactory {
@@ -48,10 +53,8 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();
   }
-  std::string name() const override { return "envoy.bootstrap.internal_listener_registr"; };
+  std::string name() const override { return "envoy.bootstrap.internal_listener_registry"; };
 };
-
-SINGLETON_MANAGER_REGISTRATION(internal_listener_registry);
 
 } // namespace InternalListener
 } // namespace Bootstrap

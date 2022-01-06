@@ -110,7 +110,38 @@ public:
       Network::UdpListenerWorkerRouterPtr listener_worker_router_;
     };
 
-    struct InternalListenerConfigImpl : public Network::InternalListenerConfig {};
+    class MockInternalListenerRegistery : public Network::InternalListenerRegistry {
+    public:
+      Network::LocalInternalListenerRegistry* getLocalRegistry() override {
+        return &local_registry_;
+      }
+
+      class MockLocalInternalListenerRegistry : public Network::LocalInternalListenerRegistry {
+public :
+    void
+      setInternalListenerManager(Network::InternalListenerManager& internal_listener_manager) override {
+        manager_ = &internal_listener_manager;
+      }
+
+      Network::InternalListenerManagerOptRef getInternalListenerManager() override {
+        if (manager_ == nullptr) {
+          return Network::InternalListenerManagerOptRef();
+        }
+        return Network::InternalListenerManagerOptRef(*manager_);
+      }
+
+      private:
+        // A thread unsafe internal listener manager.
+        Network::InternalListenerManager* manager_{nullptr};
+      };
+      MockLocalInternalListenerRegistry local_registry_;
+    };
+    class InternalListenerConfigImpl : public Network::InternalListenerConfig {
+    public:
+      InternalListenerConfigImpl(MockInternalListenerRegistery& registry) : registry_(registry) {}
+      Network::InternalListenerRegistry& internalListenerRegistry() { return registry_; }
+      MockInternalListenerRegistery& registry_;
+    };
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override {
@@ -287,7 +318,7 @@ public:
         continue_on_listener_filters_timeout, access_log_, overridden_filter_chain_manager,
         ENVOY_TCP_BACKLOG_SIZE, nullptr));
     listeners_.back()->internal_listener_config_ =
-        std::make_unique<TestListener::InternalListenerConfigImpl>();
+        std::make_unique<TestListener::InternalListenerConfigImpl>(mock_listener_registry_);
     return listeners_.back().get();
   }
 
@@ -334,6 +365,7 @@ public:
   Network::Address::InstanceConstSharedPtr local_address_{
       new Network::Address::Ipv4Instance("127.0.0.1", 10001)};
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
+  TestListener::MockInternalListenerRegistery mock_listener_registry_;
   std::list<TestListenerPtr> listeners_;
   Api::ApiPtr api_{Api::createApiForTest()};
   Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};

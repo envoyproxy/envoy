@@ -14,8 +14,6 @@ public:
 
   void
   setInternalListenerManager(Network::InternalListenerManager& internal_listener_manager) override {
-
-    ASSERT(manager_ == nullptr);
     manager_ = &internal_listener_manager;
   }
 

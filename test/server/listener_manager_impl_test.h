@@ -67,6 +67,14 @@ protected:
   ListenerManagerImplTest() : api_(Api::createApiForTest(server_.api_.random_)) {}
 
   void SetUp() override {
+    // place holder. The
+    ASSERT_NE(nullptr,
+              server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+                  "internal_listener_registry_singleton", [registry = internal_registry_]() {
+                    ENVOY_LOG_MISC(debug, "lambdai: create Dumb internal registry");
+                    return registry;
+                  }));
+
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     ON_CALL(server_.validation_context_, staticValidationVisitor())
@@ -306,6 +314,19 @@ protected:
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
   Api::OsSysCallsImpl os_sys_calls_actual_;
   NiceMock<MockInstance> server_;
+  class DumbInternalListenerRegistry : public Singleton::Instance,
+                                       public Network::InternalListenerRegistry {
+  public:
+    ~DumbInternalListenerRegistry() {
+      ENVOY_LOG_MISC(debug, "lambdai: destroy DumbInternalListenerRegistry");
+    }
+    MOCK_METHOD(Network::LocalInternalListenerRegistry*, getLocalRegistry, ());
+  };
+  std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
+      std::make_shared<DumbInternalListenerRegistry>()};
+  // TestThreadsafeSingletonInjector<Network::InternalListenerRegistry>
+  // registry_{&internal_registry_};
+
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
   MockWorker* worker_ = new MockWorker();

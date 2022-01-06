@@ -1656,6 +1656,8 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        # TODO: move to extenstion
+        "//source/extensions/io_socket/user_space:config",
     ],
 )
 

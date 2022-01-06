@@ -23,7 +23,9 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
                                              Singleton::Manager& singleton_manager)
     : worker_index_(worker_index), dispatcher_(dispatcher),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false),
-      singleton_manager_(singleton_manager) {}
+      singleton_manager_(singleton_manager) {
+  UNREFERENCED_PARAMETER(singleton_manager_);
+}
 
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
 
@@ -49,15 +51,11 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
     // Link this ConnectionHandlerImpl to the thread local. Ideally this should be done during the
     // initialization of ConnectionHandlerImpl. We move it here because the thread local object is
     // not yet ready.
-    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
-        singleton_manager_.getTyped<Network::InternalListenerRegistry>(
-            // TODO: avoid hacking into the singleton var implmentation.
-            "internal_listener_registry_singleton");
-    RELEASE_ASSERT(internal_listener_registry != nullptr,
-                   "Failed to get internal listener registry");
+    Network::InternalListenerRegistry& internal_listener_registry =
+        config.internalListenerConfig()->internalListenerRegistry();
     Network::LocalInternalListenerRegistry* local_registry =
-        internal_listener_registry->getLocalRegistry();
-    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry");
+        internal_listener_registry.getLocalRegistry();
+    RELEASE_ASSERT(local_registry != nullptr, "Failed to get local internal listener registry.");
     local_registry->setInternalListenerManager(*this);
     if (overridden_listener.has_value()) {
       for (auto& listener : listeners_) {

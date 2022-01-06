@@ -107,12 +107,15 @@ public:
 
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
+class InternalListenerRegistry;
 /**
  * Configuration for an internal listener.
  */
 class InternalListenerConfig {
 public:
   virtual ~InternalListenerConfig() = default;
+
+  virtual InternalListenerRegistry& internalListenerRegistry() PURE;
 };
 
 using InternalListenerConfigOptRef = OptRef<InternalListenerConfig>;

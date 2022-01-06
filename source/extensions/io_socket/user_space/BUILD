@@ -12,6 +12,8 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     srcs = ["config.h"],
+    # for integration tests
+    visibility = ["//visibility:public"],
     deps = [
         ":client_connection_factory",
         ":internal_listener_registry",
