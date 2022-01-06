@@ -689,7 +689,7 @@ private:
 // based on extractor name.
 // The table is static member of StreamInfoFormatter and is
 // created upon startup.
-std::map<absl::string_view, StreamInfoFormatter::FieldExtractorCreateFunc>
+absl::flat_hash_map<absl::string_view, StreamInfoFormatter::FieldExtractorCreateFunc>
     StreamInfoFormatter::known_field_extractors_ = {
         {"REQUEST_DURATION",
          []() {

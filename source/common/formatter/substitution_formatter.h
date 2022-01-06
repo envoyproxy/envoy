@@ -443,7 +443,7 @@ public:
 
 private:
   FieldExtractorPtr field_extractor_;
-  static std::map<absl::string_view, FieldExtractorCreateFunc> known_field_extractors_;
+  static absl::flat_hash_map<absl::string_view, FieldExtractorCreateFunc> known_field_extractors_;
 };
 
 /**
