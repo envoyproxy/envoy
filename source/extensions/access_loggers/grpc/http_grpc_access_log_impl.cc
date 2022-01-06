@@ -120,7 +120,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       const auto entry = request_headers.get(header);
       const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(request_headers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+        logged_headers->insert({header.get(), std::string(all_values.result().value())});
       }
     }
   }
@@ -142,7 +142,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       const auto entry = response_headers.get(header);
       const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(response_headers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+        logged_headers->insert({header.get(), std::string(all_values.result().value())});
       }
     }
   }
@@ -155,7 +155,7 @@ void HttpGrpcAccessLog::emitLog(const Http::RequestHeaderMap& request_headers,
       const auto all_values =
           Http::HeaderUtility::getAllOfHeaderAsString(response_trailers, header);
       if (all_values.result().has_value()) {
-        logged_headers->insert({header.get(), std::string(all_values.result().value_or(""))});
+        logged_headers->insert({header.get(), std::string(all_values.result().value())});
       }
     }
   }
