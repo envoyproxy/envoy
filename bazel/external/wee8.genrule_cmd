@@ -62,6 +62,11 @@ WEE8_BUILD_ARGS+=" v8_enable_i18n_support=false"
 WEE8_BUILD_ARGS+=" use_sysroot=false"
 WEE8_BUILD_ARGS+=" use_glib=false"
 
+# Use locally installed toolchain on Windows.
+if [[ $${SYSTEM} == *MSYS_NT* ]]; then
+  export DEPOT_TOOLS_WIN_TOOLCHAIN=0
+fi
+
 # Generate inspector files.
 "$$gn" gen out/wee8 --args="$$WEE8_BUILD_ARGS"
 "$$ninja" -C out/wee8 src/inspector:protocol_generated_sources
