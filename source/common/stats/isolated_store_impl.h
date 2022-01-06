@@ -101,7 +101,7 @@ public:
     return true;
   }
 
-  void forEachStat(SizeFn f_size, std::function<void(Base&)> f_stat) const {
+  void forEachStat(SizeFn f_size, StatFn<Base> f_stat) const {
     if (f_size != nullptr) {
       f_size(stats_.size());
     }
@@ -225,6 +225,25 @@ public:
 
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override {
     text_readouts_.forEachStat(f_size, f_stat);
+  }
+
+  bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
+                   PageDirection direction) const override {
+    return alloc_.counterPage(f_stat, start, direction);
+  }
+
+  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
+                 PageDirection direction) const override {
+    return alloc_.gaugePage(f_stat, start, direction);
+  }
+
+  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+                       PageDirection direction) const override {
+    return alloc_.textReadoutPage(f_stat, start, direction);
+  }
+
+  bool histogramPage(PageFn<Histogram>, absl::string_view, PageDirection) const override {
+    return false;
   }
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {

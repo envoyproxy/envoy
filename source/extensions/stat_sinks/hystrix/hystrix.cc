@@ -287,7 +287,7 @@ HystrixSink::HystrixSink(Server::Configuration::ServerFactoryContext& server,
   ENVOY_LOG(debug,
             "adding hystrix_event_stream endpoint to enable connection to hystrix dashboard");
   admin.addHandler("/hystrix_event_stream", "send hystrix event stream",
-                   MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false);
+                   MAKE_ADMIN_HANDLER(handlerHystrixEventStream), false, false, {});
 }
 
 Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,

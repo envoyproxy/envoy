@@ -24,6 +24,7 @@ BACKTRACE
 BSON
 BPF
 Repick
+UI
 btree
 CAS
 CB
@@ -910,6 +911,7 @@ overridable
 oversized
 packagename
 pageheap
+pagesize
 param
 parameterization
 parameterize

@@ -17,6 +17,8 @@ namespace Envoy {
 namespace Stats {
 namespace {
 
+constexpr size_t num_stats = 11;
+
 class AllocatorImplTest : public testing::Test {
 protected:
   AllocatorImplTest() : alloc_(symbol_table_), pool_(symbol_table_) {}
@@ -36,6 +38,33 @@ protected:
     if (!are_stats_marked_for_deletion_) {
       EXPECT_EQ(0, symbol_table_.numSymbols());
     }
+  }
+
+  std::vector<CounterSharedPtr> makeCounters() {
+    std::vector<CounterSharedPtr> counters;
+    for (size_t idx = 0; idx < num_stats; ++idx) {
+      auto stat_name = makeStat(absl::StrCat("counter.", idx));
+      counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
+    }
+    return counters;
+  }
+
+  std::vector<GaugeSharedPtr> makeGauges() {
+    std::vector<GaugeSharedPtr> gauges;
+    for (size_t idx = 0; idx < num_stats; ++idx) {
+      auto stat_name = makeStat(absl::StrCat("gauge.", idx));
+      gauges.emplace_back(
+          alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
+    }
+    return gauges;
+  }
+
+  template <class Metrics> StatNameHashSet collectStatNames(const Metrics& metrics) {
+    StatNameHashSet stat_names;
+    for (auto& metric : metrics) {
+      stat_names.insert(metric->statName());
+    }
+    return stat_names;
   }
 
   SymbolTableImpl symbol_table_;
@@ -157,16 +186,8 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
 }
 
 TEST_F(AllocatorImplTest, ForEachCounter) {
-  StatNameHashSet stat_names;
-  std::vector<CounterSharedPtr> counters;
-
-  const size_t num_stats = 11;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("counter.", idx));
-    stat_names.insert(stat_name);
-    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
-  }
+  std::vector<CounterSharedPtr> counters = makeCounters();
+  StatNameHashSet stat_names = collectStatNames(counters);
 
   size_t num_counters = 0;
   size_t num_iterations = 0;
@@ -210,16 +231,8 @@ TEST_F(AllocatorImplTest, ForEachCounter) {
 }
 
 TEST_F(AllocatorImplTest, ForEachGauge) {
-  StatNameHashSet stat_names;
-  std::vector<GaugeSharedPtr> gauges;
-
-  const size_t num_stats = 11;
-
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    stat_names.insert(stat_name);
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-  }
+  std::vector<GaugeSharedPtr> gauges = makeGauges();
+  StatNameHashSet stat_names = collectStatNames(gauges);
 
   size_t num_gauges = 0;
   size_t num_iterations = 0;
@@ -265,8 +278,6 @@ TEST_F(AllocatorImplTest, ForEachGauge) {
 TEST_F(AllocatorImplTest, ForEachTextReadout) {
   StatNameHashSet stat_names;
   std::vector<TextReadoutSharedPtr> text_readouts;
-
-  const size_t num_stats = 11;
 
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
@@ -369,11 +380,8 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   const size_t num_stats = 10;
   are_stats_marked_for_deletion_ = true;
 
-  std::vector<CounterSharedPtr> counters;
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("counter.", idx));
-    counters.emplace_back(alloc_.makeCounter(stat_name, StatName(), {}));
-  }
+  std::vector<CounterSharedPtr> counters = makeCounters();
+
   // Reject a stat and remove it from "scope".
   StatName const rejected_counter_name = counters[4]->statName();
   alloc_.markCounterForDeletion(counters[4]);
@@ -390,11 +398,8 @@ TEST_F(AllocatorImplTest, AskForDeletedStat) {
   EXPECT_EQ(deleted_counter->value(), 0);
   EXPECT_EQ(rejected_counter.value(), 2);
 
-  std::vector<GaugeSharedPtr> gauges;
-  for (size_t idx = 0; idx < num_stats; ++idx) {
-    auto stat_name = makeStat(absl::StrCat("gauge.", idx));
-    gauges.emplace_back(alloc_.makeGauge(stat_name, StatName(), {}, Gauge::ImportMode::Accumulate));
-  }
+  std::vector<GaugeSharedPtr> gauges = makeGauges();
+
   // Reject a stat and remove it from "scope".
   StatName const rejected_gauge_name = gauges[4]->statName();
   alloc_.markGaugeForDeletion(gauges[4]);
@@ -442,8 +447,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedCounter) {
 
   alloc_.setSinkPredicates(std::move(moved_sink_predicates));
 
-  const size_t num_stats = 11;
-
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("counter.", idx));
     // sink every 3rd stat
@@ -487,8 +490,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedGauge) {
   std::vector<GaugeSharedPtr> unsinked_gauges;
 
   alloc_.setSinkPredicates(std::move(moved_sink_predicates));
-  const size_t num_stats = 11;
-
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("gauge.", idx));
     // sink every 5th stat
@@ -533,8 +534,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   std::vector<TextReadoutSharedPtr> unsinked_text_readouts;
 
   alloc_.setSinkPredicates(std::move(moved_sink_predicates));
-  const size_t num_stats = 11;
-
   for (size_t idx = 0; idx < num_stats; ++idx) {
     auto stat_name = makeStat(absl::StrCat("text_readout.", idx));
     // sink every 2nd stat
@@ -568,6 +567,74 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
       [&num_iterations](Stats::TextReadout&) { ++num_iterations; });
   EXPECT_EQ(num_sinked_text_readouts, 0);
   EXPECT_EQ(num_iterations, 0);
+}
+
+TEST_F(AllocatorImplTest, CounterPageForward) {
+  std::vector<CounterSharedPtr> counters = makeCounters();
+  constexpr size_t page_size = 5;
+  uint32_t page_index = 0;
+
+  auto test_page = [this, &page_index](absl::string_view start,
+                                       std::vector<uint32_t> suffixes) -> bool {
+    ++page_index;
+    std::vector<Counter*> page;
+    bool ret = alloc_.counterPage(
+        [&page](Counter& counter) {
+          page.push_back(&counter);
+          return page.size() < page_size;
+        },
+        start, PageDirection::Forward);
+    EXPECT_EQ(suffixes.size(), page.size());
+    uint32_t i = 0;
+    for (uint32_t suffix : suffixes) {
+      if (i == page.size()) {
+        break;
+      }
+      EXPECT_EQ(absl::StrCat("counter.", suffix), page[i++]->name()) << "Page: " << page_index;
+    }
+    return ret;
+  };
+
+  EXPECT_TRUE(test_page("", {0, 1, 10, 2, 3}));
+  EXPECT_TRUE(test_page("a", {0, 1, 10, 2, 3}));
+  EXPECT_TRUE(test_page("counter.3x", {4, 5, 6, 7, 8}));
+  EXPECT_FALSE(test_page("counter.4", {5, 6, 7, 8, 9}));
+  EXPECT_FALSE(test_page("counter.8x", {9}));
+  EXPECT_FALSE(test_page("counter.9", {}));
+}
+
+TEST_F(AllocatorImplTest, CounterPageBackward) {
+  std::vector<CounterSharedPtr> counters = makeCounters();
+  constexpr size_t page_size = 5;
+  uint32_t page_index = 0;
+
+  auto test_page = [this, &page_index](absl::string_view start,
+                                       std::vector<uint32_t> suffixes) -> bool {
+    ++page_index;
+    std::vector<Counter*> page;
+    bool ret = alloc_.counterPage(
+        [&page](Counter& counter) {
+          page.push_back(&counter);
+          return page.size() < page_size;
+        },
+        start, PageDirection::Backward);
+    EXPECT_EQ(suffixes.size(), page.size());
+    uint32_t i = 0;
+    for (uint32_t suffix : suffixes) {
+      if (i == page.size()) {
+        break;
+      }
+      EXPECT_EQ(absl::StrCat("counter.", suffix), page[i++]->name()) << "Page: " << page_index;
+    }
+    return ret;
+  };
+
+  EXPECT_TRUE(test_page("", {9, 8, 7, 6, 5}));
+  EXPECT_TRUE(test_page("z", {9, 8, 7, 6, 5}));
+  EXPECT_TRUE(test_page("counter.5", {4, 3, 2, 10, 1}));
+  EXPECT_TRUE(test_page("counter.4x", {4, 3, 2, 10, 1}));
+  EXPECT_FALSE(test_page("counter.1", {0}));
+  EXPECT_FALSE(test_page("counter.0x", {0}));
 }
 
 } // namespace

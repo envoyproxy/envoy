@@ -139,7 +139,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
 
-  EXPECT_EQ("404", request("admin", "GET", "/stats?format=blah", response));
+  EXPECT_EQ("400", request("admin", "GET", "/stats?format=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json", response));
@@ -427,7 +427,7 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   };
 
   EXPECT_TRUE(
-      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false, {}));
 
   // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
   BufferingStreamDecoderPtr response;

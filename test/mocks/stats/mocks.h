@@ -298,6 +298,10 @@ public:
   MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
   MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
   MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
+  MOCK_METHOD(bool, counterPage, (PageFn<Counter>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(bool, gaugePage, (PageFn<Gauge>, absl::string_view, PageDirection), (const));
+  MOCK_METHOD(bool, textreadoutPage, (PageFn<TextReadout>, absl::string_view, PageDirection),
+              (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));

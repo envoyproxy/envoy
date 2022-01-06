@@ -23,7 +23,6 @@
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
-#include "source/common/html/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/header_map_impl.h"
@@ -34,6 +33,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/extensions/request_id/uuid/config.h"
+#include "source/server/admin/admin_html_generator.h"
 #include "source/server/admin/utils.h"
 #include "source/server/listener_impl.h"
 
@@ -44,72 +44,6 @@
 
 namespace Envoy {
 namespace Server {
-
-namespace {
-
-/**
- * Favicon base64 image was harvested by screen-capturing the favicon from a Chrome tab
- * while visiting https://www.envoyproxy.io/. The resulting PNG was translated to base64
- * by dropping it into https://www.base64-image.de/ and then pasting the resulting string
- * below.
- *
- * The actual favicon source for that, https://www.envoyproxy.io/img/favicon.ico is nicer
- * because it's transparent, but is also 67646 bytes, which is annoying to inline. We could
- * just reference that rather than inlining it, but then the favicon won't work when visiting
- * the admin page from a network that can't see the internet.
- */
-const char EnvoyFavicon[] =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARnQU1"
-    "BAACxjwv8YQUAAAAJcEhZcwAAEnQAABJ0Ad5mH3gAAAH9SURBVEhL7ZRdTttAFIUrUFaAX5w9gIhgUfzshFRK+gIbaVbA"
-    "zwaqCly1dSpKk5A485/YCdXpHTB4BsdgVe0bD0cZ3Xsm38yZ8byTUuJ/6g3wqqoBrBhPTzmmLfptMbAzttJTpTKAF2MWC"
-    "7ADCdNIwXZpvMMwayiIwwS874CcOc9VuQPR1dBBChPMITpFXXU45hukIIH6kHhzVqkEYB8F5HYGvZ5B7EvwmHt9K/59Cr"
-    "U3QbY2RNYaQPYmJc+jPIBICNCcg20ZsAsCPfbcrFlRF+cJZpvXSJt9yMTxO/IAzJrCOfhJXiOgFEX/SbZmezTWxyNk4Q9"
-    "anHMmjnzAhEyhAW8LCE6wl26J7ZFHH1FMYQxh567weQBOO1AW8D7P/UXAQySq/QvL8Fu9HfCEw4SKALm5BkC3bwjwhSKr"
-    "A5hYAMXTJnPNiMyRBVzVjcgCyHiSm+8P+WGlnmwtP2RzbCMiQJ0d2KtmmmPorRHEhfMROVfTG5/fYrF5iWXzE80tfy9WP"
-    "sCqx5Buj7FYH0LvDyHiqd+3otpsr4/fa5+xbEVQPfrYnntylQG5VGeMLBhgEfyE7o6e6qYzwHIjwl0QwXSvvTmrVAY4D5"
-    "ddvT64wV0jRrr7FekO/XEjwuwwhuw7Ef7NY+dlfXpLb06EtHUJdVbsxvNUqBrwj/QGeEUSfwBAkmWHn5Bb/gAAAABJRU5";
-
-const char AdminHtmlStart[] = R"(
-<head>
-  <title>Envoy Admin</title>
-  <link rel='shortcut icon' type='image/png' href='@FAVICON@'/>
-  <style>
-    .home-table {
-      font-family: sans-serif;
-      font-size: medium;
-      border-collapse: collapse;
-    }
-
-    .home-row:nth-child(even) {
-      background-color: #dddddd;
-    }
-
-    .home-data {
-      border: 1px solid #dddddd;
-      text-align: left;
-      padding: 8px;
-    }
-
-    .home-form {
-      margin-bottom: 0;
-    }
-  </style>
-</head>
-<body>
-  <table class='home-table'>
-    <thead>
-      <th class='home-data'>Command</th>
-      <th class='home-data'>Description</th>
-     </thead>
-     <tbody>
-)";
-
-const char AdminHtmlEnd[] = R"(
-    </tbody>
-  </table>
-</body>
-)";
-} // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 
@@ -161,63 +95,185 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       server_info_handler_(server),
       // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
-          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
-          {"/certs", "print certs on machine",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts), false, false},
-          {"/clusters", "upstream cluster status",
-           MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters), false, false},
-          {"/config_dump", "dump current Envoy configs (experimental)",
-           MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump), false, false},
-          {"/init_dump", "dump current Envoy init manager information (experimental)",
-           MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false},
-          {"/contention", "dump current Envoy mutex contention stats (if enabled)",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false},
-          {"/cpuprofiler", "enable/disable the CPU profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler), false, true},
-          {"/heapprofiler", "enable/disable the heap profiler",
-           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler), false, true},
-          {"/healthcheck/fail", "cause the server to fail health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true},
-          {"/healthcheck/ok", "cause the server to pass health checks",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk), false, true},
-          {"/help", "print out list of admin commands", MAKE_ADMIN_HANDLER(handlerHelp), false,
-           false},
-          {"/hot_restart_version", "print the hot restart compatibility version",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion), false, false},
-          {"/logging", "query/change logging levels",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging), false, true},
-          {"/memory", "print current allocation/heap usage",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory), false, false},
-          {"/quitquitquit", "exit the server",
-           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit), false, true},
-          {"/reset_counters", "reset all counters to zero",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters), false, true},
-          {"/drain_listeners", "drain listeners",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners), false, true},
-          {"/server_info", "print server version/status information",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo), false, false},
-          {"/ready", "print server state, return 200 if LIVE, otherwise return 503",
-           MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady), false, false},
-          {"/stats", "print server stats", MAKE_ADMIN_HANDLER(stats_handler_.handlerStats), false,
-           false},
-          {"/stats/prometheus", "print server stats in prometheus format",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerPrometheusStats), false, false},
-          {"/stats/recentlookups", "Show recent stat-name lookups",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups), false, false},
-          {"/stats/recentlookups/clear", "clear list of stat-name lookups and counter",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear), false, true},
-          {"/stats/recentlookups/disable", "disable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable), false, true},
-          {"/stats/recentlookups/enable", "enable recording of reset stat-name lookup names",
-           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable), false, true},
-          {"/listeners", "print listener info",
-           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo), false, false},
-          {"/runtime", "print runtime values", MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
-           false, false},
-          {"/runtime_modify", "modify runtime values",
-           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify), false, true},
-          {"/reopen_logs", "reopen access logs",
-           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs), false, true},
+          {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false, {}},
+          {"/certs",
+           "print certs on machine",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerCerts),
+           false,
+           false,
+           {}},
+          {"/clusters",
+           "upstream cluster status",
+           MAKE_ADMIN_HANDLER(clusters_handler_.handlerClusters),
+           false,
+           false,
+           {}},
+          {"/config_dump",
+           "dump current Envoy configs (experimental)",
+           MAKE_ADMIN_HANDLER(config_dump_handler_.handlerConfigDump),
+           false,
+           false,
+           {}},
+          {"/init_dump",
+           "dump current Envoy init manager information (experimental)",
+           MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump),
+           false,
+           false,
+           {}},
+          {"/contention",
+           "dump current Envoy mutex contention stats (if enabled)",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerContention),
+           false,
+           false,
+           {}},
+          {"/cpuprofiler",
+           "enable/disable the CPU profiler",
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerCpuProfiler),
+           false,
+           true,
+           {}},
+          {"/heapprofiler",
+           "enable/disable the heap profiler",
+           MAKE_ADMIN_HANDLER(profiling_handler_.handlerHeapProfiler),
+           false,
+           true,
+           {}},
+          {"/healthcheck/fail",
+           "cause the server to fail health checks",
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail),
+           false,
+           true,
+           {}},
+          {"/healthcheck/ok",
+           "cause the server to pass health checks",
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckOk),
+           false,
+           true,
+           {}},
+          {"/help",
+           "print out list of admin commands",
+           MAKE_ADMIN_HANDLER(handlerHelp),
+           false,
+           false,
+           {}},
+          {"/hot_restart_version",
+           "print the hot restart compatibility version",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerHotRestartVersion),
+           false,
+           false,
+           {}},
+          {"/logging",
+           "query/change logging levels",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerLogging),
+           false,
+           true,
+           {}},
+          {"/memory",
+           "print current allocation/heap usage",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerMemory),
+           false,
+           false,
+           {}},
+          {"/quitquitquit",
+           "exit the server",
+           MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerQuitQuitQuit),
+           false,
+           true,
+           {}},
+          {"/reset_counters",
+           "reset all counters to zero",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerResetCounters),
+           false,
+           true,
+           {}},
+          {"/drain_listeners",
+           "drain listeners",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerDrainListeners),
+           false,
+           true,
+           {}},
+          {"/server_info",
+           "print server version/status information",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerServerInfo),
+           false,
+           false,
+           {}},
+          {"/ready",
+           "print server state, return 200 if LIVE, otherwise return 503",
+           MAKE_ADMIN_HANDLER(server_info_handler_.handlerReady),
+           false,
+           false,
+           {}},
+          stats_handler_.statsHandler(),
+          {"/stats/json",
+           "print stats as with HTML paging",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsJson),
+           false,
+           false,
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+             "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::Boolean, "pretty", "Add indentation to show JSON structure"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"}}},
+          {"/stats/prometheus",
+           "print server stats in prometheus format",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsPrometheus),
+           false,
+           false,
+           {{ParamDescriptor::Type::Boolean, "usedonly",
+             "Only include stats that have been written by system since restart"},
+            {ParamDescriptor::Type::Boolean, "text_readouts",
+             "Render text_readouts as new gaugues with value 0 (increases Prometheus data size)"},
+            {ParamDescriptor::Type::String, "filter",
+             "Regular expression (ecmascript) for filtering stats"}}},
+          {"/stats/recentlookups",
+           "Show recent stat-name lookups",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookups),
+           false,
+           false,
+           {}},
+          {"/stats/recentlookups/clear",
+           "clear list of stat-name lookups and counter",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsClear),
+           false,
+           true,
+           {}},
+          {"/stats/recentlookups/disable",
+           "disable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsDisable),
+           false,
+           true,
+           {}},
+          {"/stats/recentlookups/enable",
+           "enable recording of reset stat-name lookup names",
+           MAKE_ADMIN_HANDLER(stats_handler_.handlerStatsRecentLookupsEnable),
+           false,
+           true,
+           {}},
+          {"/listeners",
+           "print listener info",
+           MAKE_ADMIN_HANDLER(listeners_handler_.handlerListenerInfo),
+           false,
+           false,
+           {}},
+          {"/runtime",
+           "print runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntime),
+           false,
+           false,
+           {}},
+          {"/runtime_modify",
+           "modify runtime values",
+           MAKE_ADMIN_HANDLER(runtime_handler_.handlerRuntimeModify),
+           false,
+           true,
+           {}},
+          {"/reopen_logs",
+           "reopen access logs",
+           MAKE_ADMIN_HANDLER(logs_handler_.handlerReopenLogs),
+           false,
+           true,
+           {}},
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
@@ -264,6 +320,43 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+#if 0
+      ParamValues values;
+      const Http::Utility::QueryParams params =
+          Http::Utility::parseAndDecodeQueryString(path_and_query);
+      for (const ParamDescriptor& desc : handler.params_) {
+        auto iter = params.find(desc.id_);
+        if (iter != params.end()) {
+          switch (desc.type_) {
+            case ParamDescriptor::Type::Boolean: {
+              if (iter->second == "false") {
+                values.boolean_map_[desc.id_] = false;
+              } else if (iter->second == "true" || iter->second.empty()) {
+                values.boolean_map_[desc.id_] = true;
+              } else {
+                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
+                return Http::Code::BadRequest;
+              }
+              break;
+            }
+            case ParamDescriptor::Type::Integer: {
+              int64_t val;
+              if (absl::SimpleAtoi(iter->second, &val)) {
+                values.integer_map_[desc.id_] = val;
+              } else {
+                response.add(fmt::format("Invalid value for query-param {}.", desc.id_));
+                return Http::Code::BadRequest;
+              }
+              break;
+            }
+            case ParamDescriptor::Type::String:
+              values.string_map_[desc.id_] = iter->second;
+              break;
+          }
+        }
+      }
+#endif
+
       found_handler = true;
       if (handler.mutates_server_state_) {
         const absl::string_view method = admin_stream.getRequestHeaders().getMethodValue();
@@ -317,47 +410,15 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::ResponseHeaderMap&,
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::ResponseHeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
-
-  response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
+  AdminHtmlGenerator gen(response);
+  gen.renderHead();
 
   // Prefix order is used during searching, but for printing do them in alpha order.
+  OptRef<const Http::Utility::QueryParams> no_query_params;
   for (const UrlHandler* handler : sortedHandlers()) {
-    absl::string_view path = handler->prefix_;
-
-    if (path == "/") {
-      continue; // No need to print self-link to index page.
-    }
-
-    // Remove the leading slash from the link, so that the admin page can be
-    // rendered as part of another console, on a sub-path.
-    //
-    // E.g. consider a downstream dashboard that embeds the Envoy admin console.
-    // In that case, the "/stats" endpoint would be at
-    // https://DASHBOARD/envoy_admin/stats. If the links we present on the home
-    // page are absolute (e.g. "/stats") they won't work in the context of the
-    // dashboard. Removing the leading slash, they will work properly in both
-    // the raw admin console and when embedded in another page and URL
-    // hierarchy.
-    ASSERT(!path.empty());
-    ASSERT(path[0] == '/');
-    path = path.substr(1);
-
-    // For handlers that mutate state, render the link as a button in a POST form,
-    // rather than an anchor tag. This should discourage crawlers that find the /
-    // page from accidentally mutating all the server state by GETting all the hrefs.
-    const char* link_format =
-        handler->mutates_server_state_
-            ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
-            : "<a href='{}'>{}</a>";
-    const std::string link = fmt::format(link_format, path, path);
-
-    // Handlers are all specified by statically above, and are thus trusted and do
-    // not require escaping.
-    response.add(fmt::format("<tr class='home-row'><td class='home-data'>{}</td>"
-                             "<td class='home-data'>{}</td></tr>\n",
-                             link, Html::Utility::sanitize(handler->help_text_)));
+    gen.renderUrlHandler(*handler, no_query_params);
   }
-  response.add(AdminHtmlEnd);
+  gen.renderTail();
   return Http::Code::OK;
 }
 
@@ -366,7 +427,8 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 }
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
-                           HandlerCb callback, bool removable, bool mutates_state) {
+                           HandlerCb callback, bool removable, bool mutates_state,
+                           const ParamDescriptorVec& params) {
   ASSERT(prefix.size() > 1);
   ASSERT(prefix[0] == '/');
 
@@ -383,7 +445,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
   auto it = std::find_if(handlers_.cbegin(), handlers_.cend(),
                          [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_; });
   if (it == handlers_.end()) {
-    handlers_.push_back({prefix, help_text, callback, removable, mutates_state});
+    handlers_.push_back({prefix, help_text, callback, removable, mutates_state, params});
     return true;
   }
   return false;

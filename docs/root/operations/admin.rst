@@ -431,6 +431,10 @@ modify different aspects of the server:
   value represents the summary since the start of Envoy instance. "No recorded values" in the histogram
   output indicates that it has not been updated with a value. See :ref:`here <operations_stats>` for more information.
 
+  Warning: if there are a large number of clusters, say more than 10000, then this
+  endpoint may disrupt server operation due to CPU and/or memory overhead. It also
+  may overwhelm a browser if one is being used to display the admin console.
+
   .. http:get:: /stats?usedonly
 
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at

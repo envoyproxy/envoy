@@ -271,6 +271,7 @@ public:
     std::string value_copy(value);
     absl::MutexLock lock(&mutex_);
     value_ = std::move(value_copy);
+    flags_ |= Flags::Used;
   }
   std::string value() const override {
     absl::MutexLock lock(&mutex_);
@@ -383,6 +384,51 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
   for (auto& text_readout : text_readouts_) {
     f_stat(*text_readout);
   }
+}
+
+template <class Set, class Fn>
+bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start,
+                               PageDirection direction) const {
+  StatNameManagedStorage start_name(start, symbol_table_);
+  Thread::LockGuard lock(mutex_);
+  if (direction == PageDirection::Forward) {
+    auto iter = set->lower_bound(start_name.statName());
+    if (iter == set->end()) {
+      return false;
+    }
+    if ((*iter)->statName() == start_name.statName()) {
+      ++iter;
+    }
+    for (bool cont = true; cont && iter != set->end(); ++iter) {
+      if (!f_stat(**iter)) {
+        cont = false;
+      }
+    }
+    return iter != set->end();
+  }
+  auto iter = start.empty() ? set->end() : set->lower_bound(start_name.statName());
+  while (iter != set->begin()) {
+    --iter;
+    if (!f_stat(**iter)) {
+      break;
+    }
+  }
+  return iter != set->begin();
+}
+
+bool AllocatorImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
+                                PageDirection direction) const {
+  return pageHelper(&counters_, f_stat, start, direction);
+}
+
+bool AllocatorImpl::gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
+                              PageDirection direction) const {
+  return pageHelper(&gauges_, f_stat, start, direction);
+}
+
+bool AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
+                                    PageDirection direction) const {
+  return pageHelper(&text_readouts_, f_stat, start, direction);
 }
 
 void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {

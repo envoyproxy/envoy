@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["admin.h"],
     deps = [
         ":admin_filter_lib",
+        ":admin_html_generator_lib",
         ":clusters_handler_lib",
         ":config_dump_handler_lib",
         ":config_tracker_lib",
@@ -45,7 +46,6 @@ envoy_cc_library(
         "//source/common/common:mutex_tracer_lib",
         "//source/common/common:utility_lib",
         "//source/common/formatter:substitution_formatter_lib",
-        "//source/common/html:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
@@ -84,6 +84,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "admin_html_generator_lib",
+    srcs = ["admin_html_generator.cc"],
+    hdrs = ["admin_html_generator.h"],
+    deps = [
+        "//envoy/server:admin_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/html:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "handler_ctx_lib",
     hdrs = ["handler_ctx.h"],
     deps = [
@@ -96,6 +108,7 @@ envoy_cc_library(
     srcs = ["stats_handler.cc"],
     hdrs = ["stats_handler.h"],
     deps = [
+        ":admin_html_generator_lib",
         ":handler_ctx_lib",
         ":prometheus_stats_lib",
         ":utils_lib",

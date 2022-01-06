@@ -83,7 +83,8 @@ public:
   //
   // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
-                  bool removable, bool mutates_server_state) override;
+                  bool removable, bool mutates_server_state,
+                  const ParamDescriptorVec& params) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
 
@@ -209,17 +210,6 @@ public:
   uint64_t maxRequestsPerConnection() const override { return 0; }
 
 private:
-  /**
-   * Individual admin handler including prefix, help text, and callback.
-   */
-  struct UrlHandler {
-    const std::string prefix_;
-    const std::string help_text_;
-    const HandlerCb handler_;
-    const bool removable_;
-    const bool mutates_server_state_;
-  };
-
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
