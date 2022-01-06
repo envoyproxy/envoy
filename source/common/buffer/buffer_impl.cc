@@ -577,7 +577,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
   }
 
   // Less data in slices than length() reported.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected data in slices");
+  return false;
 }
 
 OwnedImpl::OwnedImpl() = default;

@@ -119,13 +119,13 @@ private:
     void onAboveWriteBufferHighWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected data written to happy eyeballs connection");
     }
 
     void onBelowWriteBufferLowWatermark() override {
       // No data will be written to the connection while the wrapper is associated with it,
       // so the write buffer should never hit the high watermark.
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected data drained from happy eyeballs connection");
     }
 
     ClientConnection& connection() { return connection_; }

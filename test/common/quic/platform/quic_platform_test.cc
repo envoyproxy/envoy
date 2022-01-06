@@ -387,7 +387,7 @@ TEST_F(QuicPlatformTest, QuicNotReached) {
 #ifdef NDEBUG
   QUIC_NOTREACHED(); // Expect no-op.
 #else
-  EXPECT_DEATH(QUIC_NOTREACHED(), "not reached");
+  EXPECT_DEATH(QUIC_NOTREACHED(), "reached unexpected code");
 #endif
 }
 

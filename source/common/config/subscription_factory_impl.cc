@@ -116,7 +116,6 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     throw EnvoyException(
         "Missing config source specifier in envoy::config::core::v3::ConfigSource");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
@@ -194,7 +193,6 @@ SubscriptionPtr SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     // TODO(htuch): Implement HTTP semantics for collection ResourceLocators.
     throw EnvoyException("Unsupported code path");
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Config
