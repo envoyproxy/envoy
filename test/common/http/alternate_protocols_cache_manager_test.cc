@@ -74,14 +74,6 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithEntry) {
   EXPECT_TRUE(cache->findAlternatives(origin).has_value());
 }
 
-size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                     timeSystem().monotonicTime().time_since_epoch())
-                     .count();
-std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds);
-TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt",
-                                          absl::StrCat(key.length(), "\n", key, value.length(),
-                                                       "\n", value));
-
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));
   options1_.mutable_key_value_store_config();
