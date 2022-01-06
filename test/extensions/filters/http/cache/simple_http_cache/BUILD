@@ -15,8 +15,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/cache/simple_http_cache:config",
         "//test/extensions/filters/http/cache:common",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "//test/mocks/server:factory_context_mocks",
     ],
 )

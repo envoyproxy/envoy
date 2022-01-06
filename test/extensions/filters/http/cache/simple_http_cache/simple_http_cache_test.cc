@@ -6,9 +6,9 @@
 #include "source/extensions/filters/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/common.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
-#include "test/mocks/server/factory_context.h"
 
 #include "gtest/gtest.h"
 
@@ -278,7 +278,8 @@ TEST(Registration, GetFactory) {
   envoy::extensions::filters::http::cache::v3::CacheConfig config;
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   config.mutable_typed_config()->PackFrom(*factory->createEmptyConfigProto());
-  EXPECT_EQ(factory->getCache(config, factory_context).cacheInfo().name_, "envoy.extensions.http.cache.simple");
+  EXPECT_EQ(factory->getCache(config, factory_context).cacheInfo().name_,
+            "envoy.extensions.http.cache.simple");
 }
 
 TEST_F(SimpleHttpCacheTest, VaryResponses) {
