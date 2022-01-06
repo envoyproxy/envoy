@@ -35,7 +35,7 @@ public:
 };
 
 struct MaybeMatchResult {
-  const ActionPtr result_;
+  const ActionFactoryCb result_;
   const MatchState match_state_;
 };
 
@@ -56,21 +56,18 @@ static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
     return evaluateMatch(*result.on_match_->matcher_, data);
   }
 
-  return MaybeMatchResult{result.on_match_->action_cb_(), MatchState::MatchComplete};
+  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
-template <class DataType>
-using MatchTreeFactoryCb = std::function<std::unique_ptr<MatchTree<DataType>>()>;
-template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
-template <class DataType> using DataInputFactoryCb = std::function<DataInputPtr<DataType>()>;
 
 /**
  * Recursively constructs a MatchTree from a protobuf configuration.
  * @param DataType the type used as a source for DataInputs
  * @param ActionFactoryContext the context provided to Action factories
  */
-template <class DataType, class ActionFactoryContext> class MatchTreeFactory {
+template <class DataType, class ActionFactoryContext>
+class MatchTreeFactory : public OnMatchFactory<DataType> {
 public:
   MatchTreeFactory(ActionFactoryContext& context,
                    Server::Configuration::ServerFactoryContext& factory_context,
@@ -86,9 +83,19 @@ public:
     case MatcherType::kMatcherList:
       return createListMatcher(config);
     default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("match fail");
       return nullptr;
     }
+  }
+
+  absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const xds::type::matcher::v3::Matcher::OnMatch& on_match) override {
+    return createOnMatchBase(on_match);
+  }
+
+  absl::optional<OnMatchFactoryCb<DataType>>
+  createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch& on_match) override {
+    return createOnMatchBase(on_match);
   }
 
 private:
@@ -167,6 +174,7 @@ private:
 
   template <class MatcherType>
   MatchTreeFactoryCb<DataType> createTreeMatcher(const MatcherType& matcher) {
+    auto data_input = createDataInput(matcher.matcher_tree().input());
     switch (matcher.matcher_tree().tree_type_case()) {
     case MatcherType::MatcherTree::kExactMatchMap: {
       std::vector<std::pair<std::string, OnMatchFactoryCb<DataType>>> match_children;
@@ -177,7 +185,6 @@ private:
             std::make_pair(children.first, *MatchTreeFactory::createOnMatch(children.second)));
       }
 
-      auto data_input = createDataInput(matcher.matcher_tree().input());
       auto on_no_match = createOnMatch(matcher.on_no_match());
 
       return [match_children, data_input, on_no_match]() {
@@ -191,15 +198,22 @@ private:
     }
     case MatcherType::MatcherTree::kPrefixMatchMap:
       PANIC("unsupported");
-    case MatcherType::MatcherTree::kCustomMatch:
-      PANIC("unsupported");
+    case MatcherType::MatcherTree::kCustomMatch: {
+      auto& factory = Config::Utility::getAndCheckFactory<CustomMatcherFactory<DataType>>(
+          matcher.matcher_tree().custom_match());
+      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+          matcher.matcher_tree().custom_match().typed_config(),
+          server_factory_context_.messageValidationVisitor(), factory);
+      return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
+                                                  *this);
+    }
     default:
       PANIC("unsupported");
     }
   }
 
   template <class OnMatchType>
-  absl::optional<OnMatchFactoryCb<DataType>> createOnMatch(const OnMatchType& on_match) {
+  absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
     if (on_match.has_matcher()) {
       return [matcher_factory = create(on_match.matcher())]() {
         return OnMatch<DataType>{{}, matcher_factory()};
