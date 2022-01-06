@@ -807,10 +807,10 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
     )
 
 def _v8():
-    external_genrule_repository(
+    external_http_archive(
         name = "v8",
-        genrule_cmd_file = "@envoy//bazel/external:wee8.genrule_cmd",
         patches = ["@envoy//bazel/external:wee8.patch"],
+        patch_args = ["-p1"],
     )
     native.bind(
         name = "wee8",

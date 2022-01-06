@@ -1,40 +1,96 @@
-1. Generate inspector files using genrule_cmd.
+1. Generate inspector files using @rules_python.
 2. Set v8_enable_handle_zapping=False to regain performance.
 3. Replace @zlib with //external:zlib and fix the include path.
 4. Fix build on Windows.
 5. Fix build on aarch64.
 6. Fix build with GCC.
 
---- BUILD.bazel
-+++ BUILD.bazel
-@@ -17,6 +17,7 @@ load(
-     "v8_torque",
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 5d607a5048..91547f81ad 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -3,6 +3,8 @@
+ # found in the LICENSE file.
+ 
+ load("@bazel_skylib//lib:selects.bzl", "selects")
++load("@rules_python//python:defs.bzl", "py_binary")
++load("@configs_pip3//:requirements.bzl", "requirement")
+ load(
+     "@v8//:bazel/defs.bzl",
+     "v8_binary",
+@@ -3069,9 +3071,39 @@ v8_torque(
+     noicu_srcs = [":noicu/torque_files"],
  )
- load(":bazel/v8-non-pointer-compression.bzl", "v8_binary_non_pointer_compression")
-+load(":genrule_cmd.bzl", "genrule_cmd")
  
- # =================================================
- # Flags
-@@ -104,7 +105,7 @@ v8_flag(name = "v8_enable_disassembler")
- 
- v8_flag(
-     name = "v8_enable_handle_zapping",
--    default = True,
-+    default = False,
- )
- 
- v8_flag(name = "v8_enable_hugepage")
-@@ -3092,8 +3093,7 @@ genrule(
++py_binary(
++    name = "code_generator",
++    srcs = [
++        "third_party/inspector_protocol/code_generator.py",
++        "third_party/inspector_protocol/pdl.py",
++    ],
++    data = [
++        "third_party/inspector_protocol/lib/Forward_h.template",
++        "third_party/inspector_protocol/lib/Object_cpp.template",
++        "third_party/inspector_protocol/lib/Object_h.template",
++        "third_party/inspector_protocol/lib/Protocol_cpp.template",
++        "third_party/inspector_protocol/lib/ValueConversions_cpp.template",
++        "third_party/inspector_protocol/lib/ValueConversions_h.template",
++        "third_party/inspector_protocol/lib/Values_cpp.template",
++        "third_party/inspector_protocol/lib/Values_h.template",
++        "third_party/inspector_protocol/lib/base_string_adapter_cc.template",
++        "third_party/inspector_protocol/lib/base_string_adapter_h.template",
++        "third_party/inspector_protocol/templates/Exported_h.template",
++        "third_party/inspector_protocol/templates/Imported_h.template",
++        "third_party/inspector_protocol/templates/TypeBuilder_cpp.template",
++        "third_party/inspector_protocol/templates/TypeBuilder_h.template",
++    ],
++    deps = [
++        requirement("jinja2"),
++    ],
++)
++
+ genrule(
+     name = "generated_inspector_files",
+-    srcs = ["include/js_protocol.pdl"],
++    srcs = [
++        "include/js_protocol.pdl",
++        "src/inspector/inspector_protocol_config.json",
++    ],
+     outs = [
+         "include/inspector/Debugger.h",
+         "include/inspector/Runtime.h",
+@@ -3092,10 +3124,27 @@ genrule(
          "src/inspector/protocol/Schema.cpp",
          "src/inspector/protocol/Schema.h",
      ],
 -    cmd = "bazel/generate-inspector-files.sh $(@D)",
 -    cmd_bat = "bazel\\generate-inspector-files.cmd $(@D)",
-+    cmd = genrule_cmd("@envoy//bazel/external:wee8.genrule_cmd"),
-     local = 1,
+-    local = 1,
++    cmd = """
++        export DIR=$$(dirname $$(dirname $(location :include/js_protocol.pdl))) \
++        && \
++        sed -e 's@"path": "..\\/..\\/@"path": "'"$${DIR}"'\\/@g' \
++            -e 's@"output": "..\\/..\\/@"output": "@g' \
++            -e 's@"output": "protocol"@"output": "src\\/inspector\\/protocol"@g' \
++            $(location src/inspector/inspector_protocol_config.json) \
++            > modified_config.json \
++        && \
++        $(location :code_generator) \
++            --jinja_dir . \
++            --inspector_protocol_dir third_party/inspector_protocol \
++            --config modified_config.json \
++            --output_base $(@D) \
++        && \
++        rm modified_config.json
++        """,
      message = "Generating inspector files",
++    tools = [
++        ":code_generator",
++    ],
  )
-@@ -3241,7 +3241,7 @@ v8_library(
+ 
+ filegroup(
+@@ -3241,7 +3290,7 @@ v8_library(
      ],
      deps = [
          ":v8_libbase",
@@ -43,8 +99,10 @@
      ],
  )
  
---- bazel/defs.bzl
-+++ bazel/defs.bzl
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 14fff6f049..088d989b99 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
 @@ -120,13 +120,17 @@ def _default_args():
              ],
              "@v8//bazel/config:is_gcc": [
@@ -74,8 +132,10 @@
          "arm64-v8a": "arm64",
          "arm": "arm64",
          "armeabi-v7a": "arm32",
---- src/snapshot/snapshot-utils.cc
-+++ src/snapshot/snapshot-utils.cc
+diff --git a/src/snapshot/snapshot-utils.cc b/src/snapshot/snapshot-utils.cc
+index 6db6698d7e..b56d31085f 100644
+--- a/src/snapshot/snapshot-utils.cc
++++ b/src/snapshot/snapshot-utils.cc
 @@ -5,7 +5,7 @@
  #include "src/snapshot/snapshot-utils.h"
  
