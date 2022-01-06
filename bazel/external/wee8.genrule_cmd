@@ -80,7 +80,9 @@ fi
 
 # Clang or not Clang, that is the question.
 WEE8_BUILD_ARGS+=" is_clang=$$IS_CLANG"
-if [[ $${SYSTEM} != Darwin ]]; then
+if [[ $${SYSTEM} == Darwin ]]; then
+  WEE8_BUILD_ARGS+=" use_lld=false"
+else
   WEE8_BUILD_ARGS+=" use_lld=$$IS_CLANG"
 fi
 # Use local toolchain.
