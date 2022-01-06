@@ -1112,7 +1112,8 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
 
-  // Get the shared pointer to the formatter.
+  // Create a pointer to the formatter by calling a function
+  // associated with formatter's name.
   field_extractor_ = (*it).second();
 }
 
