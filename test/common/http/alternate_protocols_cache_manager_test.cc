@@ -1,3 +1,4 @@
+#include "source/common/http/alternate_protocols_cache_impl.h"
 #include "source/common/http/alternate_protocols_cache_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
 
@@ -58,6 +59,28 @@ TEST_F(AlternateProtocolsCacheManagerTest, GetCache) {
   EXPECT_NE(nullptr, cache);
   EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
 }
+
+TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithEntry) {
+  auto* entry = options1_.add_prepopulated_entries();
+  entry->set_hostname("foo.com");
+  entry->set_port(1);
+
+  initialize();
+  AlternateProtocolsCacheSharedPtr cache = manager_->getCache(options1_, dispatcher_);
+  EXPECT_NE(nullptr, cache);
+  EXPECT_EQ(cache, manager_->getCache(options1_, dispatcher_));
+
+  const AlternateProtocolsCacheImpl::Origin origin = {"https", entry->hostname(), entry->port()};
+  EXPECT_TRUE(cache->findAlternatives(origin).has_value());
+}
+
+size_t seconds = std::chrono::duration_cast<std::chrono::seconds>(
+                     timeSystem().monotonicTime().time_since_epoch())
+                     .count();
+std::string value = absl::StrCat("h3=\":", port, "\"; ma=", 86400 + seconds);
+TestEnvironment::writeStringToFileForTest("alt_svc_cache.txt",
+                                          absl::StrCat(key.length(), "\n", key, value.length(),
+                                                       "\n", value));
 
 TEST_F(AlternateProtocolsCacheManagerTest, GetCacheWithFlushingAndConcurrency) {
   EXPECT_CALL(context_.options_, concurrency()).WillOnce(Return(5));

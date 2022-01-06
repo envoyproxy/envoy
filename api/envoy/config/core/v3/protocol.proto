@@ -128,11 +128,16 @@ message UpstreamHttpProtocolOptions {
 // advertised HTTP/3 support.
 // As with regular cached entries, if the origin response would result in clearing an existing
 // alternate protocol cache entry, pre-populated entries will also be cleared.
+// Adding a cache entry with hostname=foo.com port=123 is the equivalent of getting
+// response headers
+// alt-svc: h3=:"123"; ma=86400" in a response to a request to foo.com:123
 message AlternateProtocolsCacheEntry {
-  // FIXME comment.
-  string host_name = 1 [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
-  uint32 port = 2 [(validate.rules).uint32 = {lte: 65535}, (validate.rules).message = {required: true}];
-  uint32 alternate_port = 3 [(validate.rules).uint32 = {lte: 65535}, (validate.rules).message = {required: true}];
+  // The host name for the alternate protocol entry.
+  string hostname = 1
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+
+  // The port for the alternate protocol entry.
+  uint32 port = 2 [(validate.rules).uint32 = {lt: 65535 gt: 0}];
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
@@ -162,6 +167,10 @@ message AlternateProtocolsCacheOptions {
   // This function is currently only supported if concurrency is 1
   TypedExtensionConfig key_value_store_config = 3;
 
+  // Allows pre-populating the cache with entries, to reduce odds of using TCP for the
+  // first request to endpoints expected to support HTTP/3.
+  // Note that if a given entry is present in the key value store, and prepopulated_entries, the key
+  // value store value will be used.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 }
 
