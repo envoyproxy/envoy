@@ -8,8 +8,8 @@ HTTP3 overview
   HTTP/3 downstream support is now GA, but continued improvements are coming, tracked in
   the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
-  HTTP/3 upstream support is fine for in-datacenter use, but is not ready for internet use
-  and is missing some key latency features. See details below.
+  HTTP/3 upstream support is fine for locally controlled networks, but is not ready for
+  general internet use, and is missing some key latency features. See details below.
 
 
 HTTP3 downstream
