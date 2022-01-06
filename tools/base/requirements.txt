@@ -774,9 +774,9 @@ verboselogs==1.7 \
 wrapt==1.12.1 \
     --hash=sha256:b62ffa81fb85f4332a4f609cab4ac40709470da05643a082ec1eb88e6d9b97d7
     # via deprecated
-yapf==0.31.0 \
-    --hash=sha256:408fb9a2b254c302f49db83c59f9aa0b4b0fd0ec25be3a5c51181327922ff63d \
-    --hash=sha256:e3a234ba8455fe201eaa649cdac872d590089a18b661e39bbac7020978dd9c2e
+yapf==0.32.0 \
+    --hash=sha256:8fea849025584e486fd06d6ba2bed717f396080fd3cc236ba10cb97c4c51cf32 \
+    --hash=sha256:a3f5085d37ef7e3e004c4ba9f9b3e40c54ff1901cd111f05145ae313a7c67d1b
     # via
     #   -r requirements.in
     #   envoy.code-format.python-check
