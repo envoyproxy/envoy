@@ -211,97 +211,97 @@ private:
       return factory.createCustomMatcherFactoryCb(*message, server_factory_context_, data_input,
                                                   *this);
     }
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
-
-  template <class OnMatchType>
-  absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
-    if (on_match.has_matcher()) {
-      return [matcher_factory = create(on_match.matcher())]() {
-        return OnMatch<DataType>{{}, matcher_factory()};
-      };
-    } else if (on_match.has_action()) {
-      auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
-          on_match.action());
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
-          factory);
-
-      auto action_factory = factory.createActionFactoryCb(
-          *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
-      return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
 
-    return absl::nullopt;
-  }
+    template <class OnMatchType>
+    absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+      if (on_match.has_matcher()) {
+        return [matcher_factory = create(on_match.matcher())]() {
+          return OnMatch<DataType>{{}, matcher_factory()};
+        };
+      } else if (on_match.has_action()) {
+        auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
+            on_match.action());
+        ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+            on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
+            factory);
 
-  // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
-  class CommonProtocolInputWrapper : public DataInput<DataType> {
-  public:
-    explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
-        : common_protocol_input_(std::move(common_protocol_input)) {}
+        auto action_factory = factory.createActionFactoryCb(
+            *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
+        return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
+      }
 
-    DataInputGetResult get(const DataType&) const override {
-      return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
-                                common_protocol_input_->get()};
+      return absl::nullopt;
     }
 
-  private:
-    const CommonProtocolInputPtr common_protocol_input_;
-  };
+    // Wrapper around a CommonProtocolInput that allows it to be used as a DataInput<DataType>.
+    class CommonProtocolInputWrapper : public DataInput<DataType> {
+    public:
+      explicit CommonProtocolInputWrapper(CommonProtocolInputPtr&& common_protocol_input)
+          : common_protocol_input_(std::move(common_protocol_input)) {}
 
-  template <class TypedExtensionConfigType>
-  DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
-    auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
-    if (factory != nullptr) {
-      validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
+      DataInputGetResult get(const DataType&) const override {
+        return DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable,
+                                  common_protocol_input_->get()};
+      }
 
+    private:
+      const CommonProtocolInputPtr common_protocol_input_;
+    };
+
+    template <class TypedExtensionConfigType>
+    DataInputFactoryCb<DataType> createDataInput(const TypedExtensionConfigType& config) {
+      auto* factory = Config::Utility::getFactory<DataInputFactory<DataType>>(config);
+      if (factory != nullptr) {
+        validation_visitor_.validateDataInput(*factory, config.typed_config().type_url());
+
+        ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+            config.typed_config(), server_factory_context_.messageValidationVisitor(), *factory);
+        auto data_input = factory->createDataInputFactoryCb(
+            *message, server_factory_context_.messageValidationVisitor());
+        return data_input;
+      }
+
+      // If the provided config doesn't match a typed input, assume that this is one of the common
+      // inputs.
+      auto& common_input_factory =
+          Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          config.typed_config(), server_factory_context_.messageValidationVisitor(), *factory);
-      auto data_input = factory->createDataInputFactoryCb(
+          config.typed_config(), server_factory_context_.messageValidationVisitor(),
+          common_input_factory);
+      auto common_input = common_input_factory.createCommonProtocolInputFactoryCb(
           *message, server_factory_context_.messageValidationVisitor());
-      return data_input;
+      return
+          [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
     }
 
-    // If the provided config doesn't match a typed input, assume that this is one of the common
-    // inputs.
-    auto& common_input_factory =
-        Config::Utility::getAndCheckFactory<CommonProtocolInputFactory>(config);
-    ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-        config.typed_config(), server_factory_context_.messageValidationVisitor(),
-        common_input_factory);
-    auto common_input = common_input_factory.createCommonProtocolInputFactoryCb(
-        *message, server_factory_context_.messageValidationVisitor());
-    return
-        [common_input]() { return std::make_unique<CommonProtocolInputWrapper>(common_input()); };
-  }
-
-  template <class SinglePredicateType>
-  InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
-    switch (predicate.matcher_case()) {
-    case SinglePredicateType::kValueMatch:
-      return [value_match = predicate.value_match()]() {
-        return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
-            value_match);
-      };
-    case SinglePredicateType::kCustomMatch: {
-      auto& factory =
-          Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
-      ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
-          predicate.custom_match().typed_config(),
-          server_factory_context_.messageValidationVisitor(), factory);
-      return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
+    template <class SinglePredicateType>
+    InputMatcherFactoryCb createInputMatcher(const SinglePredicateType& predicate) {
+      switch (predicate.matcher_case()) {
+      case SinglePredicateType::kValueMatch:
+        return [value_match = predicate.value_match()]() {
+          return std::make_unique<StringInputMatcher<std::decay_t<decltype(value_match)>>>(
+              value_match);
+        };
+      case SinglePredicateType::kCustomMatch: {
+        auto& factory =
+            Config::Utility::getAndCheckFactory<InputMatcherFactory>(predicate.custom_match());
+        ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
+            predicate.custom_match().typed_config(),
+            server_factory_context_.messageValidationVisitor(), factory);
+        return factory.createInputMatcherFactoryCb(*message, server_factory_context_);
+      }
+      case SinglePredicateType::MATCHER_NOT_SET:
+        PANIC_DUE_TO_PROTO_UNSET;
+      }
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
-    case SinglePredicateType::MATCHER_NOT_SET:
-      PANIC_DUE_TO_PROTO_UNSET;
-    }
-    PANIC_DUE_TO_CORRUPT_ENUM;
-  }
 
-  const std::string stats_prefix_;
-  ActionFactoryContext& action_factory_context_;
-  Server::Configuration::ServerFactoryContext& server_factory_context_;
-  MatchTreeValidationVisitor<DataType>& validation_visitor_;
-};
+    const std::string stats_prefix_;
+    ActionFactoryContext& action_factory_context_;
+    Server::Configuration::ServerFactoryContext& server_factory_context_;
+    MatchTreeValidationVisitor<DataType>& validation_visitor_;
+  };
 } // namespace Matcher
 } // namespace Envoy
