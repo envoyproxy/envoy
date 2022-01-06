@@ -48,7 +48,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EgressOperation;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING; // Make the compiler happy.
 }
 
 Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& stream_info) {
@@ -66,8 +66,6 @@ Decision HttpTracerUtility::shouldTraceRequest(const StreamInfo::StreamInfo& str
   default:
     return {trace_reason, false};
   }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
