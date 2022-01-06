@@ -169,7 +169,7 @@ TEST_P(AdminStatsTest, HandlerStatsPage) {
     bool in_pre = false;
     std::string out = data.toString();
     std::vector<absl::string_view> item_vector;
-    for (absl::string_view line : absl::StrSplit(out, "\n")) {
+    for (absl::string_view line : absl::StrSplit(out, '\n')) {
       if (line == "<pre>") {
         in_pre = true;
       } else if (line == "</pre>") {

@@ -13,8 +13,6 @@
 #include "gmock/gmock-matchers.h"
 #include "gtest/gtest.h"
 
-using testing::ElementsAre;
-
 namespace Envoy {
 namespace Stats {
 namespace {
