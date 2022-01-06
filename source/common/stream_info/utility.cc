@@ -149,65 +149,40 @@ ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status)
   // TODO(ambuc): Replace this with the non-draft URL when finalized.
   switch (proxy_status) {
   case ProxyStatusError::DnsTimeout:
-    return Http::Code::GatewayTimeout; // 504;
-  case ProxyStatusError::DnsError:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::DestinationNotFound:
-    return Http::Code::InternalServerError; // 500;
-  case ProxyStatusError::DestinationUnavailable:
-    return Http::Code::ServiceUnavailable;
-  case ProxyStatusError::DestinationIpProhibited:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::DestinationIpUnroutable:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::ConnectionRefused:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::ConnectionTerminated:
-    return Http::Code::BadGateway; // 502;
   case ProxyStatusError::ConnectionTimeout:
-    return Http::Code::GatewayTimeout; // 504;
   case ProxyStatusError::ConnectionReadTimeout:
-    return Http::Code::GatewayTimeout; // 504;
   case ProxyStatusError::ConnectionWriteTimeout:
-    return Http::Code::GatewayTimeout; // 504;
-  case ProxyStatusError::ConnectionLimitReached:
-    return Http::Code::ServiceUnavailable;
-  case ProxyStatusError::TlsProtocolError:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::TlsCertificateError:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::TlsAlertReceived:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpRequestDenied:
-    return Http::Code::Forbidden;
-  case ProxyStatusError::HttpResponseIncomplete:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseHeaderSectionSize:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseHeaderSize:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseBodySize:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseTrailerSectionSize:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseTrailerSize:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseTransferCoding:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::HttpResponseContentCoding:
-    return Http::Code::BadGateway; // 502;
   case ProxyStatusError::HttpResponseTimeout:
-    return Http::Code::GatewayTimeout; // 504;
+    return Http::Code::GatewayTimeout; // 504
+  case ProxyStatusError::DnsError:
+  case ProxyStatusError::DestinationIpProhibited:
+  case ProxyStatusError::DestinationIpUnroutable:
+  case ProxyStatusError::ConnectionRefused:
+  case ProxyStatusError::ConnectionTerminated:
+  case ProxyStatusError::TlsProtocolError:
+  case ProxyStatusError::TlsCertificateError:
+  case ProxyStatusError::TlsAlertReceived:
+  case ProxyStatusError::HttpResponseIncomplete:
+  case ProxyStatusError::HttpResponseHeaderSectionSize:
+  case ProxyStatusError::HttpResponseHeaderSize:
+  case ProxyStatusError::HttpResponseBodySize:
+  case ProxyStatusError::HttpResponseTrailerSectionSize:
+  case ProxyStatusError::HttpResponseTrailerSize:
+  case ProxyStatusError::HttpResponseTransferCoding:
+  case ProxyStatusError::HttpResponseContentCoding:
   case ProxyStatusError::HttpUpgradeFailed:
-    return Http::Code::BadGateway; // 502;
   case ProxyStatusError::HttpProtocolError:
-    return Http::Code::BadGateway; // 502;
-  case ProxyStatusError::ProxyInternalError:
-    return Http::Code::InternalServerError; // 500;
-  case ProxyStatusError::ProxyConfigurationError:
-    return Http::Code::InternalServerError; // 500;
   case ProxyStatusError::ProxyLoopDetected:
-    return Http::Code::BadGateway; // 502;
+    return Http::Code::BadGateway; // 502
+  case ProxyStatusError::DestinationNotFound:
+  case ProxyStatusError::ProxyInternalError:
+  case ProxyStatusError::ProxyConfigurationError:
+    return Http::Code::InternalServerError; // 500
+  case ProxyStatusError::DestinationUnavailable:
+  case ProxyStatusError::ConnectionLimitReached:
+    return Http::Code::ServiceUnavailable; // 503
+  case ProxyStatusError::HttpRequestDenied:
+    return Http::Code::Forbidden; // 403
   case ProxyStatusError::ProxyInternalResponse:
   case ProxyStatusError::HttpRequestError:
   default:
@@ -283,7 +258,7 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
   case ProxyStatusError::ConnectionLimitReached:
     return CONNECTION_LIMIT_REACHED;
   case ProxyStatusError::TlsProtocolError:
-    return TLS_PROTOCOL_ERORR;
+    return TLS_PROTOCOL_ERROR;
   case ProxyStatusError::TlsCertificateError:
     return TLS_CERTIFICATE_ERORR;
   case ProxyStatusError::TlsAlertReceived:

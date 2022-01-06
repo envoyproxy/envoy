@@ -172,7 +172,7 @@ public:
   constexpr static absl::string_view CONNECTION_READ_TIMEOUT = "connection_read_timeout";
   constexpr static absl::string_view CONNECTION_WRITE_TIMEOUT = "connection_write_timeout";
   constexpr static absl::string_view CONNECTION_LIMIT_REACHED = "connection_limit_reached";
-  constexpr static absl::string_view TLS_PROTOCOL_ERORR = "tls_protocol_error";
+  constexpr static absl::string_view TLS_PROTOCOL_ERROR = "tls_protocol_error";
   constexpr static absl::string_view TLS_CERTIFICATE_ERORR = "tls_certificate_error";
   constexpr static absl::string_view TLS_ALERT_RECEIVED = "tls_alert_received";
   constexpr static absl::string_view HTTP_REQUEST_ERROR = "http_request_error";

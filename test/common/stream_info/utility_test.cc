@@ -193,6 +193,118 @@ TEST_F(ProxyStatusTest, ToStringServerName) {
               AllOf(HasSubstr("foo"), Not(HasSubstr("envoy"))));
 }
 
+TEST(ProxyStatusRecommendedHttpStatusCode, TestAll) {
+  for (const auto& [proxy_status_error, http_code] :
+       std::vector<std::pair<ProxyStatusError, absl::optional<Http::Code>>>{
+           {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::DnsTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::ConnectionTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::ConnectionReadTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::ConnectionWriteTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::HttpResponseTimeout, Http::Code::GatewayTimeout},
+           {ProxyStatusError::DnsError, Http::Code::BadGateway},
+           {ProxyStatusError::DestinationIpProhibited, Http::Code::BadGateway},
+           {ProxyStatusError::DestinationIpUnroutable, Http::Code::BadGateway},
+           {ProxyStatusError::ConnectionRefused, Http::Code::BadGateway},
+           {ProxyStatusError::ConnectionTerminated, Http::Code::BadGateway},
+           {ProxyStatusError::TlsProtocolError, Http::Code::BadGateway},
+           {ProxyStatusError::TlsCertificateError, Http::Code::BadGateway},
+           {ProxyStatusError::TlsAlertReceived, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseIncomplete, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseHeaderSectionSize, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseHeaderSize, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseBodySize, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseTrailerSectionSize, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseTrailerSize, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseTransferCoding, Http::Code::BadGateway},
+           {ProxyStatusError::HttpResponseContentCoding, Http::Code::BadGateway},
+           {ProxyStatusError::HttpUpgradeFailed, Http::Code::BadGateway},
+           {ProxyStatusError::HttpProtocolError, Http::Code::BadGateway},
+           {ProxyStatusError::ProxyLoopDetected, Http::Code::BadGateway},
+           {ProxyStatusError::DestinationNotFound, Http::Code::InternalServerError},
+           {ProxyStatusError::ProxyInternalError, Http::Code::InternalServerError},
+           {ProxyStatusError::ProxyConfigurationError, Http::Code::InternalServerError},
+           {ProxyStatusError::DestinationUnavailable, Http::Code::ServiceUnavailable},
+           {ProxyStatusError::ConnectionLimitReached, Http::Code::ServiceUnavailable},
+           {ProxyStatusError::HttpRequestDenied, Http::Code::Forbidden},
+           {ProxyStatusError::ProxyInternalResponse, absl::nullopt},
+           {ProxyStatusError::HttpRequestError, absl::nullopt},
+       }) {
+    EXPECT_THAT(ProxyStatusUtils::recommendedHttpStatusCode(proxy_status_error), http_code);
+  }
+}
+
+TEST(ProxyStatusErrorToString, TestAll) {
+  for (const auto& [proxy_status_error, error_string] :
+       std::vector<std::pair<ProxyStatusError, std::string>>{
+           {ProxyStatusError::DnsTimeout, "dns_timeout"},
+           {ProxyStatusError::DnsError, "dns_error"},
+           {ProxyStatusError::DestinationNotFound, "destination_not_found"},
+           {ProxyStatusError::DestinationUnavailable, "destination_unavailable"},
+           {ProxyStatusError::DestinationIpProhibited, "destination_ip_prohibited"},
+           {ProxyStatusError::DestinationIpUnroutable, "destination_ip_unroutable"},
+           {ProxyStatusError::ConnectionRefused, "connection_refused"},
+           {ProxyStatusError::ConnectionTerminated, "connection_terminated"},
+           {ProxyStatusError::ConnectionTimeout, "connection_timeout"},
+           {ProxyStatusError::ConnectionReadTimeout, "connection_read_timeout"},
+           {ProxyStatusError::ConnectionWriteTimeout, "connection_write_timeout"},
+           {ProxyStatusError::ConnectionLimitReached, "connection_limit_reached"},
+           {ProxyStatusError::TlsProtocolError, "tls_protocol_error"},
+           {ProxyStatusError::TlsCertificateError, "tls_certificate_error"},
+           {ProxyStatusError::TlsAlertReceived, "tls_alert_received"},
+           {ProxyStatusError::HttpRequestError, "http_request_error"},
+           {ProxyStatusError::HttpRequestDenied, "http_request_denied"},
+           {ProxyStatusError::HttpResponseIncomplete, "http_response_incomplete"},
+           {ProxyStatusError::HttpResponseHeaderSectionSize, "http_response_header_section_size"},
+           {ProxyStatusError::HttpResponseHeaderSize, "http_response_header_size"},
+           {ProxyStatusError::HttpResponseBodySize, "http_response_body_size"},
+           {ProxyStatusError::HttpResponseTrailerSectionSize, "http_response_trailer_section_size"},
+           {ProxyStatusError::HttpResponseTrailerSize, "http_response_trailer_size"},
+           {ProxyStatusError::HttpResponseTransferCoding, "http_response_transfer_coding"},
+           {ProxyStatusError::HttpResponseContentCoding, "http_response_content_coding"},
+           {ProxyStatusError::HttpResponseTimeout, "http_response_timeout"},
+           {ProxyStatusError::HttpUpgradeFailed, "http_upgrade_failed"},
+           {ProxyStatusError::HttpProtocolError, "http_protocol_error"},
+           {ProxyStatusError::ProxyInternalResponse, "proxy_internal_response"},
+           {ProxyStatusError::ProxyInternalError, "proxy_internal_error"},
+           {ProxyStatusError::ProxyConfigurationError, "proxy_configuration_error"},
+           {ProxyStatusError::ProxyLoopDetected, "proxy_loop_detected"},
+           {ProxyStatusError::LastProxyStatus, "-"},
+       }) {
+    EXPECT_THAT(ProxyStatusUtils::proxyStatusErrorToString(proxy_status_error), error_string);
+  }
+}
+
+TEST(ProxyStatusFromStreamInfo, TestAll) {
+  for (const auto& [response_flag, proxy_status_error] :
+       std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
+           {ResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},
+           {ResponseFlag::NoHealthyUpstream, ProxyStatusError::DestinationUnavailable},
+           {ResponseFlag::UpstreamRequestTimeout, ProxyStatusError::ConnectionTimeout},
+           {ResponseFlag::LocalReset, ProxyStatusError::ConnectionTimeout},
+           {ResponseFlag::UpstreamRemoteReset, ProxyStatusError::ConnectionTerminated},
+           {ResponseFlag::UpstreamConnectionFailure, ProxyStatusError::ConnectionRefused},
+           {ResponseFlag::UpstreamConnectionTermination, ProxyStatusError::ConnectionTerminated},
+           {ResponseFlag::UpstreamOverflow, ProxyStatusError::ConnectionLimitReached},
+           {ResponseFlag::NoRouteFound, ProxyStatusError::DestinationNotFound},
+           {ResponseFlag::RateLimited, ProxyStatusError::ConnectionLimitReached},
+           {ResponseFlag::RateLimitServiceError, ProxyStatusError::ConnectionLimitReached},
+           {ResponseFlag::UpstreamRetryLimitExceeded, ProxyStatusError::DestinationUnavailable},
+           {ResponseFlag::StreamIdleTimeout, ProxyStatusError::HttpResponseTimeout},
+           {ResponseFlag::InvalidEnvoyRequestHeaders, ProxyStatusError::HttpRequestError},
+           {ResponseFlag::DownstreamProtocolError, ProxyStatusError::HttpRequestError},
+           {ResponseFlag::UpstreamMaxStreamDurationReached, ProxyStatusError::HttpResponseTimeout},
+           {ResponseFlag::NoFilterConfigFound, ProxyStatusError::ProxyConfigurationError},
+           {ResponseFlag::UpstreamProtocolError, ProxyStatusError::HttpProtocolError},
+           {ResponseFlag::NoClusterFound, ProxyStatusError::DestinationUnavailable},
+       }) {
+    NiceMock<MockStreamInfo> stream_info;
+    ON_CALL(stream_info, hasResponseFlag(response_flag)).WillByDefault(Return(true));
+    EXPECT_THAT(ProxyStatusUtils::fromStreamInfo(stream_info), proxy_status_error);
+  }
+}
+
 } // namespace
 } // namespace StreamInfo
 } // namespace Envoy
