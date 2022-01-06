@@ -369,6 +369,9 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
+  //
+  // Pass factory context to allow HttpCache to use async client, stats scope
+  // etc.
   virtual HttpCache&
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config, 
            Server::Configuration::FactoryContext& context) PURE;
