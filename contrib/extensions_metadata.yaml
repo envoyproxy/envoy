@@ -56,5 +56,5 @@ envoy.bootstrap.vcl:
 envoy.matching.input_matchers.hyperscan:
   categories:
   - envoy.matching.input_matchers
-  security_posture: requires_trusted_downstream_and_upstream
+  security_posture: robust_to_untrusted_downstream
   status: alpha
