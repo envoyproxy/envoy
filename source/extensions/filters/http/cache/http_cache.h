@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
@@ -369,7 +370,8 @@ public:
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
   virtual HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config) PURE;
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config, 
+           Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;
 
 private:
