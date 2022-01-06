@@ -187,6 +187,16 @@ public:
 
   std::string toString() const override { return std::string(data_.data() + start_, size_); }
 
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
+    size_t total_size_to_write = 0;
+
+    for (const auto& fragment : fragments) {
+      total_size_to_write += fragment.size();
+      add(fragment.data(), fragment.size());
+    }
+    return total_size_to_write;
+  }
+
   void setWatermarks(uint32_t) override {
     // Not implemented.
     // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
@@ -206,12 +216,6 @@ public:
   char* mutableEnd() { return mutableStart() + size_; }
 
   const char* end() const { return start() + size_; }
-
-  uint8_t* inlineReserve(uint64_t size) override {
-    FUZZ_ASSERT(start_ + size_ + size <= data_.size());
-    size_ += size;
-    return reinterpret_cast<uint8_t*>(mutableEnd());
-  }
 
   std::array<char, 2 * TotalMaxAllocation> data_;
   uint32_t start_{TotalMaxAllocation};

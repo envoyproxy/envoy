@@ -107,8 +107,7 @@ StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection,
 void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view value) {
   ASSERT(!key.empty());
 
-  const uint64_t header_size =
-      connection_.buffer().addFragments<false>(key, COLON_SPACE, value, CRLF);
+  const uint64_t header_size = connection_.buffer().addFragments({key, COLON_SPACE, value, CRLF});
 
   bytes_meter_->addHeaderBytesSent(header_size);
 }
@@ -298,7 +297,7 @@ void StreamEncoderImpl::encodeMetadata(const MetadataMapVector&) {
 
 void StreamEncoderImpl::endEncode() {
   if (chunk_encoding_) {
-    connection_.buffer().addFragments(LAST_CHUNK, CRLF);
+    connection_.buffer().addFragments({LAST_CHUNK, CRLF});
   }
 
   flushOutput(true);
@@ -412,8 +411,8 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     reason_phrase = {status_string, status_string_len};
   }
 
-  connection_.buffer().addFragments<false>(response_prefix, absl::StrCat(numeric_status), SPACE,
-                                           reason_phrase, CRLF);
+  connection_.buffer().addFragments(
+      {response_prefix, absl::StrCat(numeric_status), SPACE, reason_phrase, CRLF});
 
   if (numeric_status >= 300) {
     // Don't do special CONNECT logic if the CONNECT was rejected.
@@ -454,8 +453,8 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     host_or_path_view = path->value().getStringView();
   }
 
-  connection_.buffer().addFragments<false>(method->value().getStringView(), SPACE,
-                                           host_or_path_view, REQUEST_POSTFIX);
+  connection_.buffer().addFragments(
+      {method->value().getStringView(), SPACE, host_or_path_view, REQUEST_POSTFIX});
 
   encodeHeadersBase(headers, absl::nullopt, end_stream,
                     HeaderUtility::requestShouldHaveNoBody(headers));

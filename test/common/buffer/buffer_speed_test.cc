@@ -520,12 +520,12 @@ static void bufferAddVsAddFragments(benchmark::State& state) {
     } else {
       if (write_cycle == Write2UnitsPerCall) {
         for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
-          buffer.addFragments(data_unit_view, data_unit_view);
+          buffer.addFragments({data_unit_view, data_unit_view});
         }
       } else {
         for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
-          buffer.addFragments(data_unit_view, data_unit_view, data_unit_view, data_unit_view,
-                              data_unit_view);
+          buffer.addFragments(
+              {data_unit_view, data_unit_view, data_unit_view, data_unit_view, data_unit_view});
         }
       }
     }

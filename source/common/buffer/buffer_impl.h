@@ -741,6 +741,8 @@ public:
     return reserveWithMaxLength(length);
   }
 
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
+
 protected:
   static constexpr uint64_t default_read_reservation_size_ =
       Reservation::MAX_SLICES_ * Slice::default_slice_size_;
@@ -752,30 +754,6 @@ protected:
 
   void commit(uint64_t length, absl::Span<RawSlice> slices,
               ReservationSlicesOwnerPtr slices_owner) override;
-
-  uint8_t* inlineReserve(uint64_t size) override {
-    // If no any slice in the buffer then create one new slice based on the expected continuous
-    // memory size.
-    if (slices_.empty()) {
-      slices_.emplace_back(Slice(size, account_));
-      length_ += size;
-      slices_.back().reservable_ += size;
-      return slices_.back().base_;
-    }
-
-    // If the back slice has enough continuous memory then reserve the memory segment and mark it
-    // as already used.
-    auto& back = slices_.back();
-    if (back.reservableSize() >= size) {
-      uint8_t* mem = back.base_ + back.reservable_;
-      length_ += size;
-      back.reservable_ += size;
-      return mem;
-    }
-
-    // No enough continuous memory in the back slice.
-    return nullptr;
-  }
 
 private:
   /**

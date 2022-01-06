@@ -1080,7 +1080,7 @@ TEST(BufferHelperTest, AddFragments) {
   {
     // Add some string fragments.
     Buffer::OwnedImpl buffer;
-    buffer.addFragments("aaaaa", absl::string_view("bbbbb"));
+    buffer.addFragments({"aaaaa", "bbbbb"});
     EXPECT_EQ("aaaaabbbbb", buffer.toString());
   }
 
@@ -1089,7 +1089,7 @@ TEST(BufferHelperTest, AddFragments) {
     Buffer::OwnedImpl buffer;
     std::string str;
     for (size_t i = 0; i < 1024; i++) {
-      buffer.addFragments("aaaaa", "bbbbb", "ccccc", "ddddd");
+      buffer.addFragments({"aaaaa", "bbbbb", "ccccc", "ddddd"});
       str += "aaaaabbbbbcccccddddd";
     }
     EXPECT_EQ(buffer.length(), 20 * 1024);

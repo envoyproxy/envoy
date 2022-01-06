@@ -576,32 +576,13 @@ TEST_F(WatermarkBufferTest, AddFragments) {
 
   buffer.setWatermarks(23);
 
-  buffer.addFragments("aaaaa", "bbbbb");
+  buffer.addFragments({"aaaaa", "bbbbb"});
   EXPECT_EQ(high_watermark_buffer, 0);
 
-  buffer.addFragments("ccccc", "ddddd");
+  buffer.addFragments({"ccccc", "ddddd"});
   EXPECT_EQ(high_watermark_buffer, 0);
 
-  buffer.addFragments("eeeee", "fffff");
-  EXPECT_EQ(high_watermark_buffer, 1);
-}
-
-TEST_F(WatermarkBufferTest, AddFragmentsDisableWatermarkCheck) {
-  int high_watermark_buffer = 0;
-  Buffer::WatermarkBuffer buffer{nullptr, [&]() -> void { ++high_watermark_buffer; }, nullptr};
-
-  buffer.setWatermarks(23);
-
-  buffer.addFragments("aaaaa", "bbbbb");
-  EXPECT_EQ(high_watermark_buffer, 0);
-
-  buffer.addFragments("ccccc", "ddddd");
-  EXPECT_EQ(high_watermark_buffer, 0);
-
-  buffer.addFragments<false>("eeeee", "fffff");
-  EXPECT_EQ(high_watermark_buffer, 0);
-
-  buffer.add(nullptr, 0);
+  buffer.addFragments({"eeeee", "fffff"});
   EXPECT_EQ(high_watermark_buffer, 1);
 }
 

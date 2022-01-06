@@ -459,38 +459,11 @@ public:
   }
 
   /**
-   * Copy multiple arguments to the buffer. The type of arguments must be automatically convertible
-   * (e.g. char*, char[], std::string) to `absl::string_view`.
-   * @param args A set of arguments with variable length and type. The arguments must be guaranteed
-   * to be safely convertible to `absl::string_view`.
+   * Copy multiple string type fragments to the buffer.
+   * @param fragments A set of string view with variable length.
    * @return The total size of the data copied to the buffer.
    */
-  template <bool ActionAfterAdd = true, class... Args> size_t addFragments(Args&&... args) {
-    size_t total_size_to_write = 0;
-
-    static_assert(sizeof...(args) >= 2, "At least two arguments");
-
-    constexpr auto write_helper = [](uint8_t** dst, absl::string_view v) {
-      memcpy(*dst, v.data(), v.size()); // NOLINT(safe-memcpy)
-      *dst += v.size();
-    };
-
-    total_size_to_write = (absl::string_view(args).size() + ...);
-
-    auto* mem = inlineReserve(total_size_to_write);
-    if (mem != nullptr) {
-      (write_helper(&mem, absl::string_view(args)), ...);
-      // Call the `add` method to trigger action after writing such as watermark checking.
-      if constexpr (ActionAfterAdd) {
-        add(nullptr, 0);
-      }
-    } else {
-      // No enough continuous memory in the back slice and downgrade to using `add` method.
-      (add(absl::string_view(args)), ...);
-    }
-
-    return total_size_to_write;
-  }
+  virtual size_t addFragments(absl::Span<const absl::string_view> fragments) PURE;
 
   /**
    * Set the buffer's high watermark. The buffer's low watermark is implicitly set to half the high
@@ -512,18 +485,6 @@ public:
    * the low watermark.
    */
   virtual bool highWatermarkTriggered() const PURE;
-
-protected:
-  /**
-   * Reserve contiguous memory segment with specific size from the back slice. The first address of
-   * this memory segment will be returned. The reserved memory will be regarded as used and directly
-   * increase the length of the buffer.
-   *
-   * @param expected contiguous memory segment size.
-   * @return the first address of this memory segment or nullptr if there is not enough continuous
-   * memory in the back slice.
-   */
-  virtual uint8_t* inlineReserve(uint64_t size) PURE;
 
 private:
   friend Reservation;

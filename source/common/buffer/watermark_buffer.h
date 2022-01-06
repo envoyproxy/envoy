@@ -43,6 +43,12 @@ public:
   void appendSliceForTest(const void* data, uint64_t size) override;
   void appendSliceForTest(absl::string_view data) override;
 
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
+    size_t total_size_to_write = OwnedImpl::addFragments(fragments);
+    checkHighAndOverflowWatermarks();
+    return total_size_to_write;
+  }
+
   void setWatermarks(uint32_t high_watermark) override;
   uint32_t highWatermark() const override { return high_watermark_; }
   // Returns true if the high watermark callbacks have been called more recently

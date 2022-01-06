@@ -588,5 +588,35 @@ std::vector<Slice::SliceRepresentation> OwnedImpl::describeSlicesForTest() const
   return slices;
 }
 
+size_t OwnedImpl::addFragments(absl::Span<const absl::string_view> fragments) {
+  size_t total_size_to_write = 0;
+
+  for (const auto& fragment : fragments) {
+    total_size_to_write += fragment.size();
+  }
+
+  if (slices_.empty()) {
+    slices_.emplace_back(Slice(total_size_to_write, account_));
+  }
+
+  Slice& back = slices_.back();
+  if (back.reservableSize() >= total_size_to_write) {
+    uint8_t* mem = back.base_ + back.reservable_;
+    for (const auto& fragment : fragments) {
+      memcpy(mem, fragment.data(), fragment.size()); // NOLINT(safe-memcpy)
+      mem += fragment.size();
+    }
+    length_ += total_size_to_write;
+    back.reservable_ += total_size_to_write;
+  } else {
+    // Downgrade to using `addImpl` for no enough memory in the back slice.
+    for (const auto& fragment : fragments) {
+      addImpl(fragment.data(), fragment.size());
+    }
+  }
+
+  return total_size_to_write;
+}
+
 } // namespace Buffer
 } // namespace Envoy
