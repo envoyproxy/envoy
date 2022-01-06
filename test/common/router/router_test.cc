@@ -2504,7 +2504,8 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
   response_decoder3->decodeHeaders(std::move(response_headers2), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 
-  EXPECT_EQ(333U, callbacks_.stream_info_.upstreamInfo()->upstreamConnectionId());
+  ASSERT_TRUE(callbacks_.streamInfo().upstreamInfo()->upstreamConnectionId().has_value());
+  EXPECT_EQ(333U, callbacks_.stream_info_.upstreamInfo()->upstreamConnectionId().value());
 
   // TODO: Verify hedge stats here once they are implemented.
 }
