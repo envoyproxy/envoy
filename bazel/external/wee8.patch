@@ -2,6 +2,7 @@
 2. Set v8_enable_handle_zapping=False to regain performance.
 3. Replace @zlib with //external:zlib and fix the include path.
 4. Fix build on Windows.
+5. Fix build on aarch64.
 
 --- BUILD.bazel
 +++ BUILD.bazel
@@ -43,14 +44,17 @@
  
 --- bazel/defs.bzl
 +++ bazel/defs.bzl
-@@ -367,6 +367,7 @@ def _v8_target_cpu_transition_impl(settings, attr):
+@@ -370,8 +370,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
          "x86_64": "x64",
          "darwin": "x64",
          "darwin_x86_64": "x64",
 +        "x64_windows": "x64",
          "x86": "ia32",
          "ppc": "ppc64",
++        "aarch64": "arm64",
          "arm64-v8a": "arm64",
+         "arm": "arm64",
+         "armeabi-v7a": "arm32",
 --- src/snapshot/snapshot-utils.cc
 +++ src/snapshot/snapshot-utils.cc
 @@ -5,7 +5,7 @@
