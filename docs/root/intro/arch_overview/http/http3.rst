@@ -5,12 +5,12 @@ HTTP3 overview
 
 .. warning::
 
-  HTTP/3 upstream support is still in Alpha, and should be used with caution.
-  Outstanding issues required for upstream HTTP/3 to go GA can be found
-  `here. <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_
-
   HTTP/3 downstream support is now GA, but continued improvements are coming, tracked in
   the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
+
+  HTTP/3 upstream support is fine for in-datacenter use, but is not ready for internet use
+  and is missing some key latency features. See details below.
+
 
 HTTP3 downstream
 ----------------
@@ -36,8 +36,11 @@ log a warning on start-up if BPF is unsupported on the platform, or is attempted
 HTTP3 upstream
 --------------
 
-HTTP/3 upstream support is still in Alpha, and should be used with caution.
-Outstanding issues required for upstream HTTP/3 to go GA can be found
+HTTP/3 upstream support is implemented, but is missing some key features. The code is now covered by Envoy's
+security policy, and is fine to use in production environments the network is under the deployer's control
+(e.g. will not randomly black-hole connections). It is not reccomended for use on the open internet
+until blackhole detection and fail-over to TCP is implemented. There are also a number of major latency
+improvements underway such as upstream support for 0-rtt handshakes: see open issues for upstream HTTP/3
 `here <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_
 
 Envoy HTTP/3 support can be turned up by turning up HTTP/3 support in
