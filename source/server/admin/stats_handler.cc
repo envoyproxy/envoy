@@ -218,18 +218,6 @@ Http::Code StatsHandler::handlerStats(absl::string_view url,
   return stats(params, server_.stats(), response_headers, response);
 }
 
-Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
-                                          Http::ResponseHeaderMap& response_headers,
-                                          Buffer::Instance& response, AdminStream&) {
-  Params params;
-  Http::Code code = params.parse(url, response);
-  if (code != Http::Code::OK) {
-    return code;
-  }
-  params.format_ = Format::Json;
-  return stats(params, server_.stats(), response_headers, response);
-}
-
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
@@ -611,8 +599,6 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     response.add("</body>\n");
   }
 
-  // Display plain stats if format query param is not there.
-  // statsAsText(counters_and_gauges, text_readouts, histograms, response);
   return Http::Code::OK;
 }
 
@@ -655,105 +641,6 @@ Http::Code StatsHandler::handlerContention(absl::string_view,
                  "--enable-mutex-tracing.");
   }
   return Http::Code::OK;
-}
-
-void StatsHandler::statsAsText(const std::map<std::string, uint64_t>& counters_and_gauges,
-                               const std::map<std::string, std::string>& text_readouts,
-                               const std::vector<Stats::HistogramSharedPtr>& histograms,
-                               Buffer::Instance& response) {
-  // Display plain stats if format query param is not there.
-  for (const auto& text_readout : text_readouts) {
-    response.add(fmt::format("{}: \"{}\"\n", text_readout.first,
-                             Html::Utility::sanitize(text_readout.second)));
-  }
-  for (const auto& stat : counters_and_gauges) {
-    response.add(fmt::format("{}: {}\n", stat.first, stat.second));
-  }
-  for (const auto& histogram : histograms) {
-    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-    if (phist != nullptr) {
-      response.add(fmt::format("{}: {}\n", phist->name(), phist->quantileSummary()));
-    }
-  }
-}
-
-std::string StatsHandler::statsAsJson(const std::map<std::string, uint64_t>& counters_and_gauges,
-                                      const std::map<std::string, std::string>& text_readouts,
-                                      const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                                      const bool pretty_print) {
-
-  ProtobufWkt::Struct document;
-  std::vector<ProtobufWkt::Value> stats_array;
-  for (const auto& text_readout : text_readouts) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(text_readout.first);
-    (*stat_obj_fields)["value"] = ValueUtil::stringValue(text_readout.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-  for (const auto& stat : counters_and_gauges) {
-    ProtobufWkt::Struct stat_obj;
-    auto* stat_obj_fields = stat_obj.mutable_fields();
-    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
-    (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
-    stats_array.push_back(ValueUtil::structValue(stat_obj));
-  }
-
-  ProtobufWkt::Struct histograms_obj;
-  auto* histograms_obj_fields = histograms_obj.mutable_fields();
-
-  ProtobufWkt::Struct histograms_obj_container;
-  auto* histograms_obj_container_fields = histograms_obj_container.mutable_fields();
-  std::vector<ProtobufWkt::Value> computed_quantile_array;
-
-  bool found_used_histogram = false;
-  for (const Stats::HistogramSharedPtr& histogram : all_histograms) {
-    Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(histogram.get());
-    if (phist != nullptr) {
-      if (!found_used_histogram) {
-        // It is not possible for the supported quantiles to differ across histograms, so it is ok
-        // to send them once.
-        Stats::HistogramStatisticsImpl empty_statistics;
-        std::vector<ProtobufWkt::Value> supported_quantile_array;
-        for (double quantile : empty_statistics.supportedQuantiles()) {
-          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
-        }
-        (*histograms_obj_fields)["supported_quantiles"] =
-            ValueUtil::listValue(supported_quantile_array);
-        found_used_histogram = true;
-      }
-
-      ProtobufWkt::Struct computed_quantile;
-      auto* computed_quantile_fields = computed_quantile.mutable_fields();
-      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
-
-      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
-      for (size_t i = 0; i < phist->intervalStatistics().supportedQuantiles().size(); ++i) {
-        ProtobufWkt::Struct computed_quantile_value;
-        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
-        const auto& interval = phist->intervalStatistics().computedQuantiles()[i];
-        const auto& cumulative = phist->cumulativeStatistics().computedQuantiles()[i];
-        (*computed_quantile_value_fields)["interval"] =
-            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
-        (*computed_quantile_value_fields)["cumulative"] =
-            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
-
-        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
-      }
-      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
-      computed_quantile_array.push_back(ValueUtil::structValue(computed_quantile));
-    }
-  }
-
-  if (found_used_histogram) {
-    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
-    (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
-    stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
-  }
-
-  auto* document_fields = document.mutable_fields();
-  (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
-  return MessageUtil::getJsonStringFromMessageOrDie(document, pretty_print, true);
 }
 
 Admin::UrlHandler StatsHandler::statsHandler() {

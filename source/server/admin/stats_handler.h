@@ -40,9 +40,6 @@ public:
   Http::Code handlerStats(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                           AdminStream&);
-  Http::Code handlerStatsJson(absl::string_view path_and_query,
-                              Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
-                              AdminStream&);
   Http::Code handlerStatsPrometheus(absl::string_view path_and_query,
                                     Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
@@ -106,16 +103,6 @@ private:
   static Http::Code prometheusStats(absl::string_view path_and_query, Buffer::Instance& response,
                                     Stats::Store& stats,
                                     Stats::CustomStatNamespaces& custom_namespaces);
-
-  static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
-                                 const std::map<std::string, std::string>& text_readouts,
-                                 const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                                 bool pretty_print);
-
-  static void statsAsText(const std::map<std::string, uint64_t>& all_stats,
-                          const std::map<std::string, std::string>& text_readouts,
-                          const std::vector<Stats::HistogramSharedPtr>& all_histograms,
-                          Buffer::Instance& response);
 
   static absl::string_view typeToString(Type type);
 };

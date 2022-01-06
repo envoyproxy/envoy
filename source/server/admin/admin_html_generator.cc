@@ -204,20 +204,6 @@ void AdminHtmlGenerator::renderInput(absl::string_view id, absl::string_view pat
                                "'", on_change,
                                value.empty() ? "" : absl::StrCat(" value='", value, "'"), "/>"));
     break;
-  case Admin::ParamDescriptor::Type::Mask: {
-    response_.add("<table class='home-table'><tbody>\n");
-    for (size_t row = 0; row < (choices.size() + 1) / 2; ++row) {
-      response_.add("  <tr>\n    ");
-      uint32_t last_index = std::min(2 * (row + 1), choices.size());
-      for (size_t i = 2 * row; i < last_index; ++i) {
-        response_.add(absl::StrCat("    <td><input type='checkbox' name='", choices[i], "' id='",
-                                   choices[i], "' checked>", choices[i], "</input></td>\n"));
-      }
-      response_.add("  </tr>\n");
-    }
-    response_.add("</tbody></table>\n  ");
-    break;
-  }
   case Admin::ParamDescriptor::Type::Enum:
     response_.add(absl::StrCat("\n    <select name='", id, "' id='", id, "' form='", path, "'",
                                on_change, ">\n"));
