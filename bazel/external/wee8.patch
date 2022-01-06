@@ -3,6 +3,7 @@
 3. Replace @zlib with //external:zlib and fix the include path.
 4. Fix build on Windows.
 5. Fix build on aarch64.
+6. Fix build with GCC.
 
 --- BUILD.bazel
 +++ BUILD.bazel
@@ -44,7 +45,25 @@
  
 --- bazel/defs.bzl
 +++ bazel/defs.bzl
-@@ -370,8 +370,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
+@@ -120,13 +120,17 @@ def _default_args():
+             ],
+             "@v8//bazel/config:is_gcc": [
+                 "-Wno-extra",
++                "-Wno-array-bounds",
++                "-Wno-class-memaccess",
+                 "-Wno-comments",
+                 "-Wno-deprecated-declarations",
+                 "-Wno-implicit-fallthrough",
++                "-Wno-int-in-bool-context",
+                 "-Wno-maybe-uninitialized",
+                 "-Wno-mismatched-new-delete",
+                 "-Wno-redundant-move",
+                 "-Wno-return-type",
++                "-Wno-stringop-overflow",
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+                 "-std=gnu++17",
+@@ -367,8 +371,10 @@ def _v8_target_cpu_transition_impl(settings, attr):
          "x86_64": "x64",
          "darwin": "x64",
          "darwin_x86_64": "x64",
