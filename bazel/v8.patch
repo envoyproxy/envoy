@@ -159,7 +159,7 @@ index 9547041c33..bede198480 100755
 -BAZEL_OUT=$1
 +GENERATOR=$1
 +INPUT_PDL=$2
-+INPUT_DIR=$(dirname $(dirname "${INPUT_PLD}"))
++INPUT_DIR=$(dirname $(dirname "${INPUT_PDL}"))
 +INPUT_CONFIG=$3
 +OUTPUT_DIR=$4
  
