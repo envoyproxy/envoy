@@ -18,6 +18,7 @@ namespace Stats {
 namespace {
 
 constexpr size_t num_stats = 11;
+constexpr size_t page_size = 5;
 
 class AllocatorImplTest : public testing::Test {
 protected:
@@ -571,7 +572,6 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
 
 TEST_F(AllocatorImplTest, CounterPageForward) {
   std::vector<CounterSharedPtr> counters = makeCounters();
-  constexpr size_t page_size = 5;
   uint32_t page_index = 0;
 
   auto test_page = [this, &page_index](absl::string_view start,
@@ -579,7 +579,7 @@ TEST_F(AllocatorImplTest, CounterPageForward) {
     ++page_index;
     std::vector<Counter*> page;
     bool ret = alloc_.counterPage(
-        [&page](Counter& counter) {
+        [&](Counter& counter) {
           page.push_back(&counter);
           return page.size() < page_size;
         },
@@ -605,7 +605,6 @@ TEST_F(AllocatorImplTest, CounterPageForward) {
 
 TEST_F(AllocatorImplTest, CounterPageBackward) {
   std::vector<CounterSharedPtr> counters = makeCounters();
-  constexpr size_t page_size = 5;
   uint32_t page_index = 0;
 
   auto test_page = [this, &page_index](absl::string_view start,
@@ -613,7 +612,7 @@ TEST_F(AllocatorImplTest, CounterPageBackward) {
     ++page_index;
     std::vector<Counter*> page;
     bool ret = alloc_.counterPage(
-        [&page](Counter& counter) {
+        [&](Counter& counter) {
           page.push_back(&counter);
           return page.size() < page_size;
         },

@@ -83,12 +83,6 @@ public:
   };
   using ParamDescriptorVec = std::vector<ParamDescriptor>;
 
-  /*struct ParamValues {
-    absl::flat_hash_map<std::string, bool> boolean_map_;
-    absl::flat_hash_map<std::string, int64_t> integer_map_;
-    absl::flat_hash_map<std::string, std::string> string_map_;
-    };*/
-
   /**
    * Callback for admin URL handlers.
    * @param path_and_query supplies the path and query of the request URL.
