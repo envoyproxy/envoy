@@ -37,10 +37,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // "rejected_header_mutations".
 // [#next-free-field: 8]
 message HeaderMutationRules {
-  // If true, allow modification of headers that could affect processing
-  // of subsequent filters or request routing. This includes "host",
-  // ":authority", ":scheme", and ":method". Default is false.
-  google.protobuf.BoolValue allow_routing = 1;
+  // By default, certain headers that could affect processing of subsequent
+  // filters or request routing cannot be modified. These headers are. 
+  // This includes "host", ":authority", ":scheme", and ":method". 
+  // If true, then these headers may be modified as well.
+  google.protobuf.BoolValue allow_all_routing = 1;
 
   // If true, allow modification of envoy internal headers. By default, these
   // start with "x-envoy" but this may be overridden in the *Bootstrap*
