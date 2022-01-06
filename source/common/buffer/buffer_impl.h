@@ -168,7 +168,7 @@ public:
   }
 
   /**
-   * @return the number of bytes available to be reserve()d.
+   * @return the number of bytes available to be reserved.
    * @note Read-only implementations of Slice should return zero from this method.
    */
   uint64_t reservableSize() const {
