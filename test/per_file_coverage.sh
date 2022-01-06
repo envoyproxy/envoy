@@ -7,6 +7,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.5"
 "source/common/api:76.5"
 "source/common/api/posix:75.0"
+"source/common/common:96.5"
 "source/common/common/posix:92.7"
 "source/common/config:96.5"
 "source/common/crypto:0.0"
