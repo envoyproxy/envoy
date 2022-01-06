@@ -297,8 +297,9 @@ ProxyStatusUtils::proxyStatusErrorToString(const ProxyStatusError proxy_status) 
     return PROXY_CONFIGURATION_ERROR;
   case ProxyStatusError::ProxyLoopDetected:
     return PROXY_LOOP_DETECTED;
+  default:
+    return "-";
   }
-  return "-";
 }
 
 const absl::optional<ProxyStatusError>

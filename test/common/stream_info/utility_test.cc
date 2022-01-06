@@ -270,7 +270,6 @@ TEST(ProxyStatusErrorToString, TestAll) {
            {ProxyStatusError::ProxyInternalError, "proxy_internal_error"},
            {ProxyStatusError::ProxyConfigurationError, "proxy_configuration_error"},
            {ProxyStatusError::ProxyLoopDetected, "proxy_loop_detected"},
-           {ProxyStatusError::LastProxyStatus, "-"},
        }) {
     EXPECT_THAT(ProxyStatusUtils::proxyStatusErrorToString(proxy_status_error), error_string);
   }
