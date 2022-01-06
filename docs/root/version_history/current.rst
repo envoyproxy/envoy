@@ -84,6 +84,7 @@ New Features
 * http: added support for :ref:`retriable health check status codes <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.retriable_statuses>`.
 * http: added timing information about upstream connection and encryption establishment to stream info. These can currently be accessed via custom access loggers.
 * http: added support for :ref:`forwarding HTTP1 reason phrase <envoy_v3_api_field_extensions.http.header_formatters.preserve_case.v3.PreserveCaseFormatterConfig.forward_reason_phrase>`.
+* http3: downstream http/3 support is now GA! See :ref:`here <arch_overview_http3>` for details.
 * listener: added API for extensions to access :ref:`typed_filter_metadata <envoy_v3_api_field_config.core.v3.Metadata.typed_filter_metadata>` configured in the listener's :ref:`metadata <envoy_v3_api_field_config.listener.v3.Listener.metadata>` field.
 * listener: added support for :ref:`MPTCP <envoy_v3_api_field_config.listener.v3.Listener.enable_mptcp>` (multipath TCP).
 * listener: added support for opting out listeners from the globally set downstream connection limit via :ref:`ignore_global_conn_limit <envoy_v3_api_field_config.listener.v3.Listener.ignore_global_conn_limit>`.

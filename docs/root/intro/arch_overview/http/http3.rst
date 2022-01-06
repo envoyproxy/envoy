@@ -5,14 +5,11 @@ HTTP3 overview
 
 .. warning::
 
-  HTTP/3 support is still in Alpha, and should be used with caution.
-  Outstanding issues required for HTTP/3 to go GA can be found
-  `here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
-  For example QUIC does not currently support in-place filter chain updates, so users
-  requiring dynamic config reload for QUIC should wait until
-  `#13115 <https://github.com/envoyproxy/envoy/issues/13115>`_ has been addressed.
+  HTTP/3 upstream support is still in Alpha, and should be used with caution.
+  Outstanding issues required for upstream HTTP/3 to go GA can be found
+  `here. <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_
 
-  For general feature requests beyond production readiness, you can track
+  HTTP/3 downstream support is now GA, but continued improvements are coming, tracked in
   the `area-quic <https://github.com/envoyproxy/envoy/labels/area%2Fquic>`_ tag.
 
 HTTP3 downstream
@@ -40,8 +37,8 @@ HTTP3 upstream
 --------------
 
 HTTP/3 upstream support is still in Alpha, and should be used with caution.
-Outstanding issues required for HTTP/3 to go GA can be found
-`here <https://github.com/envoyproxy/envoy/labels/quic-mvp>`_
+Outstanding issues required for upstream HTTP/3 to go GA can be found
+`here <https://github.com/envoyproxy/envoy/labels/quic-upstream-mvp>`_
 
 Envoy HTTP/3 support can be turned up by turning up HTTP/3 support in
 :ref:`http_protocol_options <envoy_v3_api_msg_extensions.upstreams.http.v3.HttpProtocolOptions>`,
