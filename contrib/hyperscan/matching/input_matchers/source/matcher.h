@@ -24,11 +24,10 @@ public:
   bool match(absl::optional<absl::string_view> input) override;
 
 private:
+  std::vector<unsigned int> flags_{};
+  std::vector<unsigned int> ids_{};
   hs_database_t* database_{};
   hs_scratch_t* scratch_{};
-
-  static int eventHandler(unsigned int, unsigned long long, unsigned long long, unsigned int,
-                          void* context);
 };
 
 } // namespace Hyperscan
