@@ -1132,10 +1132,17 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     }
     // Build the source buffer to have a single 32KB slice.
     src_buf.appendSliceForTest(data);
+    EXPECT_EQ(1, src_buf.getRawSlices().size());
+    EXPECT_EQ(32 * 1024, src_buf.frontSlice().len_);
 
     Buffer::OwnedImpl dest_buf;
     // The destination buffer are expected to have 8 Slices, each slice has 16KB buffer.
     auto reservation = dest_buf.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    for (uint64_t i = 0; i < reservation.numSlices(); i++) {
+      EXPECT_EQ(16 * 1024, reservation.slices()[i].len_);
+    }
+
     // Copy single 32 KB slice's data to 8 * 16KB slices.
     EXPECT_EQ(data.size(),
               src_buf.copyOutToSlices(32 * 1024, reservation.slices(), reservation.numSlices()));
@@ -1154,7 +1161,14 @@ TEST_F(OwnedImplTest, CopyOutToSlicesTests) {
     src_buf.appendSliceForTest("ld", 2);
     src_buf.appendSliceForTest("!", 1);
     Buffer::OwnedImpl dest_buf;
+    // The destination buffer are expected to have 8 Slices, each slice has 16KB buffer.
     auto reservation = dest_buf.reserveForRead();
+    EXPECT_EQ(8, reservation.numSlices());
+    for (uint64_t i = 0; i < reservation.numSlices(); i++) {
+      EXPECT_EQ(16 * 1024, reservation.slices()[i].len_);
+    }
+
+    // Copy data from src 7 slices into the first 16K slice of dest.
     EXPECT_EQ(data.size(),
               src_buf.copyOutToSlices(100, reservation.slices(), reservation.numSlices()));
     reservation.commit(data.size());

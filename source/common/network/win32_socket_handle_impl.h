@@ -57,7 +57,11 @@ private:
   // Implement the peek logic of recv for readability purposes
   Api::IoCallUint64Result peek(void* buffer, size_t length);
 
-  // Drain the socket into `peek_buffer_`
+  /**
+   * Drain the socket into `peek_buffer_`.
+   * @param length is the desired length of data drained into the `peek_buffer_`.
+   * @return the actual length of data drained into the `peek_buffer_`.
+   */
   Api::IoCallUint64Result drainToPeekBuffer(size_t length);
 
   // Useful functions to read from the peek buffer based on
