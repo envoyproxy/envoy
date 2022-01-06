@@ -62,9 +62,11 @@ typed_config:
     HttpProtocolIntegrationTest::initialize();
   }
 
+  // This function will create 2 upstreams, but Envoy will only point at the
+  // first, the HTTP/2 upstream.
   void createUpstreams() override {
-    // This function will create 2 upstreams, but Envoy will only point at the
-    // first, the HTTP/2 upstream.
+    // The test is configured for one upstream (Envoy will only point to the HTTP/2 upstream) but
+    // we create two. Tell the test framework this is intentional.
     skipPortUsageValidation();
     ASSERT_FALSE(autonomous_upstream_);
 
@@ -84,7 +86,6 @@ typed_config:
         fake_upstreams_.emplace_back(std::make_unique<FakeUpstream>(
             std::move(http3_factory), fake_upstreams_[0]->localAddress()->ip()->port(), version_,
             http3_config));
-        addFakeUpstream(std::move(http3_factory), Http::CodecType::HTTP3);
         return;
       }
       END_TRY
@@ -197,7 +198,7 @@ TEST_P(MixedUpstreamIntegrationTest, SimultaneousLargeRequestsAutoWithHttp3) {
   simultaneousRequest(1024 * 20, 1024 * 14 + 2, 1024 * 10 + 5, 1024 * 16);
 }
 
-// Test auto-config with a pre-populated HTTP/3 alt-svc entry. With the HTTP/3 usptream "disabled"
+// Test auto-config with a pre-populated HTTP/3 alt-svc entry. With the HTTP/3 upstream "disabled"
 // the upstream request will occur over HTTP/3.
 TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp2) {
   // Only create an HTTP/2 upstream.
