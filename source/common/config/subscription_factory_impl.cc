@@ -109,6 +109,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config), /*is_aggregated*/ false, options);
     }
     }
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     return std::make_unique<GrpcSubscriptionImpl>(
