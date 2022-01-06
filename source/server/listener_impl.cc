@@ -469,16 +469,6 @@ void ListenerImpl::buildAccessLog() {
 
 void ListenerImpl::buildInternalListener() {
   if (config_.address().has_envoy_internal_address()) {
-    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
-        parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
-            "internal_listener_registry_singleton");
-    if (internal_listener_registry == nullptr) {
-      throw EnvoyException(
-          fmt::format("error adding listener '{}': internal listener registry is not initialized.",
-                      address_->asString()));
-    }
-    internal_listener_config_ =
-        std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
     if (config_.has_api_listener()) {
       throw EnvoyException(
           fmt::format("error adding listener '{}': internal address cannot be used in api listener",
@@ -499,6 +489,16 @@ void ListenerImpl::buildInternalListener() {
       throw EnvoyException(fmt::format("error adding listener '{}': does not support socket option",
                                        address_->asString()));
     }
+    std::shared_ptr<Network::InternalListenerRegistry> internal_listener_registry =
+        parent_.server_.singletonManager().getTyped<Network::InternalListenerRegistry>(
+            "internal_listener_registry_singleton");
+    if (internal_listener_registry == nullptr) {
+      throw EnvoyException(
+          fmt::format("error adding listener '{}': internal listener registry is not initialized.",
+                      address_->asString()));
+    }
+    internal_listener_config_ =
+        std::make_unique<InternalListenerConfigImpl>(*internal_listener_registry);
   } else {
     if (config_.has_internal_listener()) {
       throw EnvoyException(fmt::format("error adding listener '{}': address is not an internal "

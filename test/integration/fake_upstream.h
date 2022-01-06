@@ -845,7 +845,6 @@ private:
   Api::ApiPtr api_;
   Event::TestTimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
-  Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::list<SharedConnectionWrapperPtr> new_connections_ ABSL_GUARDED_BY(lock_);
 

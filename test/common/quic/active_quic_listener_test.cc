@@ -79,7 +79,7 @@ protected:
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")), clock_(*dispatcher_),
         local_address_(Network::Test::getCanonicalLoopbackAddress(version_)),
-        connection_handler_(*dispatcher_, absl::nullopt, singleton_manager_),
+        connection_handler_(*dispatcher_, absl::nullopt),
         quic_version_(quic::CurrentSupportedHttp3Versions()[0]),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()) {}
 
@@ -294,7 +294,6 @@ protected:
   NiceMock<Network::MockListenerConfig> listener_config_;
   NiceMock<Network::MockUdpPacketWriterFactory> udp_packet_writer_factory_;
   quic::QuicConfig quic_config_;
-  Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};
   Server::ConnectionHandlerImpl connection_handler_;
   std::unique_ptr<ActiveQuicListener> quic_listener_;
   Network::ActiveUdpListenerFactoryPtr listener_factory_;

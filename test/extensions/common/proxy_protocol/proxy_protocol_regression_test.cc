@@ -44,7 +44,8 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
-        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt, singleton_manager_)),
+        connection_handler_(
+            new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));
@@ -169,7 +170,6 @@ public:
   std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::MockListenSocketFactory socket_factory_;
   Network::NopConnectionBalancerImpl connection_balancer_;
-  Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;

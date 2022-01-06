@@ -39,8 +39,7 @@ public:
   using ActiveInternalListenerOptRef =
       absl::optional<std::reference_wrapper<ActiveInternalListener>>;
 
-  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index,
-                        Singleton::Manager& singleton_manager);
+  ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
   // Network::ConnectionHandler
   uint64_t numConnections() const override { return num_handler_connections_; }
@@ -98,7 +97,6 @@ private:
   std::atomic<uint64_t> num_handler_connections_{};
   bool disable_listeners_;
   UnitFloat listener_reject_fraction_{UnitFloat::min()};
-  Singleton::Manager& singleton_manager_;
 };
 
 } // namespace Server

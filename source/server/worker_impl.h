@@ -29,10 +29,8 @@ struct WorkerStatNames {
 
 class ProdWorkerFactory : public WorkerFactory, Logger::Loggable<Logger::Id::main> {
 public:
-  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, ListenerHooks& hooks,
-                    Singleton::Manager& singleton_manager)
-      : tls_(tls), api_(api), stat_names_(api.rootScope().symbolTable()), hooks_(hooks),
-        singleton_manager_(singleton_manager) {}
+  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, ListenerHooks& hooks)
+      : tls_(tls), api_(api), stat_names_(api.rootScope().symbolTable()), hooks_(hooks) {}
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t index, OverloadManager& overload_manager,
@@ -43,7 +41,6 @@ private:
   Api::Api& api_;
   WorkerStatNames stat_names_;
   ListenerHooks& hooks_;
-  Singleton::Manager& singleton_manager_;
 };
 
 /**

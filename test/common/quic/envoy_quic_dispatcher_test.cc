@@ -71,8 +71,7 @@ public:
             POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
             POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
         quic_stat_names_(listener_config_.listenerScope().symbolTable()),
-        singleton_manager_(api_->threadFactory()),
-        connection_handler_(*dispatcher_, absl::nullopt, singleton_manager_),
+        connection_handler_(*dispatcher_, absl::nullopt),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
@@ -236,7 +235,6 @@ protected:
   Server::ListenerStats listener_stats_;
   Server::PerHandlerListenerStats per_worker_stats_;
   QuicStatNames quic_stat_names_;
-  Singleton::ManagerImpl singleton_manager_;
   Server::ConnectionHandlerImpl connection_handler_;
   EnvoyQuicCryptoServerStreamFactoryImpl crypto_stream_factory_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;

@@ -50,7 +50,7 @@ namespace {
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
 public:
   ConnectionHandlerTest()
-      : handler_(new ConnectionHandlerImpl(dispatcher_, 0, singleton_manager_)),
+      : handler_(new ConnectionHandlerImpl(dispatcher_, 0)),
         filter_chain_(std::make_shared<NiceMock<Network::MockFilterChain>>()),
         listener_filter_matcher_(std::make_shared<NiceMock<Network::MockListenerFilterMatcher>>()),
         access_log_(std::make_shared<AccessLog::MockInstance>()) {
@@ -367,8 +367,6 @@ public :
   NiceMock<Event::MockDispatcher> dispatcher_{"test"};
   TestListener::MockInternalListenerRegistery mock_listener_registry_;
   std::list<TestListenerPtr> listeners_;
-  Api::ApiPtr api_{Api::createApiForTest()};
-  Singleton::ManagerImpl singleton_manager_{api_->threadFactory()};
   std::unique_ptr<ConnectionHandlerImpl> handler_;
   NiceMock<Network::MockFilterChainManager> manager_;
   NiceMock<Network::MockFilterChainFactory> factory_;
