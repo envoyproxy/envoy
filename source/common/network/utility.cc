@@ -732,11 +732,11 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
               ? (packets_dropped - old_packets_dropped)
               : (packets_dropped + (std::numeric_limits<uint32_t>::max() - old_packets_dropped) +
                  1);
-      ENVOY_LOG_MISC(
-          debug,
-          "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
-          "max datagram size.",
-          delta);
+      ENVOY_BUG(false,
+                fmt::format(
+                    "Kernel dropped {} datagram(s). Consider increasing receive buffer size and/or "
+                    "max datagram size.",
+                    delta));
       udp_packet_processor.onDatagramsDropped(delta);
     }
     if (honor_read_limit) {
