@@ -1171,6 +1171,7 @@ subsetting
 substr
 substring
 substrings
+subtree
 subtrees
 subtype
 subtypes
