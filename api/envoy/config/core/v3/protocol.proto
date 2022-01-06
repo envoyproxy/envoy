@@ -124,7 +124,7 @@ message UpstreamHttpProtocolOptions {
 }
 
 // Allows pre-populating the cache with HTTP/3 alternate protocols entries.
-// This will cause Enovy to attempt HTTP/3 to those upstreams, even if the upstreams have not
+// This will cause Envoy to attempt HTTP/3 to those upstreams, even if the upstreams have not
 // advertised HTTP/3 support.
 // As with regular cached entries, if the origin response would result in clearing an existing
 // alternate protocol cache entry, pre-populated entries will also be cleared.
@@ -169,7 +169,7 @@ message AlternateProtocolsCacheOptions {
 
   // Allows pre-populating the cache with entries, to reduce odds of using TCP for the
   // first request to endpoints expected to support HTTP/3.
-  // Note that if a given entry is present in the key value store, and prepopulated_entries, the key
+  // Note that if a given entry is present in the key value store, and pre-populated_entries, the key
   // value store value will be used.
   repeated AlternateProtocolsCacheEntry prepopulated_entries = 4;
 }
