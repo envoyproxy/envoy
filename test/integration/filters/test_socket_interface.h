@@ -7,6 +7,7 @@
 
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
 #include "test/test_common/network_utility.h"
@@ -47,6 +48,17 @@ public:
     dispatcher_->post([this, events]() { activateFileEvents(events); });
   }
 
+  // HTTP/3 sockets won't have a bound peer address, but instead get peer
+  // address from the argument in sendmsg. TestIoSocketHandle::sendmsg will
+  // stash that in peer_address_override_.
+  Address::InstanceConstSharedPtr peerAddress() override {
+    if (peer_address_override_.has_value()) {
+      return Network::Utility::getAddressWithPort(
+          peer_address_override_.value().get(), peer_address_override_.value().get().ip()->port());
+    }
+    return Test::IoSocketHandlePlatformImpl::peerAddress();
+  }
+
 private:
   IoHandlePtr accept(struct sockaddr* addr, socklen_t* addrlen) override;
   Api::IoCallUint64Result writev(const Buffer::RawSlice* slices, uint64_t num_slice) override;
@@ -56,6 +68,7 @@ private:
 
   IoHandlePtr duplicate() override;
 
+  OptRef<const Address::Instance> peer_address_override_;
   const WriteOverrideProc write_override_;
   absl::Mutex mutex_;
   Event::Dispatcher* dispatcher_ ABSL_GUARDED_BY(mutex_) = nullptr;

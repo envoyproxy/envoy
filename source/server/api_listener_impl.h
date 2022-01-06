@@ -44,7 +44,10 @@ public:
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override { return nullptr; }
+  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+    IS_ENVOY_BUG("Unexpected call to addOnDrainCloseCb");
+    return nullptr;
+  }
 
 protected:
   ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
@@ -60,10 +63,14 @@ protected:
         : parent_(parent), connection_(SyntheticConnection(*this)) {}
 
     // Network::ReadFilterCallbacks
-    void continueReading() override {}
-    void injectReadDataToFilterChain(Buffer::Instance&, bool) override {}
+    void continueReading() override { IS_ENVOY_BUG("Unexpected call to continueReading"); }
+    void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
+      IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
+    }
     Upstream::HostDescriptionConstSharedPtr upstreamHost() override { return nullptr; }
-    void upstreamHost(Upstream::HostDescriptionConstSharedPtr) override {}
+    void upstreamHost(Upstream::HostDescriptionConstSharedPtr) override {
+      IS_ENVOY_BUG("Unexpected call to upstreamHost");
+    }
     Network::Connection& connection() override { return connection_; }
     const Network::Socket& socket() override { PANIC("not implemented"); }
 
@@ -81,10 +88,18 @@ protected:
       void raiseConnectionEvent(Network::ConnectionEvent event);
 
       // Network::FilterManager
-      void addWriteFilter(Network::WriteFilterSharedPtr) override {}
-      void addFilter(Network::FilterSharedPtr) override {}
-      void addReadFilter(Network::ReadFilterSharedPtr) override {}
-      void removeReadFilter(Network::ReadFilterSharedPtr) override {}
+      void addWriteFilter(Network::WriteFilterSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
+      void addFilter(Network::FilterSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
+      void addReadFilter(Network::ReadFilterSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
+      void removeReadFilter(Network::ReadFilterSharedPtr) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       bool initializeReadFilters() override { return true; }
 
       // Network::Connection
@@ -94,9 +109,14 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
-      void addBytesSentCallback(Network::Connection::BytesSentCb) override {}
-      void enableHalfClose(bool) override {}
-      bool isHalfCloseEnabled() override { return false; }
+      void addBytesSentCallback(Network::Connection::BytesSentCb) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
+      void enableHalfClose(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
+      bool isHalfCloseEnabled() override {
+        IS_ENVOY_BUG("Unexpected function call");
+        return false;
+      }
       void close(Network::ConnectionCloseType) override {}
       Event::Dispatcher& dispatcher() override {
         return parent_.parent_.factory_context_.mainThreadDispatcher();
@@ -104,9 +124,11 @@ protected:
       uint64_t id() const override { return 12345; }
       void hashKey(std::vector<uint8_t>&) const override {}
       std::string nextProtocol() const override { return EMPTY_STRING; }
-      void noDelay(bool) override {}
+      void noDelay(bool) override { IS_ENVOY_BUG("Unexpected function call"); }
       void readDisable(bool) override {}
-      void detectEarlyCloseWhenReadDisabled(bool) override {}
+      void detectEarlyCloseWhenReadDisabled(bool) override {
+        IS_ENVOY_BUG("Unexpected function call");
+      }
       bool readEnabled() const override { return true; }
       const Network::ConnectionInfoSetter& connectionInfoProvider() const override {
         return *connection_info_provider_;
@@ -123,8 +145,8 @@ protected:
       absl::string_view requestedServerName() const override { return EMPTY_STRING; }
       State state() const override { return Network::Connection::State::Open; }
       bool connecting() const override { return false; }
-      void write(Buffer::Instance&, bool) override {}
-      void setBufferLimits(uint32_t) override {}
+      void write(Buffer::Instance&, bool) override { IS_ENVOY_BUG("Unexpected function call"); }
+      void setBufferLimits(uint32_t) override { IS_ENVOY_BUG("Unexpected function call"); }
       uint32_t bufferLimit() const override { return 65000; }
       bool aboveHighWatermark() const override { return false; }
       const Network::ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
@@ -134,7 +156,10 @@ protected:
       const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
       void setDelayedCloseTimeout(std::chrono::milliseconds) override {}
       absl::string_view transportFailureReason() const override { return EMPTY_STRING; }
-      bool startSecureTransport() override { return false; }
+      bool startSecureTransport() override {
+        IS_ENVOY_BUG("Unexpected function call");
+        return false;
+      }
       absl::optional<std::chrono::milliseconds> lastRoundTripTime() const override { return {}; };
       // ScopeTrackedObject
       void dumpState(std::ostream& os, int) const override { os << "SyntheticConnection"; }
