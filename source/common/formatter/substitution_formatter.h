@@ -443,7 +443,10 @@ public:
 
 private:
   FieldExtractorPtr field_extractor_;
-  static absl::flat_hash_map<absl::string_view, FieldExtractorCreateFunc> known_field_extractors_;
+
+  using FieldExtractorLookupTbl =
+      absl::flat_hash_map<absl::string_view, StreamInfoFormatter::FieldExtractorCreateFunc>;
+  static const FieldExtractorLookupTbl& getKnownFieldExtractors();
 };
 
 /**
