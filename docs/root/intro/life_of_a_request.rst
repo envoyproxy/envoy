@@ -471,7 +471,7 @@ in the connection pool, unless the circuit breaker for maximum connections for t
 tripped. If a maximum lifetime stream limit for a connection is configured and reached, a new
 connection is allocated in the pool and the affected HTTP/2 connection is drained. Other circuit
 breakers, e.g. maximum concurrent requests to a cluster are also checked. See :repo:`circuit
-breakers <arch_overview_circuit_breakers>` and :ref:`connection pools <arch_overview_conn_pool>` for
+breakers <arch_overview_circuit_break>` and :ref:`connection pools <arch_overview_conn_pool>` for
 further details.
 
 .. image:: /_static/lor-lb.svg
