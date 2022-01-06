@@ -809,7 +809,7 @@ cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy/
 def _v8():
     external_http_archive(
         name = "v8",
-        patches = ["@envoy//bazel/external:wee8.patch"],
+        patches = ["@envoy//bazel:v8.patch"],
         patch_args = ["-p1"],
     )
     native.bind(
