@@ -1,3 +1,4 @@
+#include <memory>
 #include <vector>
 
 #include "envoy/server/filter_config.h"
@@ -129,6 +130,7 @@ TEST_P(ValidationServerTest, NoopLifecycleNotifier) {
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit, [] { FAIL(); });
   server.registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
                           [](Event::PostCb) { FAIL(); });
+  server.setSinkPredicates(std::make_unique<testing::NiceMock<Stats::MockSinkPredicates>>());
   server.shutdown();
 }
 

@@ -323,6 +323,10 @@ protected:
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
 
+  // True if the max requests circuit breakers apply.
+  // This will be false for the TCP pool, true otherwise.
+  virtual bool enforceMaxRequests() const { return true; }
+
   std::list<Instance::IdleCb> idle_callbacks_;
 
   // When calling purgePendingStreams, this list will be used to hold the streams we are about

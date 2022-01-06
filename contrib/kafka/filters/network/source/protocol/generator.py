@@ -126,12 +126,7 @@ class StatefulProcessor:
                         r'^\s*$', '', without_comments, flags=re.MULTILINE)
                     # Windows support: see PR 10542 for details.
                     amended = re.sub(r'-2147483648', 'INT32_MIN', without_empty_newlines)
-                    # Kafka JSON files are malformed. See KAFKA-12794.
-                    if input_file == 'external/kafka_source/DescribeProducersRequest.json':
-                        amended = amended[:-6]
                     message_spec = json.loads(amended)
-                    # Adopt publicly available messages only:
-                    # https://kafka.apache.org/28/protocol.html#protocol_api_keys
                     api_key = message_spec['apiKey']
                     if api_key <= 51 or api_key in [56, 57, 60, 61]:
                         message = self.parse_top_level_element(message_spec)

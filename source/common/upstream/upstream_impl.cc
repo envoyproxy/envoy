@@ -698,12 +698,12 @@ public:
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   AccessLog::AccessLogManager& accessLogManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -712,12 +712,12 @@ public:
 
   Server::ServerLifecycleNotifier& lifecycleNotifier() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Init::Manager& initManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Api::Api& api() override { return api_; }
@@ -1049,6 +1049,7 @@ ClusterImplBase::ClusterImplBase(
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
+  const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
@@ -1060,11 +1061,18 @@ ClusterImplBase::ClusterImplBase(
             std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
       });
 
-  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
-      !raw_factory_pointer->supportsAlpn()) {
-    throw EnvoyException(
-        fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
-                    cluster.name(), cluster.DebugString()));
+  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN)) {
+    if (!raw_factory_pointer->supportsAlpn()) {
+      throw EnvoyException(
+          fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
+                      cluster.name(), cluster.DebugString()));
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
+        !matcher_supports_alpn) {
+      throw EnvoyException(fmt::format(
+          "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
+          cluster.name(), cluster.DebugString()));
+    }
   }
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {

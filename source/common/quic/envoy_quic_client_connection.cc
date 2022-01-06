@@ -200,7 +200,7 @@ void EnvoyQuicClientConnection::onFileEvent(uint32_t events,
   if (connected() && (events & Event::FileReadyType::Read)) {
     Api::IoErrorPtr err = Network::Utility::readPacketsFromSocket(
         connection_socket.ioHandle(), *connection_socket.connectionInfoProvider().localAddress(),
-        *this, dispatcher_.timeSource(), true, packets_dropped_);
+        *this, dispatcher_.timeSource(), /*prefer_gro=*/false, packets_dropped_);
     if (err == nullptr) {
       // In the case where the path validation fails, the probing socket will be closed and its IO
       // events are no longer interesting.

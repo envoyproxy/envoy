@@ -502,6 +502,11 @@ public:
   virtual ~VirtualCluster() = default;
 
   /**
+   * @return the string name of the virtual cluster.
+   */
+  virtual const absl::optional<std::string>& name() const PURE;
+
+  /**
    * @return the stat-name of the virtual cluster.
    */
   virtual Stats::StatName statName() const PURE;
@@ -869,6 +874,11 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return bool true if the x-forwarded-host header should be updated.
+   */
+  virtual bool appendXfh() const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when

@@ -214,7 +214,7 @@ public:
 
   /**
    * Copy out a section of the buffer to  dynamic array of slices.
-   * @param size supplies the size of the data that will be moved.
+   * @param size supplies the size of the data that will be copied.
    * @param slices supplies the output slices to fill.
    * @param num_slice supplies the number of slices to fill.
    * @return the number of bytes copied.

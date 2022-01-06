@@ -132,9 +132,19 @@ versioning guidelines:
   for further details.
 * When all of the tests are passing and all other conditions described herein are satisfied, a
   maintainer will be assigned to review and merge the PR.
-* Once you submit a PR, *please do not rebase it*. It's much easier to review if subsequent commits
-  are new commits and/or merges. We squash rebase the final merged commit so the number of commits
-  you have in the PR don't matter.
+* Once your PR is under review, *please do not rebase it*. If you rebase, you will need to force push to
+  github, and github's user interface will force your reviewer to review the PR
+  from stratch rather than simply look at your latest changes.  It's much easier to review
+  new commits and/or merges. We squash rebase the final merged commit so the number of commits
+  you have in the PR don't matter. Again once your PR is assigned a reviewer, unless you need to fix DCO
+  *please do not force push*.  If you need to pull recent changes you can run
+  ```
+  branch=$(git status|head -1|cut -f3 -d\ )
+  git checkout main
+  git pull
+  git checkout "$branch"
+  git pull
+  ```
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
@@ -197,7 +207,7 @@ Runtime features are set true by default by inclusion in
 There are four suggested options for testing new runtime features:
 
 1. Create a per-test Runtime::LoaderSingleton as done in [DeprecatedFieldsTest.IndividualFieldDisallowedWithRuntimeOverride](https://github.com/envoyproxy/envoy/blob/main/test/common/protobuf/utility_test.cc)
-2. Create a [parameterized test](https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#how-to-write-value-parameterized-tests)
+2. Create a [parameterized test](https://github.com/google/googletest/blob/master/docs/advanced.md#how-to-write-value-parameterized-tests)
    where the set up of the test sets the new runtime value explicitly to
    GetParam() as outlined in (1).
 3. Set up integration tests with custom runtime defaults as documented in the

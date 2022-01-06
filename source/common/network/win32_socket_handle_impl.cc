@@ -80,6 +80,23 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recvmmsg(RawSliceArrays& slices, 
 
 Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length, int flags) {
   if (flags & MSG_PEEK) {
+    return peek(buffer, length);
+  }
+
+  if (peek_buffer_.length() == 0) {
+    Api::IoCallUint64Result result = IoSocketHandleImpl::recv(buffer, length, flags);
+    reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
+    return result;
+  } else {
+    return readFromPeekBuffer(buffer, length);
+  }
+}
+
+Api::IoCallUint64Result Win32SocketHandleImpl::peek(void* buffer, size_t length) {
+
+  // if the `peek_buffer_` has already enough data we can skip reading
+  // from the wire.
+  if (length > peek_buffer_.length()) {
     // The caller is responsible for calling with the larger size
     // in cases it needs to do so it can't rely on transparent event activation.
     // So no in this case we should activate read again unless the read blocked.
@@ -96,18 +113,9 @@ Api::IoCallUint64Result Win32SocketHandleImpl::recv(void* buffer, size_t length,
         return peek_result;
       }
     }
-
-    Api::IoCallUint64Result result = peekFromPeekBuffer(buffer, length);
-    return result;
   }
 
-  if (peek_buffer_.length() == 0) {
-    Api::IoCallUint64Result result = IoSocketHandleImpl::recv(buffer, length, flags);
-    reEnableEventBasedOnIOResult(result, Event::FileReadyType::Read);
-    return result;
-  } else {
-    return readFromPeekBuffer(buffer, length);
-  }
+  return peekFromPeekBuffer(buffer, length);
 }
 
 void Win32SocketHandleImpl::reEnableEventBasedOnIOResult(const Api::IoCallUint64Result& result,
@@ -121,8 +129,10 @@ Api::IoCallUint64Result Win32SocketHandleImpl::drainToPeekBuffer(size_t length) 
   size_t total_bytes_read = 0;
   while (peek_buffer_.length() < length) {
     Buffer::Reservation reservation = peek_buffer_.reserveForRead();
-    Api::IoCallUint64Result result = IoSocketHandleImpl::readv(
-        reservation.length(), reservation.slices(), reservation.numSlices());
+    uint64_t bytes_to_read =
+        std::min<uint64_t>(static_cast<uint64_t>(length - total_bytes_read), reservation.length());
+    Api::IoCallUint64Result result =
+        IoSocketHandleImpl::readv(bytes_to_read, reservation.slices(), reservation.numSlices());
     uint64_t bytes_to_commit = result.ok() ? result.return_value_ : 0;
     reservation.commit(bytes_to_commit);
     total_bytes_read += bytes_to_commit;

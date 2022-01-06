@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/access_log/access_log.h"
@@ -31,6 +32,11 @@
 #include "envoy/upstream/cluster_manager.h"
 
 namespace Envoy {
+
+namespace Stats {
+class SinkPredicates;
+}
+
 namespace Server {
 
 /**
@@ -269,6 +275,12 @@ public:
    * TODO(mattklein123): This can be removed when version 1.20.0 is no longer supported.
    */
   virtual bool enableReusePortDefault() PURE;
+
+  /**
+   * Set predicates for filtering counters, gauges and text readouts to be flushed to sinks.
+   */
+  virtual void
+  setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) PURE;
 };
 
 } // namespace Server

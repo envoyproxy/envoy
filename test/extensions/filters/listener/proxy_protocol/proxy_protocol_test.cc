@@ -99,6 +99,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   Init::Manager& initManager() override { return *init_manager_; }
+  bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -368,6 +369,15 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
           }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -434,6 +444,15 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
           }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -681,6 +700,15 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
           }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -873,6 +901,15 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
           }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -893,13 +930,13 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  bool partial_writed = false;
+  bool partial_write = false;
   // TODO(davinci26): Mocking should not be used to provide real system calls.
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
-        if (partial_writed) {
+        if (partial_write) {
           ENVOY_LOG_MISC(debug, "inject failure");
           return Api::SysCallSizeResult{-1, 0};
         }
@@ -912,7 +949,7 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
-        if (partial_writed) {
+        if (partial_write) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
@@ -959,10 +996,19 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
           }));
+  EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+  EXPECT_CALL(os_sys_calls, getifaddrs(_))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+        return os_sys_calls_actual_.getifaddrs(vector);
+      }));
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  partial_writed = true;
+  partial_write = true;
   write(buffer + 10, 10);
 
   expectConnectionError();
@@ -1429,6 +1475,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
   Init::Manager& initManager() override { return *init_manager_; }
+  bool ignoreGlobalConnLimit() const override { return false; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

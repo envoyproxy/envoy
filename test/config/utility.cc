@@ -1117,6 +1117,13 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
 }
 
 void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
+  for (auto& listener : *bootstrap_.mutable_static_resources()->mutable_listeners()) {
+    if (listener.udp_listener_config().has_quic_options()) {
+      // Disable SO_REUSEPORT, because it undesirably allows parallel test jobs to use the same
+      // port.
+      listener.mutable_enable_reuse_port()->set_value(false);
+    }
+  }
   configDownstreamTransportSocketWithTls(
       bootstrap_,
       [](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
@@ -1215,8 +1222,8 @@ void ConfigHelper::initializeTls(
     }
   }
   if (!options.san_matchers_.empty()) {
-    *validation_context->mutable_match_subject_alt_names() = {options.san_matchers_.begin(),
-                                                              options.san_matchers_.end()};
+    *validation_context->mutable_match_typed_subject_alt_names() = {options.san_matchers_.begin(),
+                                                                    options.san_matchers_.end()};
   }
 }
 

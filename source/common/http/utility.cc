@@ -387,6 +387,14 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
   headers.appendVia(via, ", ");
 }
 
+void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
+                              const bool append_xfh) {
+  if (append_xfh && !headers.getHostValue().empty()) {
+    headers.appendForwardedHost(headers.getHostValue(), ",");
+  }
+  headers.setHost(hostname);
+}
+
 std::string Utility::createSslRedirectPath(const RequestHeaderMap& headers) {
   ASSERT(headers.Host());
   ASSERT(headers.Path());
@@ -814,7 +822,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http3String;
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return EMPTY_STRING;
 }
 
 absl::string_view Utility::getScheme(const RequestHeaderMap& headers) {
@@ -924,7 +932,7 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "overload manager reset";
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 void Utility::transformUpgradeRequestFromH1toH2(RequestHeaderMap& headers) {

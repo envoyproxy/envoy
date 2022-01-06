@@ -439,6 +439,7 @@ public:
   MOCK_METHOD(ResourceLimit&, openConnections, ());
   MOCK_METHOD(uint32_t, tcpBacklogSize, (), (const));
   MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
 
   envoy::config::core::v3::TrafficDirection direction() const override {
     return envoy::config::core::v3::UNSPECIFIED;

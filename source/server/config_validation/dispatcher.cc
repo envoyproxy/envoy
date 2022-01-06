@@ -16,8 +16,9 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::ListenerPtr ValidationDispatcher::createListener(Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks&, bool) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+                                                          Network::TcpListenerCallbacks&, bool,
+                                                          bool) {
+  return nullptr;
 }
 
 } // namespace Event

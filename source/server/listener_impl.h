@@ -145,7 +145,7 @@ public:
     return drain_manager_->drainClose() || server_.drainManager().drainClose();
   }
   Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
   Server::DrainManager& drainManager();
@@ -337,6 +337,7 @@ public:
   }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   Init::Manager& initManager() override;
+  bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   envoy::config::core::v3::TrafficDirection direction() const override {
     return config().traffic_direction();
   }
@@ -423,6 +424,7 @@ private:
   const uint64_t hash_;
   const uint32_t tcp_backlog_size_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const bool ignore_global_conn_limit_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
   Init::TargetImpl listener_init_target_;

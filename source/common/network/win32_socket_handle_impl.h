@@ -53,6 +53,15 @@ private:
   // on Windows we use the MSG_PEEK of recv instead of peeking the socket
   // we drain the socket to memory. Subsequent read calls need to read
   // first from the class buffer and then go to the underlying socket.
+
+  // Implement the peek logic of recv for readability purposes
+  Api::IoCallUint64Result peek(void* buffer, size_t length);
+
+  /**
+   * Drain the socket into `peek_buffer_`.
+   * @param length is the desired length of data drained into the `peek_buffer_`.
+   * @return the actual length of data drained into the `peek_buffer_`.
+   */
   Api::IoCallUint64Result drainToPeekBuffer(size_t length);
 
   // Useful functions to read from the peek buffer based on

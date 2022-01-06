@@ -115,7 +115,7 @@ public:
   }
 
   uint64_t copyOutToSlices(uint64_t, Buffer::RawSlice*, uint64_t) const override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 
   void drain(uint64_t size) override {
@@ -139,7 +139,7 @@ public:
     return mutableStart();
   }
 
-  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { PANIC("not implemented"); }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 

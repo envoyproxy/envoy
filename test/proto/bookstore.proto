@@ -158,6 +158,11 @@ service Bookstore {
       post: "/wildcard/{arg=**}"
     };
   }
+  rpc PostCustomVerb(EchoBodyRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/foo/bar:verb"
+    };
+  }
 }
 
 service ServiceWithResponseBody {

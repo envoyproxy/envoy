@@ -733,7 +733,7 @@ private:
       return parent_.onRecvDatagram(data);
     }
     Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      PANIC("not implemented");
     }
 
   private:
@@ -809,6 +809,7 @@ private:
     ResourceLimit& openConnections() override { return connection_resource_; }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return false; }
 
     void setMaxConnections(const uint32_t num_connections) {
       connection_resource_.setMax(num_connections);

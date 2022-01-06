@@ -73,7 +73,8 @@ public:
         std::shared_ptr<AccessLog::MockInstance> access_log,
         std::shared_ptr<NiceMock<Network::MockFilterChainManager>> filter_chain_manager = nullptr,
         uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE,
-        Network::ConnectionBalancerSharedPtr connection_balancer = nullptr)
+        Network::ConnectionBalancerSharedPtr connection_balancer = nullptr,
+        bool ignore_global_conn_limit = false)
         : parent_(parent), socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()),
           tag_(tag), bind_to_port_(bind_to_port), tcp_backlog_size_(tcp_backlog_size),
           hand_off_restored_destination_connections_(hand_off_restored_destination_connections),
@@ -83,7 +84,7 @@ public:
                                    ? std::make_shared<Network::NopConnectionBalancerImpl>()
                                    : connection_balancer),
           access_logs_({access_log}), inline_filter_chain_manager_(filter_chain_manager),
-          init_manager_(nullptr) {
+          init_manager_(nullptr), ignore_global_conn_limit_(ignore_global_conn_limit) {
       envoy::config::listener::v3::UdpListenerConfig udp_config;
       udp_listener_config_ = std::make_unique<UdpListenerConfigImpl>(udp_config);
       udp_listener_config_->listener_factory_ =
@@ -152,6 +153,7 @@ public:
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
     void setMaxConnections(const uint32_t num_connections) {
       open_connections_.setMax(num_connections);
     }
@@ -174,6 +176,7 @@ public:
     const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
+    const bool ignore_global_conn_limit_;
     envoy::config::core::v3::TrafficDirection direction_;
     Network::UdpListenerCallbacks* udp_listener_callbacks_{};
   };
@@ -227,11 +230,12 @@ public:
       bool continue_on_listener_filters_timeout = false,
       std::shared_ptr<NiceMock<Network::MockFilterChainManager>> overridden_filter_chain_manager =
           nullptr,
-      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE) {
+      uint32_t tcp_backlog_size = ENVOY_TCP_BACKLOG_SIZE, bool ignore_global_conn_limit = false) {
     listeners_.emplace_back(std::make_unique<TestListener>(
         *this, tag, bind_to_port, hand_off_restored_destination_connections, name, socket_type,
         listener_filters_timeout, continue_on_listener_filters_timeout, access_log_,
-        overridden_filter_chain_manager, tcp_backlog_size, connection_balancer));
+        overridden_filter_chain_manager, tcp_backlog_size, connection_balancer,
+        ignore_global_conn_limit));
 
     if (listener == nullptr) {
       // Expecting listener config in place update.
@@ -242,9 +246,9 @@ public:
     EXPECT_CALL(listeners_.back()->socket_factory_, getListenSocket(_))
         .WillOnce(Return(listeners_.back()->socket_));
     if (socket_type == Network::Socket::Type::Stream) {
-      EXPECT_CALL(dispatcher_, createListener_(_, _, _))
+      EXPECT_CALL(dispatcher_, createListener_(_, _, _, _))
           .WillOnce(Invoke([listener, listener_callbacks](Network::SocketSharedPtr&&,
-                                                          Network::TcpListenerCallbacks& cb,
+                                                          Network::TcpListenerCallbacks& cb, bool,
                                                           bool) -> Network::Listener* {
             if (listener_callbacks != nullptr) {
               *listener_callbacks = &cb;

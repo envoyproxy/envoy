@@ -78,6 +78,7 @@ build:asan --copt -O1
 build:asan --copt -fno-optimize-sibling-calls
 
 # Clang ASAN/UBSAN
+build:clang-asan --config=clang
 build:clang-asan --config=asan
 build:clang-asan --linkopt -fuse-ld=lld
 build:clang-asan --linkopt --rtlib=compiler-rt
@@ -322,7 +323,7 @@ build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
 
 build:asan-fuzzer --config=plain-fuzzer
-build:asan-fuzzer --config=asan
+build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1

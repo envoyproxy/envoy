@@ -70,6 +70,9 @@ MockMetricSnapshot::~MockMetricSnapshot() = default;
 MockSink::MockSink() = default;
 MockSink::~MockSink() = default;
 
+MockSinkPredicates::MockSinkPredicates() = default;
+MockSinkPredicates::~MockSinkPredicates() = default;
+
 MockStore::MockStore() {
   ON_CALL(*this, counter(_)).WillByDefault(ReturnRef(counter_));
   ON_CALL(*this, gauge(_, _)).WillByDefault(ReturnRef(gauge_));

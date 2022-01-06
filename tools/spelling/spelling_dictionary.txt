@@ -403,6 +403,7 @@ absl
 accesslog
 accessor
 accessors
+acked
 ackless
 acks
 acls
@@ -869,6 +870,7 @@ nan
 nanos
 natively
 ndk
+negative
 netblock
 netblocks
 netfilter
@@ -1111,6 +1113,7 @@ siginfo
 signalstack
 siloed
 sim
+sinked
 sizeof
 smatch
 snapshotted

@@ -14,7 +14,6 @@ namespace CryptoMb {
 class FakeIppCryptoImpl : public virtual IppCrypto {
 public:
   FakeIppCryptoImpl(bool supported_instruction_set);
-  ~FakeIppCryptoImpl() override;
 
   int mbxIsCryptoMbApplicable(uint64_t features) override;
   uint32_t mbxRsaPrivateCrtSslMb8(const uint8_t* const from_pa[8], uint8_t* const to_pa[8],
@@ -26,11 +25,7 @@ public:
                               int expected_rsa_bitsize) override;
   bool mbxGetSts(uint32_t status, unsigned req_num) override;
 
-  void setRsaKey(const BIGNUM* n, const BIGNUM* e, const BIGNUM* d) {
-    n_ = BN_dup(n);
-    e_ = BN_dup(e);
-    d_ = BN_dup(d);
-  };
+  void setRsaKey(RSA* rsa) { RSA_get0_key(rsa, &n_, &e_, &d_); };
 
   void injectErrors(bool enabled) { inject_errors_ = enabled; }
 
@@ -38,9 +33,9 @@ private:
   uint32_t mbxSetSts(uint32_t status, unsigned req_num, bool success);
 
   bool supported_instruction_set_;
-  BIGNUM* n_{};
-  BIGNUM* e_{};
-  BIGNUM* d_{};
+  const BIGNUM* n_{};
+  const BIGNUM* e_{};
+  const BIGNUM* d_{};
 
   bool inject_errors_{};
 };

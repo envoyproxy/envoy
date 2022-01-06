@@ -639,8 +639,11 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 
   // If we submit a reset, nghttp2 will cancel outbound frames that have not yet been sent.
   // We want these frames to go out so we defer the reset until we send all of the frames that
-  // end the local stream.
-  if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_) {
+  // end the local stream. However, if we're resetting the stream due to
+  // overload, we should reset the stream as soon as possible to free used
+  // resources.
+  if (useDeferredReset() && local_end_stream_ && !local_end_stream_sent_ &&
+      reason != StreamResetReason::OverloadManager) {
     ASSERT(parent_.getStream(stream_id_) != nullptr);
     parent_.pending_deferred_reset_streams_.emplace(stream_id_, this);
     deferred_reset_ = reason;
@@ -1060,7 +1063,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     default:
       // We do not currently support push.
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      ENVOY_BUG(false, "push not supported");
     }
 
     break;

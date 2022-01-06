@@ -118,19 +118,36 @@ void OwnedImpl::copyOut(size_t start, uint64_t size, void* data) const {
   ASSERT(size == 0);
 }
 
-uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+uint64_t OwnedImpl::copyOutToSlices(uint64_t size, Buffer::RawSlice* dest_slices,
                                     uint64_t num_slice) const {
   uint64_t total_length_to_read = std::min(size, this->length());
-  uint64_t num_slices_to_read = 0;
-  uint64_t num_bytes_to_read = 0;
-  for (; num_slices_to_read < num_slice && num_bytes_to_read < total_length_to_read;
-       num_slices_to_read++) {
-    auto length_to_copy = std::min(static_cast<uint64_t>(slices[num_slices_to_read].len_),
-                                   total_length_to_read - num_bytes_to_read);
-    this->copyOut(num_bytes_to_read, length_to_copy, slices[num_slices_to_read].mem_);
-    num_bytes_to_read += length_to_copy;
+  uint64_t num_bytes_read = 0;
+  uint64_t num_dest_slices_read = 0;
+  uint64_t num_src_slices_read = 0;
+  uint64_t dest_slice_off = 0;
+  uint64_t src_slice_off = 0;
+  for (; num_dest_slices_read < num_slice && num_bytes_read < total_length_to_read &&
+         num_src_slices_read < slices_.size();) {
+    auto& src_slice = slices_[num_src_slices_read];
+    auto& dest_slice = dest_slices[num_dest_slices_read];
+    auto length_to_copy = std::min(
+        src_slice.dataSize() - src_slice_off,
+        std::min(static_cast<uint64_t>(dest_slice.len_), total_length_to_read - num_bytes_read));
+    memcpy(static_cast<uint8_t*>(dest_slice.mem_) + dest_slice_off, // NOLINT(safe-memcpy)
+           src_slice.data() + src_slice_off, length_to_copy);
+    src_slice_off = src_slice_off + length_to_copy;
+    dest_slice_off = dest_slice_off + length_to_copy;
+    if (src_slice_off == src_slice.dataSize()) {
+      num_src_slices_read++;
+      src_slice_off = 0;
+    }
+    if (dest_slice_off == dest_slice.len_) {
+      num_dest_slices_read++;
+      dest_slice_off = 0;
+    }
+    num_bytes_read += length_to_copy;
   }
-  return num_bytes_to_read;
+  return num_bytes_read;
 }
 
 void OwnedImpl::drain(uint64_t size) { drainImpl(size); }
@@ -560,7 +577,8 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
   }
 
   // Less data in slices than length() reported.
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected data in slices");
+  return false;
 }
 
 OwnedImpl::OwnedImpl() = default;

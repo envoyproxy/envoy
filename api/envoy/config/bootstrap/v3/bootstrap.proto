@@ -32,6 +32,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v3";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/bootstrap/v3;bootstrapv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Bootstrap]
@@ -40,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 33]
+// [#next-free-field: 34]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -325,11 +326,15 @@ message Bootstrap {
   //
   // Note that the 'set-cookie' header cannot be registered as inline header.
   repeated CustomInlineHeader inline_headers = 32;
+
+  // Optional path to a file with performance tracing data created by "Perfetto" SDK in binary
+  // ProtoBuf format. The default value is "envoy.pftrace".
+  string perf_tracing_file_path = 33;
 }
 
 // Administration interface :ref:`operations documentation
 // <operations_admin_interface>`.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Admin {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.bootstrap.v2.Admin";
 
@@ -355,6 +360,10 @@ message Admin {
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
   repeated core.v3.SocketOption socket_options = 4;
+
+  // Indicates whether :ref:`global_downstream_max_connections <config_overload_manager_limiting_connections>`
+  // should apply to the admin interface or not.
+  bool ignore_global_conn_limit = 6;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

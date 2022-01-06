@@ -310,7 +310,7 @@ void SubstitutionFormatParser::parseCommandHeader(const std::string& token, cons
   if (!subs.empty()) {
     throw EnvoyException(
         // Header format rules support only one alternative header.
-        // docs/root/configuration/access_log.rst#format-rules
+        // docs/root/configuration/observability/access_log/access_log.rst#format-rules
         absl::StrCat("More than 1 alternative header specified in token: ", token));
   }
 
@@ -686,26 +686,31 @@ private:
 };
 
 StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+  // TODO: Change this huge if-else ladder to use a switch case instead.
   if (field_name == "REQUEST_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastDownstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.lastDownstreamRxByteReceived();
         });
   } else if (field_name == "REQUEST_TX_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastUpstreamTxByteSent();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.lastUpstreamTxByteSent();
         });
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.firstUpstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          return timing.firstUpstreamRxByteReceived();
         });
   } else if (field_name == "RESPONSE_TX_DURATION") {
     field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
-          auto downstream = stream_info.lastDownstreamTxByteSent();
-          auto upstream = stream_info.firstUpstreamRxByteReceived();
+          StreamInfo::TimingUtility timing(stream_info);
+          auto downstream = timing.lastDownstreamTxByteSent();
+          auto upstream = timing.firstUpstreamRxByteReceived();
 
           absl::optional<std::chrono::nanoseconds> result;
           if (downstream && upstream) {
@@ -789,9 +794,13 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
         });
   } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
+    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
+        [](const StreamInfo::StreamInfo& stream_info)
+            -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+          if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamHost()) {
+            return stream_info.upstreamInfo()->upstreamHost()->address();
+          }
+          return nullptr;
         });
   } else if (field_name == "UPSTREAM_CLUSTER") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
@@ -813,9 +822,18 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
                      : absl::make_optional<std::string>(upstream_cluster_name);
         });
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamLocalAddress();
+    field_extractor_ = StreamInfoAddressFieldExtractor::withPort(
+        [](const StreamInfo::StreamInfo& stream_info)
+            -> std::shared_ptr<const Envoy::Network::Address::Instance> {
+          if (stream_info.upstreamInfo().has_value()) {
+            return stream_info.upstreamInfo().value().get().upstreamLocalAddress();
+          }
+          return nullptr;
+        });
+  } else if (field_name == "UPSTREAM_REQUEST_ATTEMPT_COUNT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.attemptCount().value_or(0);
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
     field_extractor_ =
@@ -936,8 +954,9 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
         [](const StreamInfo::StreamInfo& stream_info) {
           absl::optional<std::string> result;
-          if (!stream_info.upstreamTransportFailureReason().empty()) {
-            result = stream_info.upstreamTransportFailureReason();
+          if (stream_info.upstreamInfo().has_value() &&
+              !stream_info.upstreamInfo().value().get().upstreamTransportFailureReason().empty()) {
+            result = stream_info.upstreamInfo().value().get().upstreamTransportFailureReason();
           }
           return result;
         });
@@ -952,6 +971,11 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
             return stream_info.filterChainName();
           }
           return absl::nullopt;
+        });
+  } else if (field_name == "VIRTUAL_CLUSTER_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+          return stream_info.virtualClusterName();
         });
   } else if (field_name == "TLS_JA3_FINGERPRINT") {
     field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(

@@ -30,6 +30,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/socket_interface_swap.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/retry_priority.h"
@@ -38,6 +39,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
@@ -612,7 +614,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReply) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyDownstreamBytesCount) {
@@ -680,7 +682,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBody) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("InvalidHeaderFilter_ready\n"));
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid_header_filter_ready\n"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
@@ -3531,6 +3533,76 @@ TEST_P(DownstreamProtocolIntegrationTest, ContentLengthLargerThanPayload) {
   // stream error.
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+}
+
+class NoUdpGso : public Api::OsSysCallsImpl {
+public:
+  bool supportsUdpGso() const override { return false; }
+};
+
+TEST_P(DownstreamProtocolIntegrationTest, HandleDownstreamSocketFail) {
+  // Make sure for HTTP/3 Envoy will use sendmsg, so the write_matcher will work.
+  NoUdpGso reject_gso_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&reject_gso_};
+  ASSERT(!Api::OsSysCallsSingleton::get().supportsUdpGso());
+  SocketInterfaceSwap socket_swap;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  // Makes us have Envoy's writes to downstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setSourcePort(lookupPort("http"));
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  if (downstreamProtocol() == Http::CodecType::HTTP3) {
+    // For HTTP/3 since the packets are black holed, there is no client side
+    // indication of connection close. Wait on Envoy stats instead.
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 1);
+    codec_client_->close();
+  } else {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  }
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
+}
+
+TEST_P(ProtocolIntegrationTest, HandleUpstreamSocketFail) {
+  SocketInterfaceSwap socket_swap;
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto downstream_request = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  // Make sure the headers made it through.
+  waitForNextUpstreamConnection(std::vector<uint64_t>{0}, TestUtility::DefaultTimeout,
+                                fake_upstream_connection_);
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Makes us have Envoy's writes to upstream return EBADF
+  Network::IoSocketError* ebadf = Network::IoSocketError::getIoSocketEbadfInstance();
+  socket_swap.write_matcher_->setDestinationPort(fake_upstreams_[0]->localAddress()->ip()->port());
+  socket_swap.write_matcher_->setWriteOverride(ebadf);
+
+  Buffer::OwnedImpl data("HTTP body content goes here");
+  codec_client_->sendData(*downstream_request, data, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  socket_swap.write_matcher_->setWriteOverride(nullptr);
+  // Shut down the server before os_calls goes out of scope to avoid syscalls
+  // during its removal.
+  test_server_.reset();
 }
 
 } // namespace Envoy

@@ -68,7 +68,8 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& profile_path, Server::Instance& server);
+  AdminImpl(const std::string& profile_path, Server::Instance& server,
+            bool ignore_global_conn_limit);
 
   Http::Code runCallback(absl::string_view path_and_query,
                          Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
@@ -231,9 +232,7 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
     void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
+                                   std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -269,6 +268,9 @@ private:
     struct NullThreadLocalOverloadState : public ThreadLocalOverloadState {
       NullThreadLocalOverloadState(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
       const OverloadActionState& getState(const std::string&) override { return inactive_; }
+      bool tryAllocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool tryDeallocateResource(OverloadProactiveResourceName, int64_t) override { return false; }
+      bool isResourceMonitorEnabled(OverloadProactiveResourceName) override { return false; }
       Event::Dispatcher& dispatcher_;
       const OverloadActionState inactive_ = OverloadActionState::inactive();
     };
@@ -290,7 +292,7 @@ private:
 
     bool registerForAction(const std::string&, Event::Dispatcher&, OverloadActionCb) override {
       // This method shouldn't be called by the admin listener
-      NOT_REACHED_GCOVR_EXCL_LINE;
+      IS_ENVOY_BUG("Unexpected function call");
       return false;
     }
 
@@ -340,7 +342,7 @@ private:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
         : parent_(parent), name_("admin"), scope_(std::move(listener_scope)),
           stats_(Http::ConnectionManagerImpl::generateListenerStats("http.admin.", *scope_)),
-          init_manager_(nullptr) {}
+          init_manager_(nullptr), ignore_global_conn_limit_(parent.ignore_global_conn_limit_) {}
 
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
@@ -372,6 +374,7 @@ private:
     }
     uint32_t tcpBacklogSize() const override { return ENVOY_TCP_BACKLOG_SIZE; }
     Init::Manager& initManager() override { return *init_manager_; }
+    bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     AdminImpl& parent_;
     const std::string name_;
@@ -383,6 +386,7 @@ private:
   private:
     const std::vector<AccessLog::InstanceSharedPtr> empty_access_logs_;
     std::unique_ptr<Init::Manager> init_manager_;
+    const bool ignore_global_conn_limit_;
   };
   using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
@@ -455,6 +459,7 @@ private:
   const LocalReply::LocalReplyPtr local_reply_;
   const std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
   const absl::optional<std::string> scheme_{};
+  const bool ignore_global_conn_limit_;
 };
 
 } // namespace Server

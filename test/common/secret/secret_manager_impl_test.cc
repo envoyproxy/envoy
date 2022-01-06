@@ -1128,6 +1128,43 @@ tls_certificate:
       EnvoyException, "Failed to load private key provider: test");
 }
 
+// Verify that using the match_subject_alt_names will result in a typed matcher, one for each of
+// DNS, URI, EMAIL and IP_ADDRESS.
+// TODO(pradeepcrao): Delete this test once the deprecated field is removed.
+TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  const std::string yaml =
+      R"EOF(
+      name: "abc.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+        match_subject_alt_names:
+          exact: "example.foo"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
+  ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+  EXPECT_EQ(cvc_config.subjectAltNameMatchers().size(), 4);
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+            cvc_config.subjectAltNameMatchers()[1].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[2].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+            cvc_config.subjectAltNameMatchers()[2].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[3].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
+            cvc_config.subjectAltNameMatchers()[3].san_type());
+}
+
 } // namespace
 } // namespace Secret
 } // namespace Envoy

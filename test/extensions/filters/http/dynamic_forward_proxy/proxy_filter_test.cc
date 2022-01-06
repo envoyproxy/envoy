@@ -162,7 +162,7 @@ TEST_F(ProxyFilterTest, CacheOverflow) {
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Overflow, nullptr, absl::nullopt}));
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, Eq("DNS cache overflow"),
-                                         _, _, Eq("DNS cache overflow")));
+                                         _, _, Eq("dns_cache_overflow")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -200,7 +200,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflow) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_());
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
-                                         Eq("Dynamic forward proxy pending request overflow")));
+                                         Eq("dynamic_forward_proxy_pending_request_overflow")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
@@ -240,7 +240,7 @@ TEST_F(ProxyFilterTest, CircuitBreakerOverflowWithDnsCacheResourceManager) {
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_());
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,
                                          Eq("Dynamic forward proxy pending request overflow"), _, _,
-                                         Eq("Dynamic forward proxy pending request overflow")));
+                                         Eq("dynamic_forward_proxy_pending_request_overflow")));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
