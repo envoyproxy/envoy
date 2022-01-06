@@ -38,9 +38,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 8]
 message HeaderMutationRules {
   // By default, certain headers that could affect processing of subsequent
-  // filters or request routing cannot be modified. These headers are. 
-  // This includes "host", ":authority", ":scheme", and ":method". 
-  // If true, then these headers may be modified as well.
+  // filters or request routing cannot be modified. These headers are
+  // "host", ":authority", ":scheme", and ":method". Setting this parameter
+  // to true allows these headers to be modified as well.
   google.protobuf.BoolValue allow_all_routing = 1;
 
   // If true, allow modification of envoy internal headers. By default, these
