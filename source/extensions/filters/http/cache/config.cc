@@ -20,9 +20,9 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
 
   return [config, stats_prefix, &context,
           http_cache_factory](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, stats_prefix, context.scope(),
-                                                            context.timeSource(),
-                                                            http_cache_factory->getCache(config)));
+    callbacks.addStreamFilter(
+        std::make_shared<CacheFilter>(config, stats_prefix, context.scope(), context.timeSource(),
+                                      http_cache_factory->getCache(config, context)));
   };
 }
 
