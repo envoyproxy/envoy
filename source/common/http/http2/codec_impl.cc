@@ -1063,7 +1063,7 @@ Status ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     default:
       // We do not currently support push.
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+      ENVOY_BUG(false, "push not supported");
     }
 
     break;

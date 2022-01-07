@@ -227,7 +227,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   Buffer::InstancePtr& bufferedData() override;
   bool complete() override;
   bool has1xxheaders() override { return false; }
-  void do1xxHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
+  void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
   void doData(bool end_stream) override;
   void doMetadata() override {
@@ -627,6 +627,9 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override {
     return StreamInfoImpl::downstreamAddressProvider().connectionID();
+  }
+  absl::optional<absl::string_view> interfaceName() const override {
+    return StreamInfoImpl::downstreamAddressProvider().interfaceName();
   }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override {
     return StreamInfoImpl::downstreamAddressProvider().sslConnection();
