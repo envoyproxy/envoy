@@ -23,6 +23,36 @@ py_library(
 )
 
 py_binary(
+    name = "dump_repository_locations",
+    srcs = ["dump_repository_locations.py"],
+    args = [
+        "$(location //bazel:repository_locations)",
+        "$(location @envoy_api//bazel:repository_locations)",
+    ],
+    data = [
+        "//bazel:repository_locations",
+        "@envoy_api//bazel:repository_locations",
+    ],
+)
+
+genrule(
+    name = "repository_locations_metadata",
+    outs = ["repository_locations_metadata.json"],
+    cmd = """
+        $(location :dump_repository_locations) \
+            $(location //bazel:repository_locations) \
+            $(location @envoy_api//bazel:repository_locations) \
+            > $@
+
+    """,
+    tools = [
+        ":dump_repository_locations",
+        "//bazel:repository_locations",
+        "@envoy_api//bazel:repository_locations",
+    ],
+)
+
+py_binary(
     name = "cve_scan",
     srcs = ["cve_scan.py"],
     args = ["$(location :cve.yaml)"],
