@@ -36,6 +36,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // rejected. In the ext_proc filter, that counter is named
 // "rejected_header_mutations".
 // [#next-free-field: 8]
+// [#not-implemented-hide:]
 message HeaderMutationRules {
   // By default, certain headers that could affect processing of subsequent
   // filters or request routing cannot be modified. These headers are
