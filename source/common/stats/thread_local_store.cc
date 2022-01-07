@@ -980,6 +980,7 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   }
 }
 
+#if 0
 bool ThreadLocalStoreImpl::counterPage(PageFn<Counter> f_stat, absl::string_view start,
                                        PageDirection direction) const {
   return alloc_.counterPage(f_stat, start, direction);
@@ -1046,6 +1047,7 @@ bool ThreadLocalStoreImpl::scopePage(PageFn<const Scope> f_scope, absl::string_v
   }
   return iter != scopes_.end();
 }
+#endif
 
 void ThreadLocalStoreImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   alloc_.forEachSinkedCounter(f_size, f_stat);

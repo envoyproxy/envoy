@@ -249,6 +249,7 @@ public:
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
 
+  /*
   bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
                    PageDirection direction) const override;
   bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
@@ -259,6 +260,7 @@ public:
                      PageDirection direction) const override;
   bool scopePage(PageFn<const Scope> f_stat, absl::string_view start,
                  PageDirection direction) const override;
+  */
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }

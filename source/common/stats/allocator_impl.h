@@ -11,7 +11,7 @@
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/stats/metric_impl.h"
 
-#include "absl/container/btree_set.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -36,15 +36,10 @@ public:
   const SymbolTable& constSymbolTable() const override { return symbol_table_; }
 
   void forEachCounter(SizeFn, StatFn<Counter>) const override;
-  void forEachGauge(SizeFn, StatFn<Gauge>) const override;
-  void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
 
-  bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
-                   PageDirection direction) const override;
-  bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
-                 PageDirection direction) const override;
-  bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
-                       PageDirection direction) const override;
+  void forEachGauge(SizeFn, StatFn<Gauge>) const override;
+
+  void forEachTextReadout(SizeFn, StatFn<TextReadout>) const override;
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
   void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
@@ -86,20 +81,9 @@ private:
   // protected by locks.
   mutable Thread::MutexBasicLockable mutex_;
 
-  /**
-   * Iterates from a start-point until stat_fn returns false or we exhaust entries.
-   * @return whether there are more entries remaining
-   */
-  template <class Set, class Fn>
-  bool pageHelper(const Set* set, Fn stat_fn, absl::string_view start,
-                  PageDirection direction) const;
-
-  template <class StatType>
-  using StatOrderedSet = absl::btree_set<StatType*, MetricHelper::LessThan>;
-
-  StatOrderedSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
-  StatOrderedSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
-  StatOrderedSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
+  StatSet<Counter> counters_ ABSL_GUARDED_BY(mutex_);
+  StatSet<Gauge> gauges_ ABSL_GUARDED_BY(mutex_);
+  StatSet<TextReadout> text_readouts_ ABSL_GUARDED_BY(mutex_);
 
   // Retain storage for deleted stats; these are no longer in maps because
   // the matcher-pattern was established after they were created. Since the

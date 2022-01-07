@@ -83,12 +83,14 @@ public:
   virtual void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const PURE;
   virtual void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const PURE;
 
+#if 0
   virtual bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
                            PageDirection direction) const PURE;
   virtual bool gaugePage(PageFn<Gauge> f_stat, absl::string_view start,
                          PageDirection direction) const PURE;
   virtual bool textReadoutPage(PageFn<TextReadout> f_stat, absl::string_view start,
                                PageDirection direction) const PURE;
+#endif
 
   /**
    * Iterate over all stats that need to be flushed to sinks. Note, that implementations can

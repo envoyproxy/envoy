@@ -25,7 +25,6 @@ constexpr absl::string_view CountersLabel = "Counters";
 constexpr absl::string_view GaugesLabel = "Gauges";
 constexpr absl::string_view HistogramsLabel = "Histograms";
 constexpr absl::string_view TextReadoutsLabel = "TextReadouts";
-constexpr absl::string_view StartSeparator = ":";
 
 } // namespace
 
@@ -148,11 +147,16 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
     }
   }
 
-  Http::Utility::QueryParams::const_iterator scope_iter = query_.find("scope");
-  if (scope_iter != query_.end()) {
-    scope_ = scope_iter->second;
-  }
+  auto set_param = [this](const std::string& name, std::function<void(const std::string&)> setter) {
+    auto iter = query_.find(name);
+    if (iter != query_.end()) {
+      setter(iter->second);
+    }
+  };
 
+  set_param("scope", [this](const std::string& val) { scope_ = val; });
+
+#if 0
   auto parse_start = [this, parse_type](absl::string_view val) -> bool {
     std::vector<absl::string_view> split = absl::StrSplit(val, absl::MaxSplits(StartSeparator, 1));
     if ((split.size() != 2) || !parse_type(split[0], start_type_)) {
@@ -189,6 +193,7 @@ Http::Code StatsHandler::Params::parse(absl::string_view url, Buffer::Instance& 
       return Http::Code::BadRequest;
     }
   }
+#endif
 
   return Http::Code::OK;
 }
@@ -233,10 +238,10 @@ Http::Code StatsHandler::handlerStatsJson(absl::string_view url,
 class StatsHandler::Render {
 public:
   virtual ~Render() = default;
-  virtual void counter(Stats::Counter&) PURE;
-  virtual void gauge(Stats::Gauge&) PURE;
-  virtual void textReadout(Stats::TextReadout&) PURE;
-  virtual void histogram(Stats::Histogram&) PURE;
+  virtual void generate(Stats::Counter&) PURE;
+  virtual void generate(Stats::Gauge&) PURE;
+  virtual void generate(Stats::TextReadout&) PURE;
+  virtual void generate(Stats::Histogram&) PURE;
   virtual void noStats(Type type) { UNREFERENCED_PARAMETER(type); }
   virtual void render(Buffer::Instance& response) PURE;
 };
@@ -246,17 +251,17 @@ protected:
   using Group = std::vector<std::string>;
 
 public:
-  void textReadout(Stats::TextReadout& text_readout) override {
+  void generate(Stats::TextReadout& text_readout) override {
     groups_[Type::TextReadouts].emplace_back(absl::StrCat(
         text_readout.name(), ": \"", Html::Utility::sanitize(text_readout.value()), "\"\n"));
   }
-  void counter(Stats::Counter& counter) override {
+  void generate(Stats::Counter& counter) override {
     groups_[Type::Counters].emplace_back(absl::StrCat(counter.name(), ": ", counter.value(), "\n"));
   }
-  void gauge(Stats::Gauge& gauge) override {
+  void generate(Stats::Gauge& gauge) override {
     groups_[Type::Gauges].emplace_back(absl::StrCat(gauge.name(), ": ", gauge.value(), "\n"));
   }
-  void histogram(Stats::Histogram& histogram) override {
+  void generate(Stats::Histogram& histogram) override {
     Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
     if (phist != nullptr) {
       groups_[Type::Histograms].emplace_back(
@@ -286,7 +291,7 @@ public:
   void render(Buffer::Instance& response) override {
     for (const auto& iter : groups_) {
       absl::string_view label = StatsHandler::typeToString(iter.first);
-      ENVOY_LOG_MISC(error, "Rendering {}", label);
+      //ENVOY_LOG_MISC(error, "Rendering {}", label);
       const Group& group = iter.second;
       if (group.empty()) {
         response.add(absl::StrCat("<br/><i>No ", label, " found</i><br/>\n"));
@@ -305,14 +310,14 @@ class StatsHandler::JsonRender : public StatsHandler::Render {
 public:
   explicit JsonRender(const Params& params) : params_(params) {}
 
-  void counter(Stats::Counter& counter) override {
+  void generate(Stats::Counter& counter) override {
     add(counter, ValueUtil::numberValue(counter.value()));
   }
-  void gauge(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
-  void textReadout(Stats::TextReadout& text_readout) override {
+  void generate(Stats::Gauge& gauge) override { add(gauge, ValueUtil::numberValue(gauge.value())); }
+  void generate(Stats::TextReadout& text_readout) override {
     add(text_readout, ValueUtil::stringValue(text_readout.value()));
   }
-  void histogram(Stats::Histogram& histogram) override {
+  void generate(Stats::Histogram& histogram) override {
     Stats::ParentHistogram* phist = dynamic_cast<Stats::ParentHistogram*>(&histogram);
     if (phist != nullptr) {
       if (!found_used_histogram_) {
@@ -387,149 +392,144 @@ private:
 
 class StatsHandler::Context {
 public:
-  Context(const Params& params, Render& render, Buffer::Instance& response, Stats::Store& stats)
-      : params_(params), render_(render), response_(response), stats_(stats) {}
+  Context(const Params& params, Render& render, Buffer::Instance& response)
+      : params_(params), render_(render), response_(response) {}
 
-  template <class StatType>
-  void emit(Type type, absl::string_view label, std::function<void(StatType& stat_type)> render_fn,
-            std::function<bool(Stats::PageFn<StatType> stat_fn)> page_fn) {
-    ENVOY_LOG_MISC(error, "emit {}", label);
+  void collectScope(const Stats::Scope& scope) {
+    collect<Stats::TextReadout>(Type::TextReadouts, scope, text_readouts_);
+    collect<Stats::Counter>(Type::Counters, scope, counters_);
+    collect<Stats::Gauge>(Type::Gauges, scope, gauges_);
+  }
 
-    // Determine if the starting filter begins after this type. For example,
-    // counters come before gauges, so if we are forward-iterating with a
-    // start_type==Type::Gauge, and type==Type::Counter then we should not
-    // include the counters.
-    if (params_.direction_ == Stats::PageDirection::Forward) {
-      if (type < params_.start_type_) {
-        return;
-      }
-    } else if (type > params_.start_type_) {
-      return;
-    }
+  void emit() {
+    emit<Stats::TextReadout>(Type::TextReadouts, text_readouts_);
+    emit<Stats::Counter>(Type::Counters, counters_);
+    emit<Stats::Gauge>(Type::Gauges, gauges_);
+  }
+
+  template<class StatType> void collect(Type type, const Stats::Scope& scope,
+                                        Stats::StatSet<StatType>& set) {
+    //ENVOY_LOG_MISC(error, "collect {}", typeToString(type));
 
     // Bail early if the  requested type does not match the current type.
     if (params_.type_ != Type::All && params_.type_ != type) {
       return;
     }
 
-    absl::string_view prev_type_label, next_type_label;
-    if (params_.type_ == Type::All && static_cast<uint32_t>(type) > 0) {
-      prev_type_label = typeToString(static_cast<Type>(static_cast<uint32_t>(type) - 1));
-    }
-    if (params_.type_ == Type::All &&
-        static_cast<uint32_t>(type) + 1 < static_cast<uint32_t>(Type::All)) {
-      next_type_label = typeToString(static_cast<Type>(static_cast<uint32_t>(type) + 1));
+    Stats::IterateFn<StatType> fn = [this, &set](const Stats::RefcountPtr<StatType>& stat) -> bool {
+      if (params_.shouldShowMetric(*stat)) {
+        set.insert(stat.get());
+      }
+      return true;
+    };
+    scope.iterate(fn);
+  }
+
+  template <class StatType> void emit(Type type, Stats::StatSet<StatType>& set) {
+    //ENVOY_LOG_MISC(error, "emit {}", typeToString(type));
+
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
+      return;
     }
 
-    // If page is already full, we may need to enable navigation to this type prior to bailing.
-    if (params_.page_size_.has_value() && num_ >= params_.page_size_.value()) {
-      // Make sure we expose a next/prev link to reveal the types we are not hitting.
-      if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (!next_type_label.empty() && next_start_.empty()) {
-          next_start_ = absl::StrCat(next_type_label, StartSeparator, "");
-          ENVOY_LOG_MISC(error, "AAA: setting next_start_={}", next_start_);
-        }
-      } else if (prev_start_.empty()) {
-        prev_start_ = absl::StrCat(label, StartSeparator, "");
+    if (set.empty()) {
+      render_.noStats(type);
+    }
+
+    std::vector<Stats::RefcountPtr<StatType>> sorted;
+    sorted.reserve(set.size());
+    for (const Stats::RefcountPtr<StatType>& stat : set) {
+      sorted.emplace_back(stat);
+    }
+
+    struct Cmp {
+      bool operator()(const Stats::RefcountPtr<StatType>& a,
+                      const Stats::RefcountPtr<StatType>& b) const {
+        return a->constSymbolTable().lessThan(a->statName(), b->statName());
       }
+    };
+    std::sort(sorted.begin(), sorted.end(), Cmp());
+
+    for (const Stats::RefcountPtr<StatType>& stat : sorted) {
+      render_.generate(*stat);
+    }
+  }
+
+
+#if 0
+  template <class StatType>
+      void emit(Type type /*, std::function<void(StatType& stat_type)> render_fn */,
+
+    //ENVOY_LOG_MISC(error, "emit {}", typeToString(type));
+
+    // Bail early if the  requested type does not match the current type.
+    if (params_.type_ != Type::All && params_.type_ != type) {
       return;
     }
 
     std::vector<Stats::RefcountPtr<StatType>> stats;
-    // auto stat_fn = [this, &written, &response, render_fn, label](StatType& stat) -> bool {
-    auto stat_fn = [this, &stats](StatType& stat) -> bool {
+    scope_.iterate([this, &stats](Stats::RefcountPtr<StatType>& stat) {
       if (params_.shouldShowMetric(stat)) {
-        ++num_;
         stats.push_back(&stat);
       }
-      return !params_.page_size_.has_value() || num_ < params_.page_size_.value();
-    };
+    });
 
     if (stats.empty()) {
       render_.noStats(type);
     }
 
-    bool more_data = page_fn(stat_fn);
-    bool page_full = params_.page_size_.has_value() && num_ == params_.page_size_.value();
+    struct Cmp {
+      bool operator()(const Stats::RefcountPtr<StatType>& a,
+                      const Stats::RefcountPtr<StatType>& b) const {
+        return a->constSymbolTable().lessThan(a->statName(), b->statName());
+      }
+    };
 
-    if (stats.empty()) {
-      if (params_.direction_ == Stats::PageDirection::Forward) {
-        if (page_full && !next_type_label.empty() && next_start_.empty()) {
-          next_start_ = absl::StrCat(next_type_label, StartSeparator);
-          ENVOY_LOG_MISC(error, "BBB: setting next_start_={}", next_start_);
-        }
-      } else if (!prev_type_label.empty()) {
-        prev_start_ = absl::StrCat(prev_type_label, StartSeparator);
-      }
-      return;
-    }
-
-    const std::string first = absl::StrCat(label, StartSeparator, stats[0]->name());
-    const std::string last = absl::StrCat(label, StartSeparator, stats[stats.size() - 1]->name());
-
-    if (params_.direction_ == Stats::PageDirection::Forward) {
-      if (!params_.start_.empty() && prev_start_.empty()) {
-        prev_start_ = first;
-      }
-      if (more_data) {
-        next_start_ = last;
-        ENVOY_LOG_MISC(error, "CCC: setting next_start_={}", next_start_);
-      } else if (next_start_.empty() && page_full && !next_type_label.empty()) {
-        next_start_ = absl::StrCat(next_type_label, StartSeparator);
-        ENVOY_LOG_MISC(error, "DDD: setting next_start_={}", next_start_);
-      }
-    } else {
-      if (more_data) {
-        prev_start_ = last;
-      } else if (prev_start_.empty() && !prev_type_label.empty()) {
-        prev_start_ = absl::StrCat(prev_type_label, StartSeparator);
-      }
-      if (!params_.start_.empty() && next_start_.empty()) {
-        next_start_ = first;
-        ENVOY_LOG_MISC(error, "EEE: setting next_start_={}", next_start_);
-      }
-      std::reverse(stats.begin(), stats.end());
-    }
-
+    std::sort(stats.begin(), stats.end());
     for (const auto& stat : stats) {
-      render_fn(*stat);
+      //render_fn(*stat);
+      render_.generate(*stat);
     }
   }
 
   void textReadouts() {
-    emit<Stats::TextReadout>(
-        Type::TextReadouts, TextReadoutsLabel,
-        [this](Stats::TextReadout& text_readout) { render().textReadout(text_readout); },
-        [this](Stats::PageFn<Stats::TextReadout> render) -> bool {
-          return stats_.textReadoutPage(render, start(Type::TextReadouts), params_.direction_);
-        });
+    emit<Stats::TextReadout>(Type::TextReadouts);
+    // [this](Stats::TextReadout& text_readout) { render().textReadout(text_readout); });
   }
 
   void counters() {
+    emit<Stats::Counter>(Type::Counters);
+
+    /*
     emit<Stats::Counter>(
         Type::Counters, CountersLabel,
         [this](Stats::Counter& counter) { render().counter(counter); },
         [this](Stats::PageFn<Stats::Counter> render) -> bool {
-          return stats_.counterPage(render, start(Type::Counters), params_.direction_);
+          return scope_.iterate<Stats::Counter>(render, start(Type::Counters), params_.direction_);
         });
+    */
   }
 
   void gauges() {
-    emit<Stats::Gauge>(
+    emit<Stats::Gauge>(Type::Gauges);
+    /*emit<Stats::Gauge>(
         Type::Gauges, GaugesLabel, [this](Stats::Gauge& gauge) { render().gauge(gauge); },
         [this](Stats::PageFn<Stats::Gauge> render) -> bool {
-          return stats_.gaugePage(render, start(Type::Gauges), params_.direction_);
-        });
+          return scope_.gaugePage(render, start(Type::Gauges), params_.direction_);
+          });*/
   }
 
   void histograms() {
-    emit<Stats::Histogram>(
+    emit<Stats::Histogram>(Type::Histograms);
+        /*
         Type::Histograms, HistogramsLabel,
         [this](Stats::Histogram& histogram) { render().histogram(histogram); },
         [this](Stats::PageFn<Stats::Histogram> render) -> bool {
           return stats_.histogramPage(render, start(Type::Histograms), params_.direction_);
-        });
+          });*/
   }
+#endif
 
   Render& render() { return render_; }
 
@@ -544,9 +544,13 @@ public:
   const Params& params_;
   Render& render_;
   Buffer::Instance& response_;
-  Stats::Store& stats_;
+  //Stats::Store& stats_;
   std::string next_start_;
   std::string prev_start_;
+  Stats::StatSet<Stats::Counter> counters_;
+  Stats::StatSet<Stats::Gauge> gauges_;
+  Stats::StatSet<Stats::TextReadout> text_readouts_;
+  //Stats::StatSet<Stats::CounterSharedPtr> counters_;
 };
 
 Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
@@ -563,9 +567,10 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     html.setSubmitOnChange(true);
     html.renderHead();
     html.renderUrlHandler(statsHandler(), params.query_);
-    html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
-    html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    //html.renderInput("before", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    //html.renderInput("after", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    html.renderInput("scope", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
+    //html.renderInput("direction", "stats", Admin::ParamDescriptor::Type::Hidden, params.query_, {});
     html.renderTail();
     response.add("<body>\n");
     break;
@@ -582,30 +587,68 @@ Http::Code StatsHandler::stats(const Params& params, Stats::Store& stats,
     break;
   }
 
-  Context context(params, *render, response, stats);
+  // Get an ordered set of scope names, which are used for previous/next
+  // navigation, and to choose a default scope name in case none was specified
+  // in a query param.
+  std::vector<std::string> names;
+  {
+    Stats::StatNameHashSet prefixes;
+    Stats::StatFn<const Stats::Scope> add_scope =
+        [&prefixes, &names, this](const Stats::Scope& scope) {
+      if (prefixes.insert(scope.prefix()).second) {
+        names.emplace_back(server_.stats().symbolTable().toString(scope.prefix()));
+      }
+    };
+    server_.stats().forEachScope([](size_t) {}, add_scope);
+  }
 
-  if (params.direction_ == Stats::PageDirection::Forward) {
-    context.textReadouts();
-    context.counters();
-    context.gauges();
-    context.histograms();
-  } else {
-    context.histograms();
-    context.gauges();
-    context.counters();
-    context.textReadouts();
+  absl::string_view scope_name = params.scope_.has_value() ? params.scope_.value() : names[0];
+  Stats::StatNameManagedStorage scope_stat_name(scope_name, stats.symbolTable());
+
+  // Note that multiple scopes can exist with the same name, and also that
+  // scopes may be created/destroyed in other threads, whenever we are not
+  // holding the store's lock. So when we traverse the scopes, we'll both
+  // look for Scope objects matchiung our expected name, and we'll create
+  // a sorted list of sort names for use in populating next/previous buttons.
+  Context context(params, *render, response);
+  server_.stats().forEachScope([](size_t) {},
+                               [&scope_stat_name, &context](const Stats::Scope& scope) {
+    if (scope.prefix() == scope_stat_name.statName()) {
+      ENVOY_LOG_MISC(error, "Collecting {}", scope.constSymbolTable().toString(scope.prefix()));
+      context.collectScope(scope);
+    } else {
+      ENVOY_LOG_MISC(error, "Skipping {}", scope.constSymbolTable().toString(scope.prefix()));
+    }
+  });
+  context.emit();
+
+  // Determine the previous/next scopes for populating navigation buttons.
+  absl::string_view prev, next;
+  bool found = false;
+  std::sort(names.begin(), names.end());
+  for (uint32_t i = 0; i < names.size(); ++i) {
+    if (names[i] == scope_name) {
+      found = true;
+      if (i > 0) {
+        prev = names[i - 1];
+        ENVOY_LOG_MISC(error, "Found prev: {}", prev);
+      }
+      if (i < names.size() - 1) {
+        next = names[i + 1];
+        ENVOY_LOG_MISC(error, "Found next: {}", next);
+      }
+    }
   }
 
   render->render(response);
 
   if (params.format_ == Format::Html) {
-    if (!context.prev_start_.empty()) {
-      response.add(absl::StrCat("  <a href='javascript:prev(\"", context.prev_start_,
+    if (!prev.empty()) {
+      response.add(absl::StrCat("  <a href='javascript:setScope(\"", prev,
                                 "\")'>Previous</a>\n"));
     }
-    if (!context.next_start_.empty()) {
-      response.add(
-          absl::StrCat("  <a href='javascript:next(\"", context.next_start_, "\")'>Next</a>\n"));
+    if (!next.empty()) {
+      response.add(absl::StrCat("  <a href='javascript:setScope(\"", next, "\")'>Next</a>\n"));
     }
 
     response.add("</body>\n");

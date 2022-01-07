@@ -386,6 +386,7 @@ void AllocatorImpl::forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat
   }
 }
 
+#if 0
 template <class Set, class Fn>
 bool AllocatorImpl::pageHelper(const Set* set, Fn f_stat, absl::string_view start,
                                PageDirection direction) const {
@@ -430,6 +431,7 @@ bool AllocatorImpl::textReadoutPage(PageFn<TextReadout> f_stat, absl::string_vie
                                     PageDirection direction) const {
   return pageHelper(&text_readouts_, f_stat, start, direction);
 }
+#endif
 
 void AllocatorImpl::forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const {
   if (sink_predicates_ != nullptr) {

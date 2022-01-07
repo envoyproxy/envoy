@@ -233,6 +233,7 @@ public:
     f_stat(scope);
   }
 
+#if 0
   bool counterPage(PageFn<Counter> f_stat, absl::string_view start,
                    PageDirection direction) const override {
     return alloc_.counterPage(f_stat, start, direction);
@@ -259,6 +260,7 @@ public:
     f_stat(scope);
     return false;
   }
+#endif
 
   Stats::StatName prefix() const override { return StatName(); }
 

@@ -600,6 +600,7 @@ TEST_F(AllocatorImplTest, ForEachSinkedTextReadout) {
   EXPECT_EQ(num_iterations, 0);
 }
 
+#if 0
 TEST_F(AllocatorImplTest, CounterPageForward) {
   std::vector<CounterSharedPtr> counters = makeCounters();
   constexpr size_t page_size = 5;
@@ -667,6 +668,7 @@ TEST_F(AllocatorImplTest, CounterPageBackward) {
   EXPECT_FALSE(test_page("counter.1", {0}));
   EXPECT_FALSE(test_page("counter.0x", {0}));
 }
+#endif
 
 } // namespace
 } // namespace Stats
