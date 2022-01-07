@@ -6,6 +6,8 @@ Pending Release
 
 Bugfixes:
 
+- Decompressor: decompress even when `no-transform` is specified  (:issue:`#1995 <1995>`)
+
 Features:
 
 0.4.4 (December 30, 2021)
