@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_test",
     "envoy_contrib_package",
 )
@@ -10,11 +11,23 @@ envoy_contrib_package()
 
 envoy_cc_test(
     name = "config_test",
-    srcs = [
-        "config_test.cc",
-    ],
+    srcs = ["config_test.cc"],
     deps = [
         "//contrib/hyperscan/matching/input_matchers/source:config",
         "//test/mocks/server:factory_context_mocks",
+    ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "hyperscan_speed_test",
+    srcs = ["hyperscan_speed_test.cc"],
+    external_deps = [
+        "benchmark",
+        "hyperscan",
+    ],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
+        "@com_googlesource_code_re2//:re2",
     ],
 )
