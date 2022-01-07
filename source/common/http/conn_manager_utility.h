@@ -83,13 +83,33 @@ public:
    * @param request_headers the request headers.
    * @param the configuration for the HCM, which affects request ID headers.
    * @param via the via header to append, if any.
+   * @param stream_info a reference to the filter manager streaminfo.
+   * @param node_id the node ID.
    * @param clear_hop_by_hop_headers true if hop by hop headers should be
    *        cleared. This should only ever be false for envoy-mobile.
    */
   static void mutateResponseHeaders(ResponseHeaderMap& response_headers,
                                     const RequestHeaderMap* request_headers,
                                     ConnectionManagerConfig& config, const std::string& via,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    absl::string_view node_id,
                                     bool clear_hop_by_hop_headers = true);
+
+  /**
+   * Adds a Proxy-Status response header.
+   *
+   * Writing the Proxy-Status header is gated on the existence of
+   * |proxy_status_config|. The |details| field and other internals are generated in
+   * fromStreamInfo().
+   * @param response_headers the headers to mutate.
+   * @param the configuration for the HCM, which affects request ID headers.
+   * @param stream_info a reference to the filter manager streaminfo.
+   * @param node_id the node ID.
+   */
+  static void setProxyStatusHeader(ResponseHeaderMap& response_headers,
+                                   const ConnectionManagerConfig& config,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                    absl::string_view node_id);
 
   enum class NormalizePathAction {
     Continue = 0,

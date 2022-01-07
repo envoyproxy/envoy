@@ -1347,6 +1347,8 @@ void ConnectionManagerImpl::ActiveStream::encode1xxHeaders(ResponseHeaderMap& re
   // continuation headers.
   ConnectionManagerUtility::mutateResponseHeaders(
       response_headers, request_headers_.get(), connection_manager_.config_, EMPTY_STRING,
+      filter_manager_.streamInfo(),
+      /*node_id=*/connection_manager_.local_info_.node().id(),
       connection_manager_.clear_hop_by_hop_response_headers_);
 
   // Count both the 1xx and follow-up response code in stats.
@@ -1377,7 +1379,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   }
   ConnectionManagerUtility::mutateResponseHeaders(
       headers, request_headers_.get(), connection_manager_.config_,
-      connection_manager_.config_.via(), connection_manager_.clear_hop_by_hop_response_headers_);
+      connection_manager_.config_.via(), filter_manager_.streamInfo(),
+      /*node_id=*/connection_manager_.local_info_.node().id(),
+      connection_manager_.clear_hop_by_hop_response_headers_);
 
   bool drain_connection_due_to_overload = false;
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
@@ -1468,30 +1472,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
   }
 
   chargeStats(headers);
-
-  if (auto* proxy_status_config = connection_manager_.config_.proxyStatusConfig();
-      proxy_status_config != nullptr) {
-    // Writing the Proxy-Status header is gated on the existence of
-    // |proxy_status_config|. The |details| field and other internals are generated in
-    // fromStreamInfo().
-    if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
-            StreamInfo::ProxyStatusUtils::fromStreamInfo(filter_manager_.streamInfo());
-        proxy_status.has_value()) {
-      headers.appendProxyStatus(StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(
-                                    filter_manager_.streamInfo(), *proxy_status,
-                                    connection_manager_.local_info_.node().id(),
-                                    *proxy_status_config),
-                                ", ");
-      // Apply the recommended response code, if configured and applicable.
-      if (proxy_status_config->set_recommended_response_code()) {
-        if (absl::optional<Http::Code> response_code =
-                StreamInfo::ProxyStatusUtils::recommendedHttpStatusCode(*proxy_status);
-            response_code.has_value()) {
-          headers.setStatus(std::to_string(enumToInt(*response_code)));
-        }
-      }
-    }
-  }
 
   ENVOY_STREAM_LOG(debug, "encoding headers via codec (end_stream={}):\n{}", *this, end_stream,
                    headers);
