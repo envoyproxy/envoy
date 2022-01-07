@@ -19,7 +19,7 @@ IoUringFactoryImpl::IoUringFactoryImpl(uint32_t io_uring_size, bool use_submissi
   is_instantiated_ = true;
 }
 
-IoUring& IoUringFactoryImpl::getOrCreateUring() const {
+IoUring& IoUringFactoryImpl::getOrCreate() const {
   static thread_local IoUringImpl uring(io_uring_size_, use_submission_queue_polling_);
   return uring;
 }
