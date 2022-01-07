@@ -30,7 +30,7 @@ message InternalUpstreamTransport {
     }
 
     // Namespace is the filter namespace used in the dynamic metadata.
-    string namespace = 1 [(validate.rules).message = {required: true}];
+    string namespace = 1 [(validate.rules).string = {min_len: 1}];
 
     // Optional lookup path segments in the namespace for a nested struct.
     repeated string path_segments = 2;
