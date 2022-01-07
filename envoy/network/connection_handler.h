@@ -132,6 +132,17 @@ public:
      * Stop listening according to implementation's own definition.
      */
     virtual void shutdownListener() PURE;
+
+    /**
+     * Update the listener config.
+     */
+    virtual void updateListenerConfig(Network::ListenerConfig& config) PURE;
+
+    /**
+     * Called when the given filter chains are about to be removed.
+     */
+    virtual void onFilterChainDraining(
+        const std::list<const Network::FilterChain*>& draining_filter_chains) PURE;
   };
 
   using ActiveListenerPtr = std::unique_ptr<ActiveListener>;

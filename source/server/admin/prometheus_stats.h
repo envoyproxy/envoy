@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/stats/custom_stat_namespaces.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
@@ -24,8 +25,10 @@ public:
   static uint64_t statsAsPrometheus(const std::vector<Stats::CounterSharedPtr>& counters,
                                     const std::vector<Stats::GaugeSharedPtr>& gauges,
                                     const std::vector<Stats::ParentHistogramSharedPtr>& histograms,
+                                    const std::vector<Stats::TextReadoutSharedPtr>& text_readouts,
                                     Buffer::Instance& response, const bool used_only,
-                                    const absl::optional<std::regex>& regex);
+                                    const absl::optional<std::regex>& regex,
+                                    const Stats::CustomStatNamespaces& custom_namespaces);
   /**
    * Format the given tags, returning a string as a comma-separated list
    * of <tag_name>="<tag_value>" pairs.
@@ -33,26 +36,14 @@ public:
   static std::string formattedTags(const std::vector<Stats::Tag>& tags);
 
   /**
-   * Format the given metric name, prefixed with "envoy_".
+   * Format the given metric name, and prefixed with "envoy_" if it does not have a custom
+   * stat namespace. If it has a custom stat namespace AND the name without the custom namespace
+   * has a valid prometheus namespace, the trimmed name is returned.
+   * Otherwise, return nullopt.
    */
-  static std::string metricName(const std::string& extracted_name);
-
-  /**
-   * Register a prometheus namespace, stats starting with the namespace will not be
-   * automatically prefixed with envoy namespace.
-   * This method must be called from the main thread.
-   * @returns bool if a new namespace is registered, false if the namespace is already
-   *          registered or the namespace is invalid.
-   */
-  static bool registerPrometheusNamespace(absl::string_view prometheus_namespace);
-
-  /**
-   * Unregister a prometheus namespace registered by `registerPrometheusNamespace`
-   * This method must be called from the main thread.
-   * @returns bool if the Prometheus namespace is unregistered. false if the namespace
-   *          wasn't registered.
-   */
-  static bool unregisterPrometheusNamespace(absl::string_view prometheus_namespace);
+  static absl::optional<std::string>
+  metricName(const std::string& extracted_name,
+             const Stats::CustomStatNamespaces& custom_namespace_factory);
 };
 
 } // namespace Server

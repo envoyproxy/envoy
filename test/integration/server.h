@@ -9,6 +9,7 @@
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/options.h"
 #include "envoy/server/process_context.h"
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 #include "source/common/common/assert.h"
@@ -281,6 +282,34 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.counterFromStatNameWithTags(name, tags);
   }
+  void forEachCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachCounter(f_size, f_stat);
+  }
+  void forEachGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachGauge(f_size, f_stat);
+  }
+  void forEachTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachTextReadout(f_size, f_stat);
+  }
+  void forEachSinkedCounter(Stats::SizeFn f_size, StatFn<Counter> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedCounter(f_size, f_stat);
+  }
+  void forEachSinkedGauge(Stats::SizeFn f_size, StatFn<Gauge> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedGauge(f_size, f_stat);
+  }
+  void forEachSinkedTextReadout(Stats::SizeFn f_size, StatFn<TextReadout> f_stat) const override {
+    Thread::LockGuard lock(lock_);
+    store_.forEachSinkedTextReadout(f_size, f_stat);
+  }
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override {
+    UNREFERENCED_PARAMETER(sink_predicates);
+  }
+
   Counter& counterFromString(const std::string& name) override {
     Thread::LockGuard lock(lock_);
     return store_.counterFromString(name);
@@ -400,7 +429,7 @@ public:
   static IntegrationTestServerPtr create(
       const std::string& config_path, const Network::Address::IpVersion version,
       std::function<void(IntegrationTestServer&)> on_server_ready_function,
-      std::function<void()> on_server_init_function, bool deterministic,
+      std::function<void()> on_server_init_function, absl::optional<uint64_t> deterministic_value,
       Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization = false,
       ProcessObjectOptRef process_object = absl::nullopt,
       Server::FieldValidationConfig validation_config = Server::FieldValidationConfig(),
@@ -430,10 +459,11 @@ public:
   void onWorkersStarted() override {}
 
   void start(const Network::Address::IpVersion version,
-             std::function<void()> on_server_init_function, bool deterministic,
-             bool defer_listener_finalization, ProcessObjectOptRef process_object,
-             Server::FieldValidationConfig validation_config, uint32_t concurrency,
-             std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,
+             std::function<void()> on_server_init_function,
+             absl::optional<uint64_t> deterministic_value, bool defer_listener_finalization,
+             ProcessObjectOptRef process_object, Server::FieldValidationConfig validation_config,
+             uint32_t concurrency, std::chrono::seconds drain_time,
+             Server::DrainStrategy drain_strategy,
              Buffer::WatermarkFactorySharedPtr watermark_factory);
 
   void waitForCounterEq(const std::string& name, uint64_t value,
@@ -462,6 +492,11 @@ public:
     notifyingStatsAllocator().waitForCounterExists(name);
   }
 
+  // TODO(#17956): Add Gauge type to NotifyingAllocator and adopt it in this method.
+  void waitForGaugeDestroyed(const std::string& name) override {
+    ASSERT_TRUE(TestUtility::waitForGaugeDestroyed(statStore(), name, time_system_));
+  }
+
   void waitUntilHistogramHasSamples(
       const std::string& name,
       std::chrono::milliseconds timeout = std::chrono::milliseconds::zero()) override {
@@ -479,6 +514,10 @@ public:
     // When using the thread local store, only gauges() is thread safe. This also allows us
     // to test if a counter exists at all versus just defaulting to zero.
     return TestUtility::findGauge(statStore(), name);
+  }
+
+  Stats::ParentHistogramSharedPtr histogram(const std::string& name) {
+    return TestUtility::findHistogram(statStore(), name);
   }
 
   std::vector<Stats::CounterSharedPtr> counters() override { return statStore().counters(); }
@@ -538,7 +577,8 @@ private:
   /**
    * Runs the real server on a thread.
    */
-  void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
+  void threadRoutine(const Network::Address::IpVersion version,
+                     absl::optional<uint64_t> deterministic_value,
                      ProcessObjectOptRef process_object,
                      Server::FieldValidationConfig validation_config, uint32_t concurrency,
                      std::chrono::seconds drain_time, Server::DrainStrategy drain_strategy,

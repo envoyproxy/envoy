@@ -159,7 +159,6 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<PrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kPath:
     return std::make_unique<PathMatcherImpl>(rule);
-  case RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
   case RouteMatch::PathSpecifierCase::kSafeRegex:
     return std::make_unique<RegexMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kConnectMatcher:

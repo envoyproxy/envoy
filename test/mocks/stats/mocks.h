@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <string>
 
@@ -263,6 +264,15 @@ public:
   MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
 };
 
+class MockSinkPredicates : public SinkPredicates {
+public:
+  MockSinkPredicates();
+  ~MockSinkPredicates() override;
+  MOCK_METHOD(bool, includeCounter, (const Counter&));
+  MOCK_METHOD(bool, includeGauge, (const Gauge&));
+  MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
+};
+
 class MockStore : public TestUtil::TestStore {
 public:
   MockStore();
@@ -285,6 +295,9 @@ public:
   MOCK_METHOD(Histogram&, histogramFromString, (const std::string& name, Histogram::Unit unit));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
   MOCK_METHOD(std::vector<TextReadoutSharedPtr>, text_readouts, (), (const));
+  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
+  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
+  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
 
   MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
   MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
@@ -313,6 +326,7 @@ public:
 
   TestUtil::TestSymbolTable symbol_table_;
   testing::NiceMock<MockCounter> counter_;
+  testing::NiceMock<MockGauge> gauge_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
 

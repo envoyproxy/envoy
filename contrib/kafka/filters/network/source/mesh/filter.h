@@ -24,7 +24,7 @@ namespace Mesh {
  * Decoded request bytes are passed to processor, that calls us back with enriched request.
  * Request then gets invoked to starts its processing.
  * Filter is going to maintain a list of in-flight-request so it can send responses when they
- *finish.
+ * finish.
  *
  *
  * +----------------+    <creates>    +-----------------------+
@@ -37,15 +37,15 @@ namespace Mesh {
  * +-------+-------+                             |
  *         |                                     |
  *         |                                     |
- * +-------v-----------+                         | <uses>
- * |UpstreamKafkaFacade|                         |
+ * +-------v-----------+                         |<in-flight-reference>
+ * |UpstreamKafkaFacade|                         |(for callback when finished)
  * +-------+-----------+                         |
  *         |                                     |
  *         |                                     |
- * +-------v--------------+       +--------------v---------+
- * |<<ThreadLocalObject>> +------->PlaceholderKafkaProducer+
- * |ThreadLocalKafkaFacade|       +------------------------+
- * +----------------------+
+ * +-------v--------------+       +--------------v--+    +-----------------+
+ * |<<ThreadLocalObject>> +------->RichKafkaProducer+--->><<librdkafka>>   |
+ * |ThreadLocalKafkaFacade|       +-----------------+    |RdKafka::Producer|
+ * +----------------------+                              +-----------------+
  **/
 class KafkaMeshFilter : public Network::ReadFilter,
                         public Network::ConnectionCallbacks,
@@ -80,10 +80,8 @@ public:
 
 private:
   // Helper method invoked when connection gets dropped.
-  // Request references are going to be stored in 2 places: this filter (request's origin) and in
-  // UpstreamKafkaClient instances (to match pure-Kafka confirmations to the requests). Because
-  // filter can be destroyed before confirmations from Kafka are received, we are just going to mark
-  // related requests as abandoned, so they do not attempt to reference this filter anymore.
+  // Because filter can be destroyed before confirmations from Kafka are received, we are just going
+  // to mark related requests as abandoned, so they do not attempt to reference this filter anymore.
   // Impl note: this is similar to what Redis filter does.
   void abandonAllInFlightRequests();
 

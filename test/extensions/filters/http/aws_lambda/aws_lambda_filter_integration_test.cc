@@ -37,7 +37,7 @@ public:
               arn: "arn:aws:lambda:us-west-2:123456789:function:test"
               payload_passthrough: {}
             )EOF";
-    config_helper_.addFilter(fmt::format(filter, passthrough));
+    config_helper_.prependFilter(fmt::format(filter, passthrough));
 
     constexpr auto metadata_yaml = R"EOF(
         com.amazonaws.lambda:

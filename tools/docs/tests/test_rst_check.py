@@ -249,7 +249,7 @@ def test_rst_check_current_version_check_ticks(patches, matches):
         m_re.return_value.match.return_value = matches
         assert (
             version_file.check_ticks("LINE")
-            == (["Backticks should come in pairs (except for links and refs): LINE"]
+            == (["Backticks should come in pairs (``foo``) except for links (`title <url>`_) or refs (ref:`text <ref>`): LINE"]
                 if matches else []))
     assert (
         list(m_re.return_value.match.call_args)

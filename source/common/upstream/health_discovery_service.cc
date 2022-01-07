@@ -516,7 +516,7 @@ void HdsCluster::updateHosts(
                             hosts_added, hosts_removed, absl::nullopt);
 }
 
-ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+ClusterSharedPtr HdsCluster::create() { return nullptr; }
 
 ClusterInfoConstSharedPtr
 ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params) {
@@ -569,9 +569,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
   }
 }
 
-void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-}
+void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {}
 
 } // namespace Upstream
 } // namespace Envoy

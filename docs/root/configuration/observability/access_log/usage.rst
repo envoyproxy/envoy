@@ -241,6 +241,73 @@ The following command operators are supported:
   TCP
     Downstream bytes sent on connection.
 
+%UPSTREAM_REQUEST_ATTEMPT_COUNT%
+  HTTP
+    Number of times the request is attempted upstream. Note that an attempt count of '0' means that
+    the request was never attempted upstream.
+
+  TCP
+    Number of times the connection request is attempted upstream. Note that an attempt count of '0'
+    means that the connection request was never attempted upstream.
+
+  Renders a numeric value in typed JSON logs.
+
+%UPSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_HEADER_BYTES_SENT%
+  HTTP
+    Number of header bytes sent to the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%UPSTREAM_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of header bytes received from the upstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_SENT%
+  HTTP
+    Total number of bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_WIRE_BYTES_RECEIVED%
+  HTTP
+    Total number of bytes received from the downstream by the http stream. Envoy over counts sizes of received HTTP/1.1 pipelined requests by adding up bytes of requests in the pipeline to the one currently being processed.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_HEADER_BYTES_SENT%
+  HTTP
+    Number of header bytes sent to the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
+%DOWNSTREAM_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of header bytes received from the downstream by the http stream.
+
+  TCP
+    Not implemented (0).
+
   Renders a numeric value in typed JSON logs.
 
 %DURATION%
@@ -322,11 +389,18 @@ The following command operators are supported:
     * **SI**: Stream idle timeout in addition to 408 response code.
     * **DPE**: The downstream request had an HTTP protocol error.
     * **UPE**: The upstream response had an HTTP protocol error.
-    * **UMSDR**: The upstream request reached to max stream duration.
+    * **UMSDR**: The upstream request reached max stream duration.
     * **OM**: Overload Manager terminated the request.
 
 %ROUTE_NAME%
   Name of the route.
+
+%VIRTUAL_CLUSTER_NAME%
+  HTTP*/gRPC
+    Name of the matched Virtual Cluster (if any).
+
+  TCP/UDP
+    Not implemented ("-")
 
 %UPSTREAM_HOST%
   Upstream host URL (e.g., tcp://ip:port for TCP connections).
@@ -450,7 +524,7 @@ The following command operators are supported:
   HTTP
     :ref:`Dynamic Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. Dynamic Metadata
     can be set by filters using the :repo:`StreamInfo <envoy/stream_info/stream_info.h>` API:
     *setDynamicMetadata*. The data will be logged as a JSON string. For example, for the following dynamic metadata:
@@ -485,7 +559,7 @@ The following command operators are supported:
   HTTP
     :ref:`Upstream cluster Metadata <envoy_v3_api_msg_config.core.v3.Metadata>` info,
     where NAMESPACE is the filter namespace used when setting the metadata, KEY is an optional
-    lookup up key in the namespace with the option of specifying nested keys separated by ':',
+    lookup key in the namespace with the option of specifying nested keys separated by ':',
     and Z is an optional parameter denoting string truncation up to Z characters long. The data
     will be logged as a JSON string. For example, for the following dynamic metadata:
 

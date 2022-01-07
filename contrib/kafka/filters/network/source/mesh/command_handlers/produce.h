@@ -2,8 +2,8 @@
 
 #include "contrib/kafka/filters/network/source/external/requests.h"
 #include "contrib/kafka/filters/network/source/mesh/abstract_command.h"
-#include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_outbound_record.h"
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/produce_record_extractor.h"
+#include "contrib/kafka/filters/network/source/mesh/outbound_record.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_client.h"
 #include "contrib/kafka/filters/network/source/mesh/upstream_kafka_facade.h"
 
@@ -17,6 +17,37 @@ namespace Mesh {
  * Kafka 'Produce' request, that is aimed at particular cluster.
  * A single Produce request coming from downstream can map into multiple entries,
  * as the topics can be hosted on different clusters.
+ *
+ * These requests stored in 2 places: this filter (request's origin) and in RichKafkaProducer
+ * instances (to match pure-Kafka confirmations to the requests).
+ *
+ *                               +--------------+
+ *                               |<<librdkafka  |
+ *                               |notification>>+--------+
+ *                               +-+------------+        |
+ *                                 |                     |
+ *                                 |<notifies>           |
+ *                                 |                     |
+ *       +---------------+       +-v---------------+     |
+ *       |KafkaMeshFilter+--+ +--+RichKafkaProducer|     |
+ *       +-^-------------+  | |  +-----------------+     |
+ *         |                | |                          |
+ *         |     <in-flight>| |<requests-waiting         |
+ *         |                | |for-delivery>             |
+ *         |                | |                 <matches>|
+ *         |       +--------v-v---------+                |
+ *         +-------+ProduceRequestHolder|----------+     |
+ * <notifies-      +---------+----------+<contains>|     |
+ * when-finished>            |                     |     |
+ *                 +---------v----------+          |     |
+ *                 |PartitionProduceData|          |     |
+ *                 +---------^----------+          |     |
+ *                           |<absl::string_view>  |     |
+ *         +-----------------+----------------+    |     |
+ *         |                 |                |    |     |
+ *   +-----+--------+ +------+-------+ +------+----v--+  |
+ *   |OutboundRecord| |OutboundRecord| |OutboundRecord<--+
+ *   +--------------+ +--------------+ +--------------+
  */
 class ProduceRequestHolder : public BaseInFlightRequest,
                              public ProduceFinishCb,

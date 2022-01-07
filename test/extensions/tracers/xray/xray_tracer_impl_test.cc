@@ -61,7 +61,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8");
+  request_headers_.addCopy(XRayTraceHeader, "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};

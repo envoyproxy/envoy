@@ -83,18 +83,21 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
-      dns_resolution_config:
-        resolvers:
-        - socket_address:
-            address: {}
-            port_value: {}
-        dns_resolver_options:
-          use_tcp_for_dns_lookups: false
-          no_default_search_domain: false
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: {}
+              port_value: {}
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
       max_pending_lookups: 256
     server_config:
       inline_dns_table:
@@ -151,7 +154,7 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "external_resolver"
     server_config:
       inline_dns_table:
@@ -171,7 +174,7 @@ listener_filters:
   void setup(uint32_t upstream_count) {
     setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     if (upstream_count > 1) {
-      setDeterministic();
+      setDeterministicValue();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {

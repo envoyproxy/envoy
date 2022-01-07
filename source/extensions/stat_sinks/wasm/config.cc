@@ -36,18 +36,20 @@ WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
       }
       return;
     }
-    wasm_sink->setSingleton(
-        Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
+    wasm_sink->setSingleton(Common::Wasm::getOrCreateThreadLocalPlugin(
+        base_wasm, plugin, context.mainThreadDispatcher()));
   };
 
   if (!Common::Wasm::createWasm(plugin, context.scope().createScope(""), context.clusterManager(),
-                                context.initManager(), context.dispatcher(), context.api(),
-                                context.lifecycleNotifier(), remote_data_provider_,
+                                context.initManager(), context.mainThreadDispatcher(),
+                                context.api(), context.lifecycleNotifier(), remote_data_provider_,
                                 std::move(callback))) {
     throw Common::Wasm::WasmException(
         fmt::format("Unable to create Wasm Stat Sink {}", plugin->name_));
   }
 
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
   return wasm_sink;
 }
 

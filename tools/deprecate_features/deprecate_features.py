@@ -4,13 +4,15 @@ from __future__ import print_function
 import re
 import subprocess
 import fileinput
-from six.moves import input
+
+import envoy_repo
 
 
 # Sorts out the list of deprecated proto fields which should be disallowed and returns a tuple of
 # email and code changes.
 def deprecate_proto():
-    grep_output = subprocess.check_output('grep -r "deprecated = true" api/*', shell=True)
+    grep_output = subprocess.check_output(
+        'grep -r "deprecated = true" api/*', shell=True, cwd=envoy_repo.PATH)
 
     filenames_and_fields = set()
 

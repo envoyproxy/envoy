@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/common/time.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/matchers.h"
@@ -94,33 +94,31 @@ struct ResponseCacheControl {
 bool operator==(const RequestCacheControl& lhs, const RequestCacheControl& rhs);
 bool operator==(const ResponseCacheControl& lhs, const ResponseCacheControl& rhs);
 
-class CacheHeadersUtils {
-public:
-  // Parses header_entry as an HTTP time. Returns SystemTime() if
-  // header_entry is null or malformed.
-  static SystemTime httpTime(const Http::HeaderEntry* header_entry);
+namespace CacheHeadersUtils {
+// Parses header_entry as an HTTP time. Returns SystemTime() if
+// header_entry is null or malformed.
+SystemTime httpTime(const Http::HeaderEntry* header_entry);
 
-  // Calculates the age of a cached response
-  static Seconds calculateAge(const Http::ResponseHeaderMap& response_headers,
-                              SystemTime response_time, SystemTime now);
+// Calculates the age of a cached response
+Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime response_time,
+                     SystemTime now);
 
-  /**
-   * Read a leading positive decimal integer value and advance "*str" past the
-   * digits read. If overflow occurs, or no digits exist, return
-   * absl::nullopt without advancing "*str".
-   */
-  static absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
+/**
+ * Read a leading positive decimal integer value and advance "*str" past the
+ * digits read. If overflow occurs, or no digits exist, return
+ * absl::nullopt without advancing "*str".
+ */
+absl::optional<uint64_t> readAndRemoveLeadingDigits(absl::string_view& str);
 
-  // Add to out all header names from the given map that match any of the given rules.
-  static void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
-                                        const std::vector<Matchers::StringMatcherPtr>& ruleset,
-                                        absl::flat_hash_set<absl::string_view>& out);
+// Add to out all header names from the given map that match any of the given rules.
+void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
+                               const std::vector<Matchers::StringMatcherPtr>& ruleset,
+                               absl::flat_hash_set<absl::string_view>& out);
 
-  // Parses the values of a comma-delimited list as defined per
-  // https://tools.ietf.org/html/rfc7230#section-7.
-  static std::vector<absl::string_view>
-  parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
-};
+// Parses the values of a comma-delimited list as defined per
+// https://tools.ietf.org/html/rfc7230#section-7.
+std::vector<absl::string_view> parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
+} // namespace CacheHeadersUtils
 
 class VaryAllowList {
 public:

@@ -20,17 +20,26 @@ Each session is index by the 4-tuple consisting of source IP/port and local IP/p
 datagram is received on. Sessions last until the :ref:`idle timeout
 <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.idle_timeout>` is reached.
 
+Above *session stickness* could be disabled by setting :ref:`use_per_packet_load_balancing
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>` to true.
+In that case, *per packet load balancing* is enabled. It means that upstream host is selected on every single data chunk
+received by udp proxy using currently used load balancing policy.
+
 The UDP proxy listener filter also can operate as a *transparent* proxy if the
 :ref:`use_original_src_ip <envoy_v3_api_msg_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig>`
-field is set. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
+field is set to true. But please keep in mind that it does not forward the port to upstreams. It forwards only the IP address to upstreams.
 
 Load balancing and unhealthy host handling
 ------------------------------------------
 
 Envoy will fully utilize the configured load balancer for the configured upstream cluster when
-load balancing UDP datagrams. When a new session is created, Envoy will associate the session
+load balancing UDP datagrams. By default, when a new session is created, Envoy will associate the session
 with an upstream host selected using the configured load balancer. All future datagrams that
-belong to the session will be routed to the same upstream host.
+belong to the session will be routed to the same upstream host. However, if :ref:`use_per_packet_load_balancing
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_per_packet_load_balancing>`
+field is set to true, Envoy selects another upstream host on next datagram using the configured load balancer
+and creates a new session if such does not exist. So in case of several upstream hosts available for the load balancer
+each data chunk is forwarded to a different host.
 
 When an upstream host becomes unhealthy (due to :ref:`active health checking
 <arch_overview_health_checking>`), Envoy will attempt to create a new session to a healthy host

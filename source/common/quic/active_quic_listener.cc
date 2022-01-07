@@ -55,10 +55,7 @@ ActiveQuicListener::ActiveQuicListener(
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
       crypto_server_stream_factory_(crypto_server_stream_factory) {
-  // This flag fix a QUICHE issue which may crash Envoy during connection close.
-  SetQuicReloadableFlag(quic_single_ack_in_packet2, true);
-  // Do not include 32-byte per-entry overhead while counting header size.
-  quiche::FlagRegistry::getInstance();
+  ASSERT(GetQuicReloadableFlag(quic_single_ack_in_packet2));
   ASSERT(!GetQuicFlag(FLAGS_quic_header_size_limit_includes_overhead));
 
   if (Runtime::LoaderSingleton::getExisting()) {
@@ -221,6 +218,24 @@ size_t ActiveQuicListener::numPacketsExpectedPerEventLoop() const {
   return quic_dispatcher_->NumSessions() * packets_to_read_to_connection_count_ratio_;
 }
 
+void ActiveQuicListener::updateListenerConfig(Network::ListenerConfig& config) {
+  config_ = &config;
+  dynamic_cast<EnvoyQuicProofSource*>(crypto_config_->proof_source())
+      ->updateFilterChainManager(config.filterChainManager());
+  quic_dispatcher_->updateListenerConfig(config);
+}
+
+void ActiveQuicListener::onFilterChainDraining(
+    const std::list<const Network::FilterChain*>& draining_filter_chains) {
+  for (auto* filter_chain : draining_filter_chains) {
+    closeConnectionsWithFilterChain(filter_chain);
+  }
+}
+
+void ActiveQuicListener::closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain) {
+  quic_dispatcher_->closeConnectionsWithFilterChain(filter_chain);
+}
+
 ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     const envoy::config::listener::v3::QuicProtocolOptions& config, uint32_t concurrency,
     QuicStatNames& quic_stat_names)
@@ -228,22 +243,19 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
       packets_to_read_to_connection_count_ratio_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, packets_to_read_to_connection_count_ratio,
                                           DEFAULT_PACKETS_TO_READ_PER_CONNECTION)) {
-  uint64_t idle_network_timeout_ms =
+  const int64_t idle_network_timeout_ms =
       config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                 : 300000;
-  quic_config_.SetIdleNetworkTimeout(
-      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
-  int32_t max_time_before_crypto_handshake_ms =
+  const int64_t minimal_idle_network_timeout_ms = 1;
+  quic_config_.SetIdleNetworkTimeout(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(minimal_idle_network_timeout_ms, idle_network_timeout_ms)));
+  const int64_t max_time_before_crypto_handshake_ms =
       config.has_crypto_handshake_timeout()
           ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
           : 20000;
-  quic_config_.set_max_time_before_crypto_handshake(
-      quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
-  int32_t max_streams =
-      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.quic_protocol_options(), max_concurrent_streams, 100);
-  quic_config_.SetMaxBidirectionalStreamsToSend(max_streams);
-  quic_config_.SetMaxUnidirectionalStreamsToSend(max_streams);
-  configQuicInitialFlowControlWindow(config.quic_protocol_options(), quic_config_);
+  quic_config_.set_max_time_before_crypto_handshake(quic::QuicTime::Delta::FromMilliseconds(
+      std::max(quic::kInitialIdleTimeoutSecs * 1000, max_time_before_crypto_handshake_ms)));
+  convertQuicConfig(config.quic_protocol_options(), quic_config_);
 
   // Initialize crypto stream factory.
   envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;

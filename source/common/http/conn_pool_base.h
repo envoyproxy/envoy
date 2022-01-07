@@ -61,8 +61,9 @@ public:
   // ConnectionPool::Instance
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override { drainConnectionsImpl(); }
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+  }
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; }
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          Http::ConnectionPool::Callbacks& callbacks) override;
@@ -199,19 +200,6 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
-
-  // As this is called once when the stream is closed, it's a good place to
-  // update the counter as one stream has been "returned" and the negative
-  // capacity should be reduced.
-  bool hadNegativeDeltaOnStreamClosed() override {
-    int ret = negative_capacity_ != 0;
-    if (negative_capacity_ > 0) {
-      negative_capacity_--;
-    }
-    return ret;
-  }
-
-  uint64_t negative_capacity_{};
 
 protected:
   MultiplexedActiveClientBase(Envoy::Http::HttpConnPoolImplBase& parent,

@@ -10,7 +10,7 @@ resources:
   - filters:
     - name: http
       typed_config:
-        "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+        "@type": type.googleapis.com/xds.type.v3.TypedStruct
         type_url: "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
         value:
           codec_type: HTTP2

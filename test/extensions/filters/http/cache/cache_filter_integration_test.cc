@@ -33,7 +33,7 @@ public:
   }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addFilter(config);
+    config_helper_.prependFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
   }
@@ -86,9 +86,9 @@ public:
   const std::string default_config{R"EOF(
     name: "envoy.filters.http.cache"
     typed_config:
-        "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3alpha.CacheConfig"
+        "@type": "type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig"
         typed_config:
-           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3alpha.SimpleHttpCacheConfig"
+           "@type": "type.googleapis.com/envoy.extensions.cache.simple_http_cache.v3.SimpleHttpCacheConfig"
     )EOF"};
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
 };
@@ -182,6 +182,18 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
     // a freshly served response from the origin, unless the 304 response has an Age header, which
     // means it was served by an upstream cache.
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
+  }
+
+  // Advance time to get a fresh cached response
+  simTime().advanceTimeWait(Seconds(1));
+
+  // Send third request. The cached response was validated, thus it should have an Age header like
+  // fresh responses
+  {
+    IntegrationStreamDecoderPtr response_decoder =
+        sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
+    EXPECT_THAT(response_decoder->headers(),
+                HeaderHasValueRef(Http::CustomHeaders::get().Age, "1"));
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));

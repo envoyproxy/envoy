@@ -5,10 +5,10 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/processing_mode.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
@@ -96,11 +96,10 @@ public:
   bool partialBodyProcessed() const { return partial_body_processed_; }
 
   virtual void setProcessingMode(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) PURE;
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) PURE;
   bool sendHeaders() const { return send_headers_; }
   bool sendTrailers() const { return send_trailers_; }
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode
-  bodyMode() const {
+  envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode bodyMode() const {
     return body_mode_;
   }
 
@@ -114,9 +113,9 @@ public:
   virtual void requestWatermark() PURE;
   virtual void clearWatermark() PURE;
 
-  bool handleHeadersResponse(const envoy::service::ext_proc::v3alpha::HeadersResponse& response);
-  bool handleBodyResponse(const envoy::service::ext_proc::v3alpha::BodyResponse& response);
-  bool handleTrailersResponse(const envoy::service::ext_proc::v3alpha::TrailersResponse& response);
+  bool handleHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response);
+  bool handleBodyResponse(const envoy::service::ext_proc::v3::BodyResponse& response);
+  bool handleTrailersResponse(const envoy::service::ext_proc::v3::TrailersResponse& response);
 
   virtual const Buffer::Instance* bufferedData() const PURE;
   bool hasBufferedData() const { return bufferedData() != nullptr && bufferedData()->length() > 0; }
@@ -144,16 +143,16 @@ public:
   void continueIfNecessary();
   void clearAsyncState();
 
-  virtual envoy::service::ext_proc::v3alpha::HttpHeaders*
-  mutableHeaders(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const PURE;
-  virtual envoy::service::ext_proc::v3alpha::HttpBody*
-  mutableBody(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const PURE;
-  virtual envoy::service::ext_proc::v3alpha::HttpTrailers*
-  mutableTrailers(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const PURE;
+  virtual envoy::service::ext_proc::v3::HttpHeaders*
+  mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
+  virtual envoy::service::ext_proc::v3::HttpBody*
+  mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
+  virtual envoy::service::ext_proc::v3::HttpTrailers*
+  mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;
 
 protected:
   void setBodyMode(
-      envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode body_mode);
+      envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode);
 
   Filter& filter_;
   Http::StreamFilterCallbacks* filter_callbacks_;
@@ -183,7 +182,7 @@ protected:
   bool send_trailers_ : 1;
 
   // The specific mode for body handling
-  envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode_BodySendMode body_mode_;
+  envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode_;
 
   Http::RequestOrResponseHeaderMap* headers_ = nullptr;
   Http::HeaderMap* trailers_ = nullptr;
@@ -194,8 +193,7 @@ protected:
 class DecodingProcessorState : public ProcessorState {
 public:
   explicit DecodingProcessorState(
-      Filter& filter,
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode)
+      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
   }
@@ -232,23 +230,23 @@ public:
 
   void continueProcessing() const override { decoder_callbacks_->continueDecoding(); }
 
-  envoy::service::ext_proc::v3alpha::HttpHeaders*
-  mutableHeaders(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpHeaders*
+  mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_request_headers();
   }
 
-  envoy::service::ext_proc::v3alpha::HttpBody*
-  mutableBody(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpBody*
+  mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_request_body();
   }
 
-  envoy::service::ext_proc::v3alpha::HttpTrailers*
-  mutableTrailers(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpTrailers*
+  mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_request_trailers();
   }
 
   void setProcessingMode(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override {
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) override {
     setProcessingModeInternal(mode);
   }
 
@@ -257,7 +255,7 @@ public:
 
 private:
   void setProcessingModeInternal(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode);
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
 };
@@ -265,8 +263,7 @@ private:
 class EncodingProcessorState : public ProcessorState {
 public:
   explicit EncodingProcessorState(
-      Filter& filter,
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode)
+      Filter& filter, const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode)
       : ProcessorState(filter) {
     setProcessingModeInternal(mode);
   }
@@ -303,23 +300,23 @@ public:
 
   void continueProcessing() const override { encoder_callbacks_->continueEncoding(); }
 
-  envoy::service::ext_proc::v3alpha::HttpHeaders*
-  mutableHeaders(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpHeaders*
+  mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_response_headers();
   }
 
-  envoy::service::ext_proc::v3alpha::HttpBody*
-  mutableBody(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpBody*
+  mutableBody(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_response_body();
   }
 
-  envoy::service::ext_proc::v3alpha::HttpTrailers*
-  mutableTrailers(envoy::service::ext_proc::v3alpha::ProcessingRequest& request) const override {
+  envoy::service::ext_proc::v3::HttpTrailers*
+  mutableTrailers(envoy::service::ext_proc::v3::ProcessingRequest& request) const override {
     return request.mutable_response_trailers();
   }
 
   void setProcessingMode(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode) override {
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode) override {
     setProcessingModeInternal(mode);
   }
 
@@ -328,7 +325,7 @@ public:
 
 private:
   void setProcessingModeInternal(
-      const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode& mode);
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
 
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };

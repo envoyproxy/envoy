@@ -34,6 +34,7 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_rds.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_manager_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
 
@@ -151,8 +152,8 @@ Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryCont
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(
+                context.mainThreadDispatcher(), context.threadLocal());
           });
 
   Router::RouteConfigProviderManagerSharedPtr route_config_provider_manager =
@@ -227,7 +228,7 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -495,7 +496,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     Tracing::CustomTagMap custom_tags;
     for (const auto& tag : tracing_config.custom_tags()) {
-      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+      custom_tags.emplace(tag.tag(), Tracing::CustomTagUtility::createCustomTag(tag));
     }
 
     envoy::type::v3::FractionalPercent client_sampling;
@@ -826,7 +827,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.api().randomGenerator(),
         context.httpContext(), context.runtime(), context.localInfo(), context.clusterManager(),
-        context.overloadManager(), context.dispatcher().timeSource());
+        context.overloadManager(), context.mainThreadDispatcher().timeSource());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }

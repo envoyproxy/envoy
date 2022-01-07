@@ -1,9 +1,0 @@
-syntax = "proto3";
-package test.protos.breaking;
-
-message SampleMessage {
-    reserved 4;
-    reserved "four";
-
-    string three = 3;
-}

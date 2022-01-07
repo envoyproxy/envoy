@@ -147,7 +147,7 @@ TEST_F(AsyncClientImplTest, BasicStream) {
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
 
-  response_decoder_->decode100ContinueHeaders(
+  response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
   response_decoder_->decodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
@@ -531,6 +531,7 @@ TEST_F(AsyncClientImplTest, RetryWithStream) {
   EXPECT_CALL(stream_callbacks_, onComplete());
   ResponseHeaderMapPtr response_headers2(new TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder_->decodeHeaders(std::move(response_headers2), true);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, MultipleStreams) {
@@ -865,6 +866,7 @@ TEST_F(AsyncClientImplTest, LocalResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream->reset();
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, SendDataAfterRemoteClosure) {
@@ -979,6 +981,7 @@ TEST_F(AsyncClientImplTest, ResetInOnHeaders) {
       static_cast<Http::AsyncStreamImpl*>(stream);
   filter_callbacks->encodeHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false, "details");
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
@@ -1016,6 +1019,7 @@ TEST_F(AsyncClientImplTest, RemoteResetAfterStreamStart) {
   response_decoder_->decodeData(*body, false);
 
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
+  dispatcher_.clearDeferredDeleteList();
 }
 
 TEST_F(AsyncClientImplTest, ResetAfterResponseStart) {
@@ -1544,10 +1548,10 @@ TEST_F(AsyncClientImplTest, DumpState) {
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
-class AsyncClientImplUnitTest : public testing::Test {
+class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   std::unique_ptr<AsyncStreamImpl::RouteImpl> route_impl_{new AsyncStreamImpl::RouteImpl(
-      "foo", absl::nullopt,
+      client_, absl::nullopt,
       Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
       absl::nullopt)};
   AsyncStreamImpl::NullVirtualHost vhost_;
@@ -1559,7 +1563,7 @@ public:
     TestUtility::loadFromYaml(yaml_config, retry_policy);
 
     route_impl_ = std::make_unique<AsyncStreamImpl::RouteImpl>(
-        "foo", absl::nullopt,
+        client_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>(),
         std::move(retry_policy));
   }
@@ -1567,7 +1571,6 @@ public:
 
 // Test the extended fake route that AsyncClient uses.
 TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
-
   auto& route_entry = *(route_impl_->routeEntry());
 
   EXPECT_EQ(nullptr, route_impl_->decorator());
@@ -1598,7 +1601,6 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
 }
 
 TEST_F(AsyncClientImplUnitTest, RouteImplInitTestWithRetryPolicy) {
-
   const std::string yaml = R"EOF(
 per_try_timeout: 30s
 num_retries: 10

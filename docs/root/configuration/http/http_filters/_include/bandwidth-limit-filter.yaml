@@ -21,7 +21,7 @@ static_resources:
                 route: {cluster: service_protected_by_bandwidth_limit}
                 typed_per_filter_config:
                   envoy.filters.http.bandwidth_limit:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
                     stat_prefix: bandwidth_limiter_custom_route
                     enable_mode: REQUEST_AND_RESPONSE
                     limit_kbps: 500
@@ -31,7 +31,7 @@ static_resources:
           http_filters:
           - name: envoy.filters.http.bandwidth_limit
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3alpha.BandwidthLimit
+              "@type": type.googleapis.com/envoy.extensions.filters.http.bandwidth_limit.v3.BandwidthLimit
               stat_prefix: bandwidth_limiter_default
           - name: envoy.filters.http.router
   clusters:

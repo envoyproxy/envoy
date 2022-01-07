@@ -52,6 +52,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/tracing:common_values_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:null_span_lib",
     ],
 )

@@ -1,6 +1,6 @@
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 
-#include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +18,7 @@ absl::string_view cacheEntryStatusString(CacheEntryStatus s) {
   case CacheEntryStatus::FoundNotModified:
     return "FoundNotModified";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  PANIC(absl::StrFormat("Unexpected CacheEntryStatus: %d", s));
 }
 
 std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {

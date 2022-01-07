@@ -25,6 +25,7 @@ envoy_cc_test_library(
     srcs = ["config_impl_test.cc"],
     deps = [
         ":route_fuzz_proto_cc_proto",
+        "//envoy/common:hashable_interface",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

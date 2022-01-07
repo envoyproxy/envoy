@@ -13,6 +13,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "ZipkinProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/trace/v3;tracev3";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.tracers.zipkin.v4alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
@@ -50,8 +51,7 @@ message ZipkinConfig {
   string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
 
   // The API endpoint of the Zipkin service where the spans will be sent. When
-  // using a standard Zipkin installation, the API endpoint is typically
-  // /api/v1/spans, which is the default value.
+  // using a standard Zipkin installation.
   string collector_endpoint = 2 [(validate.rules).string = {min_len: 1}];
 
   // Determines whether a 128bit trace id will be used when creating a new
@@ -62,8 +62,7 @@ message ZipkinConfig {
   // The default value is true.
   google.protobuf.BoolValue shared_span_context = 4;
 
-  // Determines the selected collector endpoint version. By default, the ``HTTP_JSON_V1`` will be
-  // used.
+  // Determines the selected collector endpoint version.
   CollectorEndpointVersion collector_endpoint_version = 5;
 
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors

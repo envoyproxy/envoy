@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
@@ -51,10 +52,17 @@ public:
   }
   absl::optional<uint64_t> connectionID() const override { return connection_id_; }
   void setConnectionID(uint64_t id) override { connection_id_ = id; }
+  absl::optional<absl::string_view> interfaceName() const override { return interface_name_; }
+  void setInterfaceName(absl::string_view interface_name) override {
+    interface_name_ = std::string(interface_name);
+  }
   Ssl::ConnectionInfoConstSharedPtr sslConnection() const override { return ssl_info_; }
   void setSslConnection(const Ssl::ConnectionInfoConstSharedPtr& ssl_connection_info) override {
+    ASSERT(!ssl_info_);
     ssl_info_ = ssl_connection_info;
   }
+  absl::string_view ja3Hash() const override { return ja3_hash_; }
+  void setJA3Hash(const absl::string_view ja3_hash) override { ja3_hash_ = std::string(ja3_hash); }
 
 private:
   Address::InstanceConstSharedPtr local_address_;
@@ -63,24 +71,29 @@ private:
   Address::InstanceConstSharedPtr direct_remote_address_;
   std::string server_name_;
   absl::optional<uint64_t> connection_id_;
+  absl::optional<std::string> interface_name_;
   Ssl::ConnectionInfoConstSharedPtr ssl_info_;
+  std::string ja3_hash_;
 };
 
 class SocketImpl : public virtual Socket {
 public:
   SocketImpl(Socket::Type socket_type, const Address::InstanceConstSharedPtr& address_for_io_handle,
-             const Address::InstanceConstSharedPtr& remote_address);
+             const Address::InstanceConstSharedPtr& remote_address,
+             const SocketCreationOptions& options);
 
   // Network::Socket
-  ConnectionInfoSetter& addressProvider() override { return *address_provider_; }
-  const ConnectionInfoProvider& addressProvider() const override { return *address_provider_; }
-  ConnectionInfoProviderSharedPtr addressProviderSharedPtr() const override {
-    return address_provider_;
+  ConnectionInfoSetter& connectionInfoProvider() override { return *connection_info_provider_; }
+  const ConnectionInfoProvider& connectionInfoProvider() const override {
+    return *connection_info_provider_;
+  }
+  ConnectionInfoProviderSharedPtr connectionInfoProviderSharedPtr() const override {
+    return connection_info_provider_;
   }
   SocketPtr duplicate() override {
     // Implementing the functionality here for all sockets is tricky because it leads
     // into object slicing issues.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   IoHandle& ioHandle() override { return *io_handle_; }
@@ -128,7 +141,7 @@ protected:
              const Address::InstanceConstSharedPtr& remote_address);
 
   const IoHandlePtr io_handle_;
-  const std::shared_ptr<ConnectionInfoSetterImpl> address_provider_;
+  const std::shared_ptr<ConnectionInfoSetterImpl> connection_info_provider_;
   OptionsSharedPtr options_;
   Socket::Type sock_type_;
   Address::Type addr_type_;

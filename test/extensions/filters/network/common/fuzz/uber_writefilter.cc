@@ -103,7 +103,7 @@ void UberWriteFilterFuzzer::fuzz(
     case test::extensions::filters::network::WriteAction::kAdvanceTime: {
       time_source_.advanceTimeAndRun(
           std::chrono::milliseconds(action.advance_time().milliseconds()),
-          factory_context_.dispatcher(), Event::Dispatcher::RunType::NonBlock);
+          factory_context_.mainThreadDispatcher(), Event::Dispatcher::RunType::NonBlock);
       break;
     }
     default: {

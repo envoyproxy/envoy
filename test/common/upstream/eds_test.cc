@@ -355,9 +355,8 @@ TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
   EXPECT_TRUE(initialized_);
 }
 
-namespace {
-
-void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
+// Verify that host weight changes cause a full rebuild.
+TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
@@ -366,43 +365,26 @@ void endpointWeightChangeCausesRebuildTest(EdsTest& test, bool expect_rebuild) {
   endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
   endpoint->mutable_load_balancing_weight()->set_value(30);
 
-  test.initialize();
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(test.initialized_);
-  EXPECT_EQ(0UL, test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(30UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      30UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 1);
   EXPECT_EQ(hosts[0]->weight(), 30);
 
   endpoint->mutable_load_balancing_weight()->set_value(31);
-  test.doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_EQ(expect_rebuild ? 0UL : 1UL,
-            test.stats_.counter("cluster.name.update_no_rebuild").value());
-  EXPECT_EQ(31UL,
-            test.stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate)
-                .value());
-  auto& new_hosts = test.cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  EXPECT_EQ(
+      31UL,
+      stats_.gauge("cluster.name.max_host_weight", Stats::Gauge::ImportMode::Accumulate).value());
+  auto& new_hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(new_hosts.size(), 1);
   EXPECT_EQ(new_hosts[0]->weight(), 31);
-}
-
-} // namespace
-
-// Verify that host weight changes cause a full rebuild.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuild) {
-  endpointWeightChangeCausesRebuildTest(*this, true);
-}
-
-// Verify that host weight changes do not cause a full rebuild when the feature flag is disabled.
-TEST_F(EdsTest, EndpointWeightChangeCausesRebuildDisabled) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.upstream_host_weight_change_causes_rebuild", "false"}});
-
-  endpointWeightChangeCausesRebuildTest(*this, false);
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -1475,7 +1457,7 @@ TEST_F(EdsTest, EndpointLocality) {
 }
 
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
-// locality weighted balancing isn't configured.
+// locality weighted balancing isn't configured and the cluster does not use LB policy extensions.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
   envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
@@ -1503,12 +1485,77 @@ TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
   EXPECT_EQ(nullptr, cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights());
 }
 
+class EdsLocalityWeightsTest : public EdsTest {
+public:
+  void expectLocalityWeightsPresentForClusterConfig(const std::string& config) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("fare");
+    resetCluster(config, Cluster::InitializePhase::Secondary);
+
+    {
+      auto* endpoints = cluster_load_assignment.add_endpoints();
+      auto* locality = endpoints->mutable_locality();
+      locality->set_region("oceania");
+      locality->set_zone("hello");
+      locality->set_sub_zone("world");
+      endpoints->mutable_load_balancing_weight()->set_value(42);
+
+      auto* endpoint_address = endpoints->add_lb_endpoints()
+                                   ->mutable_endpoint()
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+      endpoint_address->set_address("1.2.3.4");
+      endpoint_address->set_port_value(80);
+    }
+
+    {
+      auto* endpoints = cluster_load_assignment.add_endpoints();
+      auto* locality = endpoints->mutable_locality();
+      locality->set_region("space");
+      locality->set_zone("station");
+      locality->set_sub_zone("international");
+
+      auto* endpoint_address = endpoints->add_lb_endpoints()
+                                   ->mutable_endpoint()
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+      endpoint_address->set_address("1.2.3.5");
+      endpoint_address->set_port_value(80);
+    }
+
+    {
+      auto* endpoints = cluster_load_assignment.add_endpoints();
+      auto* locality = endpoints->mutable_locality();
+      locality->set_region("sugar");
+      locality->set_zone("candy");
+      locality->set_sub_zone("mountain");
+      endpoints->mutable_load_balancing_weight()->set_value(37);
+
+      auto* endpoint_address = endpoints->add_lb_endpoints()
+                                   ->mutable_endpoint()
+                                   ->mutable_address()
+                                   ->mutable_socket_address();
+      endpoint_address->set_address("1.2.3.6");
+      endpoint_address->set_port_value(80);
+    }
+
+    initialize();
+    doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+    EXPECT_TRUE(initialized_);
+
+    const auto& locality_weights =
+        *cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights();
+    EXPECT_EQ(3, locality_weights.size());
+    EXPECT_EQ(42, locality_weights[0]);
+    EXPECT_EQ(0, locality_weights[1]);
+    EXPECT_EQ(37, locality_weights[2]);
+  }
+};
+
 // Validate that onConfigUpdate() propagates locality weights to the host set when locality
 // weighted balancing is configured.
-TEST_F(EdsTest, EndpointLocalityWeights) {
-  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
-  cluster_load_assignment.set_cluster_name("fare");
-  resetCluster(R"EOF(
+TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLocalityWeightedConfig) {
+  expectLocalityWeightsPresentForClusterConfig(R"EOF(
       name: name
       connect_timeout: 0.25s
       type: EDS
@@ -1523,66 +1570,32 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
             cluster_names:
             - eds
             refresh_delay: 1s
-    )EOF",
-               Cluster::InitializePhase::Secondary);
+    )EOF");
+}
 
-  {
-    auto* endpoints = cluster_load_assignment.add_endpoints();
-    auto* locality = endpoints->mutable_locality();
-    locality->set_region("oceania");
-    locality->set_zone("hello");
-    locality->set_sub_zone("world");
-    endpoints->mutable_load_balancing_weight()->set_value(42);
-
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.4");
-    endpoint_address->set_port_value(80);
-  }
-
-  {
-    auto* endpoints = cluster_load_assignment.add_endpoints();
-    auto* locality = endpoints->mutable_locality();
-    locality->set_region("space");
-    locality->set_zone("station");
-    locality->set_sub_zone("international");
-
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.5");
-    endpoint_address->set_port_value(80);
-  }
-
-  {
-    auto* endpoints = cluster_load_assignment.add_endpoints();
-    auto* locality = endpoints->mutable_locality();
-    locality->set_region("sugar");
-    locality->set_zone("candy");
-    locality->set_sub_zone("mountain");
-    endpoints->mutable_load_balancing_weight()->set_value(37);
-
-    auto* endpoint_address = endpoints->add_lb_endpoints()
-                                 ->mutable_endpoint()
-                                 ->mutable_address()
-                                 ->mutable_socket_address();
-    endpoint_address->set_address("1.2.3.6");
-    endpoint_address->set_port_value(80);
-  }
-
-  initialize();
-  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
-  EXPECT_TRUE(initialized_);
-
-  const auto& locality_weights =
-      *cluster_->prioritySet().hostSetsPerPriority()[0]->localityWeights();
-  EXPECT_EQ(3, locality_weights.size());
-  EXPECT_EQ(42, locality_weights[0]);
-  EXPECT_EQ(0, locality_weights[1]);
-  EXPECT_EQ(37, locality_weights[2]);
+// Validate that onConfigUpdate() propagates locality weights to the host set when the cluster uses
+// load balancing policy extensions.
+TEST_F(EdsLocalityWeightsTest, WeightsPresentWithLoadBalancingPolicyConfig) {
+  // envoy.load_balancers.custom_lb is registered by linking in
+  // //test/integration/load_balancers:custom_lb_policy.
+  expectLocalityWeightsPresentForClusterConfig(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: LOAD_BALANCING_POLICY_CONFIG
+      load_balancing_policy:
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancers.custom_lb
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+    )EOF");
 }
 
 // Validate that onConfigUpdate() removes any locality not referenced in the
@@ -2275,6 +2288,29 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 0);
   }
+}
+
+// Validate that onConfigUpdate() with a config that contains both LEDS config
+// source and explicit list of endpoints is rejected.
+TEST_F(EdsTest, OnConfigUpdateLedsAndEndpoints) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+  // Add an endpoint.
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("1.2.3.4");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  // Configure an LEDS data source.
+  auto* leds_conf = endpoints->mutable_leds_cluster_locality_config();
+  leds_conf->set_leds_collection_name("xdstp://foo/leds/collection");
+  initialize();
+
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  EXPECT_THROW_WITH_MESSAGE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, ""),
+                            EnvoyException,
+                            "A ClusterLoadAssignment for cluster fare cannot include both LEDS "
+                            "(resource: xdstp://foo/leds/collection) and a list of endpoints.");
 }
 
 } // namespace

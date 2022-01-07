@@ -23,7 +23,7 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )
 
@@ -38,6 +38,6 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/event:event_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/watchdog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/watchdog/v3:pkg_cc_proto",
     ],
 )

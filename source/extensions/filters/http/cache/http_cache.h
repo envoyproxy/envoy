@@ -7,8 +7,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -261,8 +262,12 @@ public:
 
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
+  //
+  // Pass factory context to allow HttpCache to use async client, stats scope
+  // etc.
   virtual HttpCache&
-  getCache(const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config) PURE;
+  getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+           Server::Configuration::FactoryContext& context) PURE;
   ~HttpCacheFactory() override = default;
 
 private:

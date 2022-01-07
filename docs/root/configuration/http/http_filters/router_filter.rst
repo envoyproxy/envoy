@@ -360,6 +360,19 @@ or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rew
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 
+.. _config_http_filters_router_x-envoy-upstream-stream-duration-ms:
+
+x-envoy-upstream-stream-duration-ms
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This value is used to configure the maximum upstream stream lifetime for the stream which has this header.
+If the stream exceeds this lifetime, it will be reset and a 408 response
+will be sent to downstream. If the value of the header is 0, then the lifetime will be
+infinite and no limit will be enforced. It is similar to
+:ref:`max_stream_duration <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>`,
+but that configuration applies to all streams to this cluster. If set, this header will
+override the cluster configuration. The value set for this header is set independently for other timeout related headers.
+
 HTTP response headers set on downstream responses
 -------------------------------------------------
 

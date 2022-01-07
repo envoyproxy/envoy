@@ -200,11 +200,7 @@ void TestEnvironment::initializeTestMain(char* program_name) {
   RELEASE_ASSERT(WSAStartup(version_requested, &wsa_data) == 0, "");
 #endif
 
-#ifdef __APPLE__
-  UNREFERENCED_PARAMETER(program_name);
-#else
   absl::InitializeSymbolizer(program_name);
-#endif
 
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
@@ -268,7 +264,11 @@ const std::string& TestEnvironment::temporaryDirectory() {
 
 std::string TestEnvironment::runfilesDirectory(const std::string& workspace) {
   RELEASE_ASSERT(runfiles_ != nullptr, "");
-  return runfiles_->Rlocation(workspace);
+  auto path = runfiles_->Rlocation(workspace);
+#ifdef WIN32
+  path = std::regex_replace(path, std::regex("\\\\"), "/");
+#endif
+  return path;
 }
 
 std::string TestEnvironment::runfilesPath(const std::string& path, const std::string& workspace) {

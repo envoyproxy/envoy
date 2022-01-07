@@ -9,8 +9,8 @@
 
 #include "absl/strings/match.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 #include "contrib/rocketmq_proxy/filters/network/source/topic_route.h"
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
 
 using Envoy::Tcp::ConnectionPool::ConnectionDataPtr;
 

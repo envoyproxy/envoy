@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
 #include "source/common/common/thread.h"
@@ -19,12 +19,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeaderMutation;
-using envoy::service::ext_proc::v3alpha::ImmediateResponse;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeaderMutation;
+using envoy::service::ext_proc::v3::ImmediateResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
 using envoy::type::v3::StatusCode;
 
 const uint32_t ExtProcFuzzMaxDataSize = 1024;

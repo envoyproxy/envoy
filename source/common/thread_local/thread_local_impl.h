@@ -19,7 +19,6 @@ namespace ThreadLocal {
  */
 class InstanceImpl : Logger::Loggable<Logger::Id::main>, public NonCopyable, public Instance {
 public:
-  InstanceImpl() { Thread::MainThread::initMainThread(); }
   ~InstanceImpl() override;
 
   // ThreadLocal::Instance
@@ -78,6 +77,7 @@ private:
 
   static thread_local ThreadLocalData thread_local_data_;
 
+  Thread::MainThread main_thread_;
   std::vector<Slot*> slots_;
   // A list of index of freed slots.
   std::list<uint32_t> free_slot_indexes_;

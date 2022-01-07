@@ -29,7 +29,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
       collector_cluster: fake_cluster
-      collector_endpoint: /api/v1/spans
+      collector_endpoint: /api/v2/spans
       collector_endpoint_version: HTTP_JSON
   )EOF";
 
@@ -67,11 +67,12 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-// Test that the deprecated extension name still functions.
+// Test that the deprecated extension name is disabled by default.
+// TODO(zuercher): remove when envoy.deprecated_features.allow_deprecated_extension_names is removed
 TEST(ZipkinTracerConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
   const std::string deprecated_name = "envoy.zipkin";
 
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
+  ASSERT_EQ(nullptr, Registry::FactoryRegistry<Server::Configuration::TracerFactory>::getFactory(
                          deprecated_name));
 }
 

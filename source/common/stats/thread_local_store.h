@@ -244,6 +244,10 @@ public:
   std::vector<TextReadoutSharedPtr> textReadouts() const override;
   std::vector<ParentHistogramSharedPtr> histograms() const override;
 
+  void forEachCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
   void setTagProducer(TagProducerPtr&& tag_producer) override {
@@ -257,6 +261,12 @@ public:
   void mergeHistograms(PostMergeCb merge_cb) override;
 
   Histogram& tlsHistogram(ParentHistogramImpl& parent, uint64_t id);
+
+  void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override;
+  void forEachSinkedGauge(SizeFn f_size, StatFn<Gauge> f_stat) const override;
+  void forEachSinkedTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
+
+  void setSinkPredicates(std::unique_ptr<SinkPredicates>&& sink_predicates) override;
 
   /**
    * @return a thread synchronizer object used for controlling thread behavior in tests.
@@ -483,11 +493,15 @@ private:
   bool rejectsAll() const { return stats_matcher_->rejectsAll(); }
   template <class StatMapClass, class StatListClass>
   void removeRejectedStats(StatMapClass& map, StatListClass& list);
+  template <class StatSharedPtr>
+  void removeRejectedStats(StatNameHashMap<StatSharedPtr>& map,
+                           std::function<void(const StatSharedPtr&)> f_deletion);
   bool checkAndRememberRejection(StatName name, StatsMatcher::FastResult fast_reject_result,
                                  StatNameStorageSet& central_rejected_stats,
                                  StatNameHashSet* tls_rejected_stats);
   TlsCache& tlsCache() { return **tls_cache_; }
 
+  OptRef<SinkPredicates> sink_predicates_;
   Allocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   using TlsCacheSlot = ThreadLocal::TypedSlotPtr<TlsCache>;
@@ -527,10 +541,7 @@ private:
   // It seems like it would be better to have each client that expects a stat
   // to exist to hold it as (e.g.) a CounterSharedPtr rather than a Counter&
   // but that would be fairly complex to change.
-  std::vector<CounterSharedPtr> deleted_counters_ ABSL_GUARDED_BY(lock_);
-  std::vector<GaugeSharedPtr> deleted_gauges_ ABSL_GUARDED_BY(lock_);
   std::vector<HistogramSharedPtr> deleted_histograms_ ABSL_GUARDED_BY(lock_);
-  std::vector<TextReadoutSharedPtr> deleted_text_readouts_ ABSL_GUARDED_BY(lock_);
 
   // Scope IDs and central cache entries that are queued for cross-scope release.
   // Because there can be a large number of scopes, all of which are released at once,

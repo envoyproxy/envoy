@@ -31,7 +31,7 @@ maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& 
   }
   }
 
-  NOT_REACHED_GCOVR_EXCL_LINE; // Needed for gcc
+  return absl::nullopt;
 }
 
 } // namespace

@@ -5,10 +5,10 @@
 #include <string>
 
 #include "envoy/event/timer.h"
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/http/filter.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -38,7 +38,7 @@ struct ExtProcFilterStats {
 
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor& config,
+  FilterConfig(const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
                const std::chrono::milliseconds message_timeout, Stats::Scope& scope,
                const std::string& stats_prefix)
       : failure_mode_allow_(config.failure_mode_allow()), message_timeout_(message_timeout),
@@ -51,8 +51,7 @@ public:
 
   const ExtProcFilterStats& stats() const { return stats_; }
 
-  const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode&
-  processingMode() const {
+  const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& processingMode() const {
     return processing_mode_;
   }
 
@@ -67,10 +66,28 @@ private:
   const std::chrono::milliseconds message_timeout_;
 
   ExtProcFilterStats stats_;
-  const envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode processing_mode_;
+  const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  explicit FilterConfigPerRoute(
+      const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& config);
+
+  void merge(const FilterConfigPerRoute& other);
+
+  bool disabled() const { return disabled_; }
+  const absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>&
+  processingMode() const {
+    return processing_mode_;
+  }
+
+private:
+  bool disabled_;
+  absl::optional<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode> processing_mode_;
+};
 
 class Filter : public Logger::Loggable<Logger::Id::filter>,
                public Http::PassThroughFilter,
@@ -110,7 +127,7 @@ public:
   // ExternalProcessorCallbacks
 
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::ext_proc::v3alpha::ProcessingResponse>&& response) override;
+      std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
 
   void onGrpcError(Grpc::Status::GrpcStatus error) override;
 
@@ -128,11 +145,13 @@ public:
   void sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers);
 
 private:
+  void mergePerRouteConfig();
   StreamOpenState openStream();
+  void closeStream();
 
   void cleanUpTimers();
   void clearAsyncState();
-  void sendImmediateResponse(const envoy::service::ext_proc::v3alpha::ImmediateResponse& response);
+  void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,
                                       Http::RequestOrResponseHeaderMap& headers, bool end_stream);
@@ -162,7 +181,7 @@ private:
 };
 
 extern std::string responseCaseToString(
-    const envoy::service::ext_proc::v3alpha::ProcessingResponse::ResponseCase response_case);
+    const envoy::service::ext_proc::v3::ProcessingResponse::ResponseCase response_case);
 
 } // namespace ExternalProcessing
 } // namespace HttpFilters

@@ -17,7 +17,7 @@ import sys
 
 from coverage import cmdline  # type:ignore
 
-from tools.base import runner, utils
+from envoy.base import runner, utils
 
 
 class CoverageRunner(runner.Runner):

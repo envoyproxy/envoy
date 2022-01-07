@@ -51,7 +51,7 @@ public:
    * (e.g. transport-level) information).
    * @param type ProtocolType to explicitly set
    */
-  virtual void setType(ProtocolType) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual void setType(ProtocolType) {}
 
   /**
    * Reads the start of a Thrift protocol message from the buffer and updates the metadata
@@ -72,6 +72,16 @@ public:
    * @throw EnvoyException if the data is not a valid message footer
    */
   virtual bool readMessageEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Peeks the start of a Thrift protocol reply payload in the buffer and updates the reply
+   * type parameter with the reply type of the payload.
+   * @param buffer the buffer to peek from
+   * @param reply_type ReplyType to set the payload's reply type to success or error
+   * @return true if reply type was successfully read, false if more data is required
+   * @throw EnvoyException if the data is not a valid payload
+   */
+  virtual bool peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) PURE;
 
   /**
    * Reads the start of a Thrift struct from the buffer and updates the name parameter with the
@@ -419,7 +429,7 @@ public:
    *
    * @return a DecoderEventHandlerSharedPtr that decodes a downstream client's upgrade request
    */
-  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { return nullptr; }
 
   /**
    * Writes a response to a downstream client's upgrade request.
@@ -428,7 +438,7 @@ public:
    */
   virtual DirectResponsePtr upgradeResponse(const DecoderEventHandler& decoder) {
     UNREFERENCED_PARAMETER(decoder);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   /**
@@ -447,7 +457,7 @@ public:
     UNREFERENCED_PARAMETER(transport);
     UNREFERENCED_PARAMETER(state);
     UNREFERENCED_PARAMETER(buffer);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    return nullptr;
   }
 
   /**
@@ -458,7 +468,6 @@ public:
   virtual void completeUpgrade(ThriftConnectionState& state, ThriftObject& response) {
     UNREFERENCED_PARAMETER(state);
     UNREFERENCED_PARAMETER(response);
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 };
 

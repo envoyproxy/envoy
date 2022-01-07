@@ -438,18 +438,17 @@ TEST(Context, ConnectionAttributes) {
   Network::Address::InstanceConstSharedPtr upstream_local_address =
       Network::Utility::parseInternetAddress("10.1.2.3", 1000, false);
   const std::string sni_name = "kittens.com";
-  info.downstream_address_provider_->setLocalAddress(local);
-  info.downstream_address_provider_->setRemoteAddress(remote);
-  info.downstream_address_provider_->setRequestedServerName(sni_name);
-  info.downstream_address_provider_->setSslConnection(downstream_ssl_info);
-  EXPECT_CALL(info, upstreamSslConnection()).WillRepeatedly(Return(upstream_ssl_info));
-  EXPECT_CALL(info, upstreamHost()).WillRepeatedly(Return(upstream_host));
-  EXPECT_CALL(info, upstreamLocalAddress()).WillRepeatedly(ReturnRef(upstream_local_address));
+  info.downstream_connection_info_provider_->setLocalAddress(local);
+  info.downstream_connection_info_provider_->setRemoteAddress(remote);
+  info.downstream_connection_info_provider_->setRequestedServerName(sni_name);
+  info.downstream_connection_info_provider_->setSslConnection(downstream_ssl_info);
   const std::string upstream_transport_failure_reason = "ConnectionTermination";
-  EXPECT_CALL(info, upstreamTransportFailureReason())
-      .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
+  info.upstreamInfo()->setUpstreamSslConnection(upstream_ssl_info);
+  info.upstreamInfo()->setUpstreamHost(upstream_host);
+  info.upstreamInfo()->setUpstreamLocalAddress(upstream_local_address);
+  info.upstreamInfo()->setUpstreamTransportFailureReason(upstream_transport_failure_reason);
   EXPECT_CALL(info, connectionID()).WillRepeatedly(Return(123));
-  info.downstream_address_provider_->setConnectionID(123);
+  info.downstream_connection_info_provider_->setConnectionID(123);
   const absl::optional<std::string> connection_termination_details = "unauthorized";
   EXPECT_CALL(info, connectionTerminationDetails())
       .WillRepeatedly(ReturnRef(connection_termination_details));

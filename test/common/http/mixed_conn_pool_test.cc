@@ -86,7 +86,7 @@ void MixedConnPoolImplTest::testAlpnHandshake(absl::optional<Protocol> protocol)
     EXPECT_EQ(protocol.value(), conn_pool_->protocol());
   }
 
-  conn_pool_->drainConnections();
+  conn_pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
   conn_pool_.reset();

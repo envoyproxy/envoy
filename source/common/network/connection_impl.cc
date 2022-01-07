@@ -98,8 +98,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   // TODO(soulxu): generate the connection id inside the addressProvider directly,
   // then we don't need a setter or any of the optional stuff.
-  socket_->addressProvider().setConnectionID(id());
-  socket_->addressProvider().setSslConnection(transport_socket_->ssl());
+  socket_->connectionInfoProvider().setConnectionID(id());
+  socket_->connectionInfoProvider().setSslConnection(transport_socket_->ssl());
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -279,8 +279,8 @@ void ConnectionImpl::noDelay(bool enable) {
     return;
   }
 
-  // Don't set NODELAY for unix domain sockets
-  if (socket_->addressType() == Address::Type::Pipe) {
+  // Don't set NODELAY for unix domain sockets or internal socket.
+  if (socket_->addressType() != Address::Type::Ip) {
     return;
   }
 
@@ -671,6 +671,7 @@ void ConnectionImpl::onWriteReady() {
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
       connecting_ = false;
+      onConnected();
       transport_socket_->onConnected();
       // It's possible that we closed during the connect callback.
       if (state() != State::Open) {
@@ -827,6 +828,7 @@ void ServerConnectionImpl::onTransportSocketConnectTimeout() {
   stream_info_.setConnectionTerminationDetails(kTransportSocketConnectTimeoutTerminationDetails);
   closeConnectionImmediately();
   transport_socket_timeout_stat_->inc();
+  failure_reason_ = "connect timeout";
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
@@ -834,12 +836,22 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
-                     std::move(transport_socket), stream_info_, false),
-      stream_info_(dispatcher.timeSource(), socket_->addressProviderSharedPtr()) {
+    : ClientConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
+                           source_address, std::move(transport_socket), options) {}
+
+ClientConnectionImpl::ClientConnectionImpl(
+    Event::Dispatcher& dispatcher, std::unique_ptr<ConnectionSocket> socket,
+    const Address::InstanceConstSharedPtr& source_address,
+    Network::TransportSocketPtr&& transport_socket,
+    const Network::ConnectionSocket::OptionsSharedPtr& options)
+    : ConnectionImpl(dispatcher, std::move(socket), std::move(transport_socket), stream_info_,
+                     false),
+      stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr()) {
+
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
-  if (remote_address->ip() == nullptr) {
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip() == nullptr) {
     return;
   }
   if (!Network::Socket::applyOptions(options, *socket_,
@@ -854,8 +866,8 @@ ClientConnectionImpl::ClientConnectionImpl(
 
   const Network::Address::InstanceConstSharedPtr* source = &source_address;
 
-  if (socket_->addressProvider().localAddress()) {
-    source = &socket_->addressProvider().localAddress();
+  if (socket_->connectionInfoProvider().localAddress()) {
+    source = &socket_->connectionInfoProvider().localAddress();
   }
 
   if (*source != nullptr) {
@@ -876,9 +888,11 @@ ClientConnectionImpl::ClientConnectionImpl(
 }
 
 void ClientConnectionImpl::connect() {
-  ENVOY_CONN_LOG(debug, "connecting to {}", *this,
-                 socket_->addressProvider().remoteAddress()->asString());
-  const Api::SysCallIntResult result = socket_->connect(socket_->addressProvider().remoteAddress());
+  ENVOY_CONN_LOG_EVENT(debug, "client_connection", "connecting to {}", *this,
+                       socket_->connectionInfoProvider().remoteAddress()->asString());
+  const Api::SysCallIntResult result =
+      socket_->connect(socket_->connectionInfoProvider().remoteAddress());
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectStart(dispatcher_.timeSource());
   if (result.return_value_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
@@ -905,6 +919,21 @@ void ClientConnectionImpl::connect() {
     // Trigger a write event. This is needed on macOS and seems harmless on Linux.
     ioHandle().activateFileEvents(Event::FileReadyType::Write);
   }
+}
+
+void ClientConnectionImpl::onConnected() {
+  stream_info_.upstreamInfo()->upstreamTiming().onUpstreamConnectComplete(dispatcher_.timeSource());
+  // There are no meaningful socket source address semantics for non-IP sockets, so skip.
+  if (socket_->connectionInfoProviderSharedPtr()->remoteAddress()->ip()) {
+    // interfaceName makes a syscall. Call once to minimize perf hit.
+    const auto maybe_interface_name = ioHandle().interfaceName();
+    if (maybe_interface_name.has_value()) {
+      ENVOY_CONN_LOG_EVENT(debug, "conn_interface", "connected on local interface '{}'", *this,
+                           maybe_interface_name.value());
+      socket_->connectionInfoProvider().setInterfaceName(maybe_interface_name.value());
+    }
+  }
+  ConnectionImpl::onConnected();
 }
 
 } // namespace Network

@@ -109,7 +109,6 @@ const char AdminHtmlEnd[] = R"(
   </table>
 </body>
 )";
-
 } // namespace
 
 ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
@@ -131,19 +130,21 @@ void AdminImpl::startHttpListener(const std::list<AccessLog::InstanceSharedPtr>&
                  "listen() failed on admin listener");
   socket_factory_ = std::make_unique<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
-  ENVOY_LOG(info, "admin address: {}", socket().addressProvider().localAddress()->asString());
+  ENVOY_LOG(info, "admin address: {}",
+            socket().connectionInfoProvider().localAddress()->asString());
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {
       ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
                 address_out_path);
     } else {
-      address_out_file << socket_->addressProvider().localAddress()->asString();
+      address_out_file << socket_->connectionInfoProvider().localAddress()->asString();
     }
   }
 }
 
-AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
+AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
+                     bool ignore_global_conn_limit)
     : server_(server),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
@@ -220,7 +221,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server)
       },
       date_provider_(server.dispatcher().timeSource()),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+      local_reply_(LocalReply::Factory::createDefault()),
+      ignore_global_conn_limit_(ignore_global_conn_limit) {}
 
 Http::ServerConnectionPtr AdminImpl::createCodec(Network::Connection& connection,
                                                  const Buffer::Instance& data,

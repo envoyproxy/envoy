@@ -5,10 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/extensions/filters/http/cache/v3/cache.pb.h"
+
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/filters/http/cache/v3alpha/cache.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 

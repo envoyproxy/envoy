@@ -1,8 +1,10 @@
 #include "source/extensions/filters/common/rbac/matchers.h"
 
 #include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/upstream/upstream.h"
 
-#include "source/common/common/assert.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/common/rbac/matcher_extension.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,12 +12,13 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v3::Permission::RuleCase::kAndRules:
-    return std::make_shared<const AndMatcher>(permission.and_rules());
+    return std::make_shared<const AndMatcher>(permission.and_rules(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kOrRules:
-    return std::make_shared<const OrMatcher>(permission.or_rules());
+    return std::make_shared<const OrMatcher>(permission.or_rules(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kHeader:
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp:
@@ -30,11 +33,16 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v3::Permission::RuleCase::kNotRule:
-    return std::make_shared<const NotMatcher>(permission.not_rule());
+    return std::make_shared<const NotMatcher>(permission.not_rule(), validation_visitor);
   case envoy::config::rbac::v3::Permission::RuleCase::kRequestedServerName:
     return std::make_shared<const RequestedServerNameMatcher>(permission.requested_server_name());
   case envoy::config::rbac::v3::Permission::RuleCase::kUrlPath:
     return std::make_shared<const PathMatcher>(permission.url_path());
+  case envoy::config::rbac::v3::Permission::RuleCase::kMatcher: {
+    auto& factory =
+        Config::Utility::getAndCheckFactory<MatcherExtensionFactory>(permission.matcher());
+    return factory.create(permission.matcher(), validation_visitor);
+  }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -72,9 +80,10 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
+                       ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule));
+    matchers_.push_back(Matcher::create(rule, validation_visitor));
   }
 }
 
@@ -96,9 +105,10 @@ bool AndMatcher::matches(const Network::Connection& connection,
   return true;
 }
 
-OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules) {
+OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
+                     ProtobufMessage::ValidationVisitor& validation_visitor) {
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule));
+    matchers_.push_back(Matcher::create(rule, validation_visitor));
   }
 }
 
@@ -137,7 +147,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   Envoy::Network::Address::InstanceConstSharedPtr ip;
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.addressProvider().remoteAddress();
+    ip = connection.connectionInfoProvider().remoteAddress();
     break;
   case DownstreamLocal:
     ip = info.downstreamAddressProvider().localAddress();

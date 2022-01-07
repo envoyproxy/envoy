@@ -6,6 +6,7 @@
 
 #include "source/common/common/fmt.h"
 #include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,6 +34,9 @@ public:
 
   bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
+  bool peekReplyPayload(Buffer::Instance& buffer, ReplyType& reply_type) override {
+    return protocol_->peekReplyPayload(buffer, reply_type);
+  }
   bool readStructBegin(Buffer::Instance& buffer, std::string& name) override {
     return protocol_->readStructBegin(buffer, name);
   }

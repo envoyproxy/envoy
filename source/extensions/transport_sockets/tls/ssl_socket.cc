@@ -43,6 +43,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
 };
+
 } // namespace
 
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
@@ -164,7 +165,7 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
 }
 
 void SslSocket::onPrivateKeyMethodComplete() {
-  ASSERT(isThreadSafe());
+  ASSERT(callbacks_ != nullptr && callbacks_->connection().dispatcher().isThreadSafe());
   ASSERT(info_->state() == Ssl::SocketState::HandshakeInProgress);
 
   // Resume handshake.
@@ -179,6 +180,13 @@ Network::Connection& SslSocket::connection() const { return callbacks_->connecti
 
 void SslSocket::onSuccess(SSL* ssl) {
   ctx_->logHandshake(ssl);
+  if (callbacks_->connection().streamInfo().upstreamInfo()) {
+    callbacks_->connection()
+        .streamInfo()
+        .upstreamInfo()
+        ->upstreamTiming()
+        .onUpstreamHandshakeComplete(callbacks_->connection().dispatcher().timeSource());
+  }
   callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 }
 
@@ -197,6 +205,11 @@ void SslSocket::drainErrorQueue() {
       } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
         saw_counted_error = true;
       }
+    } else if (ERR_GET_LIB(err) == ERR_LIB_SYS) {
+      // Any syscall errors that result in connection closure are already tracked in other
+      // connection related stats. We will still retain the specific syscall failure for
+      // transport failure reasons.
+      saw_counted_error = true;
     }
     saw_error = true;
 
@@ -330,12 +343,7 @@ void SslSocket::closeSocket(Network::ConnectionEvent) {
   }
 }
 
-std::string SslSocket::protocol() const {
-  const unsigned char* proto;
-  unsigned int proto_len;
-  SSL_get0_alpn_selected(rawSsl(), &proto, &proto_len);
-  return std::string(reinterpret_cast<const char*>(proto), proto_len);
-}
+std::string SslSocket::protocol() const { return ssl()->alpn(); }
 
 absl::string_view SslSocket::failureReason() const { return failure_reason_; }
 

@@ -150,9 +150,11 @@ public:
 
   void addIdleCallback(IdleCb cb) override { addIdleCallbackImpl(cb); }
   bool isIdle() const override { return isIdleImpl(); }
-  void startDrain() override { startDrainImpl(); }
-  void drainConnections() override {
-    drainConnectionsImpl();
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    drainConnectionsImpl(drain_behavior);
+    if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
+      return;
+    }
     // Legacy behavior for the TCP connection pool marks all connecting clients
     // as draining.
     for (auto& connecting_client : connecting_clients_) {
@@ -215,6 +217,7 @@ public:
     callbacks->onPoolFailure(reason, failure_reason, host_description);
   }
 
+  bool enforceMaxRequests() const override { return false; }
   // These two functions exist for testing parity between old and new Tcp Connection Pools.
   virtual void onConnReleased(Envoy::ConnectionPool::ActiveClient&) {}
   virtual void onConnDestroyed() {}

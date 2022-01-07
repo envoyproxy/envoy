@@ -18,7 +18,6 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/hash_policy.h"
-#include "envoy/http/header_map.h"
 #include "envoy/router/internal_redirect.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/tracing/http_tracer.h"
@@ -205,9 +204,14 @@ public:
   virtual ~RetryPolicy() = default;
 
   /**
-   * @return std::chrono::milliseconds timeout per retry attempt.
+   * @return std::chrono::milliseconds timeout per retry attempt. 0 is disabled.
    */
   virtual std::chrono::milliseconds perTryTimeout() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the optional per try idle timeout. 0 is disabled.
+   */
+  virtual std::chrono::milliseconds perTryIdleTimeout() const PURE;
 
   /**
    * @return uint32_t the number of retries to allow against the route.
@@ -231,6 +235,13 @@ public:
    * if none should be used.
    */
   virtual Upstream::RetryPrioritySharedPtr retryPriority() const PURE;
+
+  /**
+   * @return the retry options predicates for this policy. Each policy will be applied prior
+   * to retrying a request, allowing for request behavior to be customized.
+   */
+  virtual absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
+  retryOptionsPredicates() const PURE;
 
   /**
    * Number of times host selection should be reattempted when selecting a host
@@ -489,6 +500,11 @@ MAKE_STATS_STRUCT(VirtualClusterStats, VirtualClusterStatNames, ALL_VIRTUAL_CLUS
 class VirtualCluster {
 public:
   virtual ~VirtualCluster() = default;
+
+  /**
+   * @return the string name of the virtual cluster.
+   */
+  virtual const absl::optional<std::string>& name() const PURE;
 
   /**
    * @return the stat-name of the virtual cluster.
@@ -858,6 +874,11 @@ public:
    * @return bool true if the :authority header should be overwritten with the upstream hostname.
    */
   virtual bool autoHostRewrite() const PURE;
+
+  /**
+   * @return bool true if the x-forwarded-host header should be updated.
+   */
+  virtual bool appendXfh() const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
@@ -1288,7 +1309,6 @@ public:
   virtual void readDisable(bool disable) PURE;
   /**
    * Reset the stream. No events will fire beyond this point.
-   * @param reason supplies the reset reason.
    */
   virtual void resetStream() PURE;
 
@@ -1297,6 +1317,11 @@ public:
    * @param the account to assign the generic upstream.
    */
   virtual void setAccount(Buffer::BufferMemoryAccountSharedPtr account) PURE;
+
+  /**
+   * Get the bytes meter for this stream.
+   */
+  virtual const StreamInfo::BytesMeterSharedPtr& bytesMeter() PURE;
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

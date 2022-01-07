@@ -23,9 +23,11 @@ namespace SerializationTest {
 
 TEST_EmptyDeserializerShouldNotBeReady(Int8Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int16Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(UInt16Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(UInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(Int64Deserializer);
+TEST_EmptyDeserializerShouldNotBeReady(Float64Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BooleanDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarUInt32Deserializer);
 TEST_EmptyDeserializerShouldNotBeReady(VarInt32Deserializer);
@@ -38,6 +40,8 @@ TEST_EmptyDeserializerShouldNotBeReady(NullableCompactStringDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(BytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(CompactBytesDeserializer);
 TEST_EmptyDeserializerShouldNotBeReady(NullableBytesDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(NullableCompactBytesDeserializer);
+TEST_EmptyDeserializerShouldNotBeReady(UuidDeserializer);
 
 TEST(ArrayDeserializer, EmptyBufferShouldNotBeReady) {
   // given
@@ -77,9 +81,11 @@ TEST(NullableCompactArrayDeserializer, EmptyBufferShouldNotBeReady) {
 
 TEST_DeserializerShouldDeserialize(Int8Deserializer, int8_t, 42);
 TEST_DeserializerShouldDeserialize(Int16Deserializer, int16_t, 42);
+TEST_DeserializerShouldDeserialize(UInt16Deserializer, uint16_t, 42);
 TEST_DeserializerShouldDeserialize(Int32Deserializer, int32_t, 42);
 TEST_DeserializerShouldDeserialize(UInt32Deserializer, uint32_t, 42);
 TEST_DeserializerShouldDeserialize(Int64Deserializer, int64_t, 42);
+TEST_DeserializerShouldDeserialize(Float64Deserializer, double, 13.25);
 TEST_DeserializerShouldDeserialize(BooleanDeserializer, bool, true);
 
 EncodingContext encoder{-1}; // Provided api_version does not matter for primitive types.
@@ -424,7 +430,24 @@ TEST(NullableBytesDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Generic array tests.
+// Nullable compact byte-array tests.
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserialize) {
+  const NullableBytes value{{'a', 'b', 'c', 'd'}};
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserializeEmptyBytes) {
+  const NullableBytes value = {{}};
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+TEST(NullableCompactBytesDeserializer, ShouldDeserializeNullBytes) {
+  const NullableBytes value = absl::nullopt;
+  serializeCompactThenDeserializeAndCheckEquality<NullableCompactBytesDeserializer>(value);
+}
+
+// Generic-array tests.
 
 TEST(ArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
@@ -446,7 +469,7 @@ TEST(ArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Compact generic array tests.
+// Compact generic-array tests.
 
 TEST(CompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const std::vector<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
@@ -469,7 +492,7 @@ TEST(CompactArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Generic nullable array tests.
+// Nullable generic-array tests.
 
 TEST(NullableArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<std::string> value{{"aaa", "bbbbb", "cc", "d", "e", "ffffffff"}};
@@ -496,7 +519,7 @@ TEST(NullableArrayDeserializer, ShouldThrowOnInvalidLength) {
   EXPECT_THROW(testee.feed(data), EnvoyException);
 }
 
-// Compact nullable generic array tests.
+// Nullable compact generic-array tests.
 
 TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfData) {
   const NullableArray<int32_t> value{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}};
@@ -519,6 +542,13 @@ TEST(NullableCompactArrayDeserializer, ShouldConsumeCorrectAmountOfDataForLargeI
   const NullableArray<int32_t> value{raw};
   serializeCompactThenDeserializeAndCheckEquality<
       NullableCompactArrayDeserializer<Int32Deserializer>>(value);
+}
+
+// UUID.
+
+TEST(UuidDeserializer, ShouldDeserialize) {
+  const Uuid value = {13, 42};
+  serializeThenDeserializeAndCheckEquality<UuidDeserializer>(value);
 }
 
 // Tagged fields.

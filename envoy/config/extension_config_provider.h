@@ -16,7 +16,7 @@ using ConfigAppliedCb = std::function<void()>;
  * the extension configuration discovery service. Dynamically updated extension
  * configurations may share subscriptions across extension config providers.
  */
-template <class Factory, class FactoryCallback> class ExtensionConfigProvider {
+template <class FactoryCallback> class ExtensionConfigProvider {
 public:
   virtual ~ExtensionConfigProvider() = default;
 
@@ -35,17 +35,20 @@ public:
   virtual absl::optional<FactoryCallback> config() PURE;
 };
 
-template <class FactoryCallback> class DynamicExtensionConfigProviderBase {
+class DynamicExtensionConfigProviderBase {
 public:
   virtual ~DynamicExtensionConfigProviderBase() = default;
 
   /**
-   * Update the provider with a new configuration.
-   * @param config is an extension factory callback to replace the existing configuration.
+   * Update the provider with a new configuration. This interface accepts proto rather than a
+   * factory callback so that it can be generic over factory types. If instantiating the factory
+   * throws, it should only do so on the main thread, before any changes are applied to workers.
+   * @param config is the new configuration. It is expected that the configuration has already been
+   * validated.
    * @param version_info is the version of the new extension configuration.
    * @param cb the continuation callback for a completed configuration application on all threads.
    */
-  virtual void onConfigUpdate(FactoryCallback config, const std::string& version_info,
+  virtual void onConfigUpdate(const Protobuf::Message& config, const std::string& version_info,
                               ConfigAppliedCb applied_on_all_threads) PURE;
 
   /**
@@ -60,9 +63,9 @@ public:
   virtual void applyDefaultConfiguration() PURE;
 };
 
-template <class Factory, class FactoryCallback>
-class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase<FactoryCallback>,
-                                       public ExtensionConfigProvider<Factory, FactoryCallback> {};
+template <class FactoryCallback>
+class DynamicExtensionConfigProvider : public DynamicExtensionConfigProviderBase,
+                                       public ExtensionConfigProvider<FactoryCallback> {};
 
 } // namespace Config
 } // namespace Envoy

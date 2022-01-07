@@ -30,9 +30,9 @@ struct CacheResponseCodeDetailValues {
 
 using CacheResponseCodeDetails = ConstSingleton<CacheResponseCodeDetailValues>;
 
-CacheFilter::CacheFilter(
-    const envoy::extensions::filters::http::cache::v3alpha::CacheConfig& config, const std::string&,
-    Stats::Scope&, TimeSource& time_source, HttpCache& http_cache)
+CacheFilter::CacheFilter(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
+                         const std::string&, Stats::Scope&, TimeSource& time_source,
+                         HttpCache& http_cache)
     : time_source_(time_source), cache_(http_cache),
       vary_allow_list_(config.allowed_vary_headers()) {}
 
@@ -240,7 +240,7 @@ void CacheFilter::onHeaders(LookupResult&& result, Http::RequestHeaderMap& reque
   lookup_result_ = std::make_unique<LookupResult>(std::move(result));
   switch (lookup_result_->cache_entry_status_) {
   case CacheEntryStatus::FoundNotModified:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE; // We don't yet return or support these codes.
+    PANIC("unsupported code");
   case CacheEntryStatus::RequiresValidation:
     // If a cache entry requires validation, inject validation headers in the
     // request and let it pass through as if no cache entry was found. If the

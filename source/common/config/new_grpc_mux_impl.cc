@@ -158,7 +158,7 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   auto entry = subscriptions_.find(type_url);
   if (entry == subscriptions_.end()) {
     // We don't yet have a subscription for type_url! Make one!
-    addSubscription(type_url, options.use_namespace_matching_, resources.empty());
+    addSubscription(type_url, options.use_namespace_matching_);
     return addWatch(type_url, resources, callbacks, resource_decoder, options);
   }
 
@@ -230,11 +230,10 @@ void NewGrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   entry->second->watch_map_.removeWatch(watch);
 }
 
-void NewGrpcMuxImpl::addSubscription(const std::string& type_url, const bool use_namespace_matching,
-                                     const bool wildcard) {
-  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(type_url, local_info_,
-                                                                       use_namespace_matching,
-                                                                       dispatcher_, wildcard));
+void NewGrpcMuxImpl::addSubscription(const std::string& type_url,
+                                     const bool use_namespace_matching) {
+  subscriptions_.emplace(type_url, std::make_unique<SubscriptionStuff>(
+                                       type_url, local_info_, use_namespace_matching, dispatcher_));
   subscription_ordering_.emplace_back(type_url);
 }
 

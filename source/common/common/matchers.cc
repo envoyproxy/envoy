@@ -32,7 +32,7 @@ ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::v3::
   case envoy::type::matcher::v3::ValueMatcher::MatchPatternCase::kListMatch:
     return std::make_shared<const ListMatcher>(v.list_match());
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    throw EnvoyException("Uncaught default");
   }
 }
 
@@ -118,7 +118,7 @@ PathMatcher::createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex
 
 bool MetadataMatcher::match(const envoy::config::core::v3::Metadata& metadata) const {
   const auto& value = Envoy::Config::Metadata::metadataValue(&metadata, matcher_.filter(), path_);
-  return value_matcher_ && value_matcher_->match(value);
+  return value_matcher_->match(value) ^ matcher_.invert();
 }
 
 bool PathMatcher::match(const absl::string_view path) const {

@@ -90,6 +90,7 @@ public:
   MOCK_METHOD(bool, addedViaApi, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (),
@@ -117,6 +118,8 @@ public:
               lbRingHashConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig>&,
               lbMaglevConfig, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&,
+              lbRoundRobinConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&,
               lbLeastRequestConfig, (), (const));
   MOCK_METHOD(const absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig>&,
@@ -194,6 +197,7 @@ public:
       upstream_http_protocol_options_;
   absl::optional<envoy::config::core::v3::AlternateProtocolsCacheOptions>
       alternate_protocols_cache_options_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig> lb_round_robin_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::config::cluster::v3::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
@@ -213,6 +217,12 @@ class MockIdleTimeEnabledClusterInfo : public MockClusterInfo {
 public:
   MockIdleTimeEnabledClusterInfo();
   ~MockIdleTimeEnabledClusterInfo() override;
+};
+
+class MockMaxConnectionDurationEnabledClusterInfo : public MockClusterInfo {
+public:
+  MockMaxConnectionDurationEnabledClusterInfo();
+  ~MockMaxConnectionDurationEnabledClusterInfo() override;
 };
 
 } // namespace Upstream

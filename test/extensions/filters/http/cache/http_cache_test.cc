@@ -31,9 +31,9 @@ struct LookupRequestTestCase {
 
 using Seconds = std::chrono::seconds;
 
-envoy::extensions::filters::http::cache::v3alpha::CacheConfig getConfig() {
+envoy::extensions::filters::http::cache::v3::CacheConfig getConfig() {
   // Allows 'accept' to be varied in the tests.
-  envoy::extensions::filters::http::cache::v3alpha::CacheConfig config;
+  envoy::extensions::filters::http::cache::v3::CacheConfig config;
   const auto& add_accept = config.mutable_allowed_vary_headers()->Add();
   add_accept->set_exact("accept");
   return config;

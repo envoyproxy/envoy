@@ -239,35 +239,22 @@ void Utility::throwWithMalformedIp(absl::string_view ip_address) {
 // need to be updated in the future. Discussion can be found at Github issue #939.
 Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr ret;
-#ifdef SUPPORTS_GETIFADDRS
-  struct ifaddrs* ifaddr;
-  struct ifaddrs* ifa;
+  if (Api::OsSysCallsSingleton::get().supportsGetifaddrs()) {
+    Api::InterfaceAddressVector interface_addresses{};
 
-  const int rc = getifaddrs(&ifaddr);
-  RELEASE_ASSERT(!rc, "");
+    const Api::SysCallIntResult rc =
+        Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
+    RELEASE_ASSERT(!rc.return_value_, fmt::format("getiffaddrs error: {}", rc.errno_));
 
-  // man getifaddrs(3)
-  for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
-    if (ifa->ifa_addr == nullptr) {
-      continue;
-    }
-
-    if ((ifa->ifa_addr->sa_family == AF_INET && version == Address::IpVersion::v4) ||
-        (ifa->ifa_addr->sa_family == AF_INET6 && version == Address::IpVersion::v6)) {
-      const struct sockaddr_storage* addr =
-          reinterpret_cast<const struct sockaddr_storage*>(ifa->ifa_addr);
-      ret = Address::addressFromSockAddrOrThrow(
-          *addr, (version == Address::IpVersion::v4) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6));
-      if (!isLoopbackAddress(*ret)) {
+    // man getifaddrs(3)
+    for (const auto& interface_address : interface_addresses) {
+      if (!isLoopbackAddress(*interface_address.interface_addr_) &&
+          interface_address.interface_addr_->ip()->version() == version) {
+        ret = interface_address.interface_addr_;
         break;
       }
     }
   }
-
-  if (ifaddr) {
-    freeifaddrs(ifaddr);
-  }
-#endif
 
   // If the local address is not found above, then return the loopback address by default.
   if (ret == nullptr) {
@@ -285,11 +272,11 @@ bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
   // - Pipes
   // - Sockets to a loopback address
   // - Sockets where the local and remote address (ignoring port) are the same
-  const auto& remote_address = socket.addressProvider().remoteAddress();
+  const auto& remote_address = socket.connectionInfoProvider().remoteAddress();
   if (remote_address->type() == Address::Type::Pipe || isLoopbackAddress(*remote_address)) {
     return true;
   }
-  const auto local_ip = socket.addressProvider().localAddress()->ip();
+  const auto local_ip = socket.connectionInfoProvider().localAddress()->ip();
   const auto remote_ip = remote_address->ip();
   if (remote_ip != nullptr && local_ip != nullptr &&
       remote_ip->addressAsString() == local_ip->addressAsString()) {
@@ -345,7 +332,8 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  IS_ENVOY_BUG("unexpected address type");
+  return false;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
@@ -533,6 +521,9 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
     }
   }
   case envoy::config::core::v3::Address::AddressCase::kPipe:
+    return Socket::Type::Stream;
+  case envoy::config::core::v3::Address::AddressCase::kEnvoyInternalAddress:
+    // Currently internal address supports stream operation only.
     return Socket::Type::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

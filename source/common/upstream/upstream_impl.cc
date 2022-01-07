@@ -124,7 +124,6 @@ parseClusterSocketOptions(const envoy::config::cluster::v3::Cluster& config,
 
 ProtocolOptionsConfigConstSharedPtr
 createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                            const ProtobufWkt::Struct& config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -152,7 +151,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
   }
 
   Envoy::Config::Utility::translateOpaqueConfig(
-      typed_config, config, factory_context.messageValidationVisitor(), *proto_config);
+      typed_config, factory_context.messageValidationVisitor(), *proto_config);
   return factory->createProtocolOptionsConfig(*proto_config, factory_context);
 }
 
@@ -167,8 +166,7 @@ absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr> parseExten
     // protocol options.
     auto& name = Extensions::NetworkFilters::Common::FilterNameUtil::canonicalFilterName(it.first);
 
-    auto object = createProtocolOptionsConfig(
-        name, it.second, ProtobufWkt::Struct::default_instance(), factory_context);
+    auto object = createProtocolOptionsConfig(name, it.second, factory_context);
     if (object != nullptr) {
       options[name] = std::move(object);
     }
@@ -319,7 +317,10 @@ Network::ClientConnectionPtr HostImpl::createConnection(
   } else {
     connection_options = options;
   }
-  ASSERT(!address->envoyInternalAddress());
+
+  ASSERT(!address->envoyInternalAddress() ||
+         Runtime::runtimeFeatureEnabled("envoy.reloadable_features.internal_address"));
+
   Network::ClientConnectionPtr connection =
       address_list.size() > 1
           ? std::make_unique<Network::HappyEyeballsConnectionImpl>(
@@ -553,15 +554,17 @@ void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_
                                   const HostVector& hosts_added, const HostVector& hosts_removed,
                                   absl::optional<uint32_t> overprovisioning_factor,
                                   HostMapConstSharedPtr cross_priority_host_map) {
+  // Update cross priority host map first. In this way, when the update callbacks of the priority
+  // set are executed, the latest host map can always be obtained.
+  if (cross_priority_host_map != nullptr) {
+    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
+  }
+
   // Ensure that we have a HostSet for the given priority.
   getOrCreateHostSet(priority, overprovisioning_factor);
   static_cast<HostSetImpl*>(host_sets_[priority].get())
       ->updateHosts(std::move(update_hosts_params), std::move(locality_weights), hosts_added,
                     hosts_removed, overprovisioning_factor);
-
-  if (cross_priority_host_map != nullptr) {
-    const_cross_priority_host_map_ = std::move(cross_priority_host_map);
-  }
 
   if (!batch_update_) {
     runUpdateCallbacks(hosts_added, hosts_removed);
@@ -676,29 +679,31 @@ public:
   // other contexts taken from TransportSocketFactoryContext.
   FactoryContextImpl(Stats::Scope& stats_scope, Envoy::Runtime::Loader& runtime,
                      Server::Configuration::TransportSocketFactoryContext& c)
-      : admin_(c.admin()), stats_scope_(stats_scope), cluster_manager_(c.clusterManager()),
-        local_info_(c.localInfo()), dispatcher_(c.dispatcher()), runtime_(runtime),
+      : admin_(c.admin()), server_scope_(c.stats()), stats_scope_(stats_scope),
+        cluster_manager_(c.clusterManager()), local_info_(c.localInfo()),
+        dispatcher_(c.mainThreadDispatcher()), runtime_(runtime),
         singleton_manager_(c.singletonManager()), tls_(c.threadLocal()), api_(c.api()),
         options_(c.options()), message_validation_visitor_(c.messageValidationVisitor()) {}
 
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  Event::Dispatcher& dispatcher() override { return dispatcher_; }
+  Event::Dispatcher& mainThreadDispatcher() override { return dispatcher_; }
   const Server::Options& options() override { return options_; }
   const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Envoy::Runtime::Loader& runtime() override { return runtime_; }
   Stats::Scope& scope() override { return stats_scope_; }
+  Stats::Scope& serverScope() override { return server_scope_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   AccessLog::AccessLogManager& accessLogManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
@@ -707,18 +712,19 @@ public:
 
   Server::ServerLifecycleNotifier& lifecycleNotifier() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Init::Manager& initManager() override {
     // TODO(davinci26): Needs an implementation for this context. Currently not used.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("unimplemented");
   }
 
   Api::Api& api() override { return api_; }
 
 private:
   Server::Admin& admin_;
+  Stats::Scope& server_scope_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;
   const LocalInfo::LocalInfo& local_info_;
@@ -833,72 +839,42 @@ ClusterInfoImpl::ClusterInfoImpl(
                          "HttpProtocolOptions can be specified");
   }
 
-  switch (config.lb_policy()) {
-  case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
-    lb_type_ = LoadBalancerType::RoundRobin;
-    break;
-  case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
-    lb_type_ = LoadBalancerType::LeastRequest;
-    break;
-  case envoy::config::cluster::v3::Cluster::RANDOM:
-    lb_type_ = LoadBalancerType::Random;
-    break;
-  case envoy::config::cluster::v3::Cluster::RING_HASH:
-    lb_type_ = LoadBalancerType::RingHash;
-    break;
-  case envoy::config::cluster::v3::Cluster::MAGLEV:
-    lb_type_ = LoadBalancerType::Maglev;
-    break;
-  case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    lb_type_ = LoadBalancerType::ClusterProvided;
-    break;
-  case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
-    if (config.has_lb_subset_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    if (config.has_common_lb_config()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    if (!config.has_load_balancing_policy()) {
-      throw EnvoyException(
-          fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
-                      envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
-    }
-
-    for (const auto& policy : config.load_balancing_policy().policies()) {
-      TypedLoadBalancerFactory* factory =
-          Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
-              policy.typed_extension_config(), /*is_optional=*/true);
-      if (factory != nullptr) {
-        load_balancing_policy_ = policy;
-        load_balancer_factory_ = factory;
-        break;
+  // If load_balancing_policy is set we will use it directly, ignoring lb_policy.
+  if (config.has_load_balancing_policy()) {
+    configureLbPolicies(config);
+  } else {
+    switch (config.lb_policy()) {
+    case envoy::config::cluster::v3::Cluster::ROUND_ROBIN:
+      lb_type_ = LoadBalancerType::RoundRobin;
+      break;
+    case envoy::config::cluster::v3::Cluster::LEAST_REQUEST:
+      lb_type_ = LoadBalancerType::LeastRequest;
+      break;
+    case envoy::config::cluster::v3::Cluster::RANDOM:
+      lb_type_ = LoadBalancerType::Random;
+      break;
+    case envoy::config::cluster::v3::Cluster::RING_HASH:
+      lb_type_ = LoadBalancerType::RingHash;
+      break;
+    case envoy::config::cluster::v3::Cluster::MAGLEV:
+      lb_type_ = LoadBalancerType::Maglev;
+      break;
+    case envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED:
+      if (config.has_lb_subset_config()) {
+        throw EnvoyException(
+            fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                        envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
       }
-    }
 
-    if (load_balancer_factory_ == nullptr) {
-      throw EnvoyException(fmt::format(
-          "Didn't find a registered load balancer factory implementation for cluster: '{}'",
-          name_));
+      lb_type_ = LoadBalancerType::ClusterProvided;
+      break;
+    case envoy::config::cluster::v3::Cluster::LOAD_BALANCING_POLICY_CONFIG: {
+      configureLbPolicies(config);
+      break;
     }
-
-    lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
-    break;
-  }
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 
   if (config.lb_subset_config().locality_weight_aware() &&
@@ -916,6 +892,16 @@ ClusterInfoImpl::ClusterInfoImpl(
     }
   } else {
     idle_timeout_ = std::chrono::hours(1);
+  }
+
+  if (http_protocol_options_->common_http_protocol_options_.has_max_connection_duration()) {
+    max_connection_duration_ = std::chrono::milliseconds(DurationUtil::durationToMilliseconds(
+        http_protocol_options_->common_http_protocol_options_.max_connection_duration()));
+    if (max_connection_duration_.value().count() == 0) {
+      max_connection_duration_ = absl::nullopt;
+    }
+  } else {
+    max_connection_duration_ = absl::nullopt;
   }
 
   if (config.has_eds_cluster_config()) {
@@ -939,12 +925,51 @@ ClusterInfoImpl::ClusterInfoImpl(
     auto& factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
-    Config::Utility::translateOpaqueConfig(proto_config.typed_config(), ProtobufWkt::Struct(),
+    Config::Utility::translateOpaqueConfig(proto_config.typed_config(),
                                            factory_context.messageValidationVisitor(), *message);
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
   }
+}
+
+// Configures the load balancer based on config.load_balancing_policy
+void ClusterInfoImpl::configureLbPolicies(const envoy::config::cluster::v3::Cluster& config) {
+  if (config.has_lb_subset_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (config.has_common_lb_config()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} cannot be combined with common_lb_config",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  if (!config.has_load_balancing_policy()) {
+    throw EnvoyException(
+        fmt::format("cluster: LB policy {} requires load_balancing_policy to be set",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(config.lb_policy())));
+  }
+
+  for (const auto& policy : config.load_balancing_policy().policies()) {
+    TypedLoadBalancerFactory* factory =
+        Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
+            policy.typed_extension_config(), /*is_optional=*/true);
+    if (factory != nullptr) {
+      load_balancing_policy_ = policy;
+      load_balancer_factory_ = factory;
+      break;
+    }
+  }
+
+  if (load_balancer_factory_ == nullptr) {
+    throw EnvoyException(fmt::format(
+        "Didn't find a registered load balancer factory implementation for cluster: '{}'", name_));
+  }
+
+  lb_type_ = LoadBalancerType::LoadBalancingPolicyConfig;
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -1017,14 +1042,15 @@ ClusterImplBase::ClusterImplBase(
       local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
-          factory_context.singletonManager(), factory_context.dispatcher())) {
+          factory_context.singletonManager(), factory_context.mainThreadDispatcher())) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   auto* raw_factory_pointer = socket_factory.get();
 
   auto socket_matcher = std::make_unique<TransportSocketMatcherImpl>(
       cluster.transport_socket_matches(), factory_context, socket_factory, *stats_scope);
-  auto& dispatcher = factory_context.dispatcher();
+  const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
+  auto& dispatcher = factory_context.mainThreadDispatcher();
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       new ClusterInfoImpl(cluster, factory_context.clusterManager().bindConfig(), runtime,
                           std::move(socket_matcher), std::move(stats_scope), added_via_api,
@@ -1035,11 +1061,18 @@ ClusterImplBase::ClusterImplBase(
             std::unique_ptr<const Event::DispatcherThreadDeletable>(self));
       });
 
-  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN) &&
-      !raw_factory_pointer->supportsAlpn()) {
-    throw EnvoyException(
-        fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
-                    cluster.name(), cluster.DebugString()));
+  if ((info_->features() & ClusterInfoImpl::Features::USE_ALPN)) {
+    if (!raw_factory_pointer->supportsAlpn()) {
+      throw EnvoyException(
+          fmt::format("ALPN configured for cluster {} which has a non-ALPN transport socket: {}",
+                      cluster.name(), cluster.DebugString()));
+    }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.correctly_validate_alpn") &&
+        !matcher_supports_alpn) {
+      throw EnvoyException(fmt::format(
+          "ALPN configured for cluster {} which has a non-ALPN transport socket matcher: {}",
+          cluster.name(), cluster.DebugString()));
+    }
   }
 
   if (info_->features() & ClusterInfoImpl::Features::HTTP3) {
@@ -1084,9 +1117,7 @@ namespace {
 
 bool excludeBasedOnHealthFlag(const Host& host) {
   return host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC) ||
-         (host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL) &&
-          Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.health_check.immediate_failure_exclude_from_cluster"));
+         host.healthFlagGet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
 }
 
 } // namespace
@@ -1473,8 +1504,16 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality weights.
-  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  // If we are configured for locality weighted LB we populate the locality weights. We also
+  // populate locality weights if the cluster uses load balancing extensions, since the extension
+  // may want to make use of locality weights and we cannot tell by inspecting the config whether
+  // this is the case.
+  //
+  // TODO: have the load balancing extension indicate, programmatically, whether it needs locality
+  // weights, as an optimization in cases where it doesn't.
+  const bool locality_weighted_lb =
+      parent_.info()->lbConfig().has_locality_weighted_lb_config() ||
+      parent_.info()->lbType() == LoadBalancerType::LoadBalancingPolicyConfig;
   if (locality_weighted_lb) {
     locality_weights = std::make_shared<LocalityWeights>();
   }
@@ -1596,14 +1635,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       }
       if (existing_host->second->weight() != host->weight()) {
         existing_host->second->weight(host->weight());
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.upstream_host_weight_change_causes_rebuild")) {
-          // We do full host set rebuilds so that load balancers can do pre-computation of data
-          // structures based on host weight. This may become a performance problem in certain
-          // deployments so it is runtime feature guarded and may also need to be configurable
-          // and/or dynamic in the future.
-          hosts_changed = true;
-        }
+        // We do full host set rebuilds so that load balancers can do pre-computation of data
+        // structures based on host weight. This may become a performance problem in certain
+        // deployments so it is runtime feature guarded and may also need to be configurable
+        // and/or dynamic in the future.
+        hosts_changed = true;
       }
 
       hosts_changed |=
@@ -1759,6 +1795,10 @@ getDnsLookupFamilyFromEnum(envoy::config::cluster::v3::Cluster::DnsLookupFamily 
     return Network::DnsLookupFamily::V4Only;
   case envoy::config::cluster::v3::Cluster::AUTO:
     return Network::DnsLookupFamily::Auto;
+  case envoy::config::cluster::v3::Cluster::V4_PREFERRED:
+    return Network::DnsLookupFamily::V4Preferred;
+  case envoy::config::cluster::v3::Cluster::ALL:
+    return Network::DnsLookupFamily::All;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

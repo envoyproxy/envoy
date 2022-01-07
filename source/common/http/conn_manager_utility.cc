@@ -132,13 +132,14 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // are but they didn't populate XFF properly, the trusted client address is the
     // source address of the immediate downstream's connection to us.
     if (final_remote_address == nullptr) {
-      final_remote_address = connection.addressProvider().remoteAddress();
+      final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
     if (!config.skipXffAppend()) {
-      if (Network::Utility::isLoopbackAddress(*connection.addressProvider().remoteAddress())) {
+      if (Network::Utility::isLoopbackAddress(
+              *connection.connectionInfoProvider().remoteAddress())) {
         Utility::appendXff(request_headers, config.localAddress());
       } else {
-        Utility::appendXff(request_headers, *connection.addressProvider().remoteAddress());
+        Utility::appendXff(request_headers, *connection.connectionInfoProvider().remoteAddress());
       }
     }
     // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
@@ -155,7 +156,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
-                                        connection.addressProvider().remoteAddress()};
+                                        connection.connectionInfoProvider().remoteAddress()};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
@@ -186,8 +187,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // If :scheme is not set, sets :scheme based on X-Forwarded-Proto if a valid scheme,
   // else encryption level.
   // X-Forwarded-Proto and :scheme may still differ if different values are sent from downstream.
-  if (!request_headers.Scheme() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.add_and_validate_scheme_header")) {
+  if (!request_headers.Scheme()) {
     request_headers.setScheme(
         getScheme(request_headers.getForwardedProtoValue(), connection.ssl() != nullptr));
   }
@@ -208,7 +208,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   // After determining internal request status, if there is no final remote address, due to no XFF,
   // busted XFF, etc., use the direct connection remote address for logging.
   if (final_remote_address == nullptr) {
-    final_remote_address = connection.addressProvider().remoteAddress();
+    final_remote_address = connection.connectionInfoProvider().remoteAddress();
   }
 
   // Edge request is the request from external clients to front Envoy.
@@ -258,6 +258,13 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     rid_extension->set(request_headers, force_set);
   }
 
+  if (connection.connecting() && request_headers.get(Headers::get().EarlyData).empty()) {
+    // Add an Early-Data header to indicate that this is a 0-RTT request according to
+    // https://datatracker.ietf.org/doc/html/rfc8470#section-5.1.
+    HeaderString value;
+    value.setCopy("1");
+    request_headers.addViaMove(HeaderString(Headers::get().EarlyData), std::move(value));
+  }
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return {final_remote_address, absl::nullopt};
@@ -427,12 +434,14 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(RequestHeaderMap& request
   }
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
+
+  ENVOY_BUG(config.forwardClientCert() == ForwardClientCertType::AppendForward ||
+                config.forwardClientCert() == ForwardClientCertType::SanitizeSet,
+            "error in client cert logic");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
     request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
-  } else {
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

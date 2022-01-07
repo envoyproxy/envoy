@@ -1,14 +1,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/filter_manager_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/filters/network/ratelimit/ratelimit.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
@@ -357,77 +355,6 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   EXPECT_CALL(*write_filter, onWrite(BufferStringEqual("foobar"), true))
       .WillOnce(Return(FilterStatus::Continue));
   manager.onWrite();
-}
-
-// This is a very important flow so make sure it works correctly in aggregate.
-TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
-  InSequence s;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<MockClientConnection> upstream_connection;
-  NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
-  FilterManagerImpl manager(connection_, socket_);
-
-  std::string rl_yaml = R"EOF(
-domain: foo
-descriptors:
-- entries:
-  - key: hello
-    value: world
-stat_prefix: name
-    )EOF";
-
-  ON_CALL(factory_context.runtime_loader_.snapshot_,
-          featureEnabled("ratelimit.tcp_filter_enabled", 100))
-      .WillByDefault(Return(true));
-  ON_CALL(factory_context.runtime_loader_.snapshot_,
-          featureEnabled("ratelimit.tcp_filter_enforcing", 100))
-      .WillByDefault(Return(true));
-
-  envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
-  TestUtility::loadFromYaml(rl_yaml, proto_config);
-
-  Extensions::NetworkFilters::RateLimitFilter::ConfigSharedPtr rl_config(
-      new Extensions::NetworkFilters::RateLimitFilter::Config(proto_config, factory_context.scope_,
-                                                              factory_context.runtime_loader_));
-  Extensions::Filters::Common::RateLimit::MockClient* rl_client =
-      new Extensions::Filters::Common::RateLimit::MockClient();
-  manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
-      rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
-
-  factory_context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  tcp_proxy.set_stat_prefix("name");
-  tcp_proxy.set_cluster("fake_cluster");
-  TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
-  manager.addReadFilter(
-      std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_));
-
-  Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
-  EXPECT_CALL(*rl_client, limit(_, "foo",
-                                testing::ContainerEq(
-                                    std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
-                                testing::A<Tracing::Span&>(), _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](Extensions::Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            request_callbacks = &callbacks;
-          })));
-
-  EXPECT_EQ(manager.initializeReadFilters(), true);
-
-  EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
-
-  request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr, nullptr, "", nullptr);
-
-  conn_pool.poolReady(upstream_connection);
-
-  Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connection, write(BufferEqual(&buffer), _));
-  read_buffer_.add("hello");
-  manager.onRead();
-
-  connection_.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
 TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {

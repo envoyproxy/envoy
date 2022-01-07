@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["alternate_protocols_cache.h"],
     deps = [
         "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -32,6 +33,7 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/tracing:http_tracer_interface",
         "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )

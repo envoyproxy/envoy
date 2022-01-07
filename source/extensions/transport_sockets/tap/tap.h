@@ -28,8 +28,7 @@ private:
   PerSocketTapperPtr tapper_;
 };
 
-class TapSocketFactory : public Network::TransportSocketFactory,
-                         public Common::Tap::ExtensionConfigBase {
+class TapSocketFactory : public Common::Tap::ExtensionConfigBase, public PassthroughFactory {
 public:
   TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
                    Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
@@ -40,11 +39,6 @@ public:
   // Network::TransportSocketFactory
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override;
-
-private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
 };
 
 } // namespace Tap

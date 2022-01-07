@@ -21,7 +21,7 @@ protected:
 constexpr static int32_t UPDATE_COUNT = 42;
 
 TEST_F(MetricsIntegrationTest, ShouldUpdateRequestMetrics) {
-  for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
+  for (const int16_t api_key : MessageUtilities::apiKeys()) {
     // given
     // when
     for (int i = 0; i < UPDATE_COUNT; ++i) {
@@ -46,7 +46,7 @@ TEST_F(MetricsIntegrationTest, ShouldHandleUnparseableRequest) {
 }
 
 TEST_F(MetricsIntegrationTest, ShouldUpdateResponseMetrics) {
-  for (int16_t api_key = 0; api_key < MessageUtilities::apiKeys(); ++api_key) {
+  for (const int16_t api_key : MessageUtilities::apiKeys()) {
     // given
     // when
     for (int i = 0; i < UPDATE_COUNT; ++i) {

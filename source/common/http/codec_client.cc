@@ -79,6 +79,10 @@ RequestEncoder& CodecClient::newStream(ResponseDecoder& response_decoder) {
   request->encoder_ = &codec_->newStream(*request);
   request->encoder_->getStream().addCallbacks(*request);
   LinkedList::moveIntoList(std::move(request), active_requests_);
+
+  auto upstream_info = connection_->streamInfo().upstreamInfo();
+  upstream_info->setUpstreamNumStreams(upstream_info->upstreamNumStreams() + 1);
+
   disableIdleTimer();
   return *active_requests_.front()->encoder_;
 }
@@ -110,12 +114,8 @@ void CodecClient::onEvent(Network::ConnectionEvent event) {
     if (connected_) {
       reason = StreamResetReason::ConnectionTermination;
       if (protocol_error_) {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.return_502_for_upstream_protocol_errors")) {
-          reason = StreamResetReason::ProtocolError;
-          connection_->streamInfo().setResponseFlag(
-              StreamInfo::ResponseFlag::UpstreamProtocolError);
-        }
+        reason = StreamResetReason::ProtocolError;
+        connection_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::UpstreamProtocolError);
       }
     }
     while (!active_requests_.empty()) {

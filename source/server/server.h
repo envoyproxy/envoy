@@ -27,6 +27,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/logger_delegates.h"
+#include "source/common/common/perf_tracing.h"
 #include "source/common/grpc/async_client_manager_impl.h"
 #include "source/common/grpc/context_impl.h"
 #include "source/common/http/context_impl.h"
@@ -71,6 +72,7 @@ struct ServerCompilationSettingsStats {
   COUNTER(envoy_bug_failures)                                                                      \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
+  COUNTER(wip_protos)                                                                              \
   COUNTER(dropped_stat_flushes)                                                                    \
   GAUGE(concurrency, NeverImport)                                                                  \
   GAUGE(days_until_first_cert_expiring, NeverImport)                                               \
@@ -174,7 +176,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
-  Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
+  Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
   ProtobufMessage::ValidationContext& messageValidationContext() override {
@@ -182,6 +184,7 @@ public:
   }
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
+  Stats::Scope& serverScope() override { return *server_scope_; }
   Singleton::Manager& singletonManager() override { return server_.singletonManager(); }
   ThreadLocal::Instance& threadLocal() override { return server_.threadLocal(); }
   Admin& admin() override { return server_.admin(); }
@@ -291,6 +294,10 @@ public:
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
 
+  void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
+    stats_store_.setSinkPredicates(std::move(sink_predicates));
+  }
+
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
   ServerLifecycleNotifier::HandlePtr
@@ -302,7 +309,7 @@ private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
   void flushStatsInternal();
   void updateServerStats();
-  void initialize(const Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  void initialize(Network::Address::InstanceConstSharedPtr local_address,
                   ComponentFactory& component_factory);
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
@@ -397,6 +404,11 @@ private:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
+
+#ifdef ENVOY_PERFETTO
+  std::unique_ptr<perfetto::TracingSession> tracing_session_{};
+  os_fd_t tracing_fd_{INVALID_HANDLE};
+#endif
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

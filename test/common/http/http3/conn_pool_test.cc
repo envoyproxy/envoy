@@ -68,6 +68,60 @@ public:
   ConnectionPool::InstancePtr pool_;
 };
 
+class MockQuicClientTransportSocketFactory : public Quic::QuicClientTransportSocketFactory {
+public:
+  MockQuicClientTransportSocketFactory(
+      Ssl::ClientContextConfigPtr config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context)
+      : Quic::QuicClientTransportSocketFactory(move(config), factory_context) {}
+
+  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
+};
+
+TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
+  MockQuicClientTransportSocketFactory factory{
+      std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
+      context_};
+
+  EXPECT_CALL(factory, sslCtx()).WillRepeatedly(Return(nullptr));
+
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory));
+  // The unique pointer of this object will be returned in createSchedulableCallback_ of
+  // dispatcher_, so there is no risk of object leak.
+  new Event::MockSchedulableCallback(&dispatcher_);
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::TransportSocketOptionsConstSharedPtr transport_options;
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, simTime(), quic_stat_names_, store_);
+
+  EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
+}
+
+TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
+  MockQuicClientTransportSocketFactory factory{
+      std::unique_ptr<Envoy::Ssl::ClientContextConfig>(new NiceMock<Ssl::MockClientContextConfig>),
+      context_};
+
+  Ssl::ClientContextSharedPtr ssl_context(new Ssl::MockClientContext());
+  EXPECT_CALL(factory, sslCtx())
+      .WillOnce(Return(ssl_context))
+      .WillOnce(Return(nullptr))
+      .WillRepeatedly(Return(ssl_context));
+
+  EXPECT_CALL(mockHost(), address()).WillRepeatedly(Return(test_address_));
+  EXPECT_CALL(mockHost(), transportSocketFactory()).WillRepeatedly(testing::ReturnRef(factory));
+  new Event::MockSchedulableCallback(&dispatcher_);
+  Network::ConnectionSocket::OptionsSharedPtr options;
+  Network::TransportSocketOptionsConstSharedPtr transport_options;
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, simTime(), quic_stat_names_, store_);
+
+  EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
+}
+
 TEST_F(Http3ConnPoolImplTest, CreationWithBufferLimits) {
   EXPECT_CALL(mockHost().cluster_, perConnectionBufferLimitBytes);
   initialize();

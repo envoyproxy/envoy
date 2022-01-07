@@ -279,7 +279,7 @@ TEST_F(SecretManagerImplTest, DeduplicateDynamicTlsCertificateSecretProvider) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   envoy::config::core::v3::ConfigSource config_source;
@@ -362,7 +362,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
 
@@ -408,7 +408,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
   Init::TargetHandlePtr init_target_handle;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher;
 
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
@@ -461,7 +461,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -731,7 +731,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider =
@@ -879,7 +879,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSecrets) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string tls_certificate =
@@ -956,7 +956,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string validation_context =
@@ -1004,7 +1004,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticSessionTicketsContext) {
       }));
   EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   const std::string stek_context =
@@ -1085,7 +1085,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
       }));
   EXPECT_CALL(secret_context, stats()).WillOnce(ReturnRef(stats));
   EXPECT_CALL(secret_context, initManager()).WillRepeatedly(ReturnRef(init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
+  EXPECT_CALL(secret_context, mainThreadDispatcher()).WillRepeatedly(ReturnRef(*dispatcher_));
   EXPECT_CALL(secret_context, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context, api()).WillRepeatedly(ReturnRef(*api_));
 
@@ -1126,6 +1126,43 @@ tls_certificate:
   EXPECT_THROW_WITH_MESSAGE(
       Ssl::TlsCertificateConfigImpl tls_config(*secret_provider->secret(), ctx, *api_),
       EnvoyException, "Failed to load private key provider: test");
+}
+
+// Verify that using the match_subject_alt_names will result in a typed matcher, one for each of
+// DNS, URI, EMAIL and IP_ADDRESS.
+// TODO(pradeepcrao): Delete this test once the deprecated field is removed.
+TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
+  envoy::extensions::transport_sockets::tls::v3::Secret secret_config;
+  const std::string yaml =
+      R"EOF(
+      name: "abc.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+        match_subject_alt_names:
+          exact: "example.foo"
+      )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(config_tracker_));
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
+  ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+  Ssl::CertificateValidationContextConfigImpl cvc_config(
+      *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(), *api_);
+  EXPECT_EQ(cvc_config.subjectAltNameMatchers().size(), 4);
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[0].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::DNS,
+            cvc_config.subjectAltNameMatchers()[0].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[1].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::URI,
+            cvc_config.subjectAltNameMatchers()[1].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[2].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::EMAIL,
+            cvc_config.subjectAltNameMatchers()[2].san_type());
+  EXPECT_EQ("example.foo", cvc_config.subjectAltNameMatchers()[3].matcher().exact());
+  EXPECT_EQ(envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher::IP_ADDRESS,
+            cvc_config.subjectAltNameMatchers()[3].san_type());
 }
 
 } // namespace

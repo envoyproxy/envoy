@@ -29,7 +29,8 @@ class Filter : public Http::StreamFilter,
                public AccessLog::Instance,
                Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit Filter(FilterStats& stats) : decoded_headers_(false), stats_(stats) {}
+  Filter(FilterStats& stats, Event::Dispatcher& dispatcher)
+      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -43,7 +44,7 @@ public:
   void decodeComplete() override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+  Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
@@ -78,6 +79,7 @@ public:
 private:
   friend FactoryCallbacksWrapper;
 
+  Event::Dispatcher& dispatcher_;
   // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
   // serve to surface an easier to understand error, as attempting to insert a filter at a later
   // time will result in various FM assertions firing.
@@ -104,7 +106,7 @@ private:
     void decodeComplete() override;
 
     // Http::StreamEncoderFilter
-    Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap& headers) override;
+    Http::FilterHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap& headers) override;
     Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                             bool end_stream) override;
     Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;

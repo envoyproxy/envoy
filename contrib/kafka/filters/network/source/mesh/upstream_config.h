@@ -7,13 +7,19 @@
 
 #include "envoy/common/pure.h"
 
+#include "source/common/common/logger.h"
+
 #include "absl/types/optional.h"
+#include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
+#include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Kafka {
 namespace Mesh {
+
+using KafkaMeshProtoConfig = envoy::extensions::filters::network::kafka_mesh::v3alpha::KafkaMesh;
 
 // Minor helper structure that contains information about upstream Kafka clusters.
 struct ClusterConfig {
@@ -32,22 +38,51 @@ struct ClusterConfig {
   // This map always contains entry with key 'bootstrap.servers', as this is the only mandatory
   // producer property.
   std::map<std::string, std::string> upstream_producer_properties_;
+
+  bool operator==(const ClusterConfig& rhs) const {
+    return name_ == rhs.name_ && partition_count_ == rhs.partition_count_ &&
+           upstream_producer_properties_ == rhs.upstream_producer_properties_;
+  }
 };
 
 /**
  * Keeps the configuration related to upstream Kafka clusters.
- * Impl note: current matching from topic to cluster is based on prefix matching but more complex
- * rules could be added.
  */
 class UpstreamKafkaConfiguration {
 public:
   virtual ~UpstreamKafkaConfiguration() = default;
+
+  // Return this the host-port pair that's provided to Kafka clients.
+  // This value needs to follow same rules as 'advertised.address' property of Kafka broker.
+  virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
+
+  // Provides cluster for given Kafka topic, according to the rules contained within this
+  // configuration object.
   virtual absl::optional<ClusterConfig>
   computeClusterConfigForTopic(const std::string& topic) const PURE;
-  virtual std::pair<std::string, int32_t> getAdvertisedAddress() const PURE;
 };
 
 using UpstreamKafkaConfigurationSharedPtr = std::shared_ptr<const UpstreamKafkaConfiguration>;
+
+/**
+ * Implementation that uses only topic-prefix to figure out which Kafka cluster to use.
+ */
+class UpstreamKafkaConfigurationImpl : public UpstreamKafkaConfiguration,
+                                       private Logger::Loggable<Logger::Id::kafka> {
+public:
+  UpstreamKafkaConfigurationImpl(const KafkaMeshProtoConfig& config);
+
+  // UpstreamKafkaConfiguration
+  absl::optional<ClusterConfig>
+  computeClusterConfigForTopic(const std::string& topic) const override;
+
+  // UpstreamKafkaConfiguration
+  std::pair<std::string, int32_t> getAdvertisedAddress() const override;
+
+private:
+  const std::pair<std::string, int32_t> advertised_address_;
+  std::map<std::string, ClusterConfig> topic_prefix_to_cluster_config_;
+};
 
 } // namespace Mesh
 } // namespace Kafka

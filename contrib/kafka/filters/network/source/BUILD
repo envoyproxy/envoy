@@ -5,14 +5,14 @@ load(
     "envoy_contrib_package",
 )
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
-load("@kafka_pip3//:requirements.bzl", "requirement")
+load("@base_pip3//:requirements.bzl", "requirement")
 
 licenses(["notice"])  # Apache 2
 
 envoy_contrib_package()
 
 # Kafka network filter.
-# Broker filter public docs: docs/root/configuration/network_filters/kafka_broker_filter.rst
+# Broker filter public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/kafka_broker_filter
 
 envoy_cc_contrib_extension(
     name = "kafka_broker_config_lib",

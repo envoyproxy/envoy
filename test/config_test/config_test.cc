@@ -27,6 +27,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -85,16 +86,15 @@ public:
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
         .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
 
-    // TODO(snowp): There's no way to override runtime flags per example file (since we mock out the
-    // runtime loader), so temporarily enable this flag explicitly here until we flip the default.
-    // This should allow the existing configuration examples to continue working despite the feature
-    // being disabled by default.
-    ON_CALL(*snapshot_,
-            runtimeFeatureEnabled("envoy.reloadable_features.experimental_matching_api"))
-        .WillByDefault(Return(true));
     ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
       return snapshot_;
     }));
+
+    // For configuration/example tests we don't fail if WIP APIs are used.
+    EXPECT_CALL(server_.validation_context_.static_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
+    EXPECT_CALL(server_.validation_context_.dynamic_validation_visitor_, onWorkInProgress(_))
+        .Times(AtLeast(0));
 
     envoy::config::bootstrap::v3::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(

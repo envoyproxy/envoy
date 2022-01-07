@@ -8,7 +8,6 @@
 
 #include "absl/container/flat_hash_map.h"
 
-// TODO(alyssawilk) move to a common extension dir.
 namespace Envoy {
 
 // This is the base implementation of the KeyValueStore. It handles the various

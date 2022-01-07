@@ -6,8 +6,8 @@
 #include "contrib/rocketmq_proxy/filters/network/source/active_message.h"
 #include "contrib/rocketmq_proxy/filters/network/source/codec.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
+#include "contrib/rocketmq_proxy/filters/network/source/constant.h"
 #include "contrib/rocketmq_proxy/filters/network/source/protocol.h"
-#include "contrib/rocketmq_proxy/filters/network/source/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

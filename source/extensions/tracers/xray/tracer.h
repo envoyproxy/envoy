@@ -65,6 +65,12 @@ public:
   }
 
   /**
+   * Sets the current direction on the Span.
+   * This information will be included in the X-Ray span's annotation.
+   */
+  void setDirection(absl::string_view direction) { direction_ = std::string(direction); }
+
+  /**
    * Sets the name of the Span.
    */
   void setName(absl::string_view name) { name_ = std::string(name); }
@@ -140,7 +146,15 @@ public:
    */
   const std::string& id() const { return id_; }
 
+  /**
+   * Gets this Span's parent ID.
+   */
   const std::string& parentId() const { return parent_segment_id_; }
+
+  /**
+   * Gets this Span's direction.
+   */
+  const std::string& direction() const { return direction_; }
 
   /**
    * Gets this Span's name.
@@ -196,6 +210,7 @@ private:
   DaemonBroker& broker_;
   Envoy::SystemTime start_time_;
   std::string operation_name_;
+  std::string direction_;
   std::string id_;
   std::string trace_id_;
   std::string parent_segment_id_;
@@ -222,7 +237,8 @@ public:
   /**
    * Starts a tracing span for X-Ray
    */
-  Tracing::SpanPtr startSpan(const std::string& operation_name, Envoy::SystemTime start_time,
+  Tracing::SpanPtr startSpan(const Tracing::Config&, const std::string& operation_name,
+                             Envoy::SystemTime start_time,
                              const absl::optional<XRayHeader>& xray_header);
   /**
    * Creates a Span that is marked as not-sampled.

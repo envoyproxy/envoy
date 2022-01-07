@@ -518,9 +518,20 @@ public:
    *
    * @param reset_handler supplies the stream_reset_handler the account will
    * invoke to reset the stream.
-   * @return a BufferMemoryAccountSharedPtr of the newly created account.
+   * @return a BufferMemoryAccountSharedPtr of the newly created account or
+   * nullptr if tracking is disabled.
    */
   virtual BufferMemoryAccountSharedPtr createAccount(Http::StreamResetHandler& reset_handler) PURE;
+
+  /**
+   * Goes through the tracked accounts, resetting the accounts and their
+   * corresponding stream depending on the pressure.
+   *
+   * @param pressure scaled threshold pressure used to compute the buckets to
+   *  reset internally.
+   * @return the number of streams reset
+   */
+  virtual uint64_t resetAccountsGivenPressure(float pressure) PURE;
 };
 
 using WatermarkFactoryPtr = std::unique_ptr<WatermarkFactory>;

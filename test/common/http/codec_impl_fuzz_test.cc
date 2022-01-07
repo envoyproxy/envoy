@@ -215,7 +215,7 @@ public:
         auto headers =
             fromSanitizedHeaders<TestResponseHeaderMapImpl>(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
-        state.response_encoder_->encode100ContinueHeaders(headers);
+        state.response_encoder_->encode1xxHeaders(headers);
       }
       break;
     }
@@ -683,6 +683,10 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
     dynamic_cast<Http2::ClientConnectionImpl&>(*client).goAway();
     dynamic_cast<Http2::ServerConnectionImpl&>(*server).goAway();
   }
+
+  // Run deletion as would happen on the dispatchers to avoid inversion of
+  // lifetimes of dispatcher and connection.
+  server_connection.dispatcher_.to_delete_.clear();
 }
 
 } // namespace

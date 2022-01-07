@@ -32,12 +32,9 @@ public:
     UNREFERENCED_PARAMETER(runtime);
     return Status::Block;
 #else
-    bool warn_only = true;
-
-    if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(
-                       "envoy.deprecated_features.allow_deprecated_extension_names", true)) {
-      warn_only = false;
-    }
+    const bool warn_only =
+        runtime && runtime->snapshot().deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.allow_deprecated_extension_names", false);
 
     return warn_only ? Status::Warn : Status::Block;
 #endif

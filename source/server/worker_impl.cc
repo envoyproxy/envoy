@@ -20,14 +20,16 @@ WorkerPtr ProdWorkerFactory::createWorker(uint32_t index, OverloadManager& overl
       api_.allocateDispatcher(worker_name, overload_manager.scaledTimerFactory()));
   auto conn_handler = std::make_unique<ConnectionHandlerImpl>(*dispatcher, index);
   return std::make_unique<WorkerImpl>(tls_, hooks_, std::move(dispatcher), std::move(conn_handler),
-                                      overload_manager, api_);
+                                      overload_manager, api_, stat_names_);
 }
 
 WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        Event::DispatcherPtr&& dispatcher, Network::ConnectionHandlerPtr handler,
-                       OverloadManager& overload_manager, Api::Api& api)
+                       OverloadManager& overload_manager, Api::Api& api,
+                       WorkerStatNames& stat_names)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
-      api_(api) {
+      api_(api), reset_streams_counter_(
+                     api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -35,6 +37,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
   overload_manager.registerForAction(
       OverloadActionNames::get().RejectIncomingConnections, *dispatcher_,
       [this](OverloadActionState state) { rejectIncomingConnectionsCb(state); });
+  overload_manager.registerForAction(
+      OverloadActionNames::get().ResetStreams, *dispatcher_,
+      [this](OverloadActionState state) { resetStreamsUsingExcessiveMemory(state); });
 }
 
 void WorkerImpl::addListener(absl::optional<uint64_t> overridden_listener,
@@ -146,6 +151,12 @@ void WorkerImpl::stopAcceptingConnectionsCb(OverloadActionState state) {
 
 void WorkerImpl::rejectIncomingConnectionsCb(OverloadActionState state) {
   handler_->setListenerRejectFraction(state.value());
+}
+
+void WorkerImpl::resetStreamsUsingExcessiveMemory(OverloadActionState state) {
+  uint64_t streams_reset_count =
+      dispatcher_->getWatermarkFactory().resetAccountsGivenPressure(state.value().value());
+  reset_streams_counter_.add(streams_reset_count);
 }
 
 } // namespace Server

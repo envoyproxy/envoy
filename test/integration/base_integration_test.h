@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -8,6 +9,7 @@
 #include "envoy/server/process_context.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/api_version.h"
 #include "source/extensions/transport_sockets/tls/context_manager_impl.h"
 
@@ -69,7 +71,7 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { config_helper_.skipPortUsageValidation(); }
   // Make test more deterministic by using a fixed RNG value.
-  void setDeterministic() { deterministic_ = true; }
+  void setDeterministicValue(uint64_t value = 0) { deterministic_value_ = value; }
 
   Http::CodecType upstreamProtocol() const { return upstream_config_.upstream_protocol_; }
 
@@ -143,7 +145,8 @@ public:
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
                              const std::vector<std::string>& removed, const std::string& version) {
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
+        sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
       sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
     } else {
       sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version);
@@ -155,10 +158,10 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "") {
+      const std::string& expected_error_message = "", bool expect_node = true) {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
                                         expected_resource_unsubscriptions, xds_stream_,
-                                        expected_error_code, expected_error_message);
+                                        expected_error_code, expected_error_message, expect_node);
   }
 
   AssertionResult compareDeltaDiscoveryRequest(
@@ -166,7 +169,7 @@ public:
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
       const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
-      const std::string& expected_error_message = "");
+      const std::string& expected_error_message = "", bool expect_node = true);
 
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
@@ -204,29 +207,41 @@ public:
     stream->sendGrpcMessage(response);
   }
 
+  // Sends a DeltaDiscoveryResponse with a given list of added resources.
+  // Note that the resources are expected to be of the same type, and match type_url.
+  void sendExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed) {
+    xds_stream_->sendGrpcMessage(
+        createExplicitResourcesDeltaDiscoveryResponse(type_url, added_or_updated, removed));
+  }
+
+  envoy::service::discovery::v3::DeltaDiscoveryResponse
+  createExplicitResourcesDeltaDiscoveryResponse(
+      const std::string& type_url,
+      const std::vector<envoy::service::discovery::v3::Resource>& added_or_updated,
+      const std::vector<std::string>& removed);
+
   template <class T>
   envoy::service::discovery::v3::DeltaDiscoveryResponse
   createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases) {
-    envoy::service::discovery::v3::DeltaDiscoveryResponse response;
-    response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(type_url);
+    std::vector<envoy::service::discovery::v3::Resource> resources;
     for (const auto& message : added_or_updated) {
-      auto* resource = response.add_resources();
+      envoy::service::discovery::v3::Resource resource;
       ProtobufWkt::Any temp_any;
       temp_any.PackFrom(message);
-      resource->mutable_resource()->PackFrom(message);
-      resource->set_name(intResourceName(message));
-      resource->set_version(version);
+      resource.mutable_resource()->PackFrom(message);
+      resource.set_name(intResourceName(message));
+      resource.set_version(version);
       for (const auto& alias : aliases) {
-        resource->add_aliases(alias);
+        resource.add_aliases(alias);
       }
+      resources.emplace_back(resource);
     }
-    *response.mutable_removed_resources() = {removed.begin(), removed.end()};
-    static int next_nonce_counter = 0;
-    response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    return response;
+    return createExplicitResourcesDeltaDiscoveryResponse(type_url, resources, removed);
   }
 
 private:
@@ -253,8 +268,10 @@ public:
    *
    * @param port the port to connect to.
    * @param raw_http the data to send.
-   * @param response the response data will be sent here
-   * @param if the connection should be terminated once '\r\n\r\n' has been read.
+   * @param response the response data will be sent here.
+   * @param disconnect_after_headers_complete if the connection should be terminated once "\r\n\r\n"
+   *        has been read.
+   * @param transport_socket the transport socket of the created client connection.
    **/
   void sendRawHttpAndWaitForResponse(int port, const char* raw_http, std::string* response,
                                      bool disconnect_after_headers_complete = false,
@@ -345,6 +362,9 @@ protected:
   void mergeOptions(envoy::config::core::v3::Http2ProtocolOptions& options) {
     upstream_config_.http2_options_.MergeFrom(options);
   }
+  void mergeOptions(envoy::config::listener::v3::QuicProtocolOptions& options) {
+    upstream_config_.quic_options_.MergeFrom(options);
+  }
 
   std::unique_ptr<Stats::Scope> upstream_stats_store_;
 
@@ -415,8 +435,9 @@ protected:
   // This does nothing if autonomous_upstream_ is false
   bool autonomous_allow_incomplete_streams_{false};
 
-  // True if test will use a fixed RNG value.
-  bool deterministic_{};
+  // If this member is not empty, the test will use a fixed RNG value specified
+  // by it.
+  absl::optional<uint64_t> deterministic_value_{};
 
   // Set true when your test will itself take care of ensuring listeners are up, and registering
   // them in the port_map_.

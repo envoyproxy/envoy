@@ -36,13 +36,13 @@ struct MockDaemonBroker : DaemonBroker {
 };
 
 struct TraceProperties {
-  TraceProperties(const std::string span_name, const std::string origin_name,
-                  const std::string aws_key_value, const std::string operation_name,
-                  const std::string http_method, const std::string http_url,
-                  const std::string user_agent)
+  TraceProperties(const std::string& span_name, const std::string& origin_name,
+                  const std::string& aws_key_value, const std::string& operation_name,
+                  const std::string& http_method, const std::string& http_url,
+                  const std::string& user_agent, const std::string& direction)
       : span_name(span_name), origin_name(origin_name), aws_key_value(aws_key_value),
         operation_name(operation_name), http_method(http_method), http_url(http_url),
-        user_agent(user_agent) {}
+        user_agent(user_agent), direction(direction) {}
   const std::string span_name;
   const std::string origin_name;
   const std::string aws_key_value;
@@ -50,17 +50,19 @@ struct TraceProperties {
   const std::string http_method;
   const std::string http_url;
   const std::string user_agent;
+  const std::string direction;
 };
 
 class XRayTracerTest : public ::testing::Test {
 public:
   XRayTracerTest()
       : broker_(std::make_unique<MockDaemonBroker>("127.0.0.1:2000")),
-        expected_(std::make_unique<TraceProperties>("Service 1", "AWS::Service::Proxy",
-                                                    "test_value", "Create", "POST", "/first/second",
-                                                    "Mozilla/5.0 (Macintosh; Intel Mac OS X)")) {}
+        expected_(std::make_unique<TraceProperties>(
+            "Service 1", "AWS::Service::Proxy", "test_value", "egress hostname", "POST",
+            "/first/second", "Mozilla/5.0 (Macintosh; Intel Mac OS X)", "egress")) {}
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
   NiceMock<Server::MockInstance> server_;
+  NiceMock<Tracing::MockConfig> config_;
   std::unique_ptr<MockDaemonBroker> broker_;
   std::unique_ptr<TraceProperties> expected_;
   void commonAsserts(daemon::Segment& s);
@@ -75,14 +77,15 @@ void XRayTracerTest::commonAsserts(daemon::Segment& s) {
   EXPECT_EQ(expected_->http_url, s.http().request().fields().at("url").string_value().c_str());
   EXPECT_EQ(expected_->user_agent,
             s.http().request().fields().at(Tracing::Tags::get().UserAgent).string_value().c_str());
+  EXPECT_EQ(expected_->direction, s.annotations().at("direction").c_str());
 }
 
 TEST_F(XRayTracerTest, SerializeSpanTest) {
   constexpr uint32_t expected_status_code = 202;
   constexpr uint32_t expected_content_length = 1337;
-  constexpr auto expected_client_ip = "10.0.0.100";
-  constexpr auto expected_x_forwarded_for = false;
-  constexpr auto expected_upstream_address = "10.0.0.200";
+  constexpr absl::string_view expected_client_ip = "10.0.0.100";
+  constexpr bool expected_x_forwarded_for = false;
+  constexpr absl::string_view expected_upstream_address = "10.0.0.200";
 
   auto on_send = [&](const std::string& json) {
     ASSERT_FALSE(json.empty());
@@ -92,7 +95,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
     commonAsserts(s);
     EXPECT_FALSE(s.trace_id().empty());
     EXPECT_FALSE(s.id().empty());
-    EXPECT_EQ(1, s.annotations().size());
+    EXPECT_EQ(2, s.annotations().size());
     EXPECT_TRUE(s.parent_id().empty());
     EXPECT_FALSE(s.fault());    /*server error*/
     EXPECT_FALSE(s.error());    /*client error*/
@@ -101,20 +104,21 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
               s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
     EXPECT_EQ(expected_content_length,
               s.http().response().fields().at("content_length").number_value());
-    EXPECT_STREQ(expected_client_ip,
-                 s.http().request().fields().at("client_ip").string_value().c_str());
+    EXPECT_EQ(expected_client_ip,
+              s.http().request().fields().at("client_ip").string_value().c_str());
     EXPECT_EQ(expected_x_forwarded_for,
               s.http().request().fields().at("x_forwarded_for").bool_value());
-    EXPECT_STREQ(expected_upstream_address,
-                 s.annotations().at(Tracing::Tags::get().UpstreamAddress).c_str());
+    EXPECT_EQ(expected_upstream_address,
+              s.annotations().at(Tracing::Tags::get().UpstreamAddress).c_str());
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -126,7 +130,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
 }
 
 TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
-  constexpr auto expected_error = "true";
+  constexpr absl::string_view expected_error = "true";
   constexpr uint32_t expected_status_code = 503;
 
   auto on_send = [&](const std::string& json) {
@@ -144,12 +148,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
               s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -177,12 +182,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
               s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -209,12 +215,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
               s.http().response().fields().at(Tracing::Tags::get().Status).number_value());
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -235,12 +242,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyValue) {
     EXPECT_FALSE(s.http().request().fields().contains(Tracing::Tags::get().Status));
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -249,8 +257,9 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyValue) {
 }
 
 TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
-  constexpr auto expected_status_code = "ok";      // status code which is not a number
-  constexpr auto expected_content_length = "huge"; // response length which is not a number
+  constexpr absl::string_view expected_status_code = "ok"; // status code which is not a number
+  constexpr absl::string_view expected_content_length =
+      "huge"; // response length which is not a number
 
   auto on_send = [&](const std::string& json) {
     ASSERT_FALSE(json.empty());
@@ -265,12 +274,13 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
     EXPECT_FALSE(s.http().request().fields().contains("content_length"));
   };
 
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
   EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
-  auto span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, expected_->operation_name,
+                               server_.timeSource().systemTime(), absl::nullopt /*headers*/);
   span->setTag(Tracing::Tags::get().HttpMethod, expected_->http_method);
   span->setTag(Tracing::Tags::get().HttpUrl, expected_->http_url);
   span->setTag(Tracing::Tags::get().UserAgent, expected_->user_agent);
@@ -318,15 +328,15 @@ TEST_F(XRayTracerTest, GetTraceId) {
 }
 
 TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
-  NiceMock<Tracing::MockConfig> config;
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   const auto& broker = *broker_;
   Tracer tracer{expected_->span_name, "",
                 aws_metadata_,        std::move(broker_),
                 server_.timeSource(), server_.api().randomGenerator()};
   // Span id taken from random generator
   EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(999));
-  auto parent_span = tracer.startSpan(expected_->operation_name, server_.timeSource().systemTime(),
-                                      absl::nullopt /*headers*/);
+  auto parent_span = tracer.startSpan(config_, expected_->operation_name,
+                                      server_.timeSource().systemTime(), absl::nullopt /*headers*/);
 
   const XRay::Span* xray_parent_span = static_cast<XRay::Span*>(parent_span.get());
   auto on_send = [&](const std::string& json) {
@@ -345,17 +355,17 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
 
   // Span id taken from random generator
   EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(262626262626));
-  auto child =
-      parent_span->spawnChild(config, expected_->operation_name, server_.timeSource().systemTime());
+  auto child = parent_span->spawnChild(config_, expected_->operation_name,
+                                       server_.timeSource().systemTime());
   child->finishSpan();
 }
 
 TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   XRayHeader xray_header;
   xray_header.trace_id_ = "a";
   xray_header.parent_id_ = "b";
-  constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr absl::string_view span_name = "my span";
 
   Tracer tracer{span_name,
                 "",
@@ -363,7 +373,7 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header);
+  auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   EXPECT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -371,13 +381,13 @@ TEST_F(XRayTracerTest, UseExistingHeaderInformation) {
 }
 
 TEST_F(XRayTracerTest, DontStartSpanOnNonSampledSpans) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   XRayHeader xray_header;
   xray_header.trace_id_ = "a";
   xray_header.parent_id_ = "b";
   xray_header.sample_decision_ =
       SamplingDecision::NotSampled; // not sampled means we should panic on calling startSpan
-  constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr absl::string_view span_name = "my span";
 
   Tracer tracer{span_name,
                 "",
@@ -386,18 +396,18 @@ TEST_F(XRayTracerTest, DontStartSpanOnNonSampledSpans) {
                 server_.timeSource(),
                 server_.api().randomGenerator()};
   Tracing::SpanPtr span;
-  ASSERT_DEATH(span =
-                   tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header),
-               "panic: not reached");
+  ASSERT_DEATH(
+      span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header),
+      "panic: not reached");
 }
 
 TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   XRayHeader xray_header;
   xray_header.trace_id_ = "a";
   xray_header.parent_id_ = "b";
   xray_header.sample_decision_ = SamplingDecision::Unknown;
-  constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  constexpr absl::string_view span_name = "my span";
 
   Tracer tracer{span_name,
                 "",
@@ -405,7 +415,7 @@ TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(), xray_header);
+  auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(), xray_header);
 
   const XRay::Span* xray_span = static_cast<XRay::Span*>(span.get());
   EXPECT_STREQ(xray_header.trace_id_.c_str(), xray_span->traceId().c_str());
@@ -416,8 +426,8 @@ TEST_F(XRayTracerTest, UnknownSpanStillSampled) {
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
-  constexpr auto span_name = "my span";
-  constexpr auto operation_name = "my operation";
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
+  constexpr absl::string_view span_name = "my span";
 
   Tracer tracer{span_name,
                 "",
@@ -425,7 +435,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                 std::move(broker_),
                 server_.timeSource(),
                 server_.api().randomGenerator()};
-  auto span = tracer.startSpan(operation_name, server_.timeSource().systemTime(),
+  auto span = tracer.startSpan(config_, "ingress", server_.timeSource().systemTime(),
                                absl::nullopt /*headers*/);
   Http::TestRequestHeaderMapImpl request_headers;
   span->injectContext(request_headers);
@@ -437,7 +447,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
 }
 
 TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
-  constexpr auto span_name = "my span";
+  constexpr absl::string_view span_name = "my span";
   Tracer tracer{span_name,
                 "",
                 aws_metadata_,
@@ -455,7 +465,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
 }
 
 TEST_F(XRayTracerTest, TraceIDFormatTest) {
-  constexpr auto span_name = "my span";
+  constexpr absl::string_view span_name = "my span";
   Tracer tracer{span_name,
                 "",
                 aws_metadata_,
@@ -479,6 +489,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, XRayDaemonTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
+  NiceMock<Tracing::MockConfig> config_;
+  ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
   absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata;
   NiceMock<Server::MockInstance> server;
   Network::Test::UdpSyncPeer xray_fake_daemon(GetParam());
@@ -486,8 +498,8 @@ TEST_P(XRayDaemonTest, VerifyUdpPacketContents) {
   Tracer tracer{"my_segment",        "origin",
                 aws_metadata,        std::make_unique<DaemonBrokerImpl>(daemon_endpoint),
                 server.timeSource(), server.api().randomGenerator()};
-  auto span = tracer.startSpan("ingress" /*operation name*/, server.timeSource().systemTime(),
-                               absl::nullopt /*headers*/);
+  auto span = tracer.startSpan(config_, "ingress" /*operation name*/,
+                               server.timeSource().systemTime(), absl::nullopt /*headers*/);
 
   span->setTag(Tracing::Tags::get().HttpStatusCode, "202");
   span->finishSpan();

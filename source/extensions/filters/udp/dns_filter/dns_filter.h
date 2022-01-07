@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/event/file_event.h"
-#include "envoy/extensions/filters/udp/dns_filter/v3alpha/dns_filter.pb.h"
+#include "envoy/extensions/filters/udp/dns_filter/v3/dns_filter.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/filter.h"
 
@@ -78,22 +78,23 @@ class DnsFilterEnvoyConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   DnsFilterEnvoyConfig(
       Server::Configuration::ListenerFactoryContext& context,
-      const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config);
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config);
 
   DnsFilterStats& stats() const { return stats_; }
   const absl::flat_hash_map<std::string, std::chrono::seconds>& domainTtl() const {
     return domain_ttl_;
   }
-  const AddressConstPtrVec& resolvers() const { return resolvers_; }
   bool forwardQueries() const { return forward_queries_; }
   const std::chrono::milliseconds resolverTimeout() const { return resolver_timeout_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   uint64_t retryCount() const { return retry_count_; }
   Random::RandomGenerator& random() const { return random_; }
   uint64_t maxPendingLookups() const { return max_pending_lookups_; }
-  const envoy::config::core::v3::DnsResolverOptions& dnsResolverOptions() const {
-    return dns_resolver_options_;
+  const envoy::config::core::v3::TypedExtensionConfig& typedDnsResolverConfig() const {
+    return typed_dns_resolver_config_;
   }
+  const Network::DnsResolverFactory& dnsResolverFactory() const { return *dns_resolver_factory_; }
+  Api::Api& api() const { return api_; }
   const TrieLookupTable<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const {
     return dns_lookup_trie_;
   }
@@ -105,9 +106,10 @@ private:
                                  POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
   }
 
-  bool loadServerConfig(const envoy::extensions::filters::udp::dns_filter::v3alpha::
-                            DnsFilterConfig::ServerContextConfig& config,
-                        envoy::data::dns::v3::DnsTable& table);
+  bool loadServerConfig(
+      const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ServerContextConfig&
+          config,
+      envoy::data::dns::v3::DnsTable& table);
 
   void addEndpointToSuffix(const absl::string_view suffix, const absl::string_view domain_name,
                            DnsEndpointConfig& endpoint_config);
@@ -123,11 +125,11 @@ private:
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   uint64_t retry_count_;
-  AddressConstPtrVec resolvers_;
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
   uint64_t max_pending_lookups_;
-  envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
+  envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config_;
+  Network::DnsResolverFactory* dns_resolver_factory_;
 };
 
 using DnsFilterEnvoyConfigSharedPtr = std::shared_ptr<const DnsFilterEnvoyConfig>;
@@ -145,8 +147,8 @@ public:
             const DnsFilterEnvoyConfigSharedPtr& config);
 
   // Network::UdpListenerReadFilter callbacks
-  void onData(Network::UdpRecvData& client_request) override;
-  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
+  Network::FilterStatus onData(Network::UdpRecvData& client_request) override;
+  Network::FilterStatus onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
   /**
    * @return bool true if the domain_name is a known domain for which we respond to queries

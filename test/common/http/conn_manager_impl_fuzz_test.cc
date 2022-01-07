@@ -473,7 +473,7 @@ public:
         auto headers = std::make_unique<TestResponseHeaderMapImpl>(
             Fuzz::fromHeaders<TestResponseHeaderMapImpl>(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
-        decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
+        decoder_filter_->callbacks_->encode1xxHeaders(std::move(headers));
         // We don't allow multiple 100-continue headers in HCM, UpstreamRequest is responsible
         // for coalescing.
         state = StreamState::PendingNonInformationalHeaders;
@@ -583,9 +583,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(filter_callbacks.connection_, close(_))
       .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setLocalAddress(
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
-  filter_callbacks.connection_.stream_info_.downstream_address_provider_->setRemoteAddress(
+  filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,

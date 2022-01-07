@@ -60,9 +60,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -134,6 +138,18 @@ udp_listener_config:
       filter_chain->transportSocketFactory());
   EXPECT_TRUE(quic_socket_factory.implementsSecureTransport());
   EXPECT_FALSE(quic_socket_factory.getTlsCertificates().empty());
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
+
+  // Stop listening shouldn't close the socket.
+  EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce(Invoke([](std::function<void()> callback) {
+    callback();
+  }));
+  EXPECT_CALL(*worker_, stopListener(_, _))
+      .WillOnce(
+          Invoke([](Network::ListenerConfig&, std::function<void()> completion) { completion(); }));
+  manager_->stopListeners(ListenerManager::StopListenersType::All);
+  EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
+  EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
 }
 #endif
 
@@ -161,9 +177,13 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_names:
-          - exact: localhost
-          - exact: 127.0.0.1
+          match_typed_subject_alt_names:
+          - matcher:
+              exact: localhost
+            san_type: URI
+          - matcher:
+              exact: 127.0.0.1
+            san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -205,9 +225,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
   )EOF",
@@ -259,9 +283,13 @@ filter_chains:
           validation_context:
             trusted_ca:
               filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-            match_subject_alt_names:
-            - exact: localhost
-            - exact: 127.0.0.1
+            match_typed_subject_alt_names:
+            - matcher:
+                exact: localhost
+              san_type: URI
+            - matcher:
+                exact: 127.0.0.1
+              san_type: IP_ADDRESS
 udp_listener_config:
   quic_options: {}
 connection_balance_config:

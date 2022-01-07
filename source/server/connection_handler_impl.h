@@ -21,6 +21,7 @@ namespace Server {
 
 class ActiveUdpListenerBase;
 class ActiveTcpListener;
+class ActiveInternalListener;
 
 /**
  * Server side connection handler. This is used both by workers as well as the
@@ -28,12 +29,15 @@ class ActiveTcpListener;
  */
 class ConnectionHandlerImpl : public Network::TcpConnectionHandler,
                               public Network::UdpConnectionHandler,
+                              public Network::InternalListenerManager,
                               NonCopyable,
                               Logger::Loggable<Logger::Id::conn_handler> {
 public:
   using UdpListenerCallbacksOptRef =
       absl::optional<std::reference_wrapper<Network::UdpListenerCallbacks>>;
   using ActiveTcpListenerOptRef = absl::optional<std::reference_wrapper<ActiveTcpListener>>;
+  using ActiveInternalListenerOptRef =
+      absl::optional<std::reference_wrapper<ActiveInternalListener>>;
 
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, absl::optional<uint32_t> worker_index);
 
@@ -63,18 +67,24 @@ public:
   // Network::UdpConnectionHandler
   Network::UdpListenerCallbacksOptRef getUdpListenerCallbacks(uint64_t listener_tag) override;
 
+  // Network::InternalListenerManager
+  Network::InternalListenerOptRef
+  findByAddress(const Network::Address::InstanceConstSharedPtr& listen_address) override;
+
 private:
   struct ActiveListenerDetails {
     // Strong pointer to the listener, whether TCP, UDP, QUIC, etc.
     Network::ConnectionHandler::ActiveListenerPtr listener_;
 
     absl::variant<absl::monostate, std::reference_wrapper<ActiveTcpListener>,
-                  std::reference_wrapper<Network::UdpListenerCallbacks>>
+                  std::reference_wrapper<Network::UdpListenerCallbacks>,
+                  std::reference_wrapper<ActiveInternalListener>>
         typed_listener_;
 
     // Helpers for accessing the data in the variant for cleaner code.
     ActiveTcpListenerOptRef tcpListener();
     UdpListenerCallbacksOptRef udpListener();
+    ActiveInternalListenerOptRef internalListener();
   };
   using ActiveListenerDetailsOptRef = absl::optional<std::reference_wrapper<ActiveListenerDetails>>;
   ActiveListenerDetailsOptRef findActiveListenerByTag(uint64_t listener_tag);

@@ -11,7 +11,7 @@ from importlib.util import spec_from_loader, module_from_spec
 from importlib.machinery import ModuleSpec, SourceFileLoader
 from typing import Iterator
 
-from tools.base import checker, utils
+from envoy.base import checker, utils
 
 BUILD_CONFIG_PATH = "source/extensions/extensions_build_config.bzl"
 CONTRIB_BUILD_CONFIG_PATH = "contrib/contrib_build_config.bzl"
@@ -49,12 +49,13 @@ EXTENSION_CATEGORIES = (
     "envoy.formatter", "envoy.grpc_credentials", "envoy.guarddog_actions", "envoy.health_checkers",
     "envoy.http.stateful_header_formatters", "envoy.internal_redirect_predicates",
     "envoy.io_socket", "envoy.http.original_ip_detection", "envoy.matching.common_inputs",
-    "envoy.matching.input_matchers", "envoy.quic.proof_source", "envoy.quic.server.crypto_stream",
-    "envoy.rate_limit_descriptors", "envoy.request_id", "envoy.resource_monitors",
-    "envoy.retry_host_predicates", "envoy.retry_priorities", "envoy.stats_sinks",
-    "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.transport_sockets.downstream",
-    "envoy.transport_sockets.upstream", "envoy.tls.cert_validator", "envoy.upstreams",
-    "envoy.wasm.runtime", "envoy.common.key_value")
+    "envoy.matching.input_matchers", "envoy.tls.key_providers", "envoy.quic.proof_source",
+    "envoy.quic.server.crypto_stream", "envoy.rate_limit_descriptors", "envoy.request_id",
+    "envoy.resource_monitors", "envoy.retry_host_predicates", "envoy.retry_priorities",
+    "envoy.stats_sinks", "envoy.thrift_proxy.filters", "envoy.tracers", "envoy.sip_proxy.filters",
+    "envoy.transport_sockets.downstream", "envoy.transport_sockets.upstream",
+    "envoy.tls.cert_validator", "envoy.upstreams", "envoy.wasm.runtime", "envoy.common.key_value",
+    "envoy.network.dns_resolver", "envoy.rbac.matchers", "envoy.access_loggers.extension_filters")
 
 EXTENSION_STATUS_VALUES = (
     # This extension is stable and is expected to be production usable.

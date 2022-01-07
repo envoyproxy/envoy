@@ -38,11 +38,11 @@ void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeCo
   // Set the address
   auto addr = peer.mutable_address();
   if (local) {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().localAddress(),
-                                                      *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection.connectionInfoProvider().localAddress(), *addr);
   } else {
-    Envoy::Network::Utility::addressToProtobufAddress(*connection.addressProvider().remoteAddress(),
-                                                      *addr);
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *connection.connectionInfoProvider().remoteAddress(), *addr);
   }
 
   // Set the principal. Preferably the URI SAN, DNS SAN or Subject in that order from the peer's

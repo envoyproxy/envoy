@@ -1,8 +1,8 @@
 #include <algorithm>
 
-#include "envoy/extensions/filters/http/ext_proc/v3alpha/ext_proc.pb.h"
+#include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/network/address.h"
-#include "envoy/service/ext_proc/v3alpha/external_processor.pb.h"
+#include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "source/extensions/filters/http/ext_proc/config.h"
 
@@ -15,17 +15,23 @@
 
 namespace Envoy {
 
-using envoy::extensions::filters::http::ext_proc::v3alpha::ProcessingMode;
-using envoy::service::ext_proc::v3alpha::BodyResponse;
-using envoy::service::ext_proc::v3alpha::CommonResponse;
-using envoy::service::ext_proc::v3alpha::HeadersResponse;
-using envoy::service::ext_proc::v3alpha::HttpBody;
-using envoy::service::ext_proc::v3alpha::HttpHeaders;
-using envoy::service::ext_proc::v3alpha::HttpTrailers;
-using envoy::service::ext_proc::v3alpha::ImmediateResponse;
-using envoy::service::ext_proc::v3alpha::ProcessingRequest;
-using envoy::service::ext_proc::v3alpha::ProcessingResponse;
-using envoy::service::ext_proc::v3alpha::TrailersResponse;
+using envoy::config::route::v3::Route;
+using envoy::config::route::v3::VirtualHost;
+using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
+using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
+using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
+using Envoy::Protobuf::MapPair;
+using Envoy::ProtobufWkt::Any;
+using envoy::service::ext_proc::v3::BodyResponse;
+using envoy::service::ext_proc::v3::CommonResponse;
+using envoy::service::ext_proc::v3::HeadersResponse;
+using envoy::service::ext_proc::v3::HttpBody;
+using envoy::service::ext_proc::v3::HttpHeaders;
+using envoy::service::ext_proc::v3::HttpTrailers;
+using envoy::service::ext_proc::v3::ImmediateResponse;
+using envoy::service::ext_proc::v3::ProcessingRequest;
+using envoy::service::ext_proc::v3::ProcessingResponse;
+using envoy::service::ext_proc::v3::TrailersResponse;
 using Extensions::HttpFilters::ExternalProcessing::HasNoHeader;
 using Extensions::HttpFilters::ExternalProcessing::HeaderProtosEqual;
 using Extensions::HttpFilters::ExternalProcessing::SingleHeaderValueIs;
@@ -80,27 +86,41 @@ protected:
       envoy::config::listener::v3::Filter ext_proc_filter;
       ext_proc_filter.set_name("envoy.filters.http.ext_proc");
       ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrDie(ext_proc_filter));
     });
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
+  void setPerRouteConfig(Route* route, const ExtProcPerRoute& cfg) {
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(cfg));
+    route->mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
+  }
+
+  void setPerHostConfig(VirtualHost& vh, const ExtProcPerRoute& cfg) {
+    Any cfg_any;
+    ASSERT_TRUE(cfg_any.PackFrom(cfg));
+    vh.mutable_typed_per_filter_config()->insert(
+        MapPair<std::string, Any>("envoy.filters.http.ext_proc", cfg_any));
+  }
+
   IntegrationStreamDecoderPtr sendDownstreamRequest(
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers) {
+      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
+    HttpTestUtility::addDefaultHeaders(headers);
     if (modify_headers) {
       (*modify_headers)(headers);
     }
-    HttpTestUtility::addDefaultHeaders(headers);
     return codec_client_->makeHeaderOnlyRequest(headers);
   }
 
   IntegrationStreamDecoderPtr sendDownstreamRequestWithBody(
       absl::string_view body,
-      absl::optional<std::function<void(Http::HeaderMap& headers)>> modify_headers) {
+      absl::optional<std::function<void(Http::RequestHeaderMap& headers)>> modify_headers) {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
     Http::TestRequestHeaderMapImpl headers;
@@ -286,7 +306,7 @@ protected:
     processor_stream_->sendGrpcMessage(response);
   }
 
-  envoy::extensions::filters::http::ext_proc::v3alpha::ExternalProcessor proto_config_{};
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
 };
@@ -427,11 +447,9 @@ TEST_P(ExtProcIntegrationTest, GetAndSetHeaders) {
       [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("x-remove-this"), "yes"); });
 
   processRequestHeadersMessage(true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
-    Http::TestRequestHeaderMapImpl expected_request_headers{{":scheme", "http"},
-                                                            {":method", "GET"},
-                                                            {"host", "host"},
-                                                            {":path", "/"},
-                                                            {"x-remove-this", "yes"}};
+    Http::TestRequestHeaderMapImpl expected_request_headers{
+        {":scheme", "http"}, {":method", "GET"},       {"host", "host"},
+        {":path", "/"},      {"x-remove-this", "yes"}, {"x-forwarded-proto", "http"}};
     EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
 
     auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
@@ -1287,6 +1305,103 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithRequestBody) {
   });
   handleUpstreamRequest();
   processResponseHeadersMessage(false, absl::nullopt);
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Set up per-route configuration that sets a custom processing mode on the
+// route, and test that the processing mode takes effect.
+TEST_P(ExtProcIntegrationTest, PerRouteProcessingMode) {
+  initializeConfig();
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    // Set up "/foo" so that it will send a buffered body
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    per_route.mutable_overrides()->mutable_processing_mode()->set_response_body_mode(
+        ProcessingMode::BUFFERED);
+    setPerRouteConfig(route, per_route);
+  });
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+  processRequestHeadersMessage(true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 100);
+  handleUpstreamRequestWithResponse(full_response, 100);
+  processResponseHeadersMessage(false, absl::nullopt);
+  // Because of the per-route config we should get a buffered response
+  processResponseBodyMessage(false, [&full_response](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body(), full_response.toString());
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Set up configuration on the virtual host and on the route and see that
+// the two are merged.
+TEST_P(ExtProcIntegrationTest, PerRouteAndHostProcessingMode) {
+  initializeConfig();
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    // Set up a processing mode for the host that should not be honored
+    ExtProcPerRoute per_host;
+    per_host.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
+        ProcessingMode::SKIP);
+    per_host.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
+        ProcessingMode::SKIP);
+    setPerHostConfig(*vh, per_host);
+
+    // Set up "/foo" so that it will send a buffered body
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    per_route.mutable_overrides()->mutable_processing_mode()->set_response_body_mode(
+        ProcessingMode::BUFFERED);
+    setPerRouteConfig(route, per_route);
+  });
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+  processRequestHeadersMessage(true, absl::nullopt);
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 100);
+  handleUpstreamRequestWithResponse(full_response, 100);
+  processResponseHeadersMessage(false, absl::nullopt);
+  // Because of the per-route config we should get a buffered response.
+  // If the config from the host is applied then this won't work.
+  processResponseBodyMessage(false, [&full_response](const HttpBody& body, BodyResponse&) {
+    EXPECT_TRUE(body.end_of_stream());
+    EXPECT_EQ(body.body(), full_response.toString());
+    return true;
+  });
+  verifyDownstreamResponse(*response, 200);
+}
+
+// Set up per-route configuration that disables ext_proc for a route and ensure
+// that it is not called.
+TEST_P(ExtProcIntegrationTest, PerRouteDisable) {
+  initializeConfig();
+  config_helper_.addConfigModifier([this](HttpConnectionManager& cm) {
+    // Set up "/foo" so that ext_proc is disabled
+    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+    auto* route = vh->mutable_routes()->Mutable(0);
+    route->mutable_match()->set_path("/foo");
+    ExtProcPerRoute per_route;
+    per_route.set_disabled(true);
+    setPerRouteConfig(route, per_route);
+  });
+  HttpIntegrationTest::initialize();
+
+  auto response =
+      sendDownstreamRequest([](Http::RequestHeaderMap& headers) { headers.setPath("/foo"); });
+  // There should be no ext_proc processing here
+  Buffer::OwnedImpl full_response;
+  TestUtility::feedBufferWithRandomCharacters(full_response, 100);
+  handleUpstreamRequestWithResponse(full_response, 100);
   verifyDownstreamResponse(*response, 200);
 }
 

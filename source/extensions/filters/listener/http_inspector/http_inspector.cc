@@ -61,10 +61,6 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
         cb.dispatcher(),
         [this](uint32_t events) {
           ENVOY_LOG(trace, "http inspector event: {}", events);
-          // inspector is always peeking and can never determine EOF.
-          // Use this event type to avoid listener timeout on the OS supporting
-          // FileReadyType::Closed.
-          bool end_stream = events & Event::FileReadyType::Closed;
 
           const ParseState parse_state = onRead();
           switch (parse_state) {
@@ -78,19 +74,11 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
             cb_->continueFilterChain(true);
             break;
           case ParseState::Continue:
-            if (end_stream) {
-              // Parser fails to determine http but the end of stream is reached. Fallback to
-              // non-http.
-              done(false);
-              cb_->socket().ioHandle().resetFileEvents();
-              cb_->continueFilterChain(true);
-            }
             // do nothing but wait for the next event
             break;
           }
         },
-        Event::PlatformDefaultTriggerType,
-        Event::FileReadyType::Read | Event::FileReadyType::Closed);
+        Event::PlatformDefaultTriggerType, Event::FileReadyType::Read);
     return Network::FilterStatus::StopIteration;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -104,6 +92,11 @@ ParseState Filter::onRead() {
       return ParseState::Continue;
     }
     config_->stats().read_error_.inc();
+    return ParseState::Error;
+  }
+
+  // Remote closed
+  if (result.return_value_ == 0) {
     return ParseState::Error;
   }
 

@@ -553,6 +553,7 @@ public:
   COUNTER(upstream_cx_http2_total)                                                                 \
   COUNTER(upstream_cx_http3_total)                                                                 \
   COUNTER(upstream_cx_idle_timeout)                                                                \
+  COUNTER(upstream_cx_max_duration_reached)                                                        \
   COUNTER(upstream_cx_max_requests)                                                                \
   COUNTER(upstream_cx_none_healthy)                                                                \
   COUNTER(upstream_cx_overflow)                                                                    \
@@ -575,6 +576,7 @@ public:
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_per_try_timeout)                                                             \
+  COUNTER(upstream_rq_per_try_idle_timeout)                                                        \
   COUNTER(upstream_rq_retry)                                                                       \
   COUNTER(upstream_rq_retry_backoff_exponential)                                                   \
   COUNTER(upstream_rq_retry_backoff_ratelimited)                                                   \
@@ -744,6 +746,11 @@ public:
   virtual const absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional maximum connection duration timeout for manager connections.
+   */
+  virtual const absl::optional<std::chrono::milliseconds> maxConnectionDuration() const PURE;
+
+  /**
    * @return how many streams should be anticipated per each current stream.
    */
   virtual float perUpstreamPreconnectRatio() const PURE;
@@ -833,6 +840,12 @@ public:
    */
   virtual const absl::optional<envoy::config::cluster::v3::Cluster::CustomClusterType>&
   clusterType() const PURE;
+
+  /**
+   * @return configuration for round robin load balancing, only used if LB type is round robin.
+   */
+  virtual const absl::optional<envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>&
+  lbRoundRobinConfig() const PURE;
 
   /**
    * @return configuration for least request load balancing, only used if LB type is least request.

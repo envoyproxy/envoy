@@ -90,6 +90,9 @@ TEST_P(WasmStatSinkConfigTest, CreateWasmFromWASM) {
   initializeWithConfig(config_);
 
   EXPECT_NE(sink_, nullptr);
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
+
   NiceMock<Stats::MockMetricSnapshot> snapshot;
   sink_->flush(snapshot);
   NiceMock<Stats::MockHistogram> histogram;

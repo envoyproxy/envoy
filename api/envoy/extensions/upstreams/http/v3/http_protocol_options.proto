@@ -10,6 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.v3";
 option java_outer_classname = "HttpProtocolOptionsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/http/v3;httpv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP Protocol Options]
@@ -118,12 +119,13 @@ message HttpProtocolOptions {
     //   is alpha is not guaranteed to be API-stable.
     config.core.v3.Http3ProtocolOptions http3_protocol_options = 3;
 
-    // [#not-implemented-hide:]
     // The presence of alternate protocols cache options causes the use of the
     // alternate protocols cache, which is responsible for parsing and caching
     // HTTP Alt-Svc headers. This enables the use of HTTP/3 for origins that
     // advertise supporting it.
-    // TODO(RyanTheOptimist): Make this field required when HTTP/3 is enabled.
+    //
+    // .. note::
+    //   This is required when HTTP/3 is enabled.
     config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 4;
   }
 
