@@ -13,16 +13,16 @@ namespace {
 class IoUringBaseTest : public ::testing::Test {
 public:
   void TearDown() override {
-    auto& uring = factory_.getOrCreateUring();
+    auto& uring = factory_.getOrCreate();
     if (uring.isEventfdRegistered()) {
       uring.unregisterEventfd();
     }
   }
 
-  static thread_local const IoUringFactoryImpl factory_;
+  static const IoUringFactoryImpl factory_;
 };
 
-thread_local const IoUringFactoryImpl IoUringBaseTest::factory_(2, false);
+const IoUringFactoryImpl IoUringBaseTest::factory_(2, false);
 
 class IoUringImplParamTest
     : public IoUringBaseTest,
@@ -53,7 +53,7 @@ TEST_P(IoUringImplParamTest, InvalidParams) {
   os_fd_t fd;
   SET_SOCKET_INVALID(fd);
 
-  auto& uring = factory_.getOrCreateUring();
+  auto& uring = factory_.getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   os_fd_t epoll_fd = epoll_create1(0);
@@ -99,8 +99,8 @@ protected:
 };
 
 TEST_F(IoUringImplTest, Instantiate) {
-  auto& uring1 = factory_.getOrCreateUring();
-  auto& uring2 = factory_.getOrCreateUring();
+  auto& uring1 = factory_.getOrCreate();
+  auto& uring2 = factory_.getOrCreate();
   EXPECT_EQ(&uring1, &uring2);
 
   EXPECT_DEATH(IoUringFactoryImpl factory2(10, false),
@@ -110,7 +110,7 @@ TEST_F(IoUringImplTest, Instantiate) {
 }
 
 TEST_F(IoUringImplTest, RegisterEventfd) {
-  auto& uring = factory_.getOrCreateUring();
+  auto& uring = factory_.getOrCreate();
 
   EXPECT_FALSE(uring.isEventfdRegistered());
   uring.registerEventfd();
@@ -131,7 +131,7 @@ TEST_F(IoUringImplTest, PrepareReadvAllDataFitsOneChunk) {
   iov.iov_base = buffer;
   iov.iov_len = 4096;
 
-  auto& uring = factory_.getOrCreateUring();
+  auto& uring = factory_.getOrCreate();
   os_fd_t event_fd = uring.registerEventfd();
   os_fd_t epoll_fd = epoll_create1(0);
   ASSERT_FALSE(epoll_fd == -1);
@@ -173,7 +173,7 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
   iov3.iov_base = buffer3;
   iov3.iov_len = 2;
 
-  auto& uring = factory_.getOrCreateUring();
+  auto& uring = factory_.getOrCreate();
 
   os_fd_t event_fd = uring.registerEventfd();
   os_fd_t epoll_fd = epoll_create1(0);

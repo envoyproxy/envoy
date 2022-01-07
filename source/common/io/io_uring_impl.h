@@ -10,7 +10,7 @@ namespace Io {
 class IoUringFactoryImpl : public IoUringFactory {
 public:
   IoUringFactoryImpl(uint32_t io_uring_size, bool use_submission_queue_polling);
-  IoUring& getOrCreateUring() const override;
+  IoUring& getOrCreate() const override;
 
 private:
   const uint32_t io_uring_size_;

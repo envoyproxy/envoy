@@ -35,6 +35,9 @@ public:
    */
   virtual void unregisterEventfd() PURE;
 
+  /**
+   * Returns true if an eventfd file descriptor is registered with the ring.
+   */
   virtual bool isEventfdRegistered() const PURE;
 
   /**
@@ -88,7 +91,8 @@ public:
    * `io_uring_enter()` system call.
    * Returns IoUringResult::Ok in case of success and may return
    * IoUringResult::Busy if we over commit the number of requests. In the latter
-   * case the application should wait for some completions and try again.
+   * case the application should drain the completion queue by handling some completions
+   * with the forEveryCompletion() method and try again.
    */
   virtual IoUringResult submit() PURE;
 };
@@ -100,7 +104,7 @@ class IoUringFactory {
 public:
   virtual ~IoUringFactory() = default;
 
-  virtual IoUring& getOrCreateUring() const PURE;
+  virtual IoUring& getOrCreate() const PURE;
 };
 
 } // namespace Io
