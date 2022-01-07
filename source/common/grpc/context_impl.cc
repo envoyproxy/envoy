@@ -90,6 +90,9 @@ ContextImpl::resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) {
     return {};
   }
 
+  // service/method will live until the request is finished to emit resulting stats (e.g. request status)
+  // values in request_names_ might get changed, for example by routing rules (i.e. "prefix_rewrite"),
+  // so we copy them here to preserve the initial value and get a proper stat
   Stats::Element service = Stats::DynamicSavedName(request_names->service_);
   Stats::Element method = Stats::DynamicSavedName(request_names->method_);
   return RequestStatNames{service, method};

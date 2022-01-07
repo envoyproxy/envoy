@@ -88,7 +88,7 @@ TEST(GrpcContextTest, ResolveServiceAndMethod) {
   EXPECT_FALSE(context.resolveDynamicServiceAndMethod(path));
 }
 
-TEST(GrpcContextTest, ResolveServiceAndMethodNotChanged) {
+TEST(GrpcContextTest, ResolvedServiceAndMethodOutliveChangesInRequestNames) {
   Http::TestRequestHeaderMapImpl headers;
   headers.setPath("/service_name/method_name?a=b");
   const Http::HeaderEntry* path = headers.Path();

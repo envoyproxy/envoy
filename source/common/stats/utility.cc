@@ -52,7 +52,6 @@ struct ElementVisitor {
   // Overloads provides for absl::visit to call.
   void operator()(StatName stat_name) { stat_names_.push_back(stat_name); }
   void operator()(absl::string_view name) { stat_names_.push_back(pool_.add(name)); }
-  void operator()(const std::string& name) { stat_names_.push_back(pool_.add(name)); }
 
   /**
    * @return the StatName constructed by joining the elements.
