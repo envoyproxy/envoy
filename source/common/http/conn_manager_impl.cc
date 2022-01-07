@@ -1477,11 +1477,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     if (absl::optional<StreamInfo::ProxyStatusError> proxy_status =
             StreamInfo::ProxyStatusUtils::fromStreamInfo(filter_manager_.streamInfo());
         proxy_status.has_value()) {
-      headers.appendProxyStatus(
-          StreamInfo::ProxyStatusUtils::toString(filter_manager_.streamInfo(), *proxy_status,
-                                                 connection_manager_.local_info_.node().id(),
-                                                 *proxy_status_config),
-          ", ");
+      headers.appendProxyStatus(StreamInfo::ProxyStatusUtils::makeProxyStatusHeader(
+                                    filter_manager_.streamInfo(), *proxy_status,
+                                    connection_manager_.local_info_.node().id(),
+                                    *proxy_status_config),
+                                ", ");
       // Apply the recommended response code, if configured and applicable.
       if (proxy_status_config->set_recommended_response_code()) {
         if (absl::optional<Http::Code> response_code =

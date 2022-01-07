@@ -190,11 +190,10 @@ ProxyStatusUtils::recommendedHttpStatusCode(const ProxyStatusError proxy_status)
   }
 }
 
-const std::string
-ProxyStatusUtils::toString(const StreamInfo& stream_info, const ProxyStatusError error,
-                           absl::string_view node_id,
-                           const envoy::extensions::filters::network::http_connection_manager::v3::
-                               HttpConnectionManager::ProxyStatusConfig& proxy_status_config) {
+const std::string ProxyStatusUtils::makeProxyStatusHeader(
+    const StreamInfo& stream_info, const ProxyStatusError error, absl::string_view node_id,
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+        ProxyStatusConfig& proxy_status_config) {
   std::vector<std::string> retval = {};
 
   switch (proxy_status_config.proxy_name()) {
