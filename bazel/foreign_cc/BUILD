@@ -152,9 +152,9 @@ envoy_cmake(
         "BUILD_TESTING": "off",
         "BUILD_SHARED_LIBS": "off",
         "CURL_HIDDEN_SYMBOLS": "off",
-        "CMAKE_USE_LIBSSH2": "off",
+        "CURL_USE_LIBSSH2": "off",
         "CURL_BROTLI": "off",
-        "CMAKE_USE_GSSAPI": "off",
+        "CURL_USE_GSSAPI": "off",
         "HTTP_ONLY": "on",
         "CMAKE_INSTALL_LIBDIR": "lib",
         # Explicitly enable Unix sockets, once afunix.h is correctly detected
@@ -169,7 +169,7 @@ envoy_cmake(
         # FindOpenSSL.cmake which fails at what looks like version parsing
         # (the libraries are found ok).
         "CURL_CA_PATH": "none",
-        "CMAKE_USE_OPENSSL": "off",
+        "CURL_USE_OPENSSL": "off",
         "OPENSSL_ROOT_DIR": "$EXT_BUILD_DEPS",
         # Avoid libidn2
         "USE_LIBIDN2": "off",
