@@ -30,6 +30,10 @@ envoy_mobile_swift_test(
         "SetLoggerTest.swift",
         "StatFlushIntegrationTest.swift",
     ],
+    # TODO(jpsim): Fix remote execution for these tests
+    tags = [
+        "no-remote-exec",
+    ],
     deps = [
         ":test_extensions",
         "//library/objective-c:envoy_engine_objc_lib",

@@ -294,6 +294,9 @@ R"(
                   enabled:
                     default_value: false
                     runtime_key: request_decompressor_enabled
+              response_direction_config:
+                common_config:
+                  ignore_no_transform_header: true
           - name: envoy.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
