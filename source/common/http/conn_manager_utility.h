@@ -109,7 +109,7 @@ public:
   static void setProxyStatusHeader(ResponseHeaderMap& response_headers,
                                    const ConnectionManagerConfig& config,
                                    const StreamInfo::StreamInfo& stream_info,
-                                    absl::string_view node_id);
+                                   absl::string_view node_id);
 
   enum class NormalizePathAction {
     Continue = 0,
