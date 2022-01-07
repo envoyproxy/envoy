@@ -372,6 +372,26 @@ TEST_F(LookupRequestTest, NotSatisfiableRange) {
   EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
+TEST_F(LookupRequestTest, HttpScheme) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {":method", "GET"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "example.com"}};
+  const LookupRequest lookup_request(request_headers, currentTime(),
+                                     vary_allow_list_);
+  EXPECT_EQ(lookup_request.key().scheme(), Key::HTTP);
+}
+
+TEST_F(LookupRequestTest, HttpsScheme) {
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {":method", "GET"},
+                                                 {":scheme", "https"},
+                                                 {":authority", "example.com"}};
+  const LookupRequest lookup_request(request_headers, currentTime(),
+                                     vary_allow_list_);
+  EXPECT_EQ(lookup_request.key().scheme(), Key::HTTPS);
+}
+
 TEST(RawByteRangeTest, IsSuffix) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_TRUE(r.isSuffix());

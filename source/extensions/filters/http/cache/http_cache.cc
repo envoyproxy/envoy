@@ -51,9 +51,9 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
   key_.set_host(std::string(request_headers.getHostValue()));
   key_.set_path(std::string(request_headers.getPathValue()));
   if (scheme == scheme_values.Http) {
-    key.set_scheme(Key::HTTP);
-  } else if (bdn_cache_key.protocol() == "https") {
-    key.set_scheme(Key::HTTPS);
+    key_.set_scheme(Key::HTTP);
+  } else if (scheme == "https") {
+    key_.set_scheme(Key::HTTPS);
   }
 }
 
