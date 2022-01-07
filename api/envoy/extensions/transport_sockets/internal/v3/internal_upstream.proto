@@ -29,10 +29,10 @@ message InternalUpstreamTransport {
       CLUSTER = 1;
     }
 
-    // Namespace is the filter namespace used in the dynamic metadata.
-    string namespace = 1 [(validate.rules).string = {min_len: 1}];
+    // Name is the filter namespace used in the dynamic metadata.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Optional lookup path segments in the namespace for a nested struct.
+    // Optional lookup path segments in the namespace struct for a nested struct.
     repeated string path_segments = 2;
   }
 
