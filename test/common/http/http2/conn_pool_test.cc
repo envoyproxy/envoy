@@ -924,7 +924,7 @@ TEST_F(Http2ConnPoolImplTest, PendingStreamsMaxPendingCircuitBreaker) {
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
   EXPECT_CALL(callbacks.pool_failure_, ready());
-  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks /*has_early_data=*/false,
+  EXPECT_EQ(nullptr, pool_->newStream(decoder, callbacks, /*has_early_data=*/false,
                                       /*should_use_alt_svc=*/false));
 
   expectStreamConnect(0, r1);
