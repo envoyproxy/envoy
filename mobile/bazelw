@@ -4,9 +4,8 @@ set -euo pipefail
 
 readonly bazelisk_version="1.10.1"
 if [[ $OSTYPE == darwin* ]]; then
-  # TODO: Support M1 once https://github.com/envoyproxy/envoy/issues/16482
-  readonly bazel_platform="darwin-amd64"
-  readonly bazel_version_sha="e485bbf84532d02a60b0eb23c702610b5408df3a199087a4f2b5e0995bbf2d5a"
+  readonly bazel_platform="darwin"
+  readonly bazel_version_sha="d3014e478fe6ebbc290e6eccdcc154e93f894300b63d521ec8d22c2e24f32892"
 else
   readonly bazel_platform="linux-amd64"
   readonly bazel_version_sha="4cb534c52cdd47a6223d4596d530e7c9c785438ab3b0a49ff347e991c210b2cd"
