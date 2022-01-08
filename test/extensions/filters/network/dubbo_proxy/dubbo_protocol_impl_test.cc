@@ -74,6 +74,7 @@ TEST(DubboProtocolImplTest, Normal) {
     addInt64(buffer, 1);
 
     Hessian2::Encoder encoder(std::make_unique<BufferWriter>(body_buffer));
+    // Encode the fake response type. `0` means the response is an exception without attachments.
     encoder.encode<int32_t>(0);
     encoder.encode<std::string>("fake_exception");
 
