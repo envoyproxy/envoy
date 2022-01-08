@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -13,7 +15,6 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
-
 #include "source/common/common/assert.h"
 #include "source/common/common/matchers.h"
 #include "source/common/config/datasource.h"
@@ -26,9 +27,6 @@
 #include "source/extensions/filters/http/oauth2/oauth.h"
 #include "source/extensions/filters/http/oauth2/oauth_client.h"
 
-#include "absl/strings/str_split.h"
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -38,38 +36,44 @@ class OAuth2Client;
 
 // Helper class used to fetch secrets (usually from SDS).
 class SecretReader {
-public:
+ public:
   virtual ~SecretReader() = default;
   virtual const std::string& clientSecret() const PURE;
   virtual const std::string& tokenSecret() const PURE;
 };
 
 class SDSSecretReader : public SecretReader {
-public:
-  SDSSecretReader(Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
-                  Secret::GenericSecretConfigProviderSharedPtr token_secret_provider, Api::Api& api)
-      : update_callback_client_(readAndWatchSecret(client_secret_, client_secret_provider, api)),
-        update_callback_token_(readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
+ public:
+  SDSSecretReader(
+      Secret::GenericSecretConfigProviderSharedPtr client_secret_provider,
+      Secret::GenericSecretConfigProviderSharedPtr token_secret_provider,
+      Api::Api& api)
+      : update_callback_client_(
+            readAndWatchSecret(client_secret_, client_secret_provider, api)),
+        update_callback_token_(
+            readAndWatchSecret(token_secret_, token_secret_provider, api)) {}
 
   const std::string& clientSecret() const override { return client_secret_; }
 
   const std::string& tokenSecret() const override { return token_secret_; }
 
-private:
-  Envoy::Common::CallbackHandlePtr
-  readAndWatchSecret(std::string& value,
-                     Secret::GenericSecretConfigProviderSharedPtr& secret_provider, Api::Api& api) {
+ private:
+  Envoy::Common::CallbackHandlePtr readAndWatchSecret(
+      std::string& value,
+      Secret::GenericSecretConfigProviderSharedPtr& secret_provider,
+      Api::Api& api) {
     const auto* secret = secret_provider->secret();
     if (secret != nullptr) {
       value = Config::DataSource::read(secret->secret(), true, api);
     }
 
-    return secret_provider->addUpdateCallback([secret_provider, &api, &value]() {
-      const auto* secret = secret_provider->secret();
-      if (secret != nullptr) {
-        value = Config::DataSource::read(secret->secret(), true, api);
-      }
-    });
+    return secret_provider->addUpdateCallback(
+        [secret_provider, &api, &value]() {
+          const auto* secret = secret_provider->secret();
+          if (secret != nullptr) {
+            value = Config::DataSource::read(secret->secret(), true, api);
+          }
+        });
   }
 
   std::string client_secret_;
@@ -82,9 +86,9 @@ private:
 /**
  * All stats for the OAuth filter. @see stats_macros.h
  */
-#define ALL_OAUTH_FILTER_STATS(COUNTER)                                                            \
-  COUNTER(oauth_unauthorized_rq)                                                                   \
-  COUNTER(oauth_failure)                                                                           \
+#define ALL_OAUTH_FILTER_STATS(COUNTER) \
+  COUNTER(oauth_unauthorized_rq)        \
+  COUNTER(oauth_failure)                \
   COUNTER(oauth_success)
 
 /**
@@ -98,8 +102,8 @@ struct FilterStats {
  * Helper structure to hold custom cookie names.
  */
 struct CookieNames {
-  CookieNames(const envoy::extensions::filters::http::oauth2::v3::OAuth2Credentials::CookieNames&
-                  cookie_names)
+  CookieNames(const envoy::extensions::filters::http::oauth2::v3::
+                  OAuth2Credentials::CookieNames& cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires()) {}
 
@@ -107,7 +111,8 @@ struct CookieNames {
               const std::string& oauth_expires)
       : bearer_token_(bearer_token.empty() ? "BearerToken" : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? "OauthHMAC" : oauth_hmac),
-        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {}
+        oauth_expires_(oauth_expires.empty() ? "OauthExpires" : oauth_expires) {
+  }
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
@@ -115,41 +120,63 @@ struct CookieNames {
 };
 
 /**
- * This class encapsulates all data needed for the filter to operate so that we don't pass around
- * raw protobufs and other arbitrary data.
+ * This class encapsulates all data needed for the filter to operate so that we
+ * don't pass around raw protobufs and other arbitrary data.
  */
 class FilterConfig {
-public:
-  FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config,
+ public:
+  FilterConfig(const envoy::extensions::filters::http::oauth2::v3::OAuth2Config&
+                   proto_config,
                Upstream::ClusterManager& cluster_manager,
                std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
                const std::string& stats_prefix);
-  const std::string& clusterName() const { return oauth_token_endpoint_.cluster(); }
+  const std::string& clusterName() const {
+    return oauth_token_endpoint_.cluster();
+  }
   const std::string& clientId() const { return client_id_; }
   bool forwardBearerToken() const { return forward_bearer_token_; }
-  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers() const {
+  const std::vector<Http::HeaderUtility::HeaderData>& passThroughMatchers()
+      const {
     return pass_through_header_matchers_;
   }
 
   const envoy::config::core::v3::HttpUri& oauthTokenEndpoint() const {
     return oauth_token_endpoint_;
   }
-  const std::string& authorizationEndpoint() const { return authorization_endpoint_; }
+  absl::string_view authorizationEndpointPathAndQueryParams() const {
+    return authorization_endpoint_url_.pathAndQueryParams();
+  }
+  absl::string_view authorizationEndpointHostAndPort() const {
+    return authorization_endpoint_url_.hostAndPort();
+  }
+  absl::string_view authorizationEndpointScheme() const {
+    return authorization_endpoint_url_.scheme();
+  }
+  const Http::Utility::QueryParams& authorizationQueryParams() const {
+    return authorization_query_params_;
+  }
   const std::string& redirectUri() const { return redirect_uri_; }
-  const Matchers::PathMatcher& redirectPathMatcher() const { return redirect_matcher_; }
+  const Matchers::PathMatcher& redirectPathMatcher() const {
+    return redirect_matcher_;
+  }
   const Matchers::PathMatcher& signoutPath() const { return signout_path_; }
   std::string clientSecret() const { return secret_reader_->clientSecret(); }
   std::string tokenSecret() const { return secret_reader_->tokenSecret(); }
   FilterStats& stats() { return stats_; }
-  const std::string& encodedAuthScopes() const { return encoded_auth_scopes_; }
-  const std::string& encodedResourceQueryParams() const { return encoded_resource_query_params_; }
+  const std::string& encodedResourceQueryParams() const {
+    return encoded_resource_query_params_;
+  }
   const CookieNames& cookieNames() const { return cookie_names_; }
 
-private:
-  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+ private:
+  static FilterStats generateStats(const std::string& prefix,
+                                   Stats::Scope& scope);
 
   const envoy::config::core::v3::HttpUri oauth_token_endpoint_;
+  // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
+  Http::Utility::Url authorization_endpoint_url_;
+  const Http::Utility::QueryParams authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
   const Matchers::PathMatcher redirect_matcher_;
@@ -159,7 +186,8 @@ private:
   const std::string encoded_auth_scopes_;
   const std::string encoded_resource_query_params_;
   const bool forward_bearer_token_ : 1;
-  const std::vector<Http::HeaderUtility::HeaderData> pass_through_header_matchers_;
+  const std::vector<Http::HeaderUtility::HeaderData>
+      pass_through_header_matchers_;
   const CookieNames cookie_names_;
 };
 
@@ -177,25 +205,28 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  * - secret
  */
 class CookieValidator {
-public:
+ public:
   virtual ~CookieValidator() = default;
   virtual const std::string& token() const PURE;
-  virtual void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) PURE;
+  virtual void setParams(const Http::RequestHeaderMap& headers,
+                         const std::string& secret) PURE;
   virtual bool isValid() const PURE;
 };
 
 class OAuth2CookieValidator : public CookieValidator {
-public:
-  explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names)
+ public:
+  explicit OAuth2CookieValidator(TimeSource& time_source,
+                                 const CookieNames& cookie_names)
       : time_source_(time_source), cookie_names_(cookie_names) {}
 
   const std::string& token() const override { return token_; }
-  void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
+  void setParams(const Http::RequestHeaderMap& headers,
+                 const std::string& secret) override;
   bool isValid() const override;
   bool hmacIsValid() const;
   bool timestampIsValid() const;
 
-private:
+ private:
   std::string token_;
   std::string id_token_;
   std::string refresh_token_;
@@ -208,36 +239,42 @@ private:
 };
 
 /**
- * The filter is the primary entry point for the OAuth workflow. Its responsibilities are to
- * receive incoming requests and decide at what state of the OAuth workflow they are in. Logic
- * beyond that is broken into component classes.
+ * The filter is the primary entry point for the OAuth workflow. Its
+ * responsibilities are to receive incoming requests and decide at what state of
+ * the OAuth workflow they are in. Logic beyond that is broken into component
+ * classes.
  */
-class OAuth2Filter : public Http::PassThroughDecoderFilter, public FilterCallbacks {
-public:
-  OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
+class OAuth2Filter : public Http::PassThroughDecoderFilter,
+                     public FilterCallbacks {
+ public:
+  OAuth2Filter(FilterConfigSharedPtr config,
+               std::unique_ptr<OAuth2Client>&& oauth_client,
                TimeSource& time_source);
 
   // Http::PassThroughDecoderFilter
-  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
+                                          bool) override;
 
   // FilterCallbacks
-  void onGetAccessTokenSuccess(const std::string& access_code, const std::string& id_token,
+  void onGetAccessTokenSuccess(const std::string& access_code,
+                               const std::string& id_token,
                                const std::string& refresh_token,
                                std::chrono::seconds expires_in) override;
-  // a catch-all function used for request failures. we don't retry, as a user can simply refresh
-  // the page in the case of a network blip.
+  // a catch-all function used for request failures. we don't retry, as a user
+  // can simply refresh the page in the case of a network blip.
   void sendUnauthorizedResponse() override;
 
   void finishFlow();
 
-private:
+ private:
   friend class OAuth2Test;
 
   std::shared_ptr<CookieValidator> validator_;
 
   // wrap up some of these in a UserData struct or something...
   std::string auth_code_;
-  std::string access_token_; // TODO - see if we can avoid this being a member variable
+  std::string
+      access_token_;  // TODO - see if we can avoid this being a member variable
   std::string id_token_;
   std::string refresh_token_;
   std::string new_expires_;
@@ -250,8 +287,8 @@ private:
   FilterConfigSharedPtr config_;
   TimeSource& time_source_;
 
-  // Determines whether or not the current request can skip the entire OAuth flow (HMAC is valid,
-  // connection is mTLS, etc.)
+  // Determines whether or not the current request can skip the entire OAuth
+  // flow (HMAC is valid, connection is mTLS, etc.)
   bool canSkipOAuth(Http::RequestHeaderMap& headers) const;
 
   Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
@@ -260,7 +297,7 @@ private:
   std::string extractAccessToken(const Http::RequestHeaderMap& headers) const;
 };
 
-} // namespace Oauth2
-} // namespace HttpFilters
-} // namespace Extensions
-} // namespace Envoy
+}  // namespace Oauth2
+}  // namespace HttpFilters
+}  // namespace Extensions
+}  // namespace Envoy

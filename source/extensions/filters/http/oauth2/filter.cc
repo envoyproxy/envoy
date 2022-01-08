@@ -118,6 +118,16 @@ std::string findValue(const absl::flat_hash_map<std::string, std::string>& map,
   const auto value_it = map.find(key);
   return value_it != map.end() ? value_it->second : EMPTY_STRING;
 }
+
+Http::Utility::QueryParams buildAutorizationQueryParams(
+    const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
+  auto query_params = Http::Utility::parseQueryString(proto_config.authorization_endpoint());
+  query_params["client_id"] = proto_config.credentials().client_id();
+  query_params["scope"] = Http::Utility::PercentEncoding::encode(
+          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
+  return query_params;
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -126,13 +136,12 @@ FilterConfig::FilterConfig(
     Stats::Scope& scope, const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
+      authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher()),
       signout_path_(proto_config.signout_path()), secret_reader_(secret_reader),
       stats_(FilterConfig::generateStats(stats_prefix, scope)),
-      encoded_auth_scopes_(Http::Utility::PercentEncoding::encode(
-          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ")),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher())),
@@ -142,8 +151,8 @@ FilterConfig::FilterConfig(
                                      "specify which cluster to direct OAuth requests to.",
                                      oauth_token_endpoint_.cluster()));
   }
-  if (!Http::Utility::Url().initialize(proto_config.authorization_endpoint(),
-                                       /*is_connect_request=*/false)) {
+  if (!authorization_endpoint_url_.initialize(authorization_endpoint_,
+                                              /*is_connect_request=*/false)) {
     throw EnvoyException(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
@@ -333,22 +342,15 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     const std::string escaped_redirect_uri =
         Http::Utility::PercentEncoding::encode(redirect_uri, ":/=&?");
 
-    Http::Utility::Url authorization_endpoint;
-    // ASSERT is safe because the constructor throws an exception if the authorization endpoint is
-    // not a valid URL.
-    ASSERT(authorization_endpoint.initialize(config_->authorizationEndpoint(),
-                                             /*is_connect_request=*/false));
-    auto query_params =
-        Http::Utility::parseQueryString(authorization_endpoint.pathAndQueryParams());
-    query_params["client_id"] = config_->clientId();
+    auto query_params = config_->authorizationQueryParams();
     query_params["redirect_uri"] = escaped_redirect_uri;
     query_params["response_type"] = "code";
-    query_params["scope"] = config_->encodedAuthScopes();
     query_params["state"] = escaped_state;
     const std::string path_and_query_params = Http::Utility::replaceQueryString(
-        Http::HeaderString(authorization_endpoint.pathAndQueryParams()), query_params);
+        Http::HeaderString(config_->authorizationEndpointPathAndQueryParams()), query_params);
     const std::string new_url =
-        absl::StrCat(authorization_endpoint.scheme(), "://", authorization_endpoint.hostAndPort(),
+        absl::StrCat(config_->authorizationEndpointScheme(), "://", 
+                     config_->authorizationEndpointHostAndPort(),
                      path_and_query_params, config_->encodedResourceQueryParams());
 
     response_headers->setLocation(new_url);

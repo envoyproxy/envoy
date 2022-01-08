@@ -144,9 +144,9 @@ namespace Utility {
 class Url {
 public:
   bool initialize(absl::string_view absolute_url, bool is_connect_request);
-  absl::string_view scheme() { return scheme_; }
-  absl::string_view hostAndPort() { return host_and_port_; }
-  absl::string_view pathAndQueryParams() { return path_and_query_params_; }
+  absl::string_view scheme() const { return scheme_; }
+  absl::string_view hostAndPort() const { return host_and_port_; }
+  absl::string_view pathAndQueryParams() const { return path_and_query_params_; }
 
 private:
   absl::string_view scheme_;

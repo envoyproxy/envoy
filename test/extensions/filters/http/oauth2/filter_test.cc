@@ -311,9 +311,6 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   test_config_ = std::make_shared<FilterConfig>(p, factory_context_.cluster_manager_, secret_reader,
                                                 scope_, "test.");
 
-  // Auth_scopes was not set, should return default value.
-  EXPECT_EQ(test_config_->encodedAuthScopes(), TEST_DEFAULT_SCOPE);
-
   // resource is optional
   EXPECT_EQ(test_config_->encodedResourceQueryParams(), "");
 
