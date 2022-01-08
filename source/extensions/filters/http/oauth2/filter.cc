@@ -124,7 +124,7 @@ Http::Utility::QueryParams buildAutorizationQueryParams(
   auto query_params = Http::Utility::parseQueryString(proto_config.authorization_endpoint());
   query_params["client_id"] = proto_config.credentials().client_id();
   query_params["scope"] = Http::Utility::PercentEncoding::encode(
-          absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
+      absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
   return query_params;
 }
 
@@ -348,10 +348,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     query_params["state"] = escaped_state;
     const std::string path_and_query_params = Http::Utility::replaceQueryString(
         Http::HeaderString(config_->authorizationEndpointPathAndQueryParams()), query_params);
-    const std::string new_url =
-        absl::StrCat(config_->authorizationEndpointScheme(), "://", 
-                     config_->authorizationEndpointHostAndPort(),
-                     path_and_query_params, config_->encodedResourceQueryParams());
+    const std::string new_url = absl::StrCat(
+        config_->authorizationEndpointScheme(), "://", config_->authorizationEndpointHostAndPort(),
+        path_and_query_params, config_->encodedResourceQueryParams());
 
     response_headers->setLocation(new_url);
     decoder_callbacks_->encodeHeaders(std::move(response_headers), true, REDIRECT_FOR_CREDENTIALS);
