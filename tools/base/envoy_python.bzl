@@ -1,4 +1,5 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@base_pip3//:requirements.bzl", base_entry_point = "entry_point")
 
 def envoy_py_test(name, package, visibility, envoy_prefix = "@envoy"):
     filepath = "$(location %s//tools/testing:base_pytest_runner.py)" % envoy_prefix
@@ -71,3 +72,28 @@ def envoy_py_binary(
 
     if test:
         envoy_py_test(name, package, visibility, envoy_prefix = envoy_prefix)
+
+def envoy_entry_point(
+        name,
+        pkg,
+        main = "//tools/base:entry_point.py",
+        entry_point = base_entry_point,
+        script = None,
+        data = None,
+        args = None):
+    script = script or pkg
+    entry_point_name = "%s_entry_point" % name
+    native.alias(
+        name = entry_point_name,
+        actual = entry_point(
+            pkg = pkg,
+            script = script,
+        ),
+    )
+    py_binary(
+        name = name,
+        srcs = [main],
+        main = main,
+        args = ["$(location %s)" % entry_point_name] + args,
+        data = [entry_point_name] + data,
+    )
