@@ -123,6 +123,7 @@ Http::Utility::QueryParams buildAutorizationQueryParams(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) {
   auto query_params = Http::Utility::parseQueryString(proto_config.authorization_endpoint());
   query_params["client_id"] = proto_config.credentials().client_id();
+  query_params["response_type"] = "code";
   query_params["scope"] = Http::Utility::PercentEncoding::encode(
       absl::StrJoin(authScopesList(proto_config.auth_scopes()), " "), ":/=&? ");
   return query_params;
@@ -343,7 +344,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
     auto query_params = config_->authorizationQueryParams();
     query_params["redirect_uri"] = escaped_redirect_uri;
-    query_params["response_type"] = "code";
     query_params["state"] = escaped_state;
     const std::string path_and_query_params = Http::Utility::replaceQueryString(
         Http::HeaderString(config_->authorizationEndpointPathAndQueryParams()), query_params);
