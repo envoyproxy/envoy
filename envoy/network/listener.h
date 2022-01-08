@@ -107,7 +107,9 @@ public:
 
 using UdpListenerConfigOptRef = OptRef<UdpListenerConfig>;
 
+// Forward declare.
 class InternalListenerRegistry;
+
 /**
  * Configuration for an internal listener.
  */
@@ -115,6 +117,10 @@ class InternalListenerConfig {
 public:
   virtual ~InternalListenerConfig() = default;
 
+  /**
+   * @return InternalListenerRegistry& The internal registry of this internal listener config. The
+   *         registry outlives this listener config.
+   */
   virtual InternalListenerRegistry& internalListenerRegistry() PURE;
 };
 
@@ -475,7 +481,7 @@ public:
   virtual ~InternalListenerManager() = default;
 
   /**
-   * Return the internal listener callbacks binding the listener address.
+   * Return the internal listene binding the listener address.
    *
    * @param listen_address the internal address of the expected internal listener.
    */
@@ -486,22 +492,26 @@ public:
 using InternalListenerManagerOptRef =
     absl::optional<std::reference_wrapper<InternalListenerManager>>;
 
+// The thread local registry. 
 class LocalInternalListenerRegistry {
 public:
   virtual ~LocalInternalListenerRegistry() = default;
 
+  // Set the internal listener manager which maintains life of internal listeners. Called by connection handler.
   virtual void setInternalListenerManager(InternalListenerManager& internal_listener_manager) PURE;
 
+  // Get the internal listener manager to obtain a listener. Called by client connection factory.
   virtual Network::InternalListenerManagerOptRef getInternalListenerManager() PURE;
 };
 
-// The singleton interface of LocalInternalListenerRegistry accessor. The prod implementation is
-// thread local.
+// The central internal listener registry interface providing the thread local accessor.
 class InternalListenerRegistry {
 public:
   virtual ~InternalListenerRegistry() = default;
 
-  // This
+  /**
+   * @return The thread local registry.
+   */
   virtual LocalInternalListenerRegistry* getLocalRegistry() PURE;
 };
 

@@ -16,10 +16,6 @@ namespace InternalListener {
 class TlsInternalListenerRegistry : public Singleton::Instance,
                                     public Network::InternalListenerRegistry {
 public:
-  ~TlsInternalListenerRegistry() override {
-    ENVOY_LOG_MISC(debug, "lambdai: destroying TlsInternalListenerRegistry");
-  }
-
   Network::LocalInternalListenerRegistry* getLocalRegistry() override {
     if (auto opt = tls_slot_->get(); opt.has_value()) {
       return &opt.value().get();

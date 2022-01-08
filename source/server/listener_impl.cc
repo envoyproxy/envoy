@@ -8,8 +8,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/stats/scope.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stats/scope.h"
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"

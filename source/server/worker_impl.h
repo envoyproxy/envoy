@@ -8,8 +8,8 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/worker.h"
-#include "envoy/thread_local/thread_local.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
 #include "source/server/listener_hooks.h"

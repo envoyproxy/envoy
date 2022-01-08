@@ -1,8 +1,9 @@
 #include "source/extensions/io_socket/user_space/internal_listener_registry.h"
 
-#include "source/extensions/io_socket/user_space/client_connection_factory.h"
 #include "envoy/singleton/manager.h"
+
 #include "source/common/singleton/threadsafe_singleton.h"
+#include "source/extensions/io_socket/user_space/client_connection_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +21,7 @@ void InternalListenerExtension::onServerInitialized() {
   // save it in the singleton
   ASSERT(internal_listener_registry == tls_registry_);
   ASSERT(internal_listener_registry->tls_slot_ == nullptr);
-  
+
   tls_registry_->tls_slot_ =
       ThreadLocal::TypedSlot<Extensions::InternalListener::ThreadLocalRegistryImpl>::makeUnique(
           server_context_.threadLocal());

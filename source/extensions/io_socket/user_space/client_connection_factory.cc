@@ -32,7 +32,8 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
       source_address, std::move(transport_socket), options);
 
   if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
-    ENVOY_LOG_MISC(debug, "server has not initialized internal listener registry, close the connection");
+    ENVOY_LOG_MISC(debug,
+                   "server has not initialized internal listener registry, close the connection");
     io_handle_server->close();
     return client_conn;
   }
@@ -44,7 +45,7 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
     return client_conn;
   }
 
-  // The request internal listener may not exist.
+  // The requested internal listener is not available yet.
   auto internal_listener = internal_listener_manager.value().get().findByAddress(address);
   if (!internal_listener.has_value()) {
     io_handle_server->close();

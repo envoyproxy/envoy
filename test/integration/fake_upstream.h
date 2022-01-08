@@ -21,7 +21,6 @@
 #include "source/common/common/basic_resource_impl.h"
 #include "source/common/common/callback_impl.h"
 #include "source/common/common/linked_object.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
@@ -35,6 +34,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #if defined(ENVOY_ENABLE_QUIC)

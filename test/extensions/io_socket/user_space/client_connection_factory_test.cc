@@ -8,8 +8,8 @@
 #include "source/extensions/io_socket/user_space/client_connection_factory.h"
 #include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
-#include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/container/fixed_array.h"
@@ -71,8 +71,6 @@ public:
   MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr &&));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
-
-
 
 TEST_F(ClientConnectionFactoryTest, ConnectFailsIfInternalConnectionManagerNotExist) {
   auto client_conn = dispatcher_->createClientConnection(

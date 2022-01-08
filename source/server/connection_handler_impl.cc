@@ -3,17 +3,17 @@
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/network/filter.h"
 #include "envoy/network/client_connection_factory.h"
+#include "envoy/network/filter.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/event/deferred_task.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/server/active_internal_listener.h"
 #include "source/server/active_tcp_listener.h"
-#include "envoy/singleton/manager.h"
-#include "source/common/network/address_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -44,9 +44,8 @@ void ConnectionHandlerImpl::addListener(absl::optional<uint64_t> overridden_list
 
   ActiveListenerDetails details;
   if (config.internalListenerConfig().has_value()) {
-    // Link this ConnectionHandlerImpl to the thread local. Ideally this should be done during the
-    // initialization of ConnectionHandlerImpl. We move it here because the thread local object is
-    // not yet ready.
+    // Ensure the this ConnectionHandlerImpl link to the thread local registry. Ideally this step
+    // should be done only once. However, an extra phase and interface is overkill.
     Network::InternalListenerRegistry& internal_listener_registry =
         config.internalListenerConfig()->internalListenerRegistry();
     Network::LocalInternalListenerRegistry* local_registry =

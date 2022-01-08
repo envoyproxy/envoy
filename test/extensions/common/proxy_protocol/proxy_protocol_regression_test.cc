@@ -5,10 +5,10 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 #include "source/server/connection_handler_impl.h"
-#include "source/common/singleton/manager_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -44,8 +44,7 @@ public:
         dispatcher_(api_->allocateDispatcher("test_thread")),
         socket_(std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
             Network::Test::getCanonicalLoopbackAddress(GetParam()))),
-        connection_handler_(
-            new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, absl::nullopt)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()),
         init_manager_(nullptr) {
     EXPECT_CALL(socket_factory_, socketType()).WillOnce(Return(Network::Socket::Type::Stream));

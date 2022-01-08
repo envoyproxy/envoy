@@ -7,17 +7,17 @@
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/api/api_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/api/api_impl.h"
-#include "source/common/singleton/manager_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/network/udp_listener_impl.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/server/active_raw_udp_listener_config.h"
 #include "source/server/connection_handler_impl.h"
 
@@ -117,18 +117,18 @@ public:
       }
 
       class MockLocalInternalListenerRegistry : public Network::LocalInternalListenerRegistry {
-public :
-    void
-      setInternalListenerManager(Network::InternalListenerManager& internal_listener_manager) override {
-        manager_ = &internal_listener_manager;
-      }
-
-      Network::InternalListenerManagerOptRef getInternalListenerManager() override {
-        if (manager_ == nullptr) {
-          return Network::InternalListenerManagerOptRef();
+      public:
+        void setInternalListenerManager(
+            Network::InternalListenerManager& internal_listener_manager) override {
+          manager_ = &internal_listener_manager;
         }
-        return Network::InternalListenerManagerOptRef(*manager_);
-      }
+
+        Network::InternalListenerManagerOptRef getInternalListenerManager() override {
+          if (manager_ == nullptr) {
+            return Network::InternalListenerManagerOptRef();
+          }
+          return Network::InternalListenerManagerOptRef(*manager_);
+        }
 
       private:
         // A thread unsafe internal listener manager.

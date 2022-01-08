@@ -73,13 +73,20 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "connection_lib",
+    deps = [
+        ":connection_impl",
+        ":default_client_connection_factory",
+    ],
+)
+
+envoy_cc_library(
+    name = "connection_impl",
     srcs = ["connection_impl.cc"],
     hdrs = ["connection_impl.h"],
     external_deps = ["abseil_optional"],
     deps = [
         ":address_lib",
         ":connection_base_lib",
-        ":default_client_connection_factory",
         ":raw_buffer_socket_lib",
         ":utility_lib",
         "//envoy/event:timer_interface",
@@ -115,21 +122,16 @@ envoy_cc_library(
         "default_client_connection_factory.cc",
     ],
     hdrs = [
-        "connection_impl.h",
         "default_client_connection_factory.h",
     ],
     deps = [
         ":address_lib",
+        ":connection_base_lib",
+        ":connection_impl",
         "//envoy/network:client_connection_factory",
         "//envoy/network:connection_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/registry",
-
-        # required by connection_impl.h
-        # will organize below when default client factory is confirmed to use dedicated target.
-        "//source/common/buffer:watermark_buffer_lib",
-        ":connection_base_lib",
-        "//source/common/stream_info:stream_info_lib",
     ],
 )
 

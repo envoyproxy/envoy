@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/thread_local/thread_local_object.h"
 #include "envoy/network/listener.h"
+#include "envoy/thread_local/thread_local_object.h"
 
 namespace Envoy {
 namespace Extensions {
